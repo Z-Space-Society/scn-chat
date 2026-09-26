@@ -4,10 +4,13 @@
   "defs": {
     "main": {
       "type": "space",
-      "description": "The user's personal chat settings.",
+      "description": "The user's chat preferences and conversation index.",
       "key": "literal:self",
       "name": "Chat settings",
-      "collections": ["network.sharedcomputer.chat.preferences"]
+      "collections": [
+        "network.sharedcomputer.chat.preferences",
+        "network.sharedcomputer.chat.conversationRef"
+      ]
     }
   }
 }

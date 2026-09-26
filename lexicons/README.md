@@ -7,9 +7,11 @@ SCN Chat's record types use the `network.sharedcomputer.chat` domain. Each conve
 | Space type | Key | Holds |
 |---|---|---|
 | `conversation` | TID | `info`, `message` |
-| `settings` | `self` | `preferences` |
+| `settings` | `self` | `preferences`, `conversationRef` |
 
 Each conversation's URI is `at://{ownerDid}/space/network.sharedcomputer.chat.conversation/{tid}`. Sharing is done via the space's read policy.
+
+Each conversation has a `conversationRef` in the settings space. This is the user's chat index. The title in the conversation's `info` record is authoritative, and the entry contains a copy for the listing.
 
 The system prompt for a conversation is built from the user's custom instructions followed by the conversation system prompt.
 
@@ -18,6 +20,8 @@ The system prompt for a conversation is built from the user's custom instruction
 A conversation can be held by writing records directly to the PDS without interacting with an appview.
 
 - Write a `message` with `role: "user"`, a TID key, and a `generation` object to ask for a reply. Messages without `generation` won't trigger a reply.
+- After changing a conversation, put its `conversationRef` with a new `updatedAt`. Its record key is the conversation's space key. The app watches the chat index, so this is how it notices the change.
+- A client can call `network.sharedcomputer.chat.requestSync` on the app with service auth from its PDS, to have the app sync immediately. Minting that token needs an `rpc:network.sharedcomputer.chat.requestSync` permission for the app's DID in the client's own OAuth scope.
 - The reply is written with the key `{userMessageKey}.r{attempt}`, where `attempt` comes from the `generation` object and defaults to 0.
 - To regenerate, update the user message with `attempt` raised by one. Earlier replies stay as siblings. Order them by attempt number, since `.r10` sorts before `.r2`.
 - When the app picks up a turn, it first writes the reply with `status: "pending"` and empty content, then updates it when generation ends. The write fails if the key already exists, so only one generation runs per attempt.

@@ -1,0 +1,25 @@
+{
+  "lexicon": 1,
+  "id": "network.sharedcomputer.chat.requestSync",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Trigger a sync of the caller's chats from their PDS, and reply to any pending generation requests.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "conversation": {
+              "type": "string",
+              "format": "space-ref",
+              "maxLength": 1024,
+              "description": "A conversation's space URI."
+            }
+          }
+        }
+      },
+      "errors": [{ "name": "UnknownConversation" }]
+    }
+  }
+}

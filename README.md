@@ -21,7 +21,7 @@ Phase 1:
 - Image attachments for vision models
 - PDF text extraction
 - Automatic chat titles
-- Chat search
+- Chat history search
 - User and admin model configuration
 
 Future:

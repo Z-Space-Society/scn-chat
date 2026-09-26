@@ -32,7 +32,10 @@
           "spaceType": "network.sharedcomputer.chat.settings",
           "authority": "self",
           "skey": "self",
-          "collection": ["network.sharedcomputer.chat.preferences"],
+          "collection": [
+            "network.sharedcomputer.chat.preferences",
+            "network.sharedcomputer.chat.conversationRef"
+          ],
           "action": ["read", "create", "update", "delete"],
           "manage": ["create", "update", "delete"]
         },

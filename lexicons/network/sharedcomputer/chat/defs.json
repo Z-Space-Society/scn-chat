@@ -15,6 +15,11 @@
         "id": { "type": "string", "maxLength": 256 }
       }
     },
+    "providerData": {
+      "type": "string",
+      "maxLength": 100000,
+      "description": "JSON-encoded provider options for this part, such as reasoning signatures. Sent back unchanged when continuing with the same provider."
+    },
     "effort": {
       "type": "string",
       "description": "The model's reasoning effort.",
@@ -87,18 +92,15 @@
       "type": "object",
       "required": ["text"],
       "properties": {
-        "text": { "type": "string", "maxLength": 500000 }
+        "text": { "type": "string", "maxLength": 500000 },
+        "providerData": { "type": "ref", "ref": "#providerData" }
       }
     },
     "reasoningPart": {
       "type": "object",
       "properties": {
         "text": { "type": "string", "maxLength": 500000 },
-        "signature": {
-          "type": "string",
-          "maxLength": 100000,
-          "description": "Token that some providers issue with their reasoning. Sent back unchanged when continuing with the same provider."
-        }
+        "providerData": { "type": "ref", "ref": "#providerData" }
       }
     },
     "imagePart": {
@@ -141,7 +143,8 @@
           "type": "string",
           "maxLength": 200000,
           "description": "JSON-encoded arguments."
-        }
+        },
+        "providerData": { "type": "ref", "ref": "#providerData" }
       }
     },
     "toolResultPart": {
@@ -153,6 +156,12 @@
           "type": "string",
           "maxLength": 500000,
           "description": "Tool output as text or JSON-encoded data."
+        },
+        "outputBlob": {
+          "type": "blob",
+          "accept": ["*/*"],
+          "maxSize": 50000000,
+          "description": "Used when the output is too long for the output record. Output will contain a summary in that case."
         },
         "isError": { "type": "boolean", "default": false }
       }

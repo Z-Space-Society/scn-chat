@@ -1,0 +1,41 @@
+{
+  "lexicon": 1,
+  "id": "network.sharedcomputer.chat.conversationRef",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "The conversation index, stored in the user's settings space. Its record key is the conversation's space key. Clients must update it whenever they change the conversation.",
+      "key": "tid",
+      "record": {
+        "type": "object",
+        "required": ["conversation", "updatedAt"],
+        "properties": {
+          "conversation": {
+            "type": "string",
+            "format": "space-ref",
+            "maxLength": 1024,
+            "description": "The conversation's space URI."
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 3000,
+            "maxGraphemes": 300,
+            "description": "Copy of the title in the conversation's info record."
+          },
+          "tags": {
+            "type": "array",
+            "description": "The user's tags for organizing their chats.",
+            "maxLength": 32,
+            "items": { "type": "string", "maxLength": 640, "maxGraphemes": 64 }
+          },
+          "sealed": {
+            "type": "ref",
+            "ref": "network.sharedcomputer.chat.defs#encryptedContent",
+            "description": "When the conversation is encrypted, holds title and tags. Those fields are then left out of the record."
+          },
+          "updatedAt": { "type": "string", "format": "datetime" }
+        }
+      }
+    }
+  }
+}
