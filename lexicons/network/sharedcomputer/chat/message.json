@@ -1,0 +1,53 @@
+{
+  "lexicon": 1,
+  "id": "network.sharedcomputer.chat.message",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "One turn in a conversation. A reply uses its parent's key plus '.r' and the generation attempt, e.g. '.r0', '.r1'.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": ["role", "content", "createdAt"],
+        "properties": {
+          "role": { "type": "string", "knownValues": ["user", "assistant"] },
+          "parent": {
+            "type": "string",
+            "format": "record-key",
+            "description": "The key of the previous message. Siblings are edits or regenerations."
+          },
+          "content": {
+            "type": "union",
+            "refs": [
+              "network.sharedcomputer.chat.defs#plainContent",
+              "network.sharedcomputer.chat.defs#encryptedContent"
+            ]
+          },
+          "generation": {
+            "type": "ref",
+            "ref": "network.sharedcomputer.chat.defs#generationRequest",
+            "description": "Asks the assistant to reply (user message)."
+          },
+          "model": {
+            "type": "ref",
+            "ref": "network.sharedcomputer.chat.defs#modelRef",
+            "description": "The model that generated the response (assistant message)."
+          },
+          "effort": {
+            "type": "ref",
+            "ref": "network.sharedcomputer.chat.defs#effort",
+            "description": "The reasoning effort (assistant message)."
+          },
+          "status": {
+            "type": "string",
+            "description": "Generation completion status (assistant message).",
+            "knownValues": ["pending", "complete", "error", "cancelled"]
+          },
+          "error": { "type": "string", "maxLength": 3000 },
+          "usage": { "type": "ref", "ref": "network.sharedcomputer.chat.defs#usage" },
+          "createdAt": { "type": "string", "format": "datetime" }
+        }
+      }
+    }
+  }
+}

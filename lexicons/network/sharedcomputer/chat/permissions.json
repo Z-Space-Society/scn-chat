@@ -1,0 +1,47 @@
+{
+  "lexicon": 1,
+  "id": "network.sharedcomputer.chat.permissions",
+  "defs": {
+    "main": {
+      "type": "permission-set",
+      "title": "Chat",
+      "detail": "Create and manage chats and settings. Read shared chats.",
+      "permissions": [
+        {
+          "type": "permission",
+          "resource": "space",
+          "spaceType": "network.sharedcomputer.chat.conversation",
+          "authority": "self",
+          "collection": [
+            "network.sharedcomputer.chat.info",
+            "network.sharedcomputer.chat.message"
+          ],
+          "action": ["read", "create", "update", "delete"],
+          "manage": ["create", "update", "delete"]
+        },
+        {
+          "type": "permission",
+          "resource": "space",
+          "spaceType": "network.sharedcomputer.chat.conversation",
+          "authority": "*",
+          "action": ["read"]
+        },
+        {
+          "type": "permission",
+          "resource": "space",
+          "spaceType": "network.sharedcomputer.chat.settings",
+          "authority": "self",
+          "skey": "self",
+          "collection": ["network.sharedcomputer.chat.preferences"],
+          "action": ["read", "create", "update", "delete"],
+          "manage": ["create", "update", "delete"]
+        },
+        {
+          "type": "permission",
+          "resource": "blob",
+          "accept": ["*/*"]
+        }
+      ]
+    }
+  }
+}

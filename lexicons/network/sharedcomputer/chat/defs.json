@@ -1,0 +1,178 @@
+{
+  "lexicon": 1,
+  "id": "network.sharedcomputer.chat.defs",
+  "defs": {
+    "modelRef": {
+      "type": "object",
+      "description": "The model being used. API keys are stored in the app database.",
+      "required": ["provider", "id"],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "maxLength": 128,
+          "knownValues": ["anthropic", "openai", "google", "openrouter", "cocore"]
+        },
+        "id": { "type": "string", "maxLength": 256 }
+      }
+    },
+    "effort": {
+      "type": "string",
+      "description": "The model's reasoning effort.",
+      "knownValues": ["none", "low", "medium", "high", "max"]
+    },
+    "generationRequest": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "type": "ref",
+          "ref": "#modelRef",
+          "description": "Model used in generating the response. If empty falls back to previous response model, then the user's default."
+        },
+        "effort": { "type": "ref", "ref": "#effort" },
+        "attempt": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000,
+          "default": 0,
+          "description": "The reply is written as '{messageKey}.r{attempt}'. Increase by 1 to ask for a regeneration."
+        },
+        "tools": {
+          "type": "array",
+          "maxLength": 64,
+          "items": { "type": "string", "maxLength": 128 },
+          "description": "Ids for the tools the assistant may use for this turn."
+        }
+      }
+    },
+    "plainContent": {
+      "type": "object",
+      "required": ["parts"],
+      "properties": {
+        "parts": {
+          "type": "array",
+          "maxLength": 1000,
+          "items": {
+            "type": "union",
+            "refs": [
+              "#textPart",
+              "#reasoningPart",
+              "#imagePart",
+              "#filePart",
+              "#toolCallPart",
+              "#toolResultPart",
+              "#sourcePart"
+            ]
+          }
+        }
+      }
+    },
+    "encryptedContent": {
+      "type": "object",
+      "description": "A sealed plainContent, or the sealed fields of the enclosing record. All user content is sealed, metadata stays in the clear.",
+      "required": ["scheme", "keyId", "nonce", "ciphertext"],
+      "properties": {
+        "scheme": { "type": "string", "maxLength": 128 },
+        "keyId": { "type": "string", "maxLength": 128 },
+        "nonce": { "type": "bytes", "maxLength": 64 },
+        "ciphertext": { "type": "bytes", "maxLength": 1000000 },
+        "blobs": {
+          "type": "array",
+          "maxLength": 100,
+          "items": { "type": "blob" },
+          "description": "Encrypted blobs referenced inside the ciphertext, listed so the PDS keeps them."
+        }
+      }
+    },
+    "textPart": {
+      "type": "object",
+      "required": ["text"],
+      "properties": {
+        "text": { "type": "string", "maxLength": 500000 }
+      }
+    },
+    "reasoningPart": {
+      "type": "object",
+      "properties": {
+        "text": { "type": "string", "maxLength": 500000 },
+        "signature": {
+          "type": "string",
+          "maxLength": 100000,
+          "description": "Token that some providers issue with their reasoning. Sent back unchanged when continuing with the same provider."
+        }
+      }
+    },
+    "imagePart": {
+      "type": "object",
+      "required": ["image"],
+      "properties": {
+        "image": {
+          "type": "blob",
+          "accept": ["image/png", "image/jpeg", "image/webp", "image/gif"],
+          "maxSize": 20000000
+        },
+        "alt": { "type": "string", "maxLength": 10000, "maxGraphemes": 1000 }
+      }
+    },
+    "filePart": {
+      "type": "object",
+      "required": ["file"],
+      "properties": {
+        "file": { "type": "blob", "accept": ["*/*"], "maxSize": 50000000 },
+        "name": { "type": "string", "maxLength": 1024 },
+        "extracted": { "type": "ref", "ref": "#extractedText" }
+      }
+    },
+    "extractedText": {
+      "type": "object",
+      "description": "Cache for text pulled from a file.",
+      "required": ["text", "method"],
+      "properties": {
+        "text": { "type": "blob", "accept": ["text/plain"], "maxSize": 20000000 },
+        "method": { "type": "string", "knownValues": ["text", "ocr"] }
+      }
+    },
+    "toolCallPart": {
+      "type": "object",
+      "required": ["callId", "tool", "input"],
+      "properties": {
+        "callId": { "type": "string", "maxLength": 256 },
+        "tool": { "type": "string", "maxLength": 128 },
+        "input": {
+          "type": "string",
+          "maxLength": 200000,
+          "description": "JSON-encoded arguments."
+        }
+      }
+    },
+    "toolResultPart": {
+      "type": "object",
+      "required": ["callId", "output"],
+      "properties": {
+        "callId": { "type": "string", "maxLength": 256 },
+        "output": {
+          "type": "string",
+          "maxLength": 500000,
+          "description": "Tool output as text or JSON-encoded data."
+        },
+        "isError": { "type": "boolean", "default": false }
+      }
+    },
+    "sourcePart": {
+      "type": "object",
+      "description": "URL source cited by the assistant.",
+      "required": ["url"],
+      "properties": {
+        "url": { "type": "string", "format": "uri" },
+        "title": { "type": "string", "maxLength": 3000, "maxGraphemes": 300 }
+      }
+    },
+    "usage": {
+      "type": "object",
+      "properties": {
+        "inputTokens": { "type": "integer", "minimum": 0 },
+        "outputTokens": { "type": "integer", "minimum": 0 },
+        "reasoningTokens": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

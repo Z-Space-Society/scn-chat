@@ -1,0 +1,13 @@
+{
+  "lexicon": 1,
+  "id": "network.sharedcomputer.chat.settings",
+  "defs": {
+    "main": {
+      "type": "space",
+      "description": "The user's personal chat settings.",
+      "key": "literal:self",
+      "name": "Chat settings",
+      "collections": ["network.sharedcomputer.chat.preferences"]
+    }
+  }
+}

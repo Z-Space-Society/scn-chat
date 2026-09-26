@@ -1,0 +1,36 @@
+{
+  "lexicon": 1,
+  "id": "network.sharedcomputer.chat.info",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "Title, tags, and defaults for a conversation.",
+      "key": "literal:self",
+      "record": {
+        "type": "object",
+        "required": ["createdAt"],
+        "properties": {
+          "title": { "type": "string", "maxLength": 3000, "maxGraphemes": 300 },
+          "titleSource": {
+            "type": "string",
+            "description": "How the title was created: by the user or auto-generated. Apps must not replace a title set by the user.",
+            "knownValues": ["user", "generated"]
+          },
+          "tags": {
+            "type": "array",
+            "maxLength": 32,
+            "items": { "type": "string", "maxLength": 640, "maxGraphemes": 64 },
+            "description": "Taxonomy terms to label a conversation with."
+          },
+          "systemPrompt": { "type": "string", "maxLength": 100000 },
+          "sealed": {
+            "type": "ref",
+            "ref": "network.sharedcomputer.chat.defs#encryptedContent",
+            "description": "When encrypted, holds title, tags, and the systemPrompt. Those fields are then left out of the record."
+          },
+          "createdAt": { "type": "string", "format": "datetime" }
+        }
+      }
+    }
+  }
+}

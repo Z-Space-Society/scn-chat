@@ -1,0 +1,24 @@
+{
+  "lexicon": 1,
+  "id": "network.sharedcomputer.chat.preferences",
+  "defs": {
+    "main": {
+      "type": "record",
+      "key": "literal:self",
+      "record": {
+        "type": "object",
+        "properties": {
+          "defaultModel": { "type": "ref", "ref": "network.sharedcomputer.chat.defs#modelRef" },
+          "defaultEffort": { "type": "ref", "ref": "network.sharedcomputer.chat.defs#effort" },
+          "customInstructions": {
+            "type": "string",
+            "maxLength": 100000,
+            "description": "Added to the system prompt for each conversation."
+          },
+          "generateTitles": { "type": "boolean", "default": true },
+          "updatedAt": { "type": "string", "format": "datetime" }
+        }
+      }
+    }
+  }
+}
