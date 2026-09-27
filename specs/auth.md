@@ -23,7 +23,7 @@ The OAuth state and session stores are `oauth_state` and `oauth_session` tables,
 
 The requested scope is `atproto include:network.sharedcomputer.chat.permissions`, with the permission set NSID taken from the lexicon module, never typed as a literal. The permission set grants the conversation, shared-read, settings, and blob permissions. The PDS resolves it through the lexicon's DNS record, so the lexicons must be published under `sharedcomputer.network` before anyone can log in. A fork publishes its own lexicons under its own domain.
 
-For local development against a PDS that cannot resolve the published permission set, `OAUTH_SCOPE_MODE=raw` requests the equivalent raw scopes instead, built from the same lexicon module: `space:` scopes for the conversation, shared-read, and settings permissions with every collection listed, plus `blob:*/*`. The default is `permission-set`, and production startup refuses `raw`.
+Before the lexicons are published, setting `auth.scopeMode` to `raw` lets a PDS without spaces sign users in, for testing the local fallback. It requests the equivalent raw scopes instead, built from the same lexicon module: `space:` scopes for the conversation, shared-read, and settings permissions with every collection listed, plus `blob:*/*`. The default is `permission-set`, and production startup refuses `raw`.
 
 ### Login
 
@@ -45,7 +45,7 @@ The `account` table holds the DID, current handle, PDS URL, storage mode (`space
 
 ### Web sessions
 
-The browser gets an `scn_session` cookie holding 32 random bytes, base64url encoded. It is `HttpOnly`, `SameSite=Lax`, `Path=/`, and `Secure` whenever `PUBLIC_URL` is HTTPS. The `web_session` table stores the token's SHA-256 hash, the DID, and creation and expiry times. Sessions last `SESSION_TTL_DAYS`, default 30, and are extended when used in the last half of their life.
+The browser gets an `scn_session` cookie holding 32 random bytes, base64url encoded. It is `HttpOnly`, `SameSite=Lax`, `Path=/`, and `Secure` whenever `PUBLIC_URL` is HTTPS. The `web_session` table stores the token's SHA-256 hash, the DID, and creation and expiry times. Sessions last `auth.sessionTtlDays` days, default 30, and are extended when used in the last half of their life.
 
 Hono middleware resolves the cookie to the account on every `/api` request. Routes that need a user return 401 without one.
 
@@ -65,13 +65,12 @@ It calls `client.restore(did)` and wraps the session in `@atproto/lex-client`'s 
 
 Roles decide what a user may do beyond using their own API keys. In phase 1 they only gate admin models, as the providers spec describes.
 
-Roles are defined in `scn-chat.config.ts`:
+Roles are defined in `config.yml`:
 
-```ts
-roles: {
-  staff: ['did:plc:abc...', 'did:plc:def...'],
-  beta: ['did:plc:ghi...'],
-}
+```yaml
+roles:
+  staff: ['did:plc:abc...', 'did:plc:def...']
+  beta: ['did:plc:ghi...']
 ```
 
 - Every signed-in user has the implicit `user` role. The name `user` cannot be defined in the config.
@@ -95,11 +94,19 @@ roles: {
 
 ### Configuration
 
+Public settings, in `config.yml`:
+
+| Setting | Override | Purpose |
+|---|---|---|
+| `auth.scopeMode` | `OAUTH_SCOPE_MODE` | `permission-set` (default) or `raw`, for local development only. |
+| `auth.sessionTtlDays` | `SESSION_TTL_DAYS` | Web session lifetime. Default 30. |
+| `auth.plcUrl` | `PLC_URL` | The PLC directory. Default `https://plc.directory`. |
+
+Secrets, in `.env`:
+
 | Variable | Purpose |
 |---|---|
 | `OAUTH_PRIVATE_KEYS` | JSON array of ES256 private JWKs, each with a `kid`. Required in production. |
-| `OAUTH_SCOPE_MODE` | `permission-set` (default) or `raw`, for local development only. |
-| `SESSION_TTL_DAYS` | Web session lifetime. Default 30. |
 
 A `pnpm keys` script prints a fresh `OAUTH_PRIVATE_KEYS` value and a `SECRET_KEY` for the providers spec.
 
@@ -117,6 +124,12 @@ A `pnpm keys` script prints a fresh `OAUTH_PRIVATE_KEYS` value and a `SECRET_KEY
 - A spaces account that loses spaces support fails login loudly instead of falling back to local storage.
 - Loopback development uses a public client, because atproto OAuth does not allow confidential loopback clients.
 - **To verify during implementation:** that a PDS without spaces accepts the permission set and skips its space permissions, as the research into the alpha source suggests.
+- Verified against the alpha PDS: its consent screen resolves the lexicon of every space type in the scope, for raw `space:` scopes as well as the permission set, and refuses the request with `invalid_scope` ("Unable to retrieve space declarations") when it cannot. A spaces PDS therefore needs the lexicons published in either scope mode.
+- Spaces support is checked after resolving `self` authorities in the granted scope to the user's DID, since `ScopePermissions` does not resolve them itself.
+- Login calls an `onLogin` hook, which creates the settings space and, for spaces users, registers for notifications, runs discovery, and syncs the index in the background. A failure is logged and does not block the login.
+- A handle is stored only when it resolves back to the same DID.
+- `JoseKey` comes from `@atproto/oauth-client-node`'s re-export, so key types cannot come from two package versions.
+- In development `PUBLIC_URL` is the Vite dev server, which proxies the server routes, so the OAuth callback returns to the web app.
 
 ## Acceptance Criteria
 
@@ -125,7 +138,7 @@ A `pnpm keys` script prints a fresh `OAUTH_PRIVATE_KEYS` value and a `SECRET_KEY
 - [ ] Production startup fails without valid `OAUTH_PRIVATE_KEYS` or with a non-HTTPS `PUBLIC_URL`.
 - [ ] The requested scope includes the permission set, with its NSID taken from the lexicon module.
 - [ ] An `invalid_scope` error from the PDS is shown on the login page.
-- [ ] `OAUTH_SCOPE_MODE=raw` requests raw space and blob scopes equivalent to the permission set, and production startup refuses it.
+- [ ] `auth.scopeMode: raw` requests raw space and blob scopes equivalent to the permission set, and production startup refuses it.
 - [ ] A new account whose granted scope allows spaces gets storage mode `space`.
 - [ ] A new account whose granted scope lacks spaces gets storage mode `local`.
 - [ ] A `space` account whose granted scope lacks spaces fails login with an explanation.
@@ -138,7 +151,3 @@ A `pnpm keys` script prints a fresh `OAUTH_PRIVATE_KEYS` value and a `SECRET_KEY
 - [ ] `rolesFor` returns `user` plus every configured role that lists the DID.
 - [ ] A config defining a role named `user`, an invalid role name, or an invalid DID fails startup, naming it.
 - [ ] `GET /api/me` includes the user's roles.
-
-## Files
-
-- (to be populated during implementation)

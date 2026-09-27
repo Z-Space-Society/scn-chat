@@ -1,0 +1,5 @@
+{
+  "name": "noexport-plugin",
+  "type": "module",
+  "exports": "./index.ts"
+}

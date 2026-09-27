@@ -35,9 +35,33 @@ Future:
 - MCP servers as tools
 - Browser and push notifications, and an installable PWA
 
+## Getting started
+
+### Requirements:
+ - Node 22.18 or newer (Node 24 is recommended)
+ - pnpm 10
+ - An ATProto account to sign in with.
+ - A spaces enabled PDS (currently optional)
+
+### Setup
+ 1. Install dependencies: `pnpm install`
+ 2. `cp .env.example .env`
+ 3. Run `pnpm keys` to generate secret keys. Copy `OAUTH_PRIVATE_KEYS` and `SECRET_KEY` into your `.env`.
+ 4. Set your AI inference provider API keys.
+ 5. Copy config.example.yml to config.yml. The defaults are setup for local development.
+ 6. Configure your supported AI models.
+
+### Start the app
+
+ 1. Run `pnpm dev`
+ 2. Open http://127.0.0.1:5173 and sign in with your ATProto handle.
+
 ## Extending
 
 Model providers, tools, file ingesters, and turn hooks are all plugins, so anyone can build their own integration.
+See:
+ - [docs/architecture.md](docs/architecture.md)
+ - [docs/plugins.md](docs/plugins.md)
 
 ## License
 

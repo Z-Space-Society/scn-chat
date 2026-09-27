@@ -1,0 +1,18 @@
+.layout {
+  display: flex;
+  gap: 1rem;
+  min-height: 100vh;
+}
+.chat-list {
+  flex: 0 0 16rem;
+}
+.layout > main {
+  flex: 1;
+  min-width: 0;
+}
+.text {
+  white-space: pre-wrap;
+}
+img {
+  max-width: 100%;
+}

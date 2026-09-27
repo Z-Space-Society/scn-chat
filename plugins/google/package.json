@@ -1,0 +1,15 @@
+{
+  "name": "@scn-chat/plugin-google",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@ai-sdk/google": "4.0.82",
+    "@scn-chat/plugin-api": "workspace:*",
+    "zod": "4.6.5"
+  }
+}

@@ -64,6 +64,8 @@ The conversation view has a share control showing the mode and members, with a c
 - Switching to public keeps the member list, so switching back does not lose it.
 - Refused, missing, and deleted conversations all return 404.
 - A conversation owned by a user of a different app can be viewed too, as long as its space is a conversation space the viewer can read.
+- Shared attachments are served from `GET /api/shared/:ownerDid/:skey/blobs/:cid`.
+- The share mode is read back as public when the read policy is public, people when there are read members, and private otherwise.
 
 ## Acceptance Criteria
 
@@ -82,7 +84,3 @@ The conversation view has a share control showing the mode and members, with a c
 - [ ] After access is revoked, the viewer's next request returns 404.
 - [ ] Attachments in a shared conversation load through the viewer's credential.
 - [ ] The shared view's response has no system prompt.
-
-## Files
-
-- (to be populated during implementation)

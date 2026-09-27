@@ -1,0 +1,91 @@
+{
+  "name": "scn-chat",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @scn-chat/server --filter @scn-chat/web dev",
+    "build": "pnpm --filter @scn-chat/web build",
+    "start": "pnpm --filter @scn-chat/server start",
+    "test": "vitest run",
+    "typecheck": "pnpm -r --parallel typecheck",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "check": "pnpm lint && pnpm typecheck && pnpm test",
+    "codegen": "pnpm --filter @scn-chat/lexicons codegen",
+    "publish-lexicons": "pnpm --filter @scn-chat/lexicons publish-lexicons",
+    "migrate": "pnpm --filter @scn-chat/server migrate",
+    "keys": "pnpm --filter @scn-chat/server keys"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.14",
+    "@types/node": "24.19.0",
+    "typescript": "7.0.2",
+    "vitest": "5.0.2"
+  },
+  "pnpm": {
+    "overrides": {
+      "@atproto/api": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/aws": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/bsky": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/bsync": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/car": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/common": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/common-web": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/crypto": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/dev-env": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/did": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/identity": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/lex": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/lex-builder": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/lex-cbor": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/lex-cli": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/lex-client": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/lex-data": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/lex-document": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/lex-installer": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/lex-json": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/lex-password-session": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/lex-resolver": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/lex-schema": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/lex-server": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/lexicon": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/lexicon-resolver": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/oauth-client": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/oauth-client-browser": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/oauth-client-browser-example": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/oauth-client-expo": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/oauth-client-node": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/oauth-provider": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/oauth-provider-api": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/oauth-provider-ui": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/oauth-scopes": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/oauth-types": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/ozone": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/pds": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/repo": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/space": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/sync": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/syntax": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/tap": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/xrpc": "0.0.0-spaces-alpha-20260915165437",
+      "@atproto/xrpc-server": "0.0.0-spaces-alpha-20260915165437"
+    },
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild"
+    ]
+  },
+  "dependencies": {
+    "@scn-chat/plugin-anthropic": "workspace:*",
+    "@scn-chat/plugin-api": "workspace:*",
+    "@scn-chat/plugin-google": "workspace:*",
+    "@scn-chat/plugin-openai": "workspace:*",
+    "@scn-chat/plugin-openai-compatible": "workspace:*",
+    "@scn-chat/plugin-pdf-text": "workspace:*",
+    "@scn-chat/plugin-titles": "workspace:*"
+  }
+}

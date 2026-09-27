@@ -75,6 +75,10 @@ Changes are announced to the UI through a subscription, so screens rerender when
 - Search only covers conversations the background download has fetched, so a new device's search fills in over the first minutes.
 - `opfs-sahpool` avoids the cross-origin isolation headers, which would break embedding and some third-party resources. The cost is one connection at a time, handled by moving the store to the focused tab.
 - The handover cannot be guaranteed, because a frozen background tab cannot release its file handles. The banner covers that case.
+- The local tables also keep each record's CID, each index entry's CID, and when each conversation was last fetched. Reconciling compares CIDs, and the background download refetches conversations whose entry is newer than their last fetch.
+- Reconciling refetches the whole conversation, or the whole index, when anything differs, since the server has no per-record route.
+- The store logic runs over a small SQL interface, so tests run it on better-sqlite3 while the worker runs it on SQLite WebAssembly.
+- The worker, OPFS persistence, and reload survival need a real browser, so they are not covered by the jsdom tests.
 
 ## Acceptance Criteria
 
@@ -95,7 +99,3 @@ Changes are announced to the UI through a subscription, so screens rerender when
 - [ ] A schema version mismatch rebuilds the database.
 - [ ] Without the origin private file system, the store works in memory.
 - [ ] The database survives a page reload.
-
-## Files
-
-- (to be populated during implementation)

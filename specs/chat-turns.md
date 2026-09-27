@@ -33,13 +33,13 @@ Chat-turns listens for `message:changed` events from sync. It calls `startTurn` 
 - The message is a create or an update of a `user` message authored by the conversation's owner.
 - The message has a `generation` object.
 - No message exists at the reply key for its current attempt.
-- The event is live, or the message's `createdAt` is within the last `TURN_BACKFILL_MINUTES`, default 60.
+- The event is live, or the message's `createdAt` is within the last `turns.backfillMinutes`, default 60.
 
 A conversation's first sync is a backfill, which only starts turns for recent messages. A conversation created by another client still gets answered, while importing or migrating old messages never triggers a flood of generations.
 
 Whether a reply exists is checked with `getRecord` at the reply key, through the record store.
 
-A turn that has been requested but not yet claimed, for example one waiting for the rate limit, is recorded in a `turn_request` table: conversation URI, user message key, attempt, and time, with the first three as the primary key. The same turn requested twice, say by the safety net and a notification, is therefore queued once. The row is deleted when the reply is claimed. On startup, the server retries every row newer than `TURN_BACKFILL_MINUTES` and drops older ones, so a restart does not lose queued turns. The table holds references only, never content.
+A turn that has been requested but not yet claimed, for example one waiting for the rate limit, is recorded in a `turn_request` table: conversation URI, user message key, attempt, and time, with the first three as the primary key. The same turn requested twice, say by the safety net and a notification, is therefore queued once. The row is deleted when the reply is claimed. On startup, the server retries every row newer than `turns.backfillMinutes` and drops older ones, so a restart does not lose queued turns. The table holds references only, never content.
 
 When sync emits `message:invalid` for a user message that carries a generation request, the server writes an error reply at `<key>.r<attempt>`, using the attempt from the raw record or 0. Its error message quotes the validation error, so the direct client sees why nothing was generated.
 
@@ -49,14 +49,14 @@ When sync emits `message:invalid` for a user message that carries a generation r
 
 1. **Load.** It reads the conversation's info record and every message from the record store, once per turn, and keeps them in memory only for the turn. The reply key is `<userMessageKey>.r<attempt>`, with `attempt` defaulting to 0.
 2. **Choose the model.** The model reference is `generation.model`, else the model of the nearest completed assistant reply up the branch, else the user's `defaultModel` preference, else the admin default. The effort is `generation.effort`, else the `defaultEffort` preference.
-3. **Rate limit.** A user may start `TURN_RATE_PER_MINUTE` turns per minute, default 10. Past that, the turn waits in an in-memory queue per user and starts when the limit allows, without claiming the reply yet. The web UI's stream shows a `queued` status meanwhile.
+3. **Rate limit.** A user may start `turns.ratePerMinute` turns per minute, default 10. Past that, the turn waits in an in-memory queue per user and starts when the limit allows, without claiming the reply yet. The web UI's stream shows a `queued` status meanwhile.
 4. **Claim.** It calls `createMessage` at the reply key with a placeholder: `role: "assistant"`, the parent key, empty `plainContent` parts, the chosen model and effort, `status: "pending"`, and `createdAt`. If that throws `RecordExists`, another runner, possibly another deployment watching the same space, owns the attempt, and `startTurn` stops. On success it records the reply URI in a local `turn_claim` table.
 5. **Resolve.** The providers spec resolves the model reference to an AI SDK model. A failure rewrites the placeholder with `status: "error"` and a message saying why.
 6. **Build the prompt.** The branch is the chain of parents from the user message to the root. The instructions are the `customInstructions` preference and the conversation's `systemPrompt`, joined by a blank line. Each message becomes an AI SDK message:
    - User text parts become text parts. Attachments follow the attachments spec.
    - Assistant replies with status `complete` or `cancelled` contribute their text parts, tool calls and results, and reasoning according to the provider's replay policy. Replies with status `error` or `pending` are skipped.
 7. **Filter.** It runs the `messages:beforeModel` hook.
-8. **Generate.** It calls `streamText` with the model, instructions, messages, the requested tools that are registered, `stopWhen: isStepCount(TURN_MAX_STEPS)` (default 8), the mapped `reasoning` value, and an abort signal. The signal fires on cancel or after `TURN_TIMEOUT_SECONDS`, default 600.
+8. **Generate.** It calls `streamText` with the model, instructions, messages, the requested tools that are registered, `stopWhen: isStepCount(turns.maxSteps)` (default 8), the mapped `reasoning` value, and an abort signal. The signal fires on cancel or after `turns.timeoutSeconds`, default 600.
 9. **Stream.** It reads `result.stream`, builds the reply's parts, and publishes events to the turn's stream buffer.
 10. **Finish.** It builds the final record: parts in the order the model produced them, usage from `result.usage` (input, output, and `outputTokenDetails.reasoningTokens`), and a status. It runs the `message:afterModel` hook, then writes the record with `putMessage`. After that it runs the `turn:after` hook.
 
@@ -99,6 +99,10 @@ The stream closes after `status`. If this server is not running that reply, the 
 
 Hooks receive a turn context holding the user's DID, the conversation's URI and info, the user's preferences, the user message, the reply record as it stands, the resolved model reference and provider, and the effort.
 
+### Configuration
+
+The `turns` section of `config.yml` sets `ratePerMinute`, `maxSteps`, `timeoutSeconds`, and `backfillMinutes`. The environment variables `TURN_RATE_PER_MINUTE`, `TURN_MAX_STEPS`, `TURN_TIMEOUT_SECONDS`, and `TURN_BACKFILL_MINUTES` override them.
+
 ## Scope Boundaries
 
 - No multi-instance deployment. Streams, cancellation, and rate limits are in-process.
@@ -116,6 +120,11 @@ Hooks receive a turn context holding the user's DID, the conversation's URI and 
 - Replies that errored or are still pending are left out of later prompts. Cancelled replies keep their partial content in the prompt.
 - The model falls back to the last completed reply's model on the branch, so switching models sticks for later turns, as the lexicons README says.
 - A turn interrupted by a restart becomes `error` with "interrupted" on the next startup, not a retry, because retrying could spend money twice.
+- Claimed replies are recorded in a local `turn_claim` table, keyed by conversation and reply key.
+- The stream channel opens as soon as a reply is claimed, so a browser subscribing right after sending never sees an unknown stream.
+- Stream writes are chained and flushed before a stream closes, so the final status is never dropped.
+- The send route returns the user message key, the reply key, and whether the turn was claimed, queued, or already answered.
+- Tools from a tool source are named `<source id>_<tool name>`, since providers only accept letters, digits, underscores, and dashes.
 
 ## Acceptance Criteria
 
@@ -144,7 +153,3 @@ Hooks receive a turn context holding the user's DID, the conversation's URI and 
 - [ ] An invalid direct-write message with a generation request gets an error reply quoting the validation error.
 - [ ] On startup, pending replies this server claimed are marked `error` with "interrupted", and pending replies it did not claim are left alone.
 - [ ] The `turn:after` hook runs after the final record is written, with the turn context.
-
-## Files
-
-- (to be populated during implementation)

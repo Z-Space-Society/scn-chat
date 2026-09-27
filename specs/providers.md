@@ -2,7 +2,7 @@
 
 ## Summary
 
-A provider connects SCN Chat to a model API. Providers are plugins that register with the provider registry from the plugins spec. Each provider turns a model ID and an API key into a Vercel AI SDK language model, and the chat-turns spec drives that model. Admins configure providers and a list of models everyone can use in `scn-chat.config.ts`. Users can add their own API keys for any provider that allows it, and, when the admin permits, their own OpenAI-compatible endpoints. User keys are encrypted in the app database. Phase 1 ships four provider plugins: Anthropic, OpenAI, Google, and OpenAI-compatible, which covers OpenRouter, co/core, llama.cpp, vLLM, and Ollama.
+A provider connects SCN Chat to a model API. Providers are plugins that register with the provider registry from the plugins spec. Each provider turns a model ID and an API key into a Vercel AI SDK language model, and the chat-turns spec drives that model. Admins configure providers and a list of models everyone can use in `config.yml`. Users can add their own API keys for any provider that allows it, and, when the admin permits, their own OpenAI-compatible endpoints. User keys are encrypted in the app database. Phase 1 ships four provider plugins: Anthropic, OpenAI, Google, and OpenAI-compatible, which covers OpenRouter, co/core, llama.cpp, vLLM, and Ollama.
 
 ## Motivation
 
@@ -45,17 +45,20 @@ interface ModelInfo {
 | `@scn-chat/plugin-google` | `@ai-sdk/google` | `createGoogle({ apiKey })` |
 | `@scn-chat/plugin-openai-compatible` | `@ai-sdk/openai-compatible` | Takes `id`, `name`, `baseURL`, and optional `apiKey`. Can be listed several times with different IDs. Sets `includeUsage: true` |
 
-Each factory takes an optional admin `apiKey` and `userKeys` (default `true`). The OpenAI-compatible factory also takes `userEndpoints` (default `false`) and `allowPrivateNetworks` (default `false`).
+Each plugin takes an optional admin `apiKey` and `userKeys` (default `true`) as options, and exports a zod `optionsSchema` for them. The OpenAI-compatible plugin also takes `userEndpoints` (default `false`) and `allowPrivateNetworks` (default `false`).
 
 ### Models
 
-The config's `models` list names the models every signed-in user can use with the admin's keys:
+The `models` list in `config.yml` names the models every signed-in user can use with the admin's keys:
 
-```ts
-models: [
-  { provider: 'anthropic', id: 'claude-sonnet-5', name: 'Claude Sonnet 5',
-    capabilities: { vision: true, reasoning: true, tools: true }, roles: ['user'], default: true },
-]
+```yaml
+models:
+  - provider: anthropic
+    id: claude-sonnet-5
+    name: Claude Sonnet 5
+    capabilities: { vision: true, reasoning: true, tools: true }
+    roles: [user]
+    default: true
 ```
 
 - Startup fails if a model names a provider that is not registered, or a provider without an admin key.
@@ -130,6 +133,9 @@ The provider data is stored in the `providerData` field of reasoning, text, and 
 - Private network addresses are refused for user endpoints by default, and allowed per provider for self-hosters running local models.
 - Provider data is kept as an opaque JSON string per part, so any provider's replay data fits without lexicon changes.
 - The plugin API depends on `@ai-sdk/provider`'s model specification, not on the `ai` runtime. If the AI SDK were ever abandoned, an adapter implementing that interface keeps existing plugins working.
+- The provider routes are `GET /api/models`, `GET /api/providers`, `POST /api/providers/:id/list-models`, and `GET`, `POST`, and `DELETE` under `/api/credentials`.
+- Credentials store the key's last four characters in a `key_hint` column, so listing them never decrypts a key.
+- The guard's blocklist is injectable, so tests can use a local server as a stand-in for a public host.
 
 ## Acceptance Criteria
 
@@ -154,7 +160,3 @@ The provider data is stored in the `providerData` field of reasoning, text, and 
 - [ ] Each lexicon effort value maps to the AI SDK reasoning value in the table.
 - [ ] Reasoning from a different provider than the current turn's is not replayed.
 - [ ] `GET /api/models` lists the admin models the user may use plus the models from the user's credentials.
-
-## Files
-
-- (to be populated during implementation)

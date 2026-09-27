@@ -9,3 +9,5 @@ coverage/
 *.db
 .DS_Store
 .claude/settings.local.json
+data/
+config.yml

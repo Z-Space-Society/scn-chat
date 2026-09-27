@@ -1,0 +1,27 @@
+{
+  "name": "@scn-chat/lexicons",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./nsid": "./src/nsid.ts"
+  },
+  "scripts": {
+    "codegen": "lex build --lexicons ../../lexicons --out src/generated --clear --index-file --import-ext .ts --lib @atproto/lex-schema",
+    "typecheck": "tsc --noEmit -p .",
+    "publish-lexicons": "node src/publish-cli.ts"
+  },
+  "dependencies": {
+    "@atproto/lex-json": "0.0.0-spaces-alpha-20260915165437",
+    "@atproto/lex-schema": "0.0.0-spaces-alpha-20260915165437"
+  },
+  "devDependencies": {
+    "@atproto/identity": "0.0.0-spaces-alpha-20260915165437",
+    "@atproto/lex": "0.0.0-spaces-alpha-20260915165437",
+    "@atproto/lex-client": "0.0.0-spaces-alpha-20260915165437",
+    "@atproto/lex-data": "0.0.0-spaces-alpha-20260915165437",
+    "@atproto/lex-document": "0.0.0-spaces-alpha-20260915165437",
+    "@atproto/lex-password-session": "0.0.0-spaces-alpha-20260915165437"
+  }
+}

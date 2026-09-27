@@ -1,0 +1,15 @@
+{
+  "name": "@scn-chat/plugin-openai-compatible",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@ai-sdk/openai-compatible": "3.0.57",
+    "@scn-chat/plugin-api": "workspace:*",
+    "zod": "4.6.5"
+  }
+}

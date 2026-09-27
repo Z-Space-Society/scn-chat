@@ -66,7 +66,3 @@ A search box above the chat list. Results replace the list while a query is acti
 - [ ] Snippets mark the matched words without inserting HTML.
 - [ ] Search makes no server request.
 - [ ] While the background download is running, the UI shows how many conversations remain.
-
-## Files
-
-- (to be populated during implementation)

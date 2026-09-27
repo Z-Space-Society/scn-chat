@@ -80,6 +80,9 @@ When the chat-turns spec builds the model's messages:
 - Extraction runs at upload time, not at send time, so a failure shows up before the user sends the message.
 - Fallback-mode blobs use the same CID scheme as a PDS, so migration to a spaces PDS keeps blob references valid.
 - Spaces users' blobs are fetched from their PDS on every turn that needs them, with no server-side cache, keeping the PDS the only store of their attachments.
+- A failed ingestion returns 422 with the ingester's message.
+- The blob routes take an optional `type` query parameter naming an image MIME type, because a PDS's `getBlob` does not report the type.
+- Local blobs keep their MIME type and size in a small JSON file beside the bytes.
 
 ## Acceptance Criteria
 
@@ -96,7 +99,3 @@ When the chat-turns spec builds the model's messages:
 - [ ] The blob route returns the PDS's refusal as 404 for a blob not referenced in the conversation, without reading the conversation's records.
 - [ ] No blob is written to server storage for a spaces user.
 - [ ] The fallback sweep removes unreferenced blobs older than a day and keeps referenced ones.
-
-## Files
-
-- (to be populated during implementation)

@@ -18,7 +18,8 @@ pnpm-workspace.yaml     packages/*, apps/*, plugins/*
 tsconfig.base.json      shared strict compiler options
 vitest.config.ts        one Vitest run across all packages
 .nvmrc                  24
-.env.example            every variable, with safe development defaults
+.env.example            the secrets, with empty values
+config.example.yml      every public setting, with development defaults
 lexicons/               lexicon JSON (exists today)
 packages/lexicons/      @scn-chat/lexicons: generated schemas and types
 apps/server/            @scn-chat/server: Hono API server
@@ -45,19 +46,33 @@ Every `@atproto/*` package with an alpha release is pinned to one exact alpha ve
 
 ### Config
 
-`apps/server/src/config.ts` parses `process.env` with a zod schema once at startup and exports a typed, frozen config object. An invalid or missing required value stops the server with a message naming the variable. `.env` is loaded with Node's built-in `process.loadEnvFile` when the file exists.
+Configuration lives in two files:
 
-| Variable | Default in `.env.example` | Purpose |
+- **`config.yml`**, at the repository root, holds every public setting. It is safe to commit or share. The `SCN_CHAT_CONFIG` environment variable can point at another path. A committed `config.example.yml` shows a working setup, and the real file is gitignored. The server fails at startup with a message pointing at the example when the file is missing.
+- **`.env`** holds only secrets and the database URL, which can contain a password. `.env.example` lists them. Node's built-in `process.loadEnvFile` loads it when it exists.
+
+`apps/server/src/config.ts` reads `config.yml` with the `yaml` package, applies environment overrides, and validates the result with a zod schema once at startup. It exports a typed, frozen config object. An invalid or missing required value stops the server with a message naming the setting.
+
+**Env references.** Any string in `config.yml` may reference an environment variable as `${NAME}`. A value that is exactly `${NAME}` becomes unset when the variable is missing, so optional settings such as an admin API key can be left out of `.env`. A reference inside a longer string whose variable is missing fails startup, naming the variable.
+
+**Env overrides.** Environment variables override individual public settings, for deployments that configure everything through the environment:
+
+| Setting in `config.yml` | Override | Default |
 |---|---|---|
-| `NODE_ENV` | `development` | `development`, `test`, or `production` |
-| `PORT` | `3000` | Server port |
-| `PUBLIC_URL` | `http://127.0.0.1:3000` | Public base URL of the app |
-| `APP_NAME` | `SCN Chat` | Display name, used by the web app |
-| `DATA_DIR` | `./data` | Directory for local files such as the SQLite database and blobs |
-| `DATABASE_URL` | `sqlite:./data/scn-chat.sqlite` | `sqlite:<path>` or `postgres://...` |
-| `LOG_LEVEL` | `info` | pino log level |
+| `app.name` | `APP_NAME` | `SCN Chat` |
+| `app.publicUrl` | `PUBLIC_URL` | `http://127.0.0.1:3000` |
+| `app.port` | `PORT` | `3000` |
+| `app.dataDir` | `DATA_DIR` | `./data` |
+| `app.logLevel` | `LOG_LEVEL` | `info` |
 
-Later specs add their own variables to the same schema and to `.env.example`.
+Later specs add their own sections and overrides to the same schema and to `config.example.yml`.
+
+**Secrets in `.env`:**
+
+| Variable | Purpose |
+|---|---|
+| `NODE_ENV` | `development`, `test`, or `production`. Kept in the environment by convention. |
+| `DATABASE_URL` | `sqlite:<path>` or `postgres://...`, default `sqlite:./data/scn-chat.sqlite` |
 
 ### Database
 
@@ -78,7 +93,7 @@ Migrations and queries stay within what both databases support. Timestamps are I
 
 - `GET /api/health` returns `{ "status": "ok", "appName": "..." }` after a trivial database query succeeds. It returns 503 with `{ "status": "error" }` when the query fails, and logs the error.
 - Every route under `/api` is private to our web app. None of it is a public API.
-- In production the server also serves the built web app from `apps/web/dist`, with an `index.html` fallback for client-side routes. In development Vite serves the web app and proxies `/api` to the server.
+- In production the server also serves the built web app from `apps/web/dist`, with an `index.html` fallback for client-side routes. In development Vite serves the web app and proxies `/api` to the server. `index.html` carries an `__APP_NAME__` placeholder in its title and `application-name` meta tag, filled with the configured app name by the server in production and by a Vite plugin, which asks the server, in development. The web app reads the name from the meta tag.
 - Logging uses pino, with request logging through a small Hono middleware.
 
 ### Web app
@@ -129,12 +144,19 @@ Biome handles both linting and formatting, configured in one `biome.json` at the
 - SQLite uses `better-sqlite3`, not Node's built-in `node:sqlite`, because Kysely's SQLite dialect targets the `better-sqlite3` API. It ships prebuilt binaries for common platforms.
 - Generated lexicon code is committed, with a test that fails when it is stale.
 - Migrations run on server startup. Kysely's migrator takes a lock, so several instances starting together on Postgres do not run a migration twice.
+- Kysely 0.29 exports the migrator from `kysely/migration`, not the main entry.
+- TypeScript 7, the native compiler, handles the project, including the generated lexicon code.
 - Timestamps and JSON are stored as text on both databases, trading Postgres-native types for portability. Search and other features that need native types add them behind dialect helpers.
+- The health status page was the foundation's placeholder. The web-ui spec replaces it with the real app, so its test moved there.
+- Public settings live in `config.yml` and secrets in `.env`, so the file that is safe to share and the one that is not stay separate.
 
 ## Acceptance Criteria
 
 - [ ] `pnpm install` on a clean clone succeeds with the committed lockfile, and resolves no `@atproto/*` package to a plain `0.0.0` release.
-- [ ] Config parsing returns typed values for a valid environment, and fails with the variable's name when a required value is missing or invalid.
+- [ ] Config parsing returns typed values from `config.yml`, and fails naming the setting when a value is missing or invalid.
+- [ ] Environment variables override the settings in the overrides table.
+- [ ] A value that is exactly `${NAME}` is unset when the variable is missing, and an embedded reference to a missing variable fails naming it.
+- [ ] A missing `config.yml` fails startup with a message naming `config.example.yml`.
 - [ ] `DATABASE_URL` with `sqlite:` produces a working SQLite database, and with `postgres://` produces a working Postgres database.
 - [ ] An unsupported `DATABASE_URL` scheme fails at startup with a clear message.
 - [ ] The migrator applies pending migrations in order on both databases, and running it again applies nothing.
@@ -145,7 +167,3 @@ Biome handles both linting and formatting, configured in one `biome.json` at the
 - [ ] Every lexicon document validates against the alpha lexicon schema.
 - [ ] The generated lexicon code matches a fresh `pnpm codegen` run.
 - [ ] `pnpm check` passes on a clean clone.
-
-## Files
-
-- (to be populated during implementation)

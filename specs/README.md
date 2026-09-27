@@ -24,7 +24,13 @@ The overview at the end of this file lists every spec and whether it is active, 
 
 ### Planned
 
-Phase 1, initial build-out, in build order:
+Phase 1, after the initial build-out:
+
+- [[search]]
+
+### Completed
+
+Phase 1, initial build-out, implemented and tested, awaiting a check against a real spaces PDS:
 
 - [[foundation]]
 - [[plugins]]
@@ -37,9 +43,3 @@ Phase 1, initial build-out, in build order:
 - [[sharing]]
 - [[browser-store]]
 - [[web-ui]]
-
-Phase 1, after the initial build-out:
-
-- [[search]]
-
-### Completed

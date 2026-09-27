@@ -73,6 +73,9 @@ After sending, the conversation subscribes to the reply's stream endpoint and ap
 - Message text is plain text, so the designer chooses the Markdown renderer and its sanitizing.
 - The typed Hono client comes from the server's route types, so the web app and server share one definition of the API.
 - The default branch is the newest sibling at each level, matching how ChatGPT shows the latest regeneration.
+- Write routes read JSON without validators, so the typed client sends bodies through its request options. Response types still come from the server's routes.
+- The `read` helper returns the body of the successful responses and throws an `ApiError` with the server's message otherwise.
+- Shared links show a sign-in prompt when signed out, and every other route sends signed-out users to `/login`.
 
 ## Acceptance Criteria
 
@@ -93,7 +96,3 @@ After sending, the conversation subscribes to the reply's stream endpoint and ap
 - [ ] If the stream drops, the reply still appears through repeated refreshes.
 - [ ] The sync button syncs the conversation and shows changes written from another client.
 - [ ] The background sync switch appears only when the admin allows opting out, and saves the account setting.
-
-## Files
-
-- (to be populated during implementation)

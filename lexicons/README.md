@@ -74,3 +74,9 @@ The finished reply, at the key `3lzmxqvzwnk2a.r0`:
   "createdAt": "2026-09-26T17:00:04.000Z"
 }
 ```
+
+## Publishing
+
+These lexicons must be resolvable by the PDS to grant their permissions, no one will be able to sign in if they're not published.
+
+`pnpm publish-lexicons <handle>` writes all lexicons to the sharedcomputer.network PDS. It signs in with an app password from `LEXICON_APP_PASSWORD` or a prompt.

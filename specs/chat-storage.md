@@ -108,14 +108,13 @@ A user's first index sync, with no `last_rev`, does not sync every conversation.
 
 ### Sync configuration
 
-The admin configures sync in `scn-chat.config.ts`:
+The admin configures sync in `config.yml`:
 
-```ts
-sync: {
-  safetyNet: { enabled: true, intervalMinutes: 15, activeWithinHours: 24 },
-  discovery: { intervalMinutes: 60, activeWithinDays: 30 },
-  allowUserOptOut: true,
-}
+```yaml
+sync:
+  safetyNet: { enabled: true, intervalMinutes: 15, activeWithinHours: 24 }
+  discovery: { intervalMinutes: 60, activeWithinDays: 30 }
+  allowUserOptOut: true
 ```
 
 - The safety net syncs the index of every user active within `activeWithinHours`, every `intervalMinutes`. That is one PDS call per user per interval, plus one per changed conversation.
@@ -156,6 +155,11 @@ All routes act on the signed-in user's own data. Message routes are in the chat-
 - A conversation's first sync is a backfill. Chat-turns only answers recent messages from a backfill, so history is never replayed.
 - The index write after a message write is not atomic with it. Discovery repairs a missing entry.
 - Op log gaps are detected with the set hash, computed from metadata-only listings, so no record content is stored or even fetched.
+- Records travel inside the server in their atproto JSON form, and are converted to lex values only at the PDS boundary. `validateRecord` converts before validating.
+- The `com.atproto.space.*` and `com.atproto.simplespace.*` lexicons are vendored into `lexicons/upstream/` from the alpha branch commit named in `UPSTREAM.md`, and generated with ours.
+- Every write by the server emits a browser event, so replies and titles written in the background reach open tabs without waiting for a notification.
+- The local backend records each op's value, so its op log returns the value as of that op.
+- Account settings are `GET /api/account` and `PUT /api/account`.
 
 ## Acceptance Criteria
 
@@ -188,7 +192,3 @@ All routes act on the signed-in user's own data. Message routes are in the chat-
 - [ ] A set hash mismatch resets the space's cursor and logs a warning.
 - [ ] The keys routes return collections, keys, and CIDs without record content.
 - [ ] The owner's writes to the settings space are forwarded to the server under its write policy, checked against a real PDS.
-
-## Files
-
-- (to be populated during implementation)
