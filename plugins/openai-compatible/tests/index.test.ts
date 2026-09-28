@@ -24,6 +24,13 @@ describe('openai-compatible plugin', () => {
     ])
   })
 
+  it('offers admin models for a keyless local server with only a base URL', async () => {
+    const { providers } = await setupForTest(
+      plugin({ id: 'ollama', name: 'Ollama', baseURL: 'http://localhost:11434/v1' }),
+    )
+    expect(providers[0]?.hasAdminKey).toBe(true)
+  })
+
   it('can be listed several times with different IDs', async () => {
     expect(plugin(cocore).id).not.toBe(plugin({ ...cocore, id: 'ollama' }).id)
   })

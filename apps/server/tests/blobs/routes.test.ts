@@ -6,7 +6,15 @@ import { createApp } from '../../src/app.ts'
 import { buildScope } from '../../src/auth/scope.ts'
 import { createBlobStores } from '../../src/blobs/store.ts'
 import { IngesterRegistry } from '../../src/plugins/registry.ts'
-import { authDeps, fakeOAuth, fakeSession, ORIGIN, sessionCookie } from '../helpers/auth.ts'
+import {
+  authDeps,
+  fakeOAuth,
+  fakeSession,
+  LOGIN_STATE,
+  loginCookie,
+  ORIGIN,
+  sessionCookie,
+} from '../helpers/auth.ts'
 import { testConfig } from '../helpers/config.ts'
 import { spacesHarness } from '../helpers/spaces.ts'
 
@@ -31,9 +39,21 @@ async function setup(storageMode: 'space' | 'local') {
     },
     'test',
   )
+  ingesters.register(
+    {
+      id: 'huge-text',
+      accepts: ['application/x-huge'],
+      method: 'text',
+      ingest: async () => ({ text: 'x'.repeat(20_000_001) }),
+    },
+    'test',
+  )
   const scope = storageMode === 'space' ? buildScope('raw') : 'atproto'
   const oauth = fakeOAuth({
-    callback: vi.fn(async () => ({ session: fakeSession('did:plc:alice', scope) })),
+    callback: vi.fn(async () => ({
+      session: fakeSession('did:plc:alice', scope),
+      state: LOGIN_STATE,
+    })),
   })
   const app = createApp({
     config: testConfig(),
@@ -42,7 +62,7 @@ async function setup(storageMode: 'space' | 'local') {
     auth: authDeps(h.db, { oauth }),
     blobs: { blobsFor: stores.forAccount, services: h.services, ingesters, logger: h.logger },
   })
-  const cookie = sessionCookie(await app.request('/oauth/callback?code=a&state=b'))
+  const cookie = sessionCookie(await app.request('/oauth/callback?code=a&state=b', loginCookie))
   const upload = async (bytes: Uint8Array, type: string, name = 'file') => {
     const res = await app.request('/api/attachments', {
       method: 'POST',
@@ -73,7 +93,7 @@ describe.each(['space', 'local'] as const)('attachments for a %s account', (mode
       content: { $type: 'network.sharedcomputer.chat.defs#plainContent', parts: [body.part] },
       createdAt: new Date().toISOString(),
     } as never)
-    const cid = (body.part?.image as { ref: { $link: string } }).ref.$link
+    const cid = (body.part!.image as { ref: { $link: string } }).ref.$link
     const res = await app.request(`/api/conversations/${skey}/blobs/${cid}?type=image/png`, {
       headers: { cookie },
     })
@@ -114,6 +134,44 @@ describe.each(['space', 'local'] as const)('attachments for a %s account', (mode
     const { upload } = await setup(mode)
     expect((await upload(new Uint8Array(20_000_001), 'image/png')).status).toBe(413)
   })
+
+  it('refuses an oversize upload sent without a content length', async () => {
+    const { app, cookie } = await setup(mode)
+    const chunk = new Uint8Array(1_000_000)
+    let sent = 0
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (sent++ > 21) controller.close()
+        else controller.enqueue(chunk)
+      },
+    })
+    const res = await app.request('/api/attachments', {
+      method: 'POST',
+      headers: { cookie, origin: ORIGIN, 'content-type': 'image/png' },
+      body,
+      duplex: 'half',
+    } as RequestInit)
+    expect(res.status).toBe(413)
+  })
+
+  it('refuses a file whose text is more than a message can hold', async () => {
+    const { upload } = await setup(mode)
+    expect((await upload(new Uint8Array([1]), 'application/x-huge')).status).toBe(413)
+  })
+
+  it('refuses a file name that is not URI-encoded', async () => {
+    const { upload } = await setup(mode)
+    expect((await upload(new Uint8Array([1]), 'application/pdf', '%E0%A4%A')).status).toBe(400)
+  })
+
+  it('lists the file types it can read', async () => {
+    const { app, cookie } = await setup(mode)
+    const res = await app.request('/api/attachments/types', { headers: { cookie } })
+    expect(await res.json()).toEqual({
+      images: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'],
+      files: ['application/pdf', 'application/x-huge'],
+    })
+  })
 })
 
 describe('blob route', () => {
@@ -121,7 +179,7 @@ describe('blob route', () => {
     const { upload, chats, app, cookie } = await setup('space')
     const { body } = await upload(new Uint8Array([1, 2]), 'image/png')
     const { skey } = await chats.createConversation()
-    const cid = (body.part?.image as { ref: { $link: string } }).ref.$link
+    const cid = (body.part!.image as { ref: { $link: string } }).ref.$link
     expect(
       (await app.request(`/api/conversations/${skey}/blobs/${cid}`, { headers: { cookie } }))
         .status,
@@ -131,7 +189,7 @@ describe('blob route', () => {
   it('serves non-image blobs as downloads', async () => {
     const { upload, app, cookie } = await setup('local')
     const { body } = await upload(new TextEncoder().encode('%PDF body'), 'application/pdf')
-    const cid = (body.part?.file as { ref: { $link: string } }).ref.$link
+    const cid = (body.part!.file as { ref: { $link: string } }).ref.$link
     const res = await app.request(`/api/conversations/3aaaaaaaaaaaa/blobs/${cid}`, {
       headers: { cookie },
     })

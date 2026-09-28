@@ -4,7 +4,7 @@
   "defs": {
     "modelRef": {
       "type": "object",
-      "description": "The model being used. API keys are stored in the app database.",
+      "description": "The model that wrote a reply, or that a request asks for.",
       "required": ["provider", "id"],
       "properties": {
         "provider": {
@@ -84,7 +84,7 @@
           "type": "array",
           "maxLength": 100,
           "items": { "type": "blob" },
-          "description": "Encrypted blobs referenced inside the ciphertext, listed so the PDS keeps them."
+          "description": "Encrypted blobs the ciphertext refers to."
         }
       }
     },

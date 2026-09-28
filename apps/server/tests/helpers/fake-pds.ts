@@ -194,6 +194,8 @@ export class FakePds {
         return blob.bytes
       }
       case atproto.simplespace.getSpace.$nsid:
+        // A real PDS has no policy for a space that doesn't exist.
+        await store.headRev(space)
         return {
           uri: space,
           readPolicy: { $type: this.policy(space).readPolicy },
@@ -201,20 +203,24 @@ export class FakePds {
           appAccess: { $type: 'com.atproto.simplespace.defs#open' },
         }
       case atproto.simplespace.updateSpace.$nsid:
+        await store.headRev(space)
         if (input.readPolicy)
           this.policy(space).readPolicy = (input.readPolicy as { $type: string }).$type
         return undefined
       case atproto.simplespace.listMembers.$nsid:
+        await store.headRev(space)
         return {
           members: [...this.policy(space).members].map(([did, access]) => ({ did, ...access })),
         }
       case atproto.simplespace.putMember.$nsid:
+        await store.headRev(space)
         this.policy(space).members.set(input.did as string, {
           read: input.read as boolean,
           write: input.write as boolean,
         })
         return undefined
       case atproto.simplespace.removeMember.$nsid:
+        await store.headRev(space)
         this.policy(space).members.delete(input.did as string)
         return undefined
       case atproto.space.listSpaces.$nsid:
@@ -250,8 +256,8 @@ export class FakePds {
         cid: parseCid(keys[0]?.cid ?? ''),
       })
     }
-    return RepoCommit.fromRecords(records as any).sign(
-      { space, author: store.did, rev } as any,
+    return RepoCommit.fromRecords(records as never).sign(
+      { space, author: store.did, rev } as never,
       this.keypair,
     )
   }

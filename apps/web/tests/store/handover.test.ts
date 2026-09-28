@@ -38,7 +38,7 @@ function tab(
   channel: ReturnType<ReturnType<typeof fakeChannels>>,
   db: { holder: string | null },
   id: string,
-  options: { failOpen?: () => boolean } = {},
+  options: { failOpen?: () => boolean; brokenOpen?: boolean } = {},
 ) {
   const states: HandoverState[] = []
   const handover = createHandover({
@@ -46,7 +46,9 @@ function tab(
     locks,
     channel,
     open: async () => {
-      if (options.failOpen?.() || (db.holder && db.holder !== id)) throw new Error('database busy')
+      if (options.brokenOpen) throw new Error('wasm failed to load')
+      if (options.failOpen?.() || (db.holder && db.holder !== id))
+        throw Object.assign(new Error('database busy'), { name: 'NoModificationAllowedError' })
       db.holder = id
     },
     pause: () => {
@@ -105,6 +107,30 @@ describe('createHandover', () => {
     expect(await a.handover.claim()).toBe('busy')
     frozen = false
     expect(await a.handover.claim()).toBe('active')
+  })
+
+  it('shows a failure, not busy, when the store fails to open for another reason', async () => {
+    const locks = fakeLocks()
+    const channels = fakeChannels()
+    const a = tab(locks, channels(), { holder: null }, 'a', { brokenOpen: true })
+    expect(await a.handover.claim()).toBe('failed')
+    expect(a.states).toEqual(['waiting', 'failed'])
+  })
+
+  it('leaves a tab inactive when another tab steals the store while it is still retrying', async () => {
+    const locks = fakeLocks()
+    const channels = fakeChannels()
+    const db = { holder: 'elsewhere' as string | null }
+    const a = tab(locks, channels(), db, 'a')
+    const b = tab(locks, channels(), db, 'b')
+    void a.handover.claim()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    const claimed = b.handover.claim()
+    db.holder = null
+    expect(await claimed).toBe('active')
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    expect(a.handover.state).toBe('inactive')
+    expect(db.holder).toBe('b')
   })
 
   it('never has two tabs active at once', async () => {

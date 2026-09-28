@@ -2,8 +2,10 @@ import { parseCid } from '@atproto/lex-data'
 import { RepoCommit, verifyCommit } from '@atproto/space'
 import { atproto, isRecordNsid, nsid, validateRecord } from '@scn-chat/lexicons'
 import { type Account, getAccount } from '../auth/accounts.ts'
+import { isLoopbackUrl } from '../auth/oauth-client.ts'
 import type { Db } from '../db/index.ts'
 import type { Logger } from '../logger.ts'
+import type { Loose } from '../loose.ts'
 import type { ChatService } from '../storage/chat-service.ts'
 import { type OpsPage, type RecordStore, SpaceNotFound } from '../storage/record-store.ts'
 import type { JsonRecord } from '../storage/records.ts'
@@ -13,9 +15,6 @@ import type { CredentialCache } from './credentials.ts'
 import type { SyncEventBus } from './events.ts'
 import { serviceId } from './identity.ts'
 import type { RecentWrites } from './recent-writes.ts'
-
-// Plain strings don't satisfy the generated methods' branded string types.
-type Loose = any
 
 export type SyncEngineDeps = {
   db: Db
@@ -245,6 +244,8 @@ export class SyncEngine {
 
   /** Register for write notifications on the user's settings space. */
   async registerIndex(did: string): Promise<void> {
+    // A PDS can't reach a loopback URL, so it could never deliver the notifications.
+    if (isLoopbackUrl(this.deps.publicUrl)) return
     const ctx = await this.context(did)
     if (!ctx) return
     const space = ctx.chats.settingsUri
@@ -300,8 +301,13 @@ export class SyncEngine {
     for (const uri of uris) {
       if (known.has(uri)) continue
       const skey = ctx.chats.skeyOf(uri)
-      await ctx.chats.repairRef(skey)
-      await this.runConversationSync(ctx, skey, false)
+      try {
+        await ctx.chats.repairRef(skey)
+        await this.runConversationSync(ctx, skey, false)
+      } catch (err) {
+        this.deps.logger.warn({ err, did, skey }, 'could not add a discovered conversation')
+        continue
+      }
       this.deps.events.emit('index:changed', { did })
     }
   }

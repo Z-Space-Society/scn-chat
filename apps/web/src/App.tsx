@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Redirect, Route, Switch, useLocation } from 'wouter'
-import { ApiError, api, read } from './api.ts'
+import { ApiError, api, onUnauthorized, read } from './api.ts'
 import { messageOf } from './components/useAction.ts'
 import { ChatPage } from './pages/ChatPage.tsx'
 import { LoginPage } from './pages/LoginPage.tsx'
@@ -34,18 +34,20 @@ export function useSession(): Session {
 
 function SignedIn({ me }: { me: Me }) {
   const store = openStore(me.did)
-  useEffect(
-    () =>
-      store.onChange((change) => {
-        if (change.type !== 'unauthorized') return
-        // Use a full page load, since the signed-in routes redirect /login to /.
-        store
-          .deleteLocalCopy()
-          .catch((err: unknown) => console.error('Could not delete the local copy', err))
-          .finally(() => location.assign('/login'))
-      }),
-    [store],
-  )
+  useEffect(() => {
+    const ended = () =>
+      // Use a full page load, since the signed-in routes redirect /login to /.
+      store
+        .deleteLocalCopy()
+        .catch((err: unknown) => console.error('Could not delete the local copy', err))
+        .finally(() => location.assign('/login'))
+    const stopApi = onUnauthorized(ended)
+    const stopStore = store.onChange((change) => change.type === 'unauthorized' && ended())
+    return () => {
+      stopApi()
+      stopStore()
+    }
+  }, [store])
   return (
     <MeContext.Provider value={me}>
       <StoreProvider store={store}>

@@ -1,21 +1,24 @@
-import { LexError } from '@atproto/lex-data'
+import {
+  DidNotFoundError,
+  PoorlyFormattedDidError,
+  UnsupportedDidMethodError,
+} from '@atproto/identity'
+import { isValidDid } from '@atproto/syntax'
 import { atproto, nsid } from '@scn-chat/lexicons'
 import type { Account } from '../auth/accounts.ts'
-import type { IdentityResolver } from '../auth/identity.ts'
+import { IdentityResolutionError, type IdentityResolver } from '../auth/identity.ts'
 import type { PdsClientFactory } from '../auth/pds.ts'
+import { lexErrorCode } from '../lex-errors.ts'
 import type { Logger } from '../logger.ts'
+import type { Loose } from '../loose.ts'
+import { SpaceNotFound } from '../storage/record-store.ts'
 import { type JsonRecord, spaceUri, toJson } from '../storage/records.ts'
+import { MEMBER_LIST, PUBLIC } from '../storage/space-policies.ts'
 import { assertValidStored, keepValid } from '../storage/validate.ts'
 import { CredentialError } from '../sync/credentials.ts'
 
-// Plain strings don't satisfy the generated methods' branded string types.
-type Loose = any
-
 export type ShareMode = 'private' | 'people' | 'public'
 export type ShareSettings = { mode: ShareMode; members: { did: string; handle: string | null }[] }
-
-const PUBLIC = { $type: 'com.atproto.simplespace.defs#publicPolicy' }
-const MEMBER_LIST = { $type: 'com.atproto.simplespace.defs#memberListPolicy' }
 
 export class ShareInputError extends Error {
   constructor(message: string) {
@@ -78,9 +81,23 @@ export class SharingService {
     return dids
   }
 
+  /** Run an owner's space management call, reporting a missing space as SpaceNotFound. */
+  private async managing<T>(space: string, fn: () => Promise<T>): Promise<T> {
+    try {
+      return await fn()
+    } catch (err) {
+      if (lexErrorCode(err) === 'SpaceNotFound') throw new SpaceNotFound(space)
+      throw err
+    }
+  }
+
   async getSettings(account: Account, skey: string): Promise<ShareSettings> {
-    const client = await this.owner(account)
     const space = spaceUri(account.did, nsid.conversation, skey)
+    return this.managing(space, () => this.readSettings(account, space))
+  }
+
+  private async readSettings(account: Account, space: string): Promise<ShareSettings> {
+    const client = await this.owner(account)
     const [config, dids] = await Promise.all([
       client.call(atproto.simplespace.getSpace, { space }),
       this.members(client, space),
@@ -104,7 +121,10 @@ export class SharingService {
   private async toDids(members: string[]): Promise<string[]> {
     return Promise.all(
       members.map(async (member) => {
-        if (member.startsWith('did:')) return member
+        if (member.startsWith('did:')) {
+          if (!isValidDid(member)) throw new ShareInputError(`"${member}" is not a valid DID`)
+          return member
+        }
         const did = await this.deps.identity.resolveHandle(member.replace(/^@/, ''))
         if (!did) throw new ShareInputError(`Cannot find the handle "${member}"`)
         return did
@@ -118,15 +138,19 @@ export class SharingService {
     mode: ShareMode,
     members: string[] = [],
   ): Promise<void> {
-    const client = await this.owner(account)
+    const wanted = mode === 'people' ? await this.toDids(members) : []
     const space = spaceUri(account.did, nsid.conversation, skey)
+    await this.managing(space, () => this.applySettings(account, space, mode, wanted))
+  }
+
+  private async applySettings(account: Account, space: string, mode: ShareMode, wanted: string[]) {
+    const client = await this.owner(account)
     const current = await this.members(client, space)
     if (mode === 'public') {
       await client.call(atproto.simplespace.updateSpace, { space, readPolicy: PUBLIC })
       return
     }
     await client.call(atproto.simplespace.updateSpace, { space, readPolicy: MEMBER_LIST })
-    const wanted = mode === 'people' ? await this.toDids(members) : []
     for (const did of current.filter((d) => !wanted.includes(d))) {
       await client.call(atproto.simplespace.removeMember, { space, did })
     }
@@ -146,7 +170,11 @@ export class SharingService {
     } catch (err) {
       if (
         (err instanceof CredentialError && DENIED.has(err.code)) ||
-        (err instanceof LexError && DENIED.has(err.error))
+        DENIED.has(lexErrorCode(err) ?? '') ||
+        err instanceof IdentityResolutionError ||
+        err instanceof DidNotFoundError ||
+        err instanceof PoorlyFormattedDidError ||
+        err instanceof UnsupportedDidMethodError
       ) {
         throw new SharedNotFound()
       }
@@ -158,7 +186,7 @@ export class SharingService {
     try {
       return await fn()
     } catch (err) {
-      if (err instanceof LexError && DENIED.has(err.error)) throw new SharedNotFound()
+      if (DENIED.has(lexErrorCode(err) ?? '')) throw new SharedNotFound()
       throw err
     }
   }

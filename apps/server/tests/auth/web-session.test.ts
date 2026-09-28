@@ -4,6 +4,7 @@ import {
   createWebSession,
   deleteAllWebSessions,
   resolveWebSession,
+  sweepExpired,
 } from '../../src/auth/web-session.ts'
 import { migrateToLatest } from '../../src/db/migrate.ts'
 import { dialects } from '../helpers/db.ts'
@@ -20,7 +21,7 @@ describe.each(dialects)('web sessions on $name', ({ create }) => {
   it('resolves a new session token to its DID and stores only its hash', async () => {
     const db = await setup()
     const token = await createWebSession(db, 'did:plc:alice', 30)
-    expect(await resolveWebSession(db, token, 30)).toBe('did:plc:alice')
+    expect(await resolveWebSession(db, token, 30)).toEqual({ did: 'did:plc:alice', renewed: false })
     const { rows } = await sql<{ token_hash: string }>`select token_hash from web_session`.execute(
       db,
     )
@@ -40,10 +41,13 @@ describe.each(dialects)('web sessions on $name', ({ create }) => {
     const db = await setup()
     const start = new Date('2026-09-01T00:00:00Z')
     const token = await createWebSession(db, 'did:plc:alice', 30, start)
-    await resolveWebSession(db, token, 30, new Date(start.getTime() + 20 * DAY))
-    expect(await resolveWebSession(db, token, 30, new Date(start.getTime() + 45 * DAY))).toBe(
-      'did:plc:alice',
-    )
+    expect(await resolveWebSession(db, token, 30, new Date(start.getTime() + 20 * DAY))).toEqual({
+      did: 'did:plc:alice',
+      renewed: true,
+    })
+    expect(
+      await resolveWebSession(db, token, 30, new Date(start.getTime() + 45 * DAY)),
+    ).toMatchObject({ did: 'did:plc:alice' })
     await db.destroy()
   })
 
@@ -53,6 +57,36 @@ describe.each(dialects)('web sessions on $name', ({ create }) => {
     const token = await createWebSession(db, 'did:plc:alice', 30, start)
     await resolveWebSession(db, token, 30, new Date(start.getTime() + 5 * DAY))
     expect(await resolveWebSession(db, token, 30, new Date(start.getTime() + 31 * DAY))).toBeNull()
+    await db.destroy()
+  })
+
+  it('sweeps expired sessions and abandoned sign-ins, keeping live ones', async () => {
+    const db = await setup()
+    const start = new Date('2026-09-01T00:00:00Z')
+    const old = await createWebSession(db, 'did:plc:alice', 30, start)
+    const live = await createWebSession(
+      db,
+      'did:plc:alice',
+      30,
+      new Date(start.getTime() + 20 * DAY),
+    )
+    await db
+      .insertInto('oauth_state')
+      .values([
+        { key: 'abandoned', value: '{}', updated_at: start.toISOString() },
+        {
+          key: 'fresh',
+          value: '{}',
+          updated_at: new Date(start.getTime() + 31 * DAY).toISOString(),
+        },
+      ])
+      .execute()
+    const now = new Date(start.getTime() + 31 * DAY + 60_000)
+    await sweepExpired(db, now)
+    expect(await resolveWebSession(db, old, 30, now)).toBeNull()
+    expect(await resolveWebSession(db, live, 30, now)).toMatchObject({ did: 'did:plc:alice' })
+    const states = await db.selectFrom('oauth_state').select('key').execute()
+    expect(states).toEqual([{ key: 'fresh' }])
     await db.destroy()
   })
 

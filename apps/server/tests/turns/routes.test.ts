@@ -2,7 +2,15 @@ import { nsid } from '@scn-chat/lexicons'
 import { describe, expect, it, vi } from 'vitest'
 import { createApp } from '../../src/app.ts'
 import { buildScope } from '../../src/auth/scope.ts'
-import { authDeps, fakeOAuth, fakeSession, ORIGIN, sessionCookie } from '../helpers/auth.ts'
+import {
+  authDeps,
+  fakeOAuth,
+  fakeSession,
+  LOGIN_STATE,
+  loginCookie,
+  ORIGIN,
+  sessionCookie,
+} from '../helpers/auth.ts'
 import { testConfig } from '../helpers/config.ts'
 import { scriptedModel, textReply, turnsHarness } from '../helpers/turns.ts'
 
@@ -11,7 +19,10 @@ const text = (value: string) => ({ $type: `${nsid.defs}#textPart`, text: value }
 async function setup(options: Parameters<typeof turnsHarness>[0] = {}) {
   const h = await turnsHarness(options)
   const oauth = fakeOAuth({
-    callback: vi.fn(async () => ({ session: fakeSession('did:plc:alice', buildScope('raw')) })),
+    callback: vi.fn(async () => ({
+      session: fakeSession('did:plc:alice', buildScope('raw')),
+      state: LOGIN_STATE,
+    })),
   })
   const app = createApp({
     config: testConfig(),
@@ -20,7 +31,7 @@ async function setup(options: Parameters<typeof turnsHarness>[0] = {}) {
     auth: authDeps(h.db, { oauth }),
     turns: { services: h.services, runner: h.runner, hub: h.hub },
   })
-  const cookie = sessionCookie(await app.request('/oauth/callback?code=a&state=b'))
+  const cookie = sessionCookie(await app.request('/oauth/callback?code=a&state=b', loginCookie))
   const post = async (path: string, body: object = {}) => {
     const res = await app.request(`/api${path}`, {
       method: 'POST',
@@ -58,6 +69,16 @@ describe('POST /api/conversations/:skey/messages', () => {
     expect((await post(`/conversations/${skey}/messages`, { parts: [] })).status).toBe(400)
     const reasoning = { $type: `${nsid.defs}#reasoningPart`, text: 'sneaky' }
     expect((await post(`/conversations/${skey}/messages`, { parts: [reasoning] })).status).toBe(400)
+  })
+
+  it('refuses a malformed generation request before writing anything', async () => {
+    const { post, skey, messages } = await setup()
+    const res = await post(`/conversations/${skey}/messages`, {
+      parts: [text('hi')],
+      generation: { tools: 'web_search' },
+    })
+    expect(res.status).toBe(400)
+    expect((await messages(skey)).size).toBe(0)
   })
 })
 

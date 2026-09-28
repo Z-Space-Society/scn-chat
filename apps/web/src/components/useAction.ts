@@ -9,5 +9,5 @@ export function useAction() {
     setError(null)
     action().catch((err: unknown) => setError(messageOf(err)))
   }, [])
-  return { error, run }
+  return { error, run, fail: setError }
 }

@@ -4,9 +4,8 @@ import { JoseKey } from '@atproto/oauth-client-node'
 import { createDpopProof } from '@atproto/space'
 import { atproto } from '@scn-chat/lexicons'
 import type { PdsClientFactory } from '../auth/pds.ts'
-
-// Plain strings don't satisfy the generated methods' branded string types.
-type Loose = any
+import type { Loose } from '../loose.ts'
+import { parseSpaceUri } from '../storage/records.ts'
 
 const CREDENTIAL_TTL_MS = 2 * 60 * 60_000
 const REFRESH_MARGIN_MS = 5 * 60_000
@@ -63,12 +62,6 @@ export type CredentialDeps = {
   now?: () => number
 }
 
-const authorityOf = (space: string) => {
-  const did = space.match(/^at:\/\/(did:[^/]+)\/space\//)?.[1]
-  if (!did) throw new CredentialError('InvalidSpace', `Not a space URI: ${space}`)
-  return did
-}
-
 /** Get a space credential for a space, acting for a user, without caching. */
 export async function mintSpaceCredential(
   deps: CredentialDeps,
@@ -79,7 +72,7 @@ export async function mintSpaceCredential(
   const fetchImpl = deps.fetch ?? fetch
   const actor: Loose = await deps.getPdsClient(actorDid)
   const { token } = await actor.call(atproto.space.getDelegationToken, { space })
-  const authorityPds = await deps.resolvePds(authorityOf(space))
+  const authorityPds = await deps.resolvePds(parseSpaceUri(space).did)
   const key = await JoseKey.generate(['ES256'])
   const url = new URL('/xrpc/com.atproto.space.getSpaceCredential', authorityPds)
   const request = new Request(url, {

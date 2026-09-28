@@ -68,6 +68,24 @@ describe('PartAccumulator', () => {
     ).toEqual(['hmm', 'Hel', 'lo'])
   })
 
+  it('keeps provider metadata that arrives on a part start or delta, as Google sends signatures', () => {
+    const acc = new PartAccumulator()
+    const signature = { google: { thoughtSignature: 'SIG' } }
+    for (const chunk of [
+      { type: 'reasoning-start', id: 'r', providerMetadata: signature },
+      { type: 'reasoning-delta', id: 'r', text: 'hmm', providerMetadata: signature },
+      { type: 'reasoning-end', id: 'r' },
+      { type: 'text-start', id: 't' },
+      { type: 'text-delta', id: 't', text: 'Hi', providerMetadata: signature },
+      { type: 'text-end', id: 't' },
+    ])
+      acc.push(part(chunk))
+    expect(acc.parts.map((p) => p.providerData)).toEqual([
+      JSON.stringify(signature),
+      JSON.stringify(signature),
+    ])
+  })
+
   it('stores unparsable tool input JSON-encoded, so it replays as the string the model sent', () => {
     const acc = new PartAccumulator()
     acc.push(part({ type: 'tool-call', toolCallId: 'c1', toolName: 'search', input: '{"q": ' }))

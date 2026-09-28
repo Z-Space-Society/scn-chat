@@ -1,7 +1,8 @@
 import type { Client } from '@atproto/lex-client'
-import { LexError } from '@atproto/lex-data'
 import { atproto } from '@scn-chat/lexicons'
 import type { PdsClientFactory } from '../auth/pds.ts'
+import { lexErrorCode } from '../lex-errors.ts'
+import type { Loose } from '../loose.ts'
 import {
   type OpsPage,
   RecordExists,
@@ -12,16 +13,10 @@ import {
   type StoredRecord,
 } from './record-store.ts'
 import { type JsonRecord, toJson, toLex } from './records.ts'
+import { MEMBER_LIST, OPEN } from './space-policies.ts'
 import { assertValidRecord } from './validate.ts'
 
-const MEMBER_LIST = { $type: 'com.atproto.simplespace.defs#memberListPolicy' } as const
-const OPEN = { $type: 'com.atproto.simplespace.defs#open' } as const
 const PAGE = 100
-
-// Plain strings don't satisfy the generated methods' branded string types.
-type Loose = any
-
-const errorCode = (err: unknown) => (err instanceof LexError ? err.error : undefined)
 
 /** A user's records on their spaces-enabled PDS. */
 export class SpaceRecordStore implements RecordStore {
@@ -46,7 +41,7 @@ export class SpaceRecordStore implements RecordStore {
     try {
       return await this.rawCall(method, input)
     } catch (err) {
-      if (errorCode(err) === 'SpaceNotFound') throw new SpaceNotFound(space)
+      if (lexErrorCode(err) === 'SpaceNotFound') throw new SpaceNotFound(space)
       throw err
     }
   }
@@ -62,7 +57,7 @@ export class SpaceRecordStore implements RecordStore {
       })
       return uri as string
     } catch (err) {
-      if (errorCode(err) === 'SpaceAlreadyExists')
+      if (lexErrorCode(err) === 'SpaceAlreadyExists')
         throw new SpaceExists(`at://${this.did}/space/${type}/${skey}`)
       throw err
     }
@@ -82,8 +77,9 @@ export class SpaceRecordStore implements RecordStore {
       })
       return { rkey, value: toJson(out.value), cid: out.cid }
     } catch (err) {
-      if (errorCode(err) === 'RecordNotFound' || errorCode(err) === 'RepoNotFound') return null
-      if (errorCode(err) === 'SpaceNotFound') throw new SpaceNotFound(space)
+      if (lexErrorCode(err) === 'RecordNotFound' || lexErrorCode(err) === 'RepoNotFound')
+        return null
+      if (lexErrorCode(err) === 'SpaceNotFound') throw new SpaceNotFound(space)
       throw err
     }
   }
@@ -100,7 +96,7 @@ export class SpaceRecordStore implements RecordStore {
           space,
         )
       } catch (err) {
-        if (errorCode(err) === 'RepoNotFound') return records
+        if (lexErrorCode(err) === 'RepoNotFound') return records
         throw err
       }
       records.push(...out.records)
@@ -145,8 +141,9 @@ export class SpaceRecordStore implements RecordStore {
       })
       return { cid: out.cid }
     } catch (err) {
-      if (errorCode(err) === 'RecordAlreadyExists') throw new RecordExists(space, collection, rkey)
-      if (errorCode(err) === 'SpaceNotFound') throw new SpaceNotFound(space)
+      if (lexErrorCode(err) === 'RecordAlreadyExists')
+        throw new RecordExists(space, collection, rkey)
+      if (lexErrorCode(err) === 'SpaceNotFound') throw new SpaceNotFound(space)
       throw err
     }
   }
@@ -182,7 +179,7 @@ export class SpaceRecordStore implements RecordStore {
           space,
         )
       } catch (err) {
-        if (errorCode(err) === 'RepoNotFound') return page
+        if (lexErrorCode(err) === 'RepoNotFound') return page
         throw err
       }
       for (const op of out.ops) {
@@ -208,7 +205,7 @@ export class SpaceRecordStore implements RecordStore {
       const out = await this.call(atproto.space.getLatestCommit, { space, repo: this.did }, space)
       return out.commit.rev
     } catch (err) {
-      if (errorCode(err) === 'RepoNotFound') return null
+      if (lexErrorCode(err) === 'RepoNotFound') return null
       throw err
     }
   }

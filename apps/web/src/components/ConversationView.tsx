@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, json, read } from '../api.ts'
-import { currentBranch } from '../lib/branch.ts'
+import { blobUrlFor } from '../lib/blob-url.ts'
 import { useMe } from '../session.tsx'
 import { messageText } from '../store/core.ts'
 import { useConversation, useStore } from '../store/react.tsx'
@@ -8,6 +8,7 @@ import { Composer, type ModelOption, modelKey } from './Composer.tsx'
 import { MessageView } from './MessageView.tsx'
 import { ShareControl } from './ShareControl.tsx'
 import { useAction } from './useAction.ts'
+import { useBranch } from './useBranch.ts'
 import { useReplyStream } from './useReplyStream.ts'
 
 export function ConversationView({ skey, models }: { skey: string; models: ModelOption[] }) {
@@ -15,7 +16,6 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
   const store = useStore()
   const { conversation, error: loadError } = useConversation(skey)
   const { error, run } = useAction()
-  const [chosen, setChosen] = useState<Record<string, string>>({})
   const [editing, setEditing] = useState<{ parent?: string; text: string } | null>(null)
   const [regenModel, setRegenModel] = useState('')
   const [renaming, setRenaming] = useState<string | null>(null)
@@ -32,12 +32,9 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
     for (const message of messages) if (message.record.status === 'pending') follow(message.rkey)
   }, [messages, follow])
 
-  const branch = currentBranch(messages, chosen)
+  const { branch, pick } = useBranch(messages)
   const leaf = branch.at(-1)?.message
-  const pick = (parent: string | null, rkey: string) =>
-    setChosen((current) => ({ ...current, [parent ?? '']: rkey }))
-  const blobUrl = (cid: string, mimeType?: string) =>
-    `/api/conversations/${skey}/blobs/${cid}${mimeType ? `?type=${encodeURIComponent(mimeType)}` : ''}`
+  const blobUrl = blobUrlFor(`/api/conversations/${skey}`)
   const title = (conversation?.info?.title as string | undefined) ?? 'New chat'
 
   const regenerate = async (userRkey: string) => {
@@ -107,7 +104,7 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
         {me.storageMode === 'space' && <ShareControl skey={skey} ownerDid={me.did} />}
       </header>
       {(error ?? loadError) && <p role="alert">{error ?? loadError}</p>}
-      {branch.map(({ message, siblings, index }) => {
+      {branch.map(({ message, siblings, index, parent: group }) => {
         const record = message.record
         const parent = (record.parent as string | undefined) ?? null
         const actions =
@@ -158,7 +155,7 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
             siblings={{
               index,
               count: siblings.length,
-              onPick: (i) => pick(parent, (siblings[i] as { rkey: string }).rkey),
+              onPick: (i) => pick(group, (siblings[i] as { rkey: string }).rkey),
             }}
             actions={actions}
           />

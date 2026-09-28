@@ -8,6 +8,7 @@ import { MeContext } from '../../src/session.tsx'
 import type { StoreClient } from '../../src/store/client.ts'
 import type { HandoverState } from '../../src/store/handover.ts'
 import { StoreProvider } from '../../src/store/react.tsx'
+import { requests, stubFetch } from '../helpers/fetch.ts'
 
 const d = (name: string) => `network.sharedcomputer.chat.defs#${name}`
 const text = (value: string) => ({
@@ -109,6 +110,7 @@ function renderWith(store: ReturnType<typeof fakeStore>, children: ReactNode) {
 }
 
 beforeEach(() => {
+  stubFetch()
   FakeEventSource.instances = []
   vi.stubGlobal('EventSource', FakeEventSource)
 })
@@ -128,24 +130,25 @@ describe('ConversationView', () => {
     expect(screen.queryByText('second answer')).toBeNull()
   })
 
-  it('regenerates and selects the new sibling reply', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => Response.json({ replyRkey: 'u.r1', status: 'claimed' })),
-    )
-    const store = fakeStore([user('u', 'question'), reply('u.r0', 'first answer', 'u')])
+  it('regenerates and selects the new reply, even when it is not the newest sibling', async () => {
+    stubFetch(vi.fn(async () => Response.json({ replyRkey: 'u.r1', status: 'claimed' })))
+    const store = fakeStore([
+      user('u', 'question'),
+      reply('u.r0', 'first answer', 'u'),
+      reply('u.r2', 'third answer', 'u'),
+    ])
     renderWith(store, <ConversationView skey="s1" models={[]} />)
     await userEvent.click(await screen.findByRole('button', { name: 'Regenerate' }))
     act(() => store.update([...store.data.messages, reply('u.r1', 'regenerated', 'u')]))
     expect(await screen.findByText('regenerated')).toBeInTheDocument()
-    expect(screen.getByText(/2 \/ 2/)).toBeInTheDocument()
+    expect(screen.getByText(/2 \/ 3/)).toBeInTheDocument()
   })
 
   it('edits a message into a sibling with its own reply', async () => {
     const fetch = vi.fn(async () =>
       Response.json({ rkey: 'u2', replyRkey: 'u2.r0', status: 'claimed' }, { status: 201 }),
     )
-    vi.stubGlobal('fetch', fetch)
+    stubFetch(fetch)
     const store = fakeStore([user('u', 'original'), reply('u.r0', 'answer', 'u')])
     renderWith(store, <ConversationView skey="s1" models={[]} />)
     await userEvent.click(await screen.findByRole('button', { name: 'Edit' }))
@@ -166,11 +169,11 @@ describe('ConversationView', () => {
 
   it('stops a generating reply', async () => {
     const fetch = vi.fn(async () => Response.json({ cancelled: true }))
-    vi.stubGlobal('fetch', fetch)
+    stubFetch(fetch)
     const store = fakeStore([user('u', 'q'), reply('u.r0', '', 'u', 'pending')])
     renderWith(store, <ConversationView skey="s1" models={[]} />)
     await userEvent.click(await screen.findByRole('button', { name: 'Stop' }))
-    expect(String((fetch.mock.calls[0] as unknown as [string])[0])).toBe(
+    expect(String((requests(fetch)[0] as [string])[0])).toBe(
       '/api/conversations/s1/messages/u.r0/cancel',
     )
   })
@@ -182,10 +185,14 @@ describe('ConversationView', () => {
     const source = FakeEventSource.instances[0] as FakeEventSource
     expect(source.url).toBe('/api/conversations/s1/messages/u.r0/stream')
     act(() => {
-      source.emit('delta', { index: 0, text: 'Hel' })
-      source.emit('delta', { index: 0, text: 'lo' })
+      source.emit('part-start', { index: 0, partType: 'reasoningPart' })
+      source.emit('delta', { index: 0, text: 'pondering' })
+      source.emit('part-start', { index: 1, partType: 'textPart' })
+      source.emit('delta', { index: 1, text: 'Hel' })
+      source.emit('delta', { index: 1, text: 'lo' })
     })
     expect(screen.getByText('Hello')).toBeInTheDocument()
+    expect(screen.getByText('pondering').closest('details')).not.toBeNull()
     act(() => source.emit('status', { status: 'complete' }))
     expect(source.closed).toBe(true)
     await vi.waitFor(() => expect(store.worker.refreshConversation).toHaveBeenCalled())
@@ -199,7 +206,7 @@ describe('ConversationView', () => {
       await vi.waitFor(() => expect(FakeEventSource.instances).toHaveLength(1))
       store.worker.refreshConversation.mockClear()
       act(() => (FakeEventSource.instances[0] as FakeEventSource).onerror?.())
-      await act(async () => vi.advanceTimersByTimeAsync(4_100))
+      await act(async () => vi.advanceTimersByTimeAsync(6_100))
       expect(store.worker.refreshConversation.mock.calls.length).toBeGreaterThanOrEqual(2)
     } finally {
       vi.useRealTimers()
@@ -212,7 +219,7 @@ describe('ConversationView errors', () => {
 
   it('regenerates with a model whose ID contains a slash', async () => {
     const fetch = vi.fn(async () => Response.json({ replyRkey: 'u.r1', status: 'claimed' }))
-    vi.stubGlobal('fetch', fetch)
+    stubFetch(fetch)
     const models = [
       { provider: 'router', id: 'anthropic/claude', name: 'Claude', capabilities: caps },
     ]
@@ -223,15 +230,14 @@ describe('ConversationView errors', () => {
       'router/anthropic/claude',
     )
     await userEvent.click(screen.getByRole('button', { name: 'Regenerate' }))
-    const init = (fetch.mock.calls[0] as unknown as [string, RequestInit])[1]
+    const init = (requests(fetch)[0] as [string, RequestInit])[1]
     expect(JSON.parse(String(init.body))).toEqual({
       model: { provider: 'router', id: 'anthropic/claude' },
     })
   })
 
   it('shows why a rename failed', async () => {
-    vi.stubGlobal(
-      'fetch',
+    stubFetch(
       vi.fn(async () =>
         Response.json(
           { error: 'InvalidRecord', message: 'The title is too long' },
@@ -247,10 +253,7 @@ describe('ConversationView errors', () => {
   })
 
   it('says so when Stop has nothing to stop', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => Response.json({ cancelled: false })),
-    )
+    stubFetch(vi.fn(async () => Response.json({ cancelled: false })))
     const store = fakeStore([user('u', 'q'), reply('u.r0', '', 'u', 'pending')])
     renderWith(store, <ConversationView skey="s1" models={[]} />)
     await userEvent.click(await screen.findByRole('button', { name: 'Stop' }))
@@ -278,6 +281,27 @@ describe('ConversationView errors', () => {
       const calls = store.worker.refreshConversation.mock.calls.length
       await act(async () => vi.advanceTimersByTimeAsync(6_000))
       expect(store.worker.refreshConversation.mock.calls.length).toBe(calls)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('ConversationView streams', () => {
+  it('waits and polls, instead of re-following, when this server is not running the reply', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      const store = fakeStore([user('u', 'q'), reply('u.r0', '', 'u', 'pending')])
+      renderWith(store, <ConversationView skey="s1" models={[]} />)
+      await vi.waitFor(() => expect(FakeEventSource.instances).toHaveLength(1))
+      await act(async () =>
+        (FakeEventSource.instances[0] as FakeEventSource).emit('status', { status: 'unknown' }),
+      )
+      await act(async () => vi.advanceTimersByTimeAsync(1_000))
+      expect(FakeEventSource.instances).toHaveLength(1)
+      const before = store.worker.refreshConversation.mock.calls.length
+      await act(async () => vi.advanceTimersByTimeAsync(2_100))
+      expect(store.worker.refreshConversation.mock.calls.length).toBe(before + 1)
     } finally {
       vi.useRealTimers()
     }

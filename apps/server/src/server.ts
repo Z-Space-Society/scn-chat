@@ -6,6 +6,7 @@ import { createOAuthClient, type OAuthClientLike } from './auth/oauth-client.ts'
 import { createPdsClientFactory } from './auth/pds.ts'
 import { createRoles } from './auth/roles.ts'
 import { buildScope } from './auth/scope.ts'
+import { sweepExpired } from './auth/web-session.ts'
 import { turnBlobs } from './blobs/routes.ts'
 import { createBlobStores } from './blobs/store.ts'
 import type { Config, ModelConfig, SyncConfig } from './config.ts'
@@ -57,7 +58,9 @@ export async function createServer(deps: ServerDeps) {
   const scope = buildScope(config.oauthScopeMode)
   const oauth = deps.oauth ?? (await createOAuthClient(config, db, scope))
   const getPdsClient = createPdsClientFactory(oauth)
-  const identity = deps.identity ?? createIdentityResolver(config.plcUrl)
+  const identity =
+    deps.identity ??
+    createIdentityResolver(config.plcUrl, { allowPrivateNetworks: config.allowPrivateNetworks })
   const resolvePds = async (did: string) => (await identity.resolve(did)).pdsUrl
   const events = new SyncEventBus()
   const recentWrites = new RecentWrites()
@@ -97,7 +100,8 @@ export async function createServer(deps: ServerDeps) {
     logger,
   })
 
-  const credentials = new CredentialCache({ getPdsClient, resolvePds })
+  const serviceFetch = config.allowPrivateNetworks ? fetch : guardedFetch
+  const credentials = new CredentialCache({ getPdsClient, resolvePds, fetch: serviceFetch })
   const engine = new SyncEngine({
     db,
     services,
@@ -127,7 +131,7 @@ export async function createServer(deps: ServerDeps) {
     getPdsClient,
     identity,
     mintCredential: (viewer, space) =>
-      mintSpaceCredential({ getPdsClient, resolvePds }, viewer, space),
+      mintSpaceCredential({ getPdsClient, resolvePds, fetch: serviceFetch }, viewer, space),
     logger,
   })
 
@@ -135,12 +139,17 @@ export async function createServer(deps: ServerDeps) {
     await services.forAccount(account).ensureSettingsSpace()
     if (account.storageMode !== 'space') return
     const did = account.did
+    // Each step runs even if an earlier one fails.
     const background = async () => {
-      await engine.registerIndex(did)
-      await engine.discover(did)
-      await engine.syncIndex(did)
+      for (const [step, run] of [
+        ['register', () => engine.registerIndex(did)],
+        ['discover', () => engine.discover(did)],
+        ['sync', () => engine.syncIndex(did)],
+      ] as const) {
+        await run().catch((err) => logger.warn({ err, did, step }, 'post-login sync failed'))
+      }
     }
-    background().catch((err) => logger.warn({ err, did }, 'post-login sync failed'))
+    void background()
   }
 
   const app = createApp({
@@ -169,9 +178,12 @@ export async function createServer(deps: ServerDeps) {
   if (deps.startBackgroundJobs !== false) {
     await runner.recover()
     stops.push(startSyncScheduler({ engine, db, config: syncConfig, logger }))
-    const sweep = setInterval(() => {
+    const sweepAll = () => {
       blobStores.local.sweep().catch((err) => logger.warn({ err }, 'blob sweep failed'))
-    }, 86_400_000)
+      sweepExpired(db).catch((err) => logger.warn({ err }, 'session sweep failed'))
+    }
+    sweepAll()
+    const sweep = setInterval(sweepAll, 86_400_000)
     stops.push(() => clearInterval(sweep))
   }
 

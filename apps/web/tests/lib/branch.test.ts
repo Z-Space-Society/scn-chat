@@ -19,6 +19,12 @@ describe('currentBranch', () => {
     expect(currentBranch(messages, {}).map((s) => s.message.rkey)).toEqual(['a', 'a.r1', 'b'])
   })
 
+  it('groups messages whose parent is missing at the root, where the root choice picks them', () => {
+    const orphans = [m('x', 'gone', '2026-09-26T00:00:00Z'), m('y', 'gone', '2026-09-26T00:01:00Z')]
+    expect(currentBranch(orphans, {})[0]).toMatchObject({ parent: null, message: { rkey: 'y' } })
+    expect(currentBranch(orphans, { '': 'x' })[0]?.message.rkey).toBe('x')
+  })
+
   it('follows a chosen sibling and what comes after it', () => {
     expect(currentBranch(messages, { a: 'a.r0' }).map((s) => s.message.rkey)).toEqual([
       'a',

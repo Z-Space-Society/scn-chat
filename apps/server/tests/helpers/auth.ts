@@ -11,6 +11,10 @@ import { testConfig } from './config.ts'
 
 export const ORIGIN = 'http://127.0.0.1:3000'
 
+/** The OAuth state the fake client returns, and the cookie that matches it. */
+export const LOGIN_STATE = 'test-login-state'
+export const loginCookie = { headers: { cookie: `scn_login=${LOGIN_STATE}` } }
+
 export function fakeSession(did: string, scope: string) {
   return { did, getTokenInfo: vi.fn(async () => ({ scope })) } as unknown as OAuthSession
 }
@@ -20,14 +24,18 @@ export function fakeOAuth(overrides: Partial<OAuthClientLike> = {}): OAuthClient
     clientMetadata: { client_id: 'http://localhost' },
     jwks: { keys: [] },
     authorize: vi.fn(async () => new URL('https://pds.test/oauth/authorize?request_uri=x')),
-    callback: vi.fn(async () => ({ session: fakeSession('did:plc:alice', buildScope('raw')) })),
+    callback: vi.fn(async () => ({
+      session: fakeSession('did:plc:alice', buildScope('raw')),
+      state: LOGIN_STATE,
+    })),
     restore: vi.fn(async (did: string) => fakeSession(did, buildScope('raw'))),
     revoke: vi.fn(async () => {}),
     ...overrides,
   }
 }
 
-export const fakeIdentity: IdentityResolver = {
+/** An identity resolver with fresh mocks for each test. */
+export const fakeIdentity = (): IdentityResolver => ({
   resolve: vi.fn(async (did: string) => ({
     did,
     handle: 'alice.test',
@@ -35,7 +43,7 @@ export const fakeIdentity: IdentityResolver = {
   })),
   resolveHandle: vi.fn(async () => 'did:plc:alice'),
   resolveSigningKey: vi.fn(async () => 'did:key:zQ3shtest'),
-}
+})
 
 export function authDeps(db: Db, overrides: Partial<AuthDeps> = {}): AuthDeps {
   return {
@@ -43,7 +51,7 @@ export function authDeps(db: Db, overrides: Partial<AuthDeps> = {}): AuthDeps {
     db,
     logger: pino({ level: 'silent' }),
     oauth: fakeOAuth(),
-    identity: fakeIdentity,
+    identity: fakeIdentity(),
     roles: createRoles({ staff: ['did:plc:alice'] }),
     scope: buildScope('raw'),
     ...overrides,

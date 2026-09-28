@@ -1,15 +1,18 @@
 import { definePlugin, type ModelProvider, type Plugin } from '@scn-chat/plugin-api'
 import pino from 'pino'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { loadPlugins, PluginLoadError, type PluginServices } from '../../src/plugins/host.ts'
 
 const logger = pino({ level: 'silent' })
 const app = { name: 'Test', publicUrl: 'http://127.0.0.1:3000' }
-const services: PluginServices = {
-  generateText: vi.fn(async () => ({ text: 'generated', finishReason: 'stop' })),
-  updateInfo: vi.fn(async () => {}),
-  userSettings: vi.fn(async () => ({ enabled: true })),
-}
+let services: PluginServices
+beforeEach(() => {
+  services = {
+    generateText: vi.fn(async () => ({ text: 'generated', finishReason: 'stop' })),
+    updateInfo: vi.fn(async () => {}),
+    userSettings: vi.fn(async () => ({ enabled: true })),
+  }
+})
 
 const plugin = (id: string, setup: Plugin['setup'] = () => {}, apiVersion = 1) =>
   definePlugin({ id, name: id, apiVersion, setup })

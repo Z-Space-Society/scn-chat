@@ -2,6 +2,7 @@ import { createServer, type Server } from 'node:http'
 import type { AddressInfo, Socket } from 'node:net'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
+  assertPublicHost,
   createGuardedFetch,
   guardConnector,
   isPrivateAddress,
@@ -16,6 +17,14 @@ beforeAll(async () => {
     if (req.url === '/redirect') {
       res.writeHead(302, { location: '/ok' })
       return res.end()
+    }
+    if (req.url === '/echo') {
+      let body = ''
+      req.on('data', (chunk) => {
+        body += chunk
+      })
+      req.on('end', () => res.end(`${req.method} ${req.headers['x-test']} ${body}`))
+      return
     }
     res.end('ok')
   })
@@ -59,6 +68,12 @@ describe('createGuardedFetch', () => {
     )
   })
 
+  it('refuses a bracketed IPv6 loopback literal', async () => {
+    await expect(createGuardedFetch()('http://[::1]:8080/')).rejects.toBeInstanceOf(
+      PrivateNetworkError,
+    )
+  })
+
   it('refuses an IPv4-mapped IPv6 literal', async () => {
     await expect(
       createGuardedFetch()(`http://[::ffff:127.0.0.1]:${port}/ok`),
@@ -70,6 +85,16 @@ describe('createGuardedFetch', () => {
       (err: unknown) => err,
     )
     expect(rootCause(error)).toBeInstanceOf(PrivateNetworkError)
+  })
+
+  it('sends a Request made by the built-in fetch, with its method, headers, and body', async () => {
+    const guarded = createGuardedFetch(() => false)
+    const request = new Request(`http://127.0.0.1:${port}/echo`, {
+      method: 'POST',
+      headers: { 'x-test': 'yes' },
+      body: 'hello',
+    })
+    expect(await (await guarded(request)).text()).toBe('POST yes hello')
   })
 
   it('does not follow redirects', async () => {
@@ -84,7 +109,9 @@ describe('guardConnector', () => {
     let destroyed = false
     const socket = {
       remoteAddress: '10.0.0.5',
-      destroy: () => void (destroyed = true),
+      destroy: () => {
+        destroyed = true
+      },
     } as unknown as Socket
     const connector = guardConnector(((
       _options: unknown,
@@ -110,5 +137,13 @@ describe('guardConnector', () => {
       ),
     )
     expect(result).toEqual({ err: null, socket })
+  })
+})
+
+describe('assertPublicHost', () => {
+  it('refuses a private address and allows a public one', async () => {
+    await expect(assertPublicHost('10.0.0.5')).rejects.toBeInstanceOf(PrivateNetworkError)
+    await expect(assertPublicHost('[::1]')).rejects.toBeInstanceOf(PrivateNetworkError)
+    await expect(assertPublicHost('8.8.8.8')).resolves.toBeUndefined()
   })
 })

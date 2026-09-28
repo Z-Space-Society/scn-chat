@@ -13,6 +13,7 @@ else if (existsSync('../../.env')) process.loadEnvFile('../../.env')
 const configPath = process.env.SCN_CHAT_CONFIG || defaultConfigPath
 const config = loadConfig({ env: process.env, file: readConfigFile(configPath), configPath })
 const logger = createLogger(config.logLevel)
+process.on('unhandledRejection', (err) => logger.error({ err }, 'unhandled promise rejection'))
 const db = createDb(config.databaseUrl)
 const plugins = await importPlugins(config.plugins, config.configDir)
 const webDist = fileURLToPath(new URL('../../web/dist', import.meta.url))

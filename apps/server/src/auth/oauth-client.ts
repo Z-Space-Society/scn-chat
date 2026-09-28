@@ -15,8 +15,8 @@ import type { Db } from '../db/index.ts'
 export interface OAuthClientLike {
   readonly clientMetadata: object
   readonly jwks: object
-  authorize(input: string, options: { scope: string }): Promise<URL>
-  callback(params: URLSearchParams): Promise<{ session: OAuthSession }>
+  authorize(input: string, options: { scope: string; state: string }): Promise<URL>
+  callback(params: URLSearchParams): Promise<{ session: OAuthSession; state: string | null }>
   restore(did: string): Promise<OAuthSession>
   revoke(did: string): Promise<void>
 }

@@ -3,6 +3,7 @@ import * as Comlink from 'comlink'
 import { type StoreChange, StoreCore } from './core.ts'
 import { StoreClosed } from './errors.ts'
 import { httpApi, Unauthorized } from './http-api.ts'
+import { STORE_NAME } from './names.ts'
 import { ensureSchema } from './schema.ts'
 import type { SqlDb } from './sql.ts'
 
@@ -26,7 +27,7 @@ const emit = (change: WorkerChange) => {
 async function fileFor(did: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(did))
   const hex = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')
-  return `/scn-chat-${hex.slice(0, 16)}.sqlite3`
+  return `/${STORE_NAME}-${hex.slice(0, 16)}.sqlite3`
 }
 
 function adapt(database: Database): SqlDb {
@@ -65,14 +66,14 @@ async function filePool(): Promise<Pool | null> {
   }
   // This fails while another tab holds the files. The reinit option, missing from the
   // published types, lets the handover's retry try again.
-  const options = { name: 'scn-chat', forceReinitIfPreviouslyFailed: true }
+  const options = { name: STORE_NAME, forceReinitIfPreviouslyFailed: true }
   pool = await sqlite3.installOpfsSAHPoolVfs(options)
   return pool
 }
 
 const api = {
   /** Open this account's database, persisting it in the origin private file system when possible. */
-  async open(did: string): Promise<{ persistent: boolean }> {
+  async open(did: string): Promise<void> {
     const sqlite3 = await loadSqlite()
     const files = await filePool()
     if (files?.isPaused()) await files.unpauseVfs()
@@ -89,7 +90,6 @@ const api = {
         )
       })
     }
-    return { persistent: Boolean(files) }
   },
 
   /** Close the database so another tab can open it. */
@@ -122,7 +122,6 @@ const api = {
   reconcileIndex: () => guard((store) => store.reconcileIndex()),
   reconcileConversation: (skey: string) => guard((store) => store.reconcileConversation(skey)),
   backgroundDownload: () => guard((store) => store.backgroundDownload()),
-  staleCount: () => guard((store) => store.staleConversations().length),
 }
 
 export type WorkerApi = typeof api

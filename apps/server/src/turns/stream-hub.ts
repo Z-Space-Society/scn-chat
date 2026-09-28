@@ -42,6 +42,12 @@ export class StreamHub {
     }
   }
 
+  /** End a channel that is still open, such as a queued turn that will not run. */
+  end(key: string, status: string): void {
+    const channel = this.channels.get(key)
+    if (channel && !channel.done) this.publish(key, { type: 'status', status })
+  }
+
   has(key: string): boolean {
     return this.channels.has(key)
   }

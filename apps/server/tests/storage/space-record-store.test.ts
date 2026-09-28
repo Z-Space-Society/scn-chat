@@ -76,7 +76,7 @@ describe('SpaceRecordStore', () => {
   })
 
   it('lists ops with the commit and keys without values', async () => {
-    const { store, pds } = await setup()
+    const { store } = await setup()
     const space = await store.createSpace(nsid.conversation, '3aaaaaaaaaaaa')
     const { cid } = await store.putRecord(space, nsid.info, 'self', info)
     const page = await store.listOps(space)

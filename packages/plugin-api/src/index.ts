@@ -7,7 +7,7 @@ import type {
   PlainContent,
   PreferencesRecord,
 } from '@scn-chat/lexicons'
-import type { z } from 'zod'
+import { z } from 'zod'
 
 export type {
   Effort,
@@ -205,4 +205,38 @@ export function definePlugin<UserSettings = unknown>(
   plugin: Plugin<UserSettings>,
 ): Plugin<UserSettings> {
   return plugin
+}
+
+/** Options for a provider plugin that only needs an API key. */
+export const keyedProviderOptions = z
+  .object({ apiKey: z.string().min(1).optional(), userKeys: z.boolean().optional() })
+  .strict()
+
+export type KeyedProviderOptions = z.infer<typeof keyedProviderOptions>
+
+/** Build the factory for a provider plugin only needs an API key. */
+export function keyedProvider(provider: {
+  id: string
+  name: string
+  replay: ReplayPolicy
+  providerOptions?: ModelProvider['providerOptions']
+  create: (apiKey: string | undefined) => (modelId: string) => LanguageModelV4
+}) {
+  return (options: KeyedProviderOptions = {}) =>
+    definePlugin({
+      id: provider.id,
+      name: provider.name,
+      apiVersion: PLUGIN_API_VERSION,
+      setup(ctx) {
+        ctx.providers.register({
+          id: provider.id,
+          name: provider.name,
+          hasAdminKey: Boolean(options.apiKey),
+          userKeys: options.userKeys ?? true,
+          replay: provider.replay,
+          ...(provider.providerOptions ? { providerOptions: provider.providerOptions } : {}),
+          createModel: ({ modelId, apiKey }) => provider.create(apiKey ?? options.apiKey)(modelId),
+        })
+      },
+    })
 }

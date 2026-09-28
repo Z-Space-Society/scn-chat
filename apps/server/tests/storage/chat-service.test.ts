@@ -1,7 +1,7 @@
 import { nsid } from '@scn-chat/lexicons'
 import { sql } from 'kysely'
 import pino from 'pino'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { Db } from '../../src/db/index.ts'
 import { migrateToLatest } from '../../src/db/migrate.ts'
 import { ChatService } from '../../src/storage/chat-service.ts'
@@ -134,6 +134,18 @@ describe.each(dialects)('ChatService on $name', ({ create }) => {
     await db.destroy()
   })
 
+  it('creates the settings space on the first write that needs it, and only then', async () => {
+    const { chats, db } = await setup()
+    const create = vi.spyOn(chats.store, 'createSpace')
+    await chats.createConversation()
+    await chats.createConversation()
+    await chats.putPreferences({ generateTitles: false })
+    const settings = create.mock.calls.filter(([type]) => type === nsid.settings)
+    expect(settings).toHaveLength(1)
+    expect((await chats.getPreferences())?.generateTitles).toBe(false)
+    await db.destroy()
+  })
+
   it('creates the settings space idempotently', async () => {
     const { chats, db } = await setup()
     await chats.ensureSettingsSpace()
@@ -197,6 +209,26 @@ describe.each(dialects)('ChatService on $name', ({ create }) => {
     })
     const { conversations } = await chats.listConversations()
     expect(conversations.map((c) => c.skey)).toEqual([skey])
+    await db.destroy()
+  })
+
+  it('reads the head revision before the records, so a write in between comes again later', async () => {
+    const { chats, db } = await setup()
+    const { skey } = await chats.createConversation()
+    const order: string[] = []
+    const head = chats.store.headRev.bind(chats.store)
+    const list = chats.store.listRecords.bind(chats.store)
+    vi.spyOn(chats.store, 'headRev').mockImplementation(async (space) => {
+      order.push('head')
+      return head(space)
+    })
+    vi.spyOn(chats.store, 'listRecords').mockImplementation(async (space, collection) => {
+      order.push('list')
+      return list(space, collection)
+    })
+    await chats.getConversation(skey)
+    await chats.listConversations()
+    expect(order).toEqual(['head', 'list', 'head', 'list'])
     await db.destroy()
   })
 

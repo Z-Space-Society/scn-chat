@@ -6,7 +6,7 @@ import type { sharingRoutes } from './sharing/routes.ts'
 import type { storageRoutes } from './storage/routes.ts'
 import type { turnRoutes } from './turns/routes.ts'
 
-/** Route types for the web app's typed client. Every router is mounted under /api. */
+/** Route types for the api client, mounted under /api, with plugins under /api/plugins. */
 export type AuthApi = ReturnType<typeof authApiRoutes>
 export type StorageApi = ReturnType<typeof storageRoutes>
 export type TurnsApi = ReturnType<typeof turnRoutes>

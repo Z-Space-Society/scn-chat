@@ -6,7 +6,7 @@ import { createApp } from '../../src/app.ts'
 import { migrateToLatest } from '../../src/db/migrate.ts'
 import { loadPlugins } from '../../src/plugins/host.ts'
 import { SecretBox } from '../../src/secrets.ts'
-import { authDeps, ORIGIN, sessionCookie } from '../helpers/auth.ts'
+import { authDeps, loginCookie, ORIGIN, sessionCookie } from '../helpers/auth.ts'
 import { testConfig } from '../helpers/config.ts'
 import { createSqliteDb } from '../helpers/db.ts'
 
@@ -41,7 +41,7 @@ async function setup() {
     auth: authDeps(db),
     plugins: { db, box, host },
   })
-  const cookie = sessionCookie(await app.request('/oauth/callback?code=a&state=b'))
+  const cookie = sessionCookie(await app.request('/oauth/callback?code=a&state=b', loginCookie))
   return { app, db, cookie }
 }
 
@@ -68,6 +68,16 @@ describe('plugin settings API', () => {
     ).json()) as Settings
     expect(body.plugins.map((plugin) => plugin.id)).toEqual(['search'])
     expect(body.plugins[0]?.schema).toMatchObject({ type: 'object' })
+  })
+
+  it('refuses settings that are not a JSON object', async () => {
+    const { app, cookie } = await setup()
+    const put = await app.request('/api/plugins/search/settings', {
+      method: 'PUT',
+      headers: { cookie, origin: ORIGIN, 'content-type': 'application/json' },
+      body: JSON.stringify(['kagi']),
+    })
+    expect(put.status).toBe(400)
   })
 
   it('saves settings and never returns secret values', async () => {

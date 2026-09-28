@@ -103,8 +103,13 @@ function assistantMessages(parts: Part[], replay: boolean): ModelMessage[] {
     if (tool.length) messages.push({ role: 'tool', content: tool })
     tool = []
   }
+  const answered = new Set(
+    parts.filter((part) => kind(part) === 'toolResultPart').map((part) => part.callId as string),
+  )
   for (const part of parts) {
     const type = kind(part)
+    // A reply cancelled mid-tool-call has a call with no result, which providers reject.
+    if (type === 'toolCallPart' && !answered.has(part.callId as string)) continue
     const providerOptions = replay ? parseProviderData(part.providerData) : undefined
     if (type === 'toolResultPart') {
       flushAssistant()

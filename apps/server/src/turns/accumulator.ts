@@ -1,5 +1,6 @@
 import { nsid } from '@scn-chat/lexicons'
 import type { TextStreamPart, ToolSet } from 'ai'
+import { safeErrorMessage } from '../safe-error.ts'
 
 type Part = Record<string, unknown>
 
@@ -18,10 +19,20 @@ export class PartAccumulator {
   readonly parts: Part[] = []
   usage: { inputTokens?: number; outputTokens?: number; reasoningTokens?: number } = {}
   private readonly open = new Map<string, number>()
+  private readonly metadata = new Map<string, Record<string, Record<string, unknown>>>()
   private readonly emit: (event: StreamEvent) => void
 
   constructor(emit: (event: StreamEvent) => void = () => {}) {
     this.emit = emit
+  }
+
+  /** Merge provider metadata for a part, which some providers send on its start or deltas. */
+  private remember(key: string, metadata: Record<string, Record<string, unknown>> | undefined) {
+    if (!metadata) return
+    const merged = this.metadata.get(key) ?? {}
+    for (const [provider, values] of Object.entries(metadata))
+      merged[provider] = { ...merged[provider], ...values }
+    this.metadata.set(key, merged)
   }
 
   private start(key: string, type: string, part: Part): number {
@@ -41,12 +52,14 @@ export class PartAccumulator {
     switch (chunk.type) {
       case 'text-start':
         this.start(`text:${chunk.id}`, 'textPart', { $type: defs('textPart'), text: '' })
+        this.remember(`text:${chunk.id}`, chunk.providerMetadata)
         break
       case 'reasoning-start':
         this.start(`reasoning:${chunk.id}`, 'reasoningPart', {
           $type: defs('reasoningPart'),
           text: '',
         })
+        this.remember(`reasoning:${chunk.id}`, chunk.providerMetadata)
         break
       case 'text-delta':
       case 'reasoning-delta': {
@@ -55,6 +68,7 @@ export class PartAccumulator {
         const index =
           this.open.get(key) ??
           this.start(key, `${kind}Part`, { $type: defs(`${kind}Part`), text: '' })
+        this.remember(key, chunk.providerMetadata)
         const part = this.parts[index] as Part
         part.text = `${part.text as string}${chunk.text}`
         this.emit({ type: 'delta', index, text: chunk.text })
@@ -64,9 +78,11 @@ export class PartAccumulator {
       case 'reasoning-end': {
         const key = `${chunk.type === 'text-end' ? 'text' : 'reasoning'}:${chunk.id}`
         const index = this.open.get(key)
-        const data = providerData(chunk.providerMetadata)
+        this.remember(key, chunk.providerMetadata)
+        const data = providerData(this.metadata.get(key))
         if (index !== undefined && data) (this.parts[index] as Part).providerData = data
         this.open.delete(key)
+        this.metadata.delete(key)
         break
       }
       case 'tool-call': {
@@ -92,7 +108,7 @@ export class PartAccumulator {
         this.add({
           $type: defs('toolResultPart'),
           callId: chunk.toolCallId,
-          output: chunk.error instanceof Error ? chunk.error.message : encode(chunk.error),
+          output: safeErrorMessage(chunk.error),
           isError: true,
         })
         break

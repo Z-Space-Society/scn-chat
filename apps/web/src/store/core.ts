@@ -280,8 +280,12 @@ export class StoreCore {
   async backgroundDownload(concurrency = 2): Promise<void> {
     const queue = this.staleConversations()
     const worker = async () => {
-      for (let skey = queue.shift(); skey; skey = queue.shift())
-        await this.refreshConversation(skey)
+      for (let skey = queue.shift(); skey; skey = queue.shift()) {
+        // Skip a conversation that fails, and fetch it again on the next download.
+        await this.refreshConversation(skey).catch((err: unknown) =>
+          console.warn('Downloading a conversation failed', skey, err),
+        )
+      }
     }
     await Promise.all(Array.from({ length: Math.min(concurrency, queue.length) }, worker))
   }

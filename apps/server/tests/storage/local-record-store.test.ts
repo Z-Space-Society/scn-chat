@@ -92,8 +92,23 @@ describe.each(dialects)('LocalRecordStore on $name', ({ create }) => {
     await store.deleteRecord(space, nsid.info, 'self')
     const page = await store.listOps(space, first)
     expect(page.ops.map((op) => op.cid === null)).toEqual([false, true])
-    expect(page.ops[0]?.value?.title).toBe('b')
     expect(await store.headRev(space)).toBe(page.rev)
+    await db.destroy()
+  })
+
+  it('keeps only the newest value in the op log, and none after a delete', async () => {
+    const { store, space, db } = await setup()
+    await store.createRecord(space, nsid.info, 'self', info('a'))
+    await store.putRecord(space, nsid.info, 'self', info('b'))
+    expect((await store.listOps(space)).ops.map((op) => op.value?.title)).toEqual([undefined, 'b'])
+    await store.deleteRecord(space, nsid.info, 'self')
+    const rows = await db
+      .selectFrom('local_op')
+      .select('value_json')
+      .where('space_uri', '=', space)
+      .where('value_json', 'is not', null)
+      .execute()
+    expect(rows).toEqual([])
     await db.destroy()
   })
 

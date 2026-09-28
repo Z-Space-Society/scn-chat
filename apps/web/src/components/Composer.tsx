@@ -1,6 +1,7 @@
 import { nsid } from '@scn-chat/lexicons/nsid'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api, json, read } from '../api.ts'
+import { messageOf, useAction } from './useAction.ts'
 
 export type ModelOption = {
   provider: string
@@ -19,6 +20,10 @@ export type ComposerProps = {
   onCancel?: () => void
 }
 
+/** The CID of an attachment part's image or file. */
+const blobCid = (part: Record<string, unknown>) =>
+  ((part.image ?? part.file) as { ref: { $link: string } }).ref.$link
+
 export const modelKey = (m: { provider: string; id: string }) => `${m.provider}/${m.id}`
 
 /** The message box, with model and effort choice and attachments. */
@@ -36,39 +41,51 @@ export function Composer({
   const [effort, setEffort] = useState('')
   const [attachments, setAttachments] = useState<Record<string, unknown>[]>([])
   const [uploading, setUploading] = useState(0)
-  const [error, setError] = useState<string | null>(null)
+  const { error, run, fail } = useAction()
   const model = models.find((m) => modelKey(m) === modelId)
+  const [types, setTypes] = useState<{ images: string[]; files: string[] } | null>(null)
+  useEffect(() => {
+    read(api.blobs.attachments.types.$get()).then(setTypes, (err: unknown) =>
+      fail(`Could not load the attachment types: ${messageOf(err)}`),
+    )
+  }, [fail])
+  // With the default model chosen, the server checks vision when the turn starts.
+  const images = !model || model.capabilities.vision
+  const accept = types && [...(images ? types.images : []), ...types.files].join(',')
 
-  const attach = async (files: FileList | null) => {
-    for (const file of Array.from(files ?? [])) {
-      if (file.type.startsWith('image/') && model && !model.capabilities.vision) {
-        setError('This model cannot read images.')
-        continue
-      }
-      setUploading((n) => n + 1)
-      try {
-        const res = await fetch('/api/attachments', {
-          method: 'POST',
-          headers: {
-            'content-type': file.type || 'application/octet-stream',
-            'x-filename': encodeURIComponent(file.name),
+  const upload = async (file: File) => {
+    setUploading((n) => n + 1)
+    try {
+      const { part } = await read(
+        api.blobs.attachments.$post(
+          {},
+          {
+            init: {
+              body: file,
+              headers: {
+                'content-type': file.type || 'application/octet-stream',
+                'x-filename': encodeURIComponent(file.name),
+              },
+            },
           },
-          body: file,
-        })
-        const body = (await res.json()) as { part?: Record<string, unknown>; message?: string }
-        if (!res.ok || !body.part) throw new Error(body.message ?? 'Upload failed')
-        setAttachments((current) => [...current, body.part as Record<string, unknown>])
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Upload failed')
-      } finally {
-        setUploading((n) => n - 1)
-      }
+        ),
+      )
+      setAttachments((current) => [...current, part])
+    } finally {
+      setUploading((n) => n - 1)
+    }
+  }
+
+  const attach = (files: FileList | null) => {
+    for (const file of Array.from(files ?? [])) {
+      if (file.type.startsWith('image/') && model && !model.capabilities.vision)
+        fail('This model cannot read images.')
+      else run(() => upload(file))
     }
   }
 
   const send = async () => {
-    if (!text.trim() && attachments.length === 0) return
-    setError(null)
+    if (uploading > 0 || (!text.trim() && attachments.length === 0)) return
     const parts = [
       ...attachments,
       ...(text.trim() ? [{ $type: `${nsid.defs}#textPart`, text }] : []),
@@ -77,19 +94,15 @@ export function Composer({
       ...(model ? { model: { provider: model.provider, id: model.id } } : {}),
       ...(effort ? { effort } : {}),
     }
-    try {
-      const sent = await read(
-        api.turns.conversations[':skey'].messages.$post(
-          { param: { skey } },
-          json({ parent, parts, generation }),
-        ),
-      )
-      setText('')
-      setAttachments([])
-      onSent({ rkey: sent.rkey, replyRkey: sent.replyRkey })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sending failed')
-    }
+    const sent = await read(
+      api.turns.conversations[':skey'].messages.$post(
+        { param: { skey } },
+        json({ parent, parts, generation }),
+      ),
+    )
+    setText('')
+    setAttachments([])
+    onSent({ rkey: sent.rkey, replyRkey: sent.replyRkey })
   }
 
   return (
@@ -97,7 +110,7 @@ export function Composer({
       className="composer"
       onSubmit={(event) => {
         event.preventDefault()
-        void send()
+        run(send)
       }}
     >
       <textarea
@@ -107,7 +120,7 @@ export function Composer({
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
-            void send()
+            run(send)
           }
         }}
       />
@@ -134,12 +147,12 @@ export function Composer({
           aria-label="Attach"
           type="file"
           multiple
-          accept={model && !model.capabilities.vision ? 'application/pdf' : undefined}
-          onChange={(e) => void attach(e.target.files)}
+          accept={accept ?? undefined}
+          onChange={(e) => attach(e.target.files)}
         />
         {uploading > 0 && <span>Uploading...</span>}
-        {attachments.map((part, i) => (
-          <span key={i}>{String(part.name ?? 'Image')}</span>
+        {attachments.map((part) => (
+          <span key={blobCid(part)}>{(part.name as string | undefined) ?? 'Image'}</span>
         ))}
         <button type="submit" disabled={uploading > 0}>
           Send

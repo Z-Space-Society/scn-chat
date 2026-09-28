@@ -9,12 +9,19 @@ export class InvalidBody extends Error {
 }
 
 /** Parse a JSON request body and validate it against the schema. */
-export async function jsonBody<S extends z.ZodType>(c: Context, schema: S): Promise<z.infer<S>> {
-  let raw: unknown
-  try {
-    raw = await c.req.json()
-  } catch {
-    throw new InvalidBody('not JSON')
+export async function jsonBody<S extends z.ZodType>(
+  c: Context,
+  schema: S,
+  options: { optional?: boolean } = {},
+): Promise<z.infer<S>> {
+  const text = await c.req.text()
+  let raw: unknown = {}
+  if (text || !options.optional) {
+    try {
+      raw = JSON.parse(text)
+    } catch {
+      throw new InvalidBody('not JSON')
+    }
   }
   const result = schema.safeParse(raw)
   if (!result.success) {

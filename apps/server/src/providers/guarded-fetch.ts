@@ -1,4 +1,5 @@
 import { type LookupAddress, lookup } from 'node:dns'
+import { lookup as lookupAll } from 'node:dns/promises'
 import { isIP, type Socket } from 'node:net'
 import ipaddr from 'ipaddr.js'
 import { Agent, buildConnector, fetch as undiciFetch } from 'undici'
@@ -78,6 +79,19 @@ export function guardConnector(
     })
 }
 
+/** Fail unless every address a host resolves to is public. */
+export async function assertPublicHost(
+  hostname: string,
+  isBlocked: IsBlocked = isPrivateAddress,
+): Promise<void> {
+  const host = hostname.replace(/^\[|\]$/g, '')
+  const addresses = isIP(host)
+    ? [host]
+    : (await lookupAll(host, { all: true })).map((a) => a.address)
+  const blocked = addresses.find(isBlocked)
+  if (blocked) throw new PrivateNetworkError(blocked)
+}
+
 /** A fetch for user-supplied endpoints that cannot reach private networks or follow redirects. */
 export function createGuardedFetch(isBlocked: IsBlocked = isPrivateAddress): typeof fetch {
   const agent = new Agent({
@@ -90,7 +104,18 @@ export function createGuardedFetch(isBlocked: IsBlocked = isPrivateAddress): typ
     const url = new URL(input instanceof Request ? input.url : String(input))
     const host = url.hostname.replace(/^\[|\]$/g, '')
     if (isIP(host) && isBlocked(host)) throw new PrivateNetworkError(host)
-    return undiciFetch(input as never, {
+    // undici's own fetch can't read a Request made by Node's built-in fetch, so unpack it.
+    const fromRequest =
+      input instanceof Request
+        ? {
+            method: input.method,
+            headers: [...input.headers],
+            body: input.body,
+            duplex: 'half' as const,
+          }
+        : {}
+    return undiciFetch(url, {
+      ...fromRequest,
       ...(init as object),
       redirect: 'error',
       dispatcher: agent,

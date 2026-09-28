@@ -1,15 +1,17 @@
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
+import { z } from 'zod'
 import { setBackgroundSync } from '../auth/accounts.ts'
 import { requireUser, signedInUser } from '../auth/routes.ts'
+import { jsonBody } from '../body.ts'
 import type { Db } from '../db/index.ts'
 import type { AppEnv } from '../env.ts'
 import type { Logger } from '../logger.ts'
 import type { HookRunner } from '../plugins/hooks.ts'
+import { jsonObject } from '../schemas.ts'
 import type { SyncEngine } from '../sync/engine.ts'
 import type { SyncEventBus, SyncEvents } from '../sync/events.ts'
 import type { ResolvedSyncConfig } from '../sync/scheduler.ts'
-import type { JsonRecord } from './records.ts'
 import type { ChatServices } from './services.ts'
 
 export type StorageRoutesDeps = {
@@ -23,6 +25,13 @@ export type StorageRoutesDeps = {
 }
 
 const OPEN_SYNC_WAIT_MS = 2_000
+
+const newConversation = z.object({
+  systemPrompt: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+})
+const conversationPatch = newConversation.extend({ title: z.string().optional() })
+const accountSettings = z.object({ backgroundSync: z.boolean().optional() })
 
 /** The chat API used by the web app. Every read goes to the user's record store. */
 export function storageRoutes(deps: StorageRoutesDeps) {
@@ -44,10 +53,7 @@ export function storageRoutes(deps: StorageRoutesDeps) {
       c.json(await chatsFor(c).listConversations(c.req.query('since'))),
     )
     .post('/conversations', async (c) => {
-      const body = (await c.req.json().catch(() => ({}))) as {
-        systemPrompt?: string
-        tags?: string[]
-      }
+      const body = await jsonBody(c, newConversation, { optional: true })
       const chats = chatsFor(c)
       const created = await chats.createConversation({
         systemPrompt: body.systemPrompt,
@@ -74,11 +80,7 @@ export function storageRoutes(deps: StorageRoutesDeps) {
     )
     .patch('/conversations/:skey', async (c) => {
       const skey = c.req.param('skey')
-      const body = (await c.req.json()) as {
-        title?: string
-        tags?: string[]
-        systemPrompt?: string
-      }
+      const body = await jsonBody(c, conversationPatch)
       const chats = chatsFor(c)
       const patch: Record<string, unknown> = {}
       if (body.title !== undefined) Object.assign(patch, { title: body.title, titleSource: 'user' })
@@ -108,7 +110,7 @@ export function storageRoutes(deps: StorageRoutesDeps) {
     })
     .get('/preferences', async (c) => c.json({ preferences: await chatsFor(c).getPreferences() }))
     .put('/preferences', async (c) => {
-      await chatsFor(c).putPreferences((await c.req.json()) as JsonRecord)
+      await chatsFor(c).putPreferences(await jsonBody(c, jsonObject))
       return c.json({ ok: true })
     })
     .get('/account', (c) => {
@@ -119,7 +121,7 @@ export function storageRoutes(deps: StorageRoutesDeps) {
       })
     })
     .put('/account', async (c) => {
-      const body = (await c.req.json()) as { backgroundSync?: boolean }
+      const body = await jsonBody(c, accountSettings)
       if (body.backgroundSync !== undefined) {
         if (!deps.syncConfig.allowUserOptOut) {
           return c.json(

@@ -30,7 +30,8 @@ export default function openaiCompatible(options: OpenAICompatibleOptions) {
       ctx.providers.register({
         id: options.id,
         name: options.name,
-        hasAdminKey: Boolean(options.apiKey && options.baseURL),
+        // Local servers such as llama.cpp and Ollama don't need a key.
+        hasAdminKey: Boolean(options.baseURL),
         userKeys: options.userKeys ?? true,
         userEndpoints: options.userEndpoints ?? false,
         allowPrivateNetworks: options.allowPrivateNetworks ?? false,

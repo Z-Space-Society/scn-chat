@@ -1,10 +1,19 @@
+import { randomBytes } from 'node:crypto'
+import type { Context } from 'hono'
 import { Hono, type MiddlewareHandler } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import type { Config } from '../config.ts'
 import type { Db } from '../db/index.ts'
 import type { AppEnv, AuthUser } from '../env.ts'
 import type { Logger } from '../logger.ts'
-import { type Account, getAccount, recordLogin, touchActivity } from './accounts.ts'
+import { safeErrorMessage } from '../safe-error.ts'
+import {
+  type Account,
+  getAccount,
+  recordLogin,
+  SpacesLostError,
+  touchActivity,
+} from './accounts.ts'
 import type { IdentityResolver } from './identity.ts'
 import type { OAuthClientLike } from './oauth-client.ts'
 import type { Roles } from './roles.ts'
@@ -31,16 +40,42 @@ export type AuthDeps = {
 
 const loginError = (message: string) => `/login?error=${encodeURIComponent(message)}`
 
+/** Ties an OAuth callback to the browser that started the sign-in. */
+const LOGIN_COOKIE = 'scn_login'
+/** Where to send the user after signing in. */
+const NEXT_COOKIE = 'scn_next'
+
+/** Is this a path on this site, and not a link to another one? */
+const isLocalPath = (path: string) => /^\/(?![/\\])/.test(path)
+
+class LoginMismatch extends Error {
+  constructor() {
+    super('This sign-in was started in a different browser. Sign in again here.')
+    this.name = 'LoginMismatch'
+  }
+}
+
+function setSessionCookie(c: Context, token: string, config: Config) {
+  setCookie(c, SESSION_COOKIE, token, {
+    httpOnly: true,
+    sameSite: 'Lax',
+    path: '/',
+    secure: config.publicUrl.startsWith('https://'),
+    maxAge: config.sessionTtlDays * 86_400,
+  })
+}
+
 /** Resolve the session cookie to the signed-in user, if any. */
 export function sessionMiddleware(deps: AuthDeps): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
     c.set('user', null)
     const token = getCookie(c, SESSION_COOKIE)
     if (token) {
-      const did = await resolveWebSession(deps.db, token, deps.config.sessionTtlDays)
-      if (did) {
-        const account = await getAccount(deps.db, did)
-        if (!account) throw new Error(`A web session names ${did}, which has no account`)
+      const session = await resolveWebSession(deps.db, token, deps.config.sessionTtlDays)
+      if (session) {
+        const account = await getAccount(deps.db, session.did)
+        if (!account) throw new Error(`A web session names ${session.did}, which has no account`)
+        if (session.renewed) setSessionCookie(c, token, deps.config)
         c.set('user', { did: account.did, account, roles: deps.roles.rolesFor(account.did) })
         await touchActivity(deps.db, account)
       }
@@ -81,16 +116,34 @@ export function oauthRoutes(deps: AuthDeps) {
       const identifier = c.req.query('identifier')?.trim()
       if (!identifier) return c.redirect(loginError('Enter your handle to sign in.'))
       try {
-        const url = await deps.oauth.authorize(identifier, { scope: deps.scope })
+        const state = randomBytes(16).toString('base64url')
+        const url = await deps.oauth.authorize(identifier, { scope: deps.scope, state })
+        const cookie = {
+          httpOnly: true,
+          sameSite: 'Lax',
+          path: '/oauth',
+          secure,
+          maxAge: 600,
+        } as const
+        setCookie(c, LOGIN_COOKIE, state, cookie)
+        const next = c.req.query('next')
+        if (next && isLocalPath(next)) setCookie(c, NEXT_COOKIE, next, cookie)
         return c.redirect(url.toString())
       } catch (err) {
         deps.logger.warn({ err, identifier }, 'oauth authorize failed')
-        return c.redirect(loginError(err instanceof Error ? err.message : 'Sign-in failed.'))
+        return c.redirect(loginError(safeErrorMessage(err)))
       }
     })
     .get('/oauth/callback', async (c) => {
+      const expected = getCookie(c, LOGIN_COOKIE)
+      const next = getCookie(c, NEXT_COOKIE)
+      deleteCookie(c, LOGIN_COOKIE, { path: '/oauth' })
+      deleteCookie(c, NEXT_COOKIE, { path: '/oauth' })
+      let did: string | undefined
       try {
-        const { session } = await deps.oauth.callback(new URL(c.req.url).searchParams)
+        const { session, state } = await deps.oauth.callback(new URL(c.req.url).searchParams)
+        did = session.did
+        if (!expected || state !== expected) throw new LoginMismatch()
         const { scope } = await session.getTokenInfo(false)
         const identity = await deps.identity.resolve(session.did)
         const account = await recordLogin(deps.db, {
@@ -107,17 +160,18 @@ export function oauthRoutes(deps: AuthDeps) {
             .catch((err) => deps.logger.error({ err, did: account.did }, 'login setup failed'))
         }
         const token = await createWebSession(deps.db, account.did, deps.config.sessionTtlDays)
-        setCookie(c, SESSION_COOKIE, token, {
-          httpOnly: true,
-          sameSite: 'Lax',
-          path: '/',
-          secure,
-          maxAge: deps.config.sessionTtlDays * 86_400,
-        })
-        return c.redirect('/')
+        setSessionCookie(c, token, deps.config)
+        return c.redirect(next && isLocalPath(next) ? next : '/')
       } catch (err) {
-        deps.logger.warn({ err }, 'oauth callback failed')
-        return c.redirect(loginError(err instanceof Error ? err.message : 'Sign-in failed.'))
+        deps.logger.warn({ err, did }, 'oauth callback failed')
+        // Revoke the tokens the OAuth client already stored for a sign-in that can't be used.
+        if (did && (err instanceof SpacesLostError || err instanceof LoginMismatch))
+          await deps.oauth
+            .revoke(did)
+            .catch((revokeErr: unknown) =>
+              deps.logger.warn({ err: revokeErr, did }, 'oauth revoke failed'),
+            )
+        return c.redirect(loginError(safeErrorMessage(err)))
       }
     })
 }

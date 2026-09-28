@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, json, read } from '../api.ts'
+import { useAction } from './useAction.ts'
 
 type Mode = 'private' | 'people' | 'public'
 
@@ -8,35 +9,31 @@ export function ShareControl({ skey, ownerDid }: { skey: string; ownerDid: strin
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState<Mode>('private')
   const [members, setMembers] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const { error, run } = useAction()
   const link = `${location.origin}/s/${ownerDid}/${skey}`
 
   useEffect(() => {
     if (!open) return
-    void read(api.sharing.conversations[':skey'].sharing.$get({ param: { skey } }))
-      .then((settings) => {
-        setMode(settings.mode)
-        setMembers(settings.members.map((m) => m.handle ?? m.did).join(', '))
-      })
-      .catch((err: Error) => setError(err.message))
-  }, [open, skey])
+    run(async () => {
+      const settings = await read(
+        api.sharing.conversations[':skey'].sharing.$get({ param: { skey } }),
+      )
+      setMode(settings.mode)
+      setMembers(settings.members.map((m) => m.handle ?? m.did).join(', '))
+    })
+  }, [open, skey, run])
 
   const save = async () => {
-    setError(null)
     const list = members
       .split(',')
       .map((m) => m.trim())
       .filter(Boolean)
-    try {
-      await read(
-        api.sharing.conversations[':skey'].sharing.$put(
-          { param: { skey } },
-          json({ mode, members: list }),
-        ),
-      )
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Saving failed')
-    }
+    await read(
+      api.sharing.conversations[':skey'].sharing.$put(
+        { param: { skey } },
+        json({ mode, members: list }),
+      ),
+    )
   }
 
   if (!open) {
@@ -66,7 +63,7 @@ export function ShareControl({ skey, ownerDid }: { skey: string; ownerDid: strin
           onChange={(e) => setMembers(e.target.value)}
         />
       )}
-      <button type="button" onClick={() => void save()}>
+      <button type="button" onClick={() => run(save)}>
         Save
       </button>
       {mode !== 'private' && <input aria-label="Link" readOnly value={link} />}

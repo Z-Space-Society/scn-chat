@@ -9,6 +9,7 @@ import type {
 } from '@scn-chat/server/api-types'
 import { type ClientResponse, hc } from 'hono/client'
 import type { SuccessStatusCode } from 'hono/utils/http-status'
+import { errorMessage } from './lib/response.ts'
 
 /** Clients for calling the hono server's /api routes. **/
 export const api = {
@@ -16,7 +17,7 @@ export const api = {
   chats: hc<StorageApi>('/api'),
   turns: hc<TurnsApi>('/api'),
   providers: hc<ProvidersApi>('/api'),
-  plugins: hc<PluginsApi>('/api'),
+  plugins: hc<PluginsApi>('/api/plugins'),
   blobs: hc<BlobsApi>('/api'),
   sharing: hc<SharingApi>('/api'),
 }
@@ -25,6 +26,14 @@ export const api = {
 export const json = (body: unknown) => ({
   init: { body: JSON.stringify(body), headers: { 'content-type': 'application/json' } },
 })
+
+const unauthorized = new Set<() => void>()
+
+/** Call a listener whenever a request finds the session has ended. */
+export function onUnauthorized(listener: () => void): () => void {
+  unauthorized.add(listener)
+  return () => unauthorized.delete(listener)
+}
 
 export class ApiError extends Error {
   readonly status: number
@@ -45,17 +54,11 @@ type SuccessBody<R> =
     : never
 
 /** Read a response's JSON. Throws ApiError on failure. */
-export async function read<R extends ClientResponse<any, any, any>>(
+export async function read<R extends ClientResponse<unknown, number, string>>(
   response: Promise<R>,
 ): Promise<SuccessBody<R>> {
   const res = await response
-  if (!res.ok) {
-    // Error bodies from a proxy may not be JSON.
-    const body = (await res.json().catch(() => ({}))) as { message?: string; error?: string }
-    throw new ApiError(
-      res.status,
-      body.message ?? body.error ?? `Request failed with ${res.status}`,
-    )
-  }
+  if (res.status === 401) for (const listener of unauthorized) listener()
+  if (!res.ok) throw new ApiError(res.status, await errorMessage(res))
   return (await res.json()) as SuccessBody<R>
 }

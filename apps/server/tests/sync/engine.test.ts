@@ -2,6 +2,7 @@ import { nsid } from '@scn-chat/lexicons'
 import { sql } from 'kysely'
 import { describe, expect, it } from 'vitest'
 import { recordCid } from '../../src/storage/records.ts'
+import { SyncEngine } from '../../src/sync/engine.ts'
 import { ALICE, collect, spacesHarness, userMessage } from '../helpers/spaces.ts'
 
 const stateOf = async (h: Awaited<ReturnType<typeof spacesHarness>>, space: string) =>
@@ -166,6 +167,27 @@ describe('SyncEngine', () => {
     expect(changed).toMatchObject([{ rkey: '3mmmmmmmmmmm1', live: false }])
   })
 
+  it('keeps discovering past a conversation with an invalid info record', async () => {
+    const h = await spacesHarness()
+    const bad = await h.external.createSpace(nsid.conversation, '3bbbbbbbbbbbb')
+    await h.external.putRecord(bad, nsid.info, 'self', {
+      $type: nsid.info,
+      createdAt: new Date().toISOString(),
+    })
+    await sql`update local_record set value_json = ${JSON.stringify({ $type: nsid.info, title: 5 })} where space_uri = ${bad}`.execute(
+      h.db,
+    )
+    const good = await h.external.createSpace(nsid.conversation, '3cccccccccccc')
+    await h.external.putRecord(good, nsid.info, 'self', {
+      $type: nsid.info,
+      createdAt: new Date().toISOString(),
+    })
+    await h.engine.discover(ALICE)
+    expect((await h.chats.listConversations()).conversations.map((c) => c.skey)).toContain(
+      '3cccccccccccc',
+    )
+  })
+
   it('does nothing for a local account', async () => {
     const h = await spacesHarness({ storageMode: 'local' })
     const changed = collect(h.events, 'message:changed')
@@ -185,6 +207,18 @@ describe('SyncEngine', () => {
     await h.engine.renewRegistrations()
     const renewed = Date.parse((await stateOf(h, h.chats.settingsUri))?.registered_until ?? '')
     expect(renewed).toBeGreaterThan(Date.now() + 60 * 60_000)
+  })
+})
+
+describe('SyncEngine registration on a loopback URL', () => {
+  it('skips registering for notifications a PDS could never deliver', async () => {
+    const h = await spacesHarness()
+    const engine = new SyncEngine({
+      ...(h.engine as unknown as { deps: ConstructorParameters<typeof SyncEngine>[0] }).deps,
+      publicUrl: 'http://127.0.0.1:5173',
+    })
+    await engine.registerIndex(ALICE)
+    expect(await stateOf(h, h.chats.settingsUri)).toBeUndefined()
   })
 })
 

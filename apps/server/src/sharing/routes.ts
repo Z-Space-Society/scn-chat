@@ -1,10 +1,15 @@
 import { Hono } from 'hono'
+import { z } from 'zod'
 import { requireUser, signedInUser } from '../auth/routes.ts'
 import { IMAGE_TYPES } from '../blobs/routes.ts'
+import { jsonBody } from '../body.ts'
 import type { AppEnv } from '../env.ts'
-import { SharedNotFound, ShareInputError, type ShareMode, type SharingService } from './service.ts'
+import { SharedNotFound, ShareInputError, type SharingService } from './service.ts'
 
-const MODES = new Set<ShareMode>(['private', 'people', 'public'])
+const shareSettings = z.object({
+  mode: z.enum(['private', 'people', 'public']),
+  members: z.array(z.string().min(1)).default([]),
+})
 const NEEDS_SPACES = 'Sharing needs a PDS that supports atproto spaces.'
 
 /** Share settings for the owner, and read-only shared views for viewers. */
@@ -21,14 +26,9 @@ export function sharingRoutes(sharing: SharingService) {
       const { account } = signedInUser(c)
       if (account.storageMode !== 'space')
         return c.json({ error: 'Forbidden', message: NEEDS_SPACES }, 403)
-      const body = (await c.req.json()) as { mode?: ShareMode; members?: string[] }
-      if (!body.mode || !MODES.has(body.mode))
-        return c.json(
-          { error: 'InvalidRequest', message: 'mode must be private, people, or public' },
-          400,
-        )
+      const body = await jsonBody(c, shareSettings)
       try {
-        await sharing.setSettings(account, c.req.param('skey'), body.mode, body.members ?? [])
+        await sharing.setSettings(account, c.req.param('skey'), body.mode, body.members)
       } catch (err) {
         if (err instanceof ShareInputError)
           return c.json({ error: 'InvalidRequest', message: err.message }, 400)

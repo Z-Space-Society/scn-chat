@@ -7,6 +7,7 @@ import {
   type RecordKey,
   type RecordStore,
   SpaceExists,
+  SpaceNotFound,
   type StoredRecord,
 } from './record-store.ts'
 import { type JsonRecord, newTid, parseSpaceUri, spaceUri } from './records.ts'
@@ -77,6 +78,17 @@ export class ChatService {
     }
   }
 
+  /** Write to the settings space, creating it first if login didn't. */
+  private async inSettingsSpace<T>(write: () => Promise<T>): Promise<T> {
+    try {
+      return await write()
+    } catch (err) {
+      if (!(err instanceof SpaceNotFound)) throw err
+      await this.ensureSettingsSpace()
+      return write()
+    }
+  }
+
   private async put(
     space: string,
     collection: string,
@@ -98,8 +110,7 @@ export class ChatService {
     const info: JsonRecord = { $type: nsid.info, createdAt: now }
     if (input.systemPrompt) info.systemPrompt = input.systemPrompt
     await this.put(uri, nsid.info, 'self', info)
-    await this.ensureSettingsSpace()
-    await this.writeRef(skey, { tags: input.tags ?? [] })
+    await this.inSettingsSpace(() => this.writeRef(skey, { tags: input.tags ?? [] }))
     return { skey, uri }
   }
 
@@ -187,6 +198,8 @@ export class ChatService {
   }
 
   async setTags(skey: string, tags: string[]): Promise<void> {
+    // Fails with SpaceNotFound for a conversation that doesn't exist.
+    await this.store.headRev(this.conversationUri(skey))
     await this.writeRef(skey, { tags })
   }
 
@@ -200,12 +213,8 @@ export class ChatService {
   }
 
   async putPreferences(record: JsonRecord): Promise<void> {
-    await this.ensureSettingsSpace()
-    await this.put(this.settingsUri, nsid.preferences, 'self', {
-      ...record,
-      $type: nsid.preferences,
-      updatedAt: new Date().toISOString(),
-    })
+    const value = { ...record, $type: nsid.preferences, updatedAt: new Date().toISOString() }
+    await this.inSettingsSpace(() => this.put(this.settingsUri, nsid.preferences, 'self', value))
   }
 
   private summary(record: StoredRecord): ConversationSummary {
@@ -241,10 +250,9 @@ export class ChatService {
         full: false,
       }
     }
-    const [records, rev] = await Promise.all([
-      this.store.listRecords(this.settingsUri, nsid.conversationRef),
-      this.store.headRev(this.settingsUri),
-    ])
+    // Read the revision first, so a write landing during the read comes again in the next changes.
+    const rev = await this.store.headRev(this.settingsUri)
+    const records = await this.store.listRecords(this.settingsUri, nsid.conversationRef)
     const conversations = keepValid(
       this.settingsUri,
       nsid.conversationRef,
@@ -276,10 +284,10 @@ export class ChatService {
         full: false,
       }
     }
-    const [info, messages, rev] = await Promise.all([
+    const rev = await this.store.headRev(uri)
+    const [info, messages] = await Promise.all([
       this.getValid(uri, nsid.info, 'self'),
       this.store.listRecords(uri, nsid.message),
-      this.store.headRev(uri),
     ])
     return {
       info,

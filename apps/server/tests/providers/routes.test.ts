@@ -6,7 +6,7 @@ import { migrateToLatest } from '../../src/db/migrate.ts'
 import { Registry } from '../../src/plugins/registry.ts'
 import { ModelCatalog } from '../../src/providers/catalog.ts'
 import { SecretBox } from '../../src/secrets.ts'
-import { authDeps, ORIGIN, sessionCookie } from '../helpers/auth.ts'
+import { authDeps, loginCookie, ORIGIN, sessionCookie } from '../helpers/auth.ts'
 import { testConfig } from '../helpers/config.ts'
 import { createSqliteDb } from '../helpers/db.ts'
 import { fakeProvider } from '../helpers/providers.ts'
@@ -55,7 +55,7 @@ async function setup() {
     auth: authDeps(db),
     providers: { db, box, catalog, providers, guardedFetch, logger },
   })
-  const cookie = sessionCookie(await app.request('/oauth/callback?code=a&state=b'))
+  const cookie = sessionCookie(await app.request('/oauth/callback?code=a&state=b', loginCookie))
   const call = async (method: string, path: string, body?: object) => {
     const res = await app.request(`/api${path}`, {
       method,

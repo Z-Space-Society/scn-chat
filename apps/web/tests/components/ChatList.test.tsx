@@ -49,4 +49,20 @@ describe('ChatList', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Cross-origin')
     expect(store.deleteLocalCopy).not.toHaveBeenCalled()
   })
+
+  it('shows why deleting the local copy failed after signing out', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json({ ok: true })),
+    )
+    const store = fakeStore()
+    store.deleteLocalCopy.mockRejectedValue(new Error('Another tab is using this device copy.'))
+    render(
+      <StoreProvider store={store as unknown as StoreClient}>
+        <ChatList />
+      </StoreProvider>,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Sign out' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Another tab')
+  })
 })

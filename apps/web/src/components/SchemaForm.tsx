@@ -69,9 +69,14 @@ export function SchemaForm({
             />
           )
         } else {
-          input = <em>Unsupported setting type</em>
+          return (
+            <p key={key}>
+              {label}: <em>Unsupported setting type</em>
+            </p>
+          )
         }
         return (
+          // biome-ignore lint/a11y/noLabelWithoutControl: every branch above sets input to a control
           <label key={key}>
             {label} {input}
             {property.description && <small>{property.description}</small>}

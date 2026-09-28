@@ -3,11 +3,20 @@ import { sql } from 'kysely'
 import { describe, expect, it, vi } from 'vitest'
 import { createApp } from '../../src/app.ts'
 import { recordLogin } from '../../src/auth/accounts.ts'
+import { IdentityResolutionError } from '../../src/auth/identity.ts'
 import { buildScope } from '../../src/auth/scope.ts'
 import { SharingService } from '../../src/sharing/service.ts'
 import { recordCid } from '../../src/storage/records.ts'
 import { CredentialError } from '../../src/sync/credentials.ts'
-import { authDeps, fakeOAuth, fakeSession, ORIGIN, sessionCookie } from '../helpers/auth.ts'
+import {
+  authDeps,
+  fakeOAuth,
+  fakeSession,
+  LOGIN_STATE,
+  loginCookie,
+  ORIGIN,
+  sessionCookie,
+} from '../helpers/auth.ts'
 import { testConfig } from '../helpers/config.ts'
 import { spacesHarness, textContent } from '../helpers/spaces.ts'
 
@@ -48,7 +57,9 @@ async function setup() {
   })
   const appFor = async (did: string) => {
     const scope = did === LOCAL ? 'atproto' : buildScope('raw')
-    const oauth = fakeOAuth({ callback: vi.fn(async () => ({ session: fakeSession(did, scope) })) })
+    const oauth = fakeOAuth({
+      callback: vi.fn(async () => ({ session: fakeSession(did, scope), state: LOGIN_STATE })),
+    })
     const app = createApp({
       config: testConfig(),
       db: h.db,
@@ -56,7 +67,7 @@ async function setup() {
       auth: authDeps(h.db, { oauth, identity }),
       sharing,
     })
-    const cookie = sessionCookie(await app.request('/oauth/callback?code=a&state=b'))
+    const cookie = sessionCookie(await app.request('/oauth/callback?code=a&state=b', loginCookie))
     return {
       raw: (path: string) => app.request(`/api${path}`, { headers: { cookie } }),
       get: async (path: string) => {
@@ -89,7 +100,7 @@ async function setup() {
     content: textContent('hello'),
     createdAt: new Date().toISOString(),
   } as never)
-  return { ...h, appFor, skey, uri, mintCredential }
+  return { ...h, appFor, skey, uri, mintCredential, identity }
 }
 
 describe('share settings', () => {
@@ -131,6 +142,45 @@ describe('share settings', () => {
     })
     expect(res.status).toBe(400)
     expect(res.body.message).toContain('nobody.test')
+  })
+
+  it('leaves a public conversation public when a handle cannot be resolved', async () => {
+    const { appFor, skey, uri, pds } = await setup()
+    const alice = await appFor('did:plc:alice')
+    await alice.put(`/conversations/${skey}/sharing`, { mode: 'public' })
+    const res = await alice.put(`/conversations/${skey}/sharing`, {
+      mode: 'people',
+      members: ['nobody.test'],
+    })
+    expect(res.status).toBe(400)
+    expect(pds.policies.get(uri)?.readPolicy).toMatch(/publicPolicy/)
+  })
+
+  it('refuses a member list that is not a list', async () => {
+    const { appFor, skey } = await setup()
+    const res = await (await appFor('did:plc:alice')).put(`/conversations/${skey}/sharing`, {
+      mode: 'people',
+      members: 'bob.test',
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it('returns 404 for the share settings of a conversation that does not exist', async () => {
+    const { appFor } = await setup()
+    const alice = await appFor('did:plc:alice')
+    expect((await alice.get('/conversations/3zzzzzzzzzzzz/sharing')).status).toBe(404)
+    expect(
+      (await alice.put('/conversations/3zzzzzzzzzzzz/sharing', { mode: 'public' })).status,
+    ).toBe(404)
+  })
+
+  it('refuses a member that looks like a DID but is not one', async () => {
+    const { appFor, skey } = await setup()
+    const res = await (await appFor('did:plc:alice')).put(`/conversations/${skey}/sharing`, {
+      mode: 'people',
+      members: ['did:nope'],
+    })
+    expect(res.status).toBe(400)
   })
 
   it('reflects changes made outside the app', async () => {
@@ -191,6 +241,14 @@ describe('shared view', () => {
       members: [BOB],
     })
     expect((await (await appFor(CAROL)).get(`/shared/did:plc:alice/${skey}`)).status).toBe(404)
+  })
+
+  it('returns 404 when the owner DID cannot be resolved', async () => {
+    const { appFor, skey, identity } = await setup()
+    const bob = await appFor(BOB)
+    identity.resolve.mockRejectedValueOnce(new IdentityResolutionError('did:plc:gone', 'not found'))
+    const view = await bob.get(`/shared/did:plc:gone/${skey}`)
+    expect(view.status).toBe(404)
   })
 
   it('lets any spaces user read a public conversation', async () => {

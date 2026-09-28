@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react'
+import type { StreamedReply } from './useReplyStream.ts'
 
 type Part = Record<string, unknown> & { $type: string }
 type Blob = { ref: { $link: string }; mimeType: string }
 
 export type MessageViewProps = {
   record: Record<string, unknown>
-  /** Text streamed so far for a pending reply, by part index. */
-  streaming?: string
+  /** Text and reasoning streamed so far for a pending reply. */
+  streaming?: StreamedReply
   blobUrl: (cid: string, mimeType?: string) => string
   siblings?: { index: number; count: number; onPick: (index: number) => void }
   actions?: ReactNode
@@ -99,10 +100,19 @@ export function MessageView({ record, streaming, blobUrl, siblings, actions }: M
       {parts
         .filter((part) => kind(part) !== 'sourcePart')
         .map((part, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: a record's parts keep their order
           <PartView key={i} part={part} blobUrl={blobUrl} />
         ))}
       {streaming !== undefined && record.status === 'pending' && (
-        <p className="text">{streaming}</p>
+        <>
+          {streaming.reasoning && (
+            <details>
+              <summary>Reasoning</summary>
+              <p className="text">{streaming.reasoning}</p>
+            </details>
+          )}
+          {streaming.text && <p className="text">{streaming.text}</p>}
+        </>
       )}
       {sources.length > 0 && (
         <ul>

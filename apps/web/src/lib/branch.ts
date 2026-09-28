@@ -25,7 +25,13 @@ export function childrenByParent(messages: BranchMessage[]): Map<string | null, 
   return groups
 }
 
-export type BranchStep = { message: BranchMessage; siblings: BranchMessage[]; index: number }
+export type BranchStep = {
+  message: BranchMessage
+  siblings: BranchMessage[]
+  index: number
+  /** The key the siblings are grouped under: their parent, or null at the root. */
+  parent: string | null
+}
 
 /** The branch to show: the chosen sibling at each level, or the newest when none is chosen. */
 export function currentBranch(
@@ -42,7 +48,7 @@ export function currentBranch(
     const pick = siblings.findIndex((m) => m.rkey === chosen[key])
     const index = pick >= 0 ? pick : siblings.length - 1
     const message = siblings[index] as BranchMessage
-    steps.push({ message, siblings, index })
+    steps.push({ message, siblings, index, parent })
     parent = message.rkey
   }
 }

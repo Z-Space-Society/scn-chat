@@ -90,7 +90,6 @@ export function createApp(deps: AppDeps) {
   if (deps.turns) api.route('/', turnRoutes(deps.turns))
   if (deps.blobs) api.route('/', blobRoutes(deps.blobs))
   if (deps.sharing) api.route('/', sharingRoutes(deps.sharing))
-  api.notFound((c) => c.json({ error: 'NotFound' }, 404))
 
   app.route('/api', api)
   if (deps.sync) app.route('/', syncRoutes(deps.sync))

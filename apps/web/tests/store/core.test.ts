@@ -157,6 +157,23 @@ describe('StoreCore background download', () => {
     expect(store.staleConversations()).toEqual([])
   })
 
+  it('keeps downloading past a conversation that fails, and leaves it stale for next time', async () => {
+    const { api, store } = setup()
+    api.index = {
+      conversations: [
+        summary('bad', '2026-09-20T00:00:00Z'),
+        summary('good', '2026-09-10T00:00:00Z'),
+      ],
+      deleted: [],
+      rev: 'r1',
+      full: true,
+    }
+    await store.syncIndex()
+    api.conversations.set('good', { info: null, messages: [], deleted: [], rev: 'c', full: true })
+    await store.backgroundDownload(1)
+    expect(store.staleConversations()).toEqual(['bad'])
+  })
+
   it('refetches a conversation whose index entry is newer than its last fetch', async () => {
     const { api, store } = setup()
     const clock = { now: '2026-09-26T00:00:00Z' }

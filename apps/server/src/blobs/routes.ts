@@ -10,6 +10,35 @@ import { BlobNotFound, type BlobStore } from './store.ts'
 export const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
 export const MAX_IMAGE_BYTES = 20_000_000
 export const MAX_FILE_BYTES = 50_000_000
+export const MAX_EXTRACTED_BYTES = 20_000_000
+const MAX_NAME_LENGTH = 1024
+
+/** Read a request body, bail when we hit `limit`. */
+async function readLimited(
+  body: ReadableStream<Uint8Array> | null,
+  limit: number,
+): Promise<Uint8Array | null> {
+  const chunks: Uint8Array[] = []
+  let size = 0
+  const reader = body?.getReader()
+  for (;;) {
+    const next = await reader?.read()
+    if (!next || next.done) break
+    size += next.value.length
+    if (size > limit) {
+      await reader?.cancel()
+      return null
+    }
+    chunks.push(next.value)
+  }
+  const bytes = new Uint8Array(size)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.length
+  }
+  return bytes
+}
 
 export type BlobRoutesDeps = {
   blobsFor: (account: Parameters<ChatServices['forAccount']>[0]) => BlobStore
@@ -22,11 +51,21 @@ export type BlobRoutesDeps = {
 export function blobRoutes(deps: BlobRoutesDeps) {
   return new Hono<AppEnv>()
     .use(requireUser)
+    .get('/attachments/types', (c) =>
+      c.json({ images: [...IMAGE_TYPES], files: deps.ingesters.accepted() }),
+    )
     .post('/attachments', async (c) => {
       const { account } = signedInUser(c)
       const mimeType =
         (c.req.header('content-type') ?? '').split(';')[0]?.trim().toLowerCase() ?? ''
-      const name = decodeURIComponent(c.req.header('x-filename') ?? 'attachment')
+      let name: string
+      try {
+        name = decodeURIComponent(c.req.header('x-filename') ?? 'attachment')
+      } catch {
+        return c.json({ error: 'InvalidRequest', message: 'x-filename is not URI-encoded' }, 400)
+      }
+      if (name.length > MAX_NAME_LENGTH)
+        return c.json({ error: 'InvalidRequest', message: 'Filename is too long' }, 400)
       const image = IMAGE_TYPES.has(mimeType)
       const ingester = image ? undefined : deps.ingesters.match(mimeType)
       if (!image && !ingester)
@@ -38,8 +77,8 @@ export function blobRoutes(deps: BlobRoutesDeps) {
       const limit = image ? MAX_IMAGE_BYTES : MAX_FILE_BYTES
       if (declared > limit)
         return c.json({ error: 'PayloadTooLarge', message: `Limit is ${limit} bytes` }, 413)
-      const bytes = new Uint8Array(await c.req.arrayBuffer())
-      if (bytes.length > limit)
+      const bytes = await readLimited(c.req.raw.body, limit)
+      if (!bytes)
         return c.json({ error: 'PayloadTooLarge', message: `Limit is ${limit} bytes` }, 413)
       const store = deps.blobsFor(account)
       if (image) {
@@ -60,8 +99,14 @@ export function blobRoutes(deps: BlobRoutesDeps) {
           422,
         )
       }
+      const extractedBytes = new TextEncoder().encode(text)
+      if (extractedBytes.length > MAX_EXTRACTED_BYTES)
+        return c.json(
+          { error: 'PayloadTooLarge', message: 'This file has more text than a message can hold' },
+          413,
+        )
       const file = await store.put(account, bytes, mimeType)
-      const extracted = await store.put(account, new TextEncoder().encode(text), 'text/plain')
+      const extracted = await store.put(account, extractedBytes, 'text/plain')
       return c.json(
         {
           part: {

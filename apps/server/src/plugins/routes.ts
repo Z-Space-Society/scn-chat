@@ -1,8 +1,10 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { requireUser, signedInUser } from '../auth/routes.ts'
+import { jsonBody } from '../body.ts'
 import type { Db } from '../db/index.ts'
 import type { AppEnv } from '../env.ts'
+import { jsonObject } from '../schemas.ts'
 import type { SecretBox } from '../secrets.ts'
 import type { PluginHost } from './host.ts'
 import {
@@ -53,7 +55,7 @@ export function pluginRoutes(deps: PluginRoutesDeps) {
     .put('/:id/settings', async (c) => {
       const plugin = find(c.req.param('id'))
       if (!plugin) return c.json({ error: 'NotFound' }, 404)
-      const body = (await c.req.json()) as Record<string, unknown>
+      const body = await jsonBody(c, jsonObject)
       try {
         await writeUserSettings(deps.db, deps.box, signedInUser(c).did, plugin, body)
       } catch (err) {

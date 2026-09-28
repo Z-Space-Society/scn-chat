@@ -229,7 +229,10 @@ describe('toModelMessages', () => {
       msg('r', {
         role: 'assistant',
         status: 'complete',
-        content: content({ $type: d('toolCallPart'), callId: 'c1', tool: 't', input: '{"q": ' }),
+        content: content(
+          { $type: d('toolCallPart'), callId: 'c1', tool: 't', input: '{"q": ' },
+          { $type: d('toolResultPart'), callId: 'c1', output: 'x' },
+        ),
       }),
     ]
     await expect(
@@ -242,5 +245,28 @@ describe('toModelMessages', () => {
     await expect(
       toModelMessages(branch, { provider: provider('p'), capabilities: caps, readBlob: noBlobs }),
     ).rejects.toThrow(/encrypted/)
+  })
+
+  it('leaves out a tool call that never got a result, as in a reply cancelled mid-call', async () => {
+    const branch = [
+      msg('r', {
+        role: 'assistant',
+        status: 'cancelled',
+        model: { provider: 'p', id: 'm' },
+        content: content(text('Let me look'), {
+          $type: d('toolCallPart'),
+          callId: 'c1',
+          tool: 'search',
+          input: '{}',
+        }),
+      }),
+    ]
+    const messages = await toModelMessages(branch, {
+      provider: provider('p'),
+      capabilities: caps,
+      readBlob: noBlobs,
+    })
+    expect(JSON.stringify(messages)).not.toContain('tool-call')
+    expect(JSON.stringify(messages)).toContain('Let me look')
   })
 })

@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { parse, YAMLParseError } from 'yaml'
 import { z } from 'zod'
 
@@ -33,6 +34,8 @@ const fileSchema = z
         logLevel: z
           .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
           .default('info'),
+        /** Let the server reach PDSes and DID documents on private networks, for a local PDS. */
+        allowPrivateNetworks: z.boolean().default(false),
       })
       .prefault({}),
     auth: z
@@ -149,6 +152,7 @@ export type Config = Readonly<{
   dataDir: string
   databaseUrl: string
   logLevel: string
+  allowPrivateNetworks: boolean
   secretKey: Buffer
   oldSecretKeys: Buffer[]
   oauthPrivateKeys: { kid: string; [key: string]: unknown }[]
@@ -156,7 +160,6 @@ export type Config = Readonly<{
   sessionTtlDays: number
   plcUrl: string
   turns: { ratePerMinute: number; maxSteps: number; timeoutMs: number; backfillWindowMs: number }
-  /** The directory holding config.yml, which plugin packages are resolved from. */
   configDir: string
   plugins: PluginEntry[]
   models: ModelConfig[]
@@ -209,7 +212,7 @@ export function readConfigFile(path: string): unknown {
 }
 
 export const defaultConfigPath = resolve(
-  dirname(new URL(import.meta.url).pathname),
+  dirname(fileURLToPath(import.meta.url)),
   '../../../config.yml',
 )
 
@@ -279,6 +282,7 @@ export function loadConfig(options: {
     dataDir: file.app.dataDir,
     databaseUrl: secrets.DATABASE_URL,
     logLevel: file.app.logLevel,
+    allowPrivateNetworks: file.app.allowPrivateNetworks,
     secretKey: Buffer.from(secrets.SECRET_KEY, 'base64'),
     oldSecretKeys: secrets.SECRET_KEYS_OLD.map((key) => Buffer.from(key, 'base64')),
     oauthPrivateKeys: secrets.OAUTH_PRIVATE_KEYS,

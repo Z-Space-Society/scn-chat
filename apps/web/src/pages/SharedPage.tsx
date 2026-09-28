@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { api, read } from '../api.ts'
 import { MessageView } from '../components/MessageView.tsx'
-import { currentBranch } from '../lib/branch.ts'
+import { useBranch } from '../components/useBranch.ts'
+import { blobUrlFor } from '../lib/blob-url.ts'
 
 type Shared = Awaited<ReturnType<typeof load>>
 
@@ -20,7 +21,11 @@ export function SharedPage({
 }) {
   const [shared, setShared] = useState<Shared | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [chosen, setChosen] = useState<Record<string, string>>({})
+  const messages = (shared?.messages ?? []).map((m) => ({
+    rkey: m.rkey,
+    record: m.value as Record<string, unknown>,
+  }))
+  const { branch, pick } = useBranch(messages)
 
   useEffect(() => {
     if (!signedIn) return
@@ -40,18 +45,12 @@ export function SharedPage({
   if (error) return <main role="alert">{error}</main>
   if (!shared) return <main>Loading...</main>
 
-  const messages = shared.messages.map((m) => ({
-    rkey: m.rkey,
-    record: m.value as Record<string, unknown>,
-  }))
-  const blobUrl = (cid: string, mimeType?: string) =>
-    `/api/shared/${ownerDid}/${skey}/blobs/${cid}${mimeType ? `?type=${encodeURIComponent(mimeType)}` : ''}`
+  const blobUrl = blobUrlFor(`/api/shared/${ownerDid}/${skey}`)
   return (
     <main className="conversation">
       <h2>{shared.title ?? 'Shared chat'}</h2>
       <p>Shared by {shared.owner.handle ?? shared.owner.did}</p>
-      {currentBranch(messages, chosen).map(({ message, siblings, index }) => {
-        const parent = (message.record.parent as string | undefined) ?? ''
+      {branch.map(({ message, siblings, index, parent }) => {
         return (
           <MessageView
             key={message.rkey}
@@ -60,8 +59,7 @@ export function SharedPage({
             siblings={{
               index,
               count: siblings.length,
-              onPick: (i) =>
-                setChosen((c) => ({ ...c, [parent]: (siblings[i] as { rkey: string }).rkey })),
+              onPick: (i) => pick(parent, (siblings[i] as { rkey: string }).rkey),
             }}
           />
         )

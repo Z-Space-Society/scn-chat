@@ -10,7 +10,7 @@ type $nsid = typeof $nsid
 
 export { $nsid }
 
-/** The model being used. API keys are stored in the app database. */
+/** The model that wrote a reply, or that a request asks for. */
 type ModelRef = {
   $type?: 'network.sharedcomputer.chat.defs#modelRef'
   provider:
@@ -25,7 +25,7 @@ type ModelRef = {
 
 export type { ModelRef }
 
-/** The model being used. API keys are stored in the app database. */
+/** The model that wrote a reply, or that a request asks for. */
 const modelRef = /*#__PURE__*/ l.typedObject<ModelRef>(
   $nsid,
   'modelRef',
@@ -161,7 +161,7 @@ type EncryptedContent = {
   ciphertext: Uint8Array
 
   /**
-   * Encrypted blobs referenced inside the ciphertext, listed so the PDS keeps them.
+   * Encrypted blobs the ciphertext refers to.
    */
   blobs?: l.BlobRef[]
 }

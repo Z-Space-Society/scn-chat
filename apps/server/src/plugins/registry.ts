@@ -46,6 +46,11 @@ export class IngesterRegistry extends Registry<Ingester> {
     super('ingester', (ingester) => ingester.id)
   }
 
+  /** Every MIME type pattern some ingester accepts. */
+  accepted(): string[] {
+    return [...new Set(this.list().flatMap((ingester) => ingester.accepts))]
+  }
+
   match(mimeType: string): Ingester | undefined {
     let best: Ingester | undefined
     for (const ingester of this.list()) {

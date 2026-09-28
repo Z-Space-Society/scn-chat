@@ -1,5 +1,6 @@
 import * as Comlink from 'comlink'
 import { createHandover, type HandoverState } from './handover.ts'
+import { STORE_NAME } from './names.ts'
 import type { WorkerApi, WorkerChange } from './worker.ts'
 
 export type StoreClient = {
@@ -39,9 +40,9 @@ function startStore(did: string): StoreClient {
   )
 
   const handover = createHandover({
-    name: `scn-chat-store-${did}`,
+    name: `${STORE_NAME}-store-${did}`,
     locks: navigator.locks as never,
-    channel: new BroadcastChannel(`scn-chat-store-${did}`) as never,
+    channel: new BroadcastChannel(`${STORE_NAME}-store-${did}`) as never,
     open: async () => {
       await worker.open(did)
       if (firstOpen) {
@@ -78,7 +79,10 @@ function startStore(did: string): StoreClient {
     claim: () => handover.claim(),
     /** Move the store to this tab first, since only the tab holding it can delete its file. */
     deleteLocalCopy: async () => {
-      if ((await handover.claim()) !== 'active')
+      const state = await handover.claim()
+      if (state === 'failed')
+        throw new Error("This device's copy of your chats couldn't be opened.")
+      if (state !== 'active')
         throw new Error('Another tab is using this device copy. Close it and try again.')
       await worker.deleteDatabase(did)
     },

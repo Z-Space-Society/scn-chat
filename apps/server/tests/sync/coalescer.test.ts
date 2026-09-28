@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Coalescer } from '../../src/sync/coalescer.ts'
 
 const tick = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -45,12 +45,24 @@ describe('Coalescer', () => {
   })
 
   it('waits the interval before running again', async () => {
-    const coalescer = new Coalescer(40)
-    const starts: number[] = []
-    const work = async () => void starts.push(Date.now())
-    await coalescer.request('a', work)
-    await coalescer.request('a', work)
-    expect((starts[1] ?? 0) - (starts[0] ?? 0)).toBeGreaterThanOrEqual(35)
+    vi.useFakeTimers()
+    try {
+      const coalescer = new Coalescer(40)
+      let runs = 0
+      const work = async () => {
+        runs++
+      }
+      const first = coalescer.request('a', work)
+      await vi.advanceTimersByTimeAsync(0)
+      await first
+      void coalescer.request('a', work)
+      await vi.advanceTimersByTimeAsync(39)
+      expect(runs).toBe(1)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(runs).toBe(2)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('rejects waiters when the work fails', async () => {

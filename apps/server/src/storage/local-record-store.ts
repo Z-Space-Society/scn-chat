@@ -1,3 +1,4 @@
+import { isUniqueViolation } from '../db/dialect.ts'
 import type { Db } from '../db/index.ts'
 import {
   InvalidCursor,
@@ -24,6 +25,17 @@ export class LocalRecordStore implements RecordStore {
     this.db = db
   }
 
+  /** Drop the values of a key's earlier ops, as a PDS does once a record is replaced or deleted. */
+  private async forgetValues(tx: Db, space: string, collection: string, rkey: string) {
+    await tx
+      .updateTable('local_op')
+      .set({ value_json: null })
+      .where('space_uri', '=', space)
+      .where('collection', '=', collection)
+      .where('rkey', '=', rkey)
+      .execute()
+  }
+
   private async assertSpace(space: string): Promise<void> {
     const row = await this.db
       .selectFrom('local_space')
@@ -41,10 +53,16 @@ export class LocalRecordStore implements RecordStore {
       .where('uri', '=', uri)
       .executeTakeFirst()
     if (existing) throw new SpaceExists(uri)
-    await this.db
-      .insertInto('local_space')
-      .values({ uri, owner_did: this.did, type, skey, created_at: new Date().toISOString() })
-      .execute()
+    try {
+      await this.db
+        .insertInto('local_space')
+        .values({ uri, owner_did: this.did, type, skey, created_at: new Date().toISOString() })
+        .execute()
+    } catch (err) {
+      // Another request created it between the check and the insert.
+      if (isUniqueViolation(err)) throw new SpaceExists(uri)
+      throw err
+    }
     return uri
   }
 
@@ -126,18 +144,25 @@ export class LocalRecordStore implements RecordStore {
           .where('rkey', '=', rkey)
           .execute()
       } else {
-        await tx
-          .insertInto('local_record')
-          .values({
-            space_uri: space,
-            collection,
-            rkey,
-            value_json: valueJson,
-            cid,
-            updated_at: now,
-          })
-          .execute()
+        try {
+          await tx
+            .insertInto('local_record')
+            .values({
+              space_uri: space,
+              collection,
+              rkey,
+              value_json: valueJson,
+              cid,
+              updated_at: now,
+            })
+            .execute()
+        } catch (err) {
+          // Another request wrote the key between the check and the insert.
+          if (isUniqueViolation(err)) throw new RecordExists(space, collection, rkey)
+          throw err
+        }
       }
+      await this.forgetValues(tx, space, collection, rkey)
       await tx
         .insertInto('local_op')
         .values({ space_uri: space, collection, rkey, cid, value_json: valueJson, created_at: now })
@@ -164,6 +189,7 @@ export class LocalRecordStore implements RecordStore {
         .where('rkey', '=', rkey)
         .executeTakeFirst()
       if (Number(result.numDeletedRows) === 0) return
+      await this.forgetValues(tx, space, collection, rkey)
       await tx
         .insertInto('local_op')
         .values({

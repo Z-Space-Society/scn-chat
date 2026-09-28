@@ -7,9 +7,10 @@ import type { Logger } from '../logger.ts'
 import type { PluginHost } from '../plugins/host.ts'
 import type { ModelCatalog } from '../providers/catalog.ts'
 import { mapEffort } from '../providers/effort.ts'
+import { safeErrorMessage } from '../safe-error.ts'
 import type { ChatService } from '../storage/chat-service.ts'
 import { RecordExists } from '../storage/record-store.ts'
-import type { JsonRecord } from '../storage/records.ts'
+import { type JsonRecord, parseSpaceUri } from '../storage/records.ts'
 import type { ChatServices } from '../storage/services.ts'
 import type { SyncEventBus, SyncEvents } from '../sync/events.ts'
 import { PartAccumulator } from './accumulator.ts'
@@ -49,15 +50,7 @@ const MAX_RECORD_BYTES = 900_000
 const defs = (name: string) => `${nsid.defs}#${name}`
 const replyKey = (userRkey: string, attempt: number) => `${userRkey}.r${attempt}`
 
-/** Shorten an error message and remove anything that looks like a secret. */
-export function safeErrorMessage(err: unknown): string {
-  const raw = err instanceof Error ? err.message : String(err)
-  return raw
-    .replace(/sk-[A-Za-z0-9_-]{8,}/g, '[redacted]')
-    .replace(/AIza[0-9A-Za-z_-]{20,}/g, '[redacted]')
-    .replace(/(bearer\s+)[A-Za-z0-9._~+/-]+=*/gi, '$1[redacted]')
-    .slice(0, 500)
-}
+type QueuedTurn = { skey: string; userRkey: string; replyRkey: string; attempt: number }
 
 type Loaded = {
   account: Account
@@ -72,7 +65,7 @@ export class TurnRunner {
   private readonly deps: TurnRunnerDeps
   private readonly running = new Map<string, AbortController>()
   private readonly startTimes = new Map<string, number[]>()
-  private readonly queued = new Map<string, { skey: string; userRkey: string }[]>()
+  private readonly queued = new Map<string, QueuedTurn[]>()
   private readonly drainTimers = new Map<string, NodeJS.Timeout>()
   private readonly background = new Set<Promise<void>>()
 
@@ -93,9 +86,14 @@ export class TurnRunner {
     return `${did}/${skey}/${replyRkey}`
   }
 
-  private async load(did: string, skey: string): Promise<Loaded> {
+  private async account(did: string): Promise<Account> {
     const account = await getAccount(this.deps.db, did)
     if (!account) throw new Error(`No account for ${did}`)
+    return account
+  }
+
+  private async load(did: string, skey: string): Promise<Loaded> {
+    const account = await this.account(did)
     const chats = this.deps.services.forAccount(account)
     const [conversation, preferences] = await Promise.all([
       chats.getConversation(skey),
@@ -133,7 +131,17 @@ export class TurnRunner {
       this.drainTimers.delete(did)
       const pending = this.queued.get(did) ?? []
       this.queued.set(did, [])
-      for (const turn of pending) void this.start(did, turn.skey, turn.userRkey)
+      for (const turn of pending) {
+        const key = this.streamKey(did, turn.skey, turn.replyRkey)
+        this.start(did, turn.skey, turn.userRkey).then(
+          // A turn that no longer runs ends its queued stream.
+          (result) => result.status === 'claimed' || this.deps.hub.end(key, result.status),
+          (err: unknown) => {
+            this.deps.logger.error({ err, did, skey: turn.skey }, 'could not start a queued turn')
+            this.deps.hub.end(key, 'error')
+          },
+        )
+      }
     }, wait)
     timer.unref()
     this.drainTimers.set(did, timer)
@@ -147,7 +155,7 @@ export class TurnRunner {
     const generation = record?.generation as
       | { model?: ModelRef; effort?: string; attempt?: number; tools?: string[] }
       | undefined
-    if (!record || record.role !== 'user' || !generation) return { status: 'skipped' }
+    if (record?.role !== 'user' || !generation) return { status: 'skipped' }
     const attempt = generation.attempt ?? 0
     const replyRkey = replyKey(userRkey, attempt)
     if (loaded.messages.has(replyRkey)) return { status: 'exists', replyRkey }
@@ -169,7 +177,7 @@ export class TurnRunner {
     if (starts.length >= this.deps.config.ratePerMinute) {
       const queue = this.queued.get(did) ?? []
       if (!queue.some((turn) => turn.skey === skey && turn.userRkey === userRkey))
-        queue.push({ skey, userRkey })
+        queue.push({ skey, userRkey, replyRkey, attempt })
       this.queued.set(did, queue)
       this.deps.hub.publish(this.streamKey(did, skey, replyRkey), { type: 'queued' })
       this.scheduleDrain(did)
@@ -243,10 +251,22 @@ export class TurnRunner {
       .execute()
   }
 
-  cancel(did: string, skey: string, replyRkey: string): boolean {
-    const controller = this.running.get(this.streamKey(did, skey, replyRkey))
-    controller?.abort(new Error('cancelled'))
-    return Boolean(controller)
+  /** Stop a running turn, or drop a queued one. */
+  async cancel(did: string, skey: string, replyRkey: string): Promise<boolean> {
+    const key = this.streamKey(did, skey, replyRkey)
+    const controller = this.running.get(key)
+    if (controller) {
+      controller.abort(new Error('cancelled'))
+      return true
+    }
+    const queue = this.queued.get(did) ?? []
+    const index = queue.findIndex((turn) => turn.skey === skey && turn.replyRkey === replyRkey)
+    const [turn] = index >= 0 ? queue.splice(index, 1) : []
+    if (!turn) return false
+    const chats = this.deps.services.forAccount(await this.account(did))
+    await this.clearRequest(chats.conversationUri(skey), turn.userRkey, turn.attempt)
+    this.deps.hub.end(key, 'cancelled')
+    return true
   }
 
   private async tools(
@@ -355,6 +375,8 @@ export class TurnRunner {
         capabilities: resolved.capabilities,
         readBlob: this.deps.blobs.reader(account, skey),
       })
+      if (generation.tools?.length && !resolved.capabilities.tools)
+        throw new TurnInputError('This model cannot use tools. Choose a model that can.')
       const result = streamText({
         model: resolved.model,
         instructions: prompt.instructions || undefined,
@@ -393,7 +415,7 @@ export class TurnRunner {
     }
 
     let content: JsonRecord = { $type: defs('plainContent'), parts: accumulator.parts }
-    if (status === 'complete' && this.deps.host) {
+    if ((status === 'complete' || status === 'cancelled') && this.deps.host) {
       try {
         content = (await this.deps.host.hooks.filter(
           'message:afterModel',
@@ -455,9 +477,8 @@ export class TurnRunner {
     const raw = event.raw
     if (raw.role !== 'user' || !raw.generation || typeof raw.generation !== 'object') return
     const attempt = Number((raw.generation as { attempt?: unknown }).attempt ?? 0)
-    const account = await getAccount(this.deps.db, event.did)
-    if (!account || !Number.isInteger(attempt)) return
-    const chats = this.deps.services.forAccount(account)
+    if (!Number.isInteger(attempt)) return
+    const chats = this.deps.services.forAccount(await this.account(event.did))
     try {
       await chats.createMessage(event.skey, replyKey(event.rkey, attempt), {
         $type: nsid.message,
@@ -500,37 +521,35 @@ export class TurnRunner {
     const claims = await this.deps.db.selectFrom('turn_claim').selectAll().execute()
     for (const claim of claims) {
       try {
-        const account = await getAccount(this.deps.db, claim.owner_did)
-        if (account) {
-          const chats = this.deps.services.forAccount(account)
-          const skey = chats.skeyOf(claim.conversation_uri)
-          const reply = await chats.store.getRecord(
-            claim.conversation_uri,
-            nsid.message,
-            claim.reply_rkey,
-          )
-          if (reply?.value.status === 'pending') {
-            await chats.putMessage(skey, claim.reply_rkey, {
-              ...reply.value,
-              status: 'error',
-              error: 'interrupted',
-            })
-          }
+        const chats = this.deps.services.forAccount(await this.account(claim.owner_did))
+        const skey = chats.skeyOf(claim.conversation_uri)
+        const reply = await chats.store.getRecord(
+          claim.conversation_uri,
+          nsid.message,
+          claim.reply_rkey,
+        )
+        if (reply?.value.status === 'pending') {
+          await chats.putMessage(skey, claim.reply_rkey, {
+            ...reply.value,
+            status: 'error',
+            error: 'interrupted',
+          })
         }
+        await this.deps.db
+          .deleteFrom('turn_claim')
+          .where('conversation_uri', '=', claim.conversation_uri)
+          .where('reply_rkey', '=', claim.reply_rkey)
+          .execute()
       } catch (err) {
+        // The claim stays, so the next restart tries again.
         this.deps.logger.warn({ err, claim }, 'could not mark an interrupted reply')
       }
-      await this.deps.db
-        .deleteFrom('turn_claim')
-        .where('conversation_uri', '=', claim.conversation_uri)
-        .where('reply_rkey', '=', claim.reply_rkey)
-        .execute()
     }
     const cutoff = new Date(this.now() - this.deps.config.backfillWindowMs).toISOString()
     await this.deps.db.deleteFrom('turn_request').where('requested_at', '<', cutoff).execute()
     const requests = await this.deps.db.selectFrom('turn_request').selectAll().execute()
     for (const request of requests) {
-      const skey = request.conversation_uri.slice(request.conversation_uri.lastIndexOf('/') + 1)
+      const { skey } = parseSpaceUri(request.conversation_uri)
       await this.start(request.owner_did, skey, request.message_rkey).catch((err) =>
         this.deps.logger.warn({ err, request }, 'could not retry a queued turn'),
       )

@@ -4,7 +4,15 @@ import { describe, expect, it, vi } from 'vitest'
 import { createApp } from '../../src/app.ts'
 import { buildScope } from '../../src/auth/scope.ts'
 import { resolveSyncConfig } from '../../src/sync/scheduler.ts'
-import { authDeps, fakeOAuth, fakeSession, ORIGIN, sessionCookie } from '../helpers/auth.ts'
+import {
+  authDeps,
+  fakeOAuth,
+  fakeSession,
+  LOGIN_STATE,
+  loginCookie,
+  ORIGIN,
+  sessionCookie,
+} from '../helpers/auth.ts'
 import { testConfig } from '../helpers/config.ts'
 import { spacesHarness } from '../helpers/spaces.ts'
 
@@ -14,7 +22,10 @@ async function setup(storageMode: 'space' | 'local', syncOptions = {}) {
   const h = await spacesHarness({ storageMode })
   const scope = storageMode === 'space' ? buildScope('raw') : 'atproto'
   const oauth = fakeOAuth({
-    callback: vi.fn(async () => ({ session: fakeSession('did:plc:alice', scope) })),
+    callback: vi.fn(async () => ({
+      session: fakeSession('did:plc:alice', scope),
+      state: LOGIN_STATE,
+    })),
   })
   const engine = { syncConversation: vi.fn(async () => {}) }
   const app = createApp({
@@ -31,7 +42,7 @@ async function setup(storageMode: 'space' | 'local', syncOptions = {}) {
       logger: h.logger,
     },
   })
-  const cookie = sessionCookie(await app.request('/oauth/callback?code=a&state=b'))
+  const cookie = sessionCookie(await app.request('/oauth/callback?code=a&state=b', loginCookie))
   const get = async (path: string) => {
     const res = await app.request(`/api${path}`, { headers: { cookie } })
     return { status: res.status, body: (await res.json()) as Json }
@@ -63,6 +74,27 @@ describe.each(['space', 'local'] as const)('chat API for a %s account', (mode) =
     const conversation = await get(`/conversations/${body.skey}`)
     expect((conversation.body.info as Json).value).toMatchObject({ systemPrompt: 'Be brief' })
     expect((await get('/conversations/3zzzzzzzzzzzz')).status).toBe(404)
+  })
+
+  it('returns 404 for tags on a conversation that does not exist, without adding it to the index', async () => {
+    const { get, send } = await setup(mode)
+    expect((await send('PATCH', '/conversations/3zzzzzzzzzzzz', { tags: ['work'] })).status).toBe(
+      404,
+    )
+    expect((await get('/conversations')).body.conversations).toEqual([])
+  })
+
+  it('refuses malformed and wrongly typed bodies with a 400', async () => {
+    const { send, app, cookie } = await setup(mode)
+    const { body } = await send('POST', '/conversations')
+    expect((await send('PATCH', `/conversations/${body.skey}`, { tags: 'work' })).status).toBe(400)
+    expect((await send('PUT', '/account', { backgroundSync: 'no' })).status).toBe(400)
+    const res = await app.request('/api/preferences', {
+      method: 'PUT',
+      headers: { cookie, origin: ORIGIN, 'content-type': 'application/json' },
+      body: '{',
+    })
+    expect(res.status).toBe(400)
   })
 
   it('reports a stored info record that does not match its lexicon as a 502', async () => {

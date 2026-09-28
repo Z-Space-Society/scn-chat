@@ -54,7 +54,7 @@ async function run(
   Object.assign(ctx.models, { generateText })
   Object.assign(ctx.conversations, { updateInfo })
   Object.assign(ctx.logger, { warn })
-  await (hooks[0]?.handler as (t: TurnContext) => Promise<void>)(context)
+  await (hooks[0]!.handler as (t: TurnContext) => Promise<void>)(context)
   return { generateText, updateInfo, warn }
 }
 

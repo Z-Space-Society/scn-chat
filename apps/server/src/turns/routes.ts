@@ -1,9 +1,11 @@
 import { nsid } from '@scn-chat/lexicons'
-import type { ModelRef } from '@scn-chat/plugin-api'
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
+import { z } from 'zod'
 import { requireUser, signedInUser } from '../auth/routes.ts'
+import { jsonBody } from '../body.ts'
 import type { AppEnv } from '../env.ts'
+import { modelRef } from '../schemas.ts'
 import type { JsonRecord } from '../storage/records.ts'
 import { newTid } from '../storage/records.ts'
 import type { ChatServices } from '../storage/services.ts'
@@ -14,11 +16,20 @@ export type TurnRoutesDeps = { services: ChatServices; runner: TurnRunner; hub: 
 
 const USER_PARTS = new Set(['textPart', 'imagePart', 'filePart'])
 
-type SendBody = {
-  parent?: string
-  parts: JsonRecord[]
-  generation?: { model?: ModelRef; effort?: string; tools?: string[] }
-}
+const sendBody = z.object({
+  parent: z.string().min(1).optional(),
+  parts: z.array(z.looseObject({ $type: z.string() })).min(1),
+  generation: z
+    .object({
+      model: modelRef.optional(),
+      effort: z.string().optional(),
+      tools: z.array(z.string()).optional(),
+    })
+    .strict()
+    .optional(),
+})
+
+const regenerateBody = z.object({ model: modelRef.optional(), effort: z.string().optional() })
 
 /** Sending messages, regenerating, cancelling, and streaming replies. */
 export function turnRoutes(deps: TurnRoutesDeps) {
@@ -27,10 +38,9 @@ export function turnRoutes(deps: TurnRoutesDeps) {
     .post('/conversations/:skey/messages', async (c) => {
       const user = signedInUser(c)
       const skey = c.req.param('skey')
-      const body = (await c.req.json()) as SendBody
-      const parts = Array.isArray(body.parts) ? body.parts : []
-      const invalid = parts.find((part) => !USER_PARTS.has(String(part.$type).split('#')[1] ?? ''))
-      if (invalid || parts.length === 0) {
+      const body = await jsonBody(c, sendBody)
+      const parts = body.parts
+      if (parts.some((part) => !USER_PARTS.has(part.$type.split('#')[1] as string))) {
         return c.json(
           { error: 'InvalidRequest', message: 'A message needs text or attachment parts only' },
           400,
@@ -57,10 +67,10 @@ export function turnRoutes(deps: TurnRoutesDeps) {
       const user = signedInUser(c)
       const skey = c.req.param('skey')
       const rkey = c.req.param('rkey')
-      const body = (await c.req.json().catch(() => ({}))) as { model?: ModelRef; effort?: string }
+      const body = await jsonBody(c, regenerateBody, { optional: true })
       const chats = deps.services.forAccount(user.account)
       const existing = await chats.store.getRecord(chats.conversationUri(skey), nsid.message, rkey)
-      if (!existing || existing.value.role !== 'user') return c.json({ error: 'NotFound' }, 404)
+      if (existing?.value.role !== 'user') return c.json({ error: 'NotFound' }, 404)
       const previous = (existing.value.generation ?? {}) as { attempt?: number } & JsonRecord
       const generation: JsonRecord = { ...previous, attempt: (previous.attempt ?? 0) + 1 }
       if (body.model) generation.model = body.model
@@ -69,9 +79,9 @@ export function turnRoutes(deps: TurnRoutesDeps) {
       const started = await deps.runner.start(user.did, skey, rkey)
       return c.json({ replyRkey: started.replyRkey ?? null, status: started.status })
     })
-    .post('/conversations/:skey/messages/:rkey/cancel', (c) => {
+    .post('/conversations/:skey/messages/:rkey/cancel', async (c) => {
       const user = signedInUser(c)
-      const cancelled = deps.runner.cancel(user.did, c.req.param('skey'), c.req.param('rkey'))
+      const cancelled = await deps.runner.cancel(user.did, c.req.param('skey'), c.req.param('rkey'))
       return c.json({ cancelled })
     })
     .get('/conversations/:skey/messages/:rkey/stream', (c) => {

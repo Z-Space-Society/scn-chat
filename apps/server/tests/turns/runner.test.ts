@@ -4,8 +4,8 @@ import pino from 'pino'
 import { describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { loadPlugins } from '../../src/plugins/host.ts'
+import { safeErrorMessage } from '../../src/safe-error.ts'
 import { LocalRecordStore } from '../../src/storage/local-record-store.ts'
-import { safeErrorMessage } from '../../src/turns/runner.ts'
 import { ALICE, textContent, userMessage } from '../helpers/spaces.ts'
 import { scriptedModel, sequenceModel, textReply, turnsHarness } from '../helpers/turns.ts'
 
@@ -171,7 +171,7 @@ describe('TurnRunner.start', () => {
     await sendUser(h, skey, '3uuuuuuuuuuu1')
     await h.runner.start(ALICE, skey, '3uuuuuuuuuuu1')
     await new Promise((resolve) => setTimeout(resolve, 150))
-    expect(h.runner.cancel(ALICE, skey, '3uuuuuuuuuuu1.r0')).toBe(true)
+    expect(await h.runner.cancel(ALICE, skey, '3uuuuuuuuuuu1.r0')).toBe(true)
     await h.runner.idle()
     const reply = (await h.messages(skey)).get('3uuuuuuuuuuu1.r0')
     expect(reply?.status).toBe('cancelled')
@@ -234,7 +234,7 @@ describe('TurnRunner.start', () => {
     await h.runner.idle()
     const reply = (await h.messages(skey)).get('3uuuuuuuuuuu1.r0')
     expect(reply?.status).toBe('complete')
-    const result = (reply?.content as { parts: Record<string, unknown>[] }).parts.find((p) =>
+    const result = (reply!.content as { parts: Record<string, unknown>[] }).parts.find((p) =>
       String(p.$type).endsWith('toolResultPart'),
     )
     expect(result?.outputBlob).toMatchObject({ $type: 'blob', mimeType: 'text/plain' })
@@ -265,6 +265,74 @@ describe('TurnRunner.start', () => {
     }
   })
 
+  it('ends the stream of a queued turn that fails to start, without an unhandled rejection', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      const h = await turnsHarness({ ratePerMinute: 1 })
+      const { skey } = await h.chats.createConversation()
+      await sendUser(h, skey, '3uuuuuuuuuuu1')
+      await sendUser(h, skey, '3uuuuuuuuuuu2')
+      await h.runner.start(ALICE, skey, '3uuuuuuuuuuu1')
+      await h.runner.start(ALICE, skey, '3uuuuuuuuuuu2')
+      const events: string[] = []
+      h.hub.subscribe(h.runner.streamKey(ALICE, skey, '3uuuuuuuuuuu2.r0'), (event) =>
+        events.push(event.type === 'status' ? `status:${event.status}` : event.type),
+      )
+      vi.spyOn(h.services, 'forAccount').mockImplementation(() => {
+        throw new Error('PDS unavailable')
+      })
+      await vi.advanceTimersByTimeAsync(61_000)
+      expect(events).toEqual(['queued', 'status:error'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('ends the stream of a queued turn that another runner already answered', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      const h = await turnsHarness({ ratePerMinute: 1 })
+      const { skey } = await h.chats.createConversation()
+      await sendUser(h, skey, '3uuuuuuuuuuu1')
+      await sendUser(h, skey, '3uuuuuuuuuuu2')
+      await h.runner.start(ALICE, skey, '3uuuuuuuuuuu1')
+      await h.runner.start(ALICE, skey, '3uuuuuuuuuuu2')
+      await h.chats.createMessage(skey, '3uuuuuuuuuuu2.r0', {
+        $type: nsid.message,
+        role: 'assistant',
+        parent: '3uuuuuuuuuuu2',
+        status: 'complete',
+        content: textContent('elsewhere'),
+        createdAt: new Date().toISOString(),
+      } as never)
+      const statuses: string[] = []
+      h.hub.subscribe(h.runner.streamKey(ALICE, skey, '3uuuuuuuuuuu2.r0'), (event) => {
+        if (event.type === 'status') statuses.push(event.status)
+      })
+      await vi.advanceTimersByTimeAsync(61_000)
+      await vi.waitFor(() => expect(statuses).toEqual(['exists']))
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('cancels a queued turn, dropping its request and ending its stream', async () => {
+    const h = await turnsHarness({ ratePerMinute: 1 })
+    const { skey } = await h.chats.createConversation()
+    await sendUser(h, skey, '3uuuuuuuuuuu1')
+    await sendUser(h, skey, '3uuuuuuuuuuu2')
+    await h.runner.start(ALICE, skey, '3uuuuuuuuuuu1')
+    await h.runner.start(ALICE, skey, '3uuuuuuuuuuu2')
+    await h.runner.idle()
+    expect(await h.runner.cancel(ALICE, skey, '3uuuuuuuuuuu2.r0')).toBe(true)
+    expect(await h.db.selectFrom('turn_request').selectAll().execute()).toEqual([])
+    const statuses: string[] = []
+    h.hub.subscribe(h.runner.streamKey(ALICE, skey, '3uuuuuuuuuuu2.r0'), (event) => {
+      if (event.type === 'status') statuses.push(event.status)
+    })
+    expect(statuses).toEqual(['cancelled'])
+  })
+
   it('queues the same unclaimed turn once', async () => {
     const h = await turnsHarness({ ratePerMinute: 1 })
     const { skey } = await h.chats.createConversation()
@@ -284,7 +352,10 @@ describe('TurnRunner.start', () => {
           id: 'watcher',
           name: 'Watcher',
           apiVersion: 1,
-          setup: (ctx) => ctx.hooks.on('turn:after', (turn) => void (seen = turn)),
+          setup: (ctx) =>
+            ctx.hooks.on('turn:after', (turn) => {
+              seen = turn
+            }),
         }),
       ],
       {
@@ -299,7 +370,7 @@ describe('TurnRunner.start', () => {
     await h.runner.start(ALICE, skey, '3uuuuuuuuuuu1')
     await h.runner.idle()
     expect(seen?.reply.rkey).toBe('3uuuuuuuuuuu1.r0')
-    expect((seen?.reply.record as unknown as { status: string }).status).toBe('complete')
+    expect((seen!.reply.record as unknown as { status: string }).status).toBe('complete')
   })
 
   it('fails the turn with an error naming the plugin when a filter throws', async () => {
@@ -378,6 +449,27 @@ describe('TurnRunner.start', () => {
     expect(reply).toMatchObject({ status: 'error', error: expect.stringContaining('encrypted') })
   })
 
+  it('fails the turn when it asks for tools on a model that cannot use them', async () => {
+    const h = await turnsHarness({
+      adminModels: [
+        {
+          id: 'plain',
+          default: true,
+          capabilities: { vision: false, reasoning: false, tools: false },
+        },
+      ],
+    })
+    const { skey } = await h.chats.createConversation()
+    await sendUser(h, skey, '3uuuuuuuuuuu1', { generation: { tools: ['web_search'] } })
+    await h.runner.start(ALICE, skey, '3uuuuuuuuuuu1')
+    await h.runner.idle()
+    const reply = (await h.messages(skey)).get('3uuuuuuuuuuu1.r0')
+    expect(reply).toMatchObject({
+      status: 'error',
+      error: expect.stringContaining('cannot use tools'),
+    })
+  })
+
   it('fails the turn when it asks for a tool that is not installed', async () => {
     const h = await turnsHarness()
     const { skey } = await h.chats.createConversation()
@@ -386,6 +478,38 @@ describe('TurnRunner.start', () => {
     await h.runner.idle()
     const reply = (await h.messages(skey)).get('3uuuuuuuuuuu1.r0')
     expect(reply).toMatchObject({ status: 'error', error: expect.stringContaining('web_search') })
+  })
+
+  it('ends with an error reply when the provider call itself throws', async () => {
+    const h = await turnsHarness({
+      model: () => scriptedModel([], { fail: new Error('connect ECONNREFUSED') }).model,
+    })
+    const { skey } = await h.chats.createConversation()
+    await sendUser(h, skey, '3uuuuuuuuuuu1')
+    await h.runner.start(ALICE, skey, '3uuuuuuuuuuu1')
+    await h.runner.idle()
+    const reply = (await h.messages(skey)).get('3uuuuuuuuuuu1.r0')
+    expect(reply).toMatchObject({ status: 'error', error: expect.stringContaining('ECONNREFUSED') })
+  })
+
+  it('writes an error reply when the finished reply cannot be written but the error can', async () => {
+    const h = await turnsHarness()
+    const { skey } = await h.chats.createConversation()
+    await sendUser(h, skey, '3uuuuuuuuuuu1')
+    const original = LocalRecordStore.prototype.putRecord
+    const put = vi
+      .spyOn(LocalRecordStore.prototype, 'putRecord')
+      .mockImplementation(async function (this: LocalRecordStore, space, collection, rkey, value) {
+        if (collection === nsid.message && value.status === 'complete')
+          throw new Error('record too large')
+        return original.call(this, space, collection, rkey, value)
+      })
+    await h.runner.start(ALICE, skey, '3uuuuuuuuuuu1')
+    await h.runner.idle()
+    put.mockRestore()
+    const reply = (await h.messages(skey)).get('3uuuuuuuuuuu1.r0')
+    expect(reply).toMatchObject({ status: 'error', error: 'record too large' })
+    expect(await h.db.selectFrom('turn_claim').selectAll().execute()).toEqual([])
   })
 
   it('keeps the claim for recovery when neither the reply nor the error reply can be written', async () => {
@@ -521,6 +645,30 @@ describe('TurnRunner.recover', () => {
     expect(all.get('ours.r0')).toMatchObject({ status: 'error', error: 'interrupted' })
     expect(all.get('theirs.r0')?.status).toBe('pending')
     expect(await h.db.selectFrom('turn_claim').selectAll().execute()).toEqual([])
+  })
+
+  it('keeps the claim of a reply it could not mark, so the next restart tries again', async () => {
+    const h = await turnsHarness()
+    const { skey, uri } = await h.chats.createConversation()
+    await h.chats.createMessage(skey, 'ours.r0', {
+      $type: nsid.message,
+      role: 'assistant',
+      content: textContent(''),
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    } as never)
+    await h.db
+      .insertInto('turn_claim')
+      .values({ conversation_uri: uri, reply_rkey: 'ours.r0', owner_did: ALICE, claimed_at: 'now' })
+      .execute()
+    const put = vi
+      .spyOn(LocalRecordStore.prototype, 'putRecord')
+      .mockRejectedValue(new Error('PDS unavailable'))
+    await h.runner.recover()
+    put.mockRestore()
+    expect(await h.db.selectFrom('turn_claim').select('reply_rkey').execute()).toEqual([
+      { reply_rkey: 'ours.r0' },
+    ])
   })
 
   it('retries recent queued turns and drops old ones', async () => {

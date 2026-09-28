@@ -13,10 +13,8 @@ import { atproto } from '@scn-chat/lexicons'
 import type { Account } from '../auth/accounts.ts'
 import type { PdsClientFactory } from '../auth/pds.ts'
 import type { Db } from '../db/index.ts'
+import type { Loose } from '../loose.ts'
 import { type JsonRecord, toJson } from '../storage/records.ts'
-
-// Plain strings don't satisfy the generated methods' branded string types.
-type Loose = any
 
 export type StoredBlob = { bytes: Uint8Array; mimeType: string }
 

@@ -37,7 +37,7 @@ describe('MessageView', () => {
     render(
       <MessageView
         blobUrl={blobUrl}
-        streaming="Hel"
+        streaming={{ text: 'Hel', reasoning: '' }}
         record={{
           role: 'assistant',
           status: 'pending',

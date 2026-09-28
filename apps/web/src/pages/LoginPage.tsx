@@ -1,5 +1,7 @@
 export function LoginPage() {
-  const error = new URLSearchParams(location.search).get('error')
+  const params = new URLSearchParams(location.search)
+  const error = params.get('error')
+  const next = params.get('next')
   return (
     <main className="login">
       <h1>Sign in</h1>
@@ -13,6 +15,7 @@ export function LoginPage() {
             required
           />
         </label>
+        {next && <input type="hidden" name="next" value={next} />}
         <button type="submit">Sign in</button>
       </form>
       {error && <p role="alert">{error}</p>}

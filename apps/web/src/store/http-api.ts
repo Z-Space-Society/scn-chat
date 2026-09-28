@@ -1,3 +1,4 @@
+import { errorMessage } from '../lib/response.ts'
 import type { ConversationChanges, IndexChanges, RecordKey, StoreApi } from './core.ts'
 
 export class Unauthorized extends Error {
@@ -10,12 +11,7 @@ export class Unauthorized extends Error {
 async function get<T>(fetchImpl: typeof fetch, path: string): Promise<T> {
   const res = await fetchImpl(path, { credentials: 'same-origin' })
   if (res.status === 401) throw new Unauthorized()
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { message?: string; error?: string }
-    throw new Error(
-      `GET ${path} returned ${res.status}: ${body.message ?? body.error ?? 'no details'}`,
-    )
-  }
+  if (!res.ok) throw new Error(`GET ${path} returned ${res.status}: ${await errorMessage(res)}`)
   return (await res.json()) as T
 }
 
