@@ -149,6 +149,7 @@ See [`plugins/pdf-text`](../plugins/pdf-text/src/index.ts) as an example.
 - **Filters:** Each handlers return value is sent to the next filter.
 - **Actions:** Return values are ignored. If an action raises an exception it's logged and the turn and later actions continue.
 - **Order:** Pass `{ order: 'pre' }` or `{ order: 'post' }` to run before or after the `'normal'` handlers.
+- **Turn context:** `turn.tools` lists the tools offered to the model this turn, so a `messages:beforeModel` filter can add guidance for its tools only when they are in use.
 
 ## Per-user settings
 

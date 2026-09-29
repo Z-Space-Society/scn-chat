@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Redirect, Route, Switch, useLocation } from 'wouter'
 import { ApiError, api, onUnauthorized, read } from './api.ts'
 import { messageOf } from './components/useAction.ts'
+import { syncTimeZone } from './lib/time-zone.ts'
 import { ChatPage } from './pages/ChatPage.tsx'
 import { LoginPage } from './pages/LoginPage.tsx'
 import { SettingsPage } from './pages/SettingsPage.tsx'
@@ -41,6 +42,7 @@ function SignedIn({ me }: { me: Me }) {
         .deleteLocalCopy()
         .catch((err: unknown) => console.error('Could not delete the local copy', err))
         .finally(() => location.assign('/login'))
+    syncTimeZone().catch((err: unknown) => console.warn('Could not save the time zone', err))
     const stopApi = onUnauthorized(ended)
     const stopStore = store.onChange((change) => change.type === 'unauthorized' && ended())
     return () => {

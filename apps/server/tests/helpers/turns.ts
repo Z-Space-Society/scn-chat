@@ -66,6 +66,8 @@ export async function turnsHarness(
     host?: PluginHost
     ratePerMinute?: number
     timeoutMs?: number
+    systemPrompt?: string
+    now?: () => number
   } = {},
 ) {
   const h = await spacesHarness({ storageMode: options.storageMode })
@@ -134,8 +136,11 @@ export async function turnsHarness(
       maxSteps: 4,
       timeoutMs: options.timeoutMs ?? 10_000,
       backfillWindowMs: 60 * 60_000,
+      systemPrompt: options.systemPrompt ?? '',
     },
+    appName: 'Test Chat',
     logger: h.logger,
+    ...(options.now ? { now: options.now } : {}),
   })
   const setModel = (factory: () => LanguageModelV4) => {
     modelFactory = factory

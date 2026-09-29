@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { MessageView } from '../../src/components/MessageView.tsx'
 
@@ -78,7 +79,7 @@ describe('MessageView', () => {
     expect(container.querySelector('a[href^="javascript"]')).toBeNull()
   })
 
-  it('shows Markdown images in assistant text as links instead of loading them', () => {
+  it('shows the full URL of a Markdown image in assistant text and loads it only on click', async () => {
     const { container } = render(
       <MessageView
         blobUrl={blobUrl}
@@ -93,8 +94,10 @@ describe('MessageView', () => {
       />,
     )
     expect(container.querySelector('img')).toBeNull()
-    expect(screen.getByRole('link', { name: 'chart' })).toHaveAttribute(
-      'href',
+    expect(screen.getByText('https://example.com/c.png?q=secret')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Load image' }))
+    expect(screen.getByAltText('chart')).toHaveAttribute(
+      'src',
       'https://example.com/c.png?q=secret',
     )
   })

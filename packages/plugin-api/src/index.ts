@@ -110,6 +110,8 @@ export type TurnContext = {
   /** Missing when no model was chosen and there is no default, which fails the turn. */
   model?: ModelRef
   effort?: Effort
+  /** Tools offered to the model this turn. */
+  tools: string[]
 }
 
 export type BranchMessage = { rkey: string; author: string; record: MessageRecord }

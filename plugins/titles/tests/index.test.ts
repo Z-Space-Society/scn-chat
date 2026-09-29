@@ -18,6 +18,7 @@ function turn(
       info: { createdAt: 'now', ...overrides.info } as never,
     },
     preferences: overrides.preferences as never,
+    tools: [],
     userMessage: {
       rkey: 'u',
       record: {

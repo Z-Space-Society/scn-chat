@@ -36,7 +36,7 @@ Any route except `/login` and a shared route redirects to `/login` when `/api/me
 - **ChatList.** Conversation titles from the browser store, newest first. Untitled conversations show "New chat". It has a button to start a new chat.
 - **Conversation.** It shows the messages on the current branch, from the root to the selected leaf. A message with siblings shows "‹ 2 / 3 ›" controls that switch branches. By default the branch follows the newest sibling at each level. It also has the title, with rename, the share control from the sharing spec, and a sync button that calls the conversation's sync route and then refreshes it in the browser store.
 - **Message.**
-  - Assistant text parts, including streamed text, are rendered as GitHub-flavored Markdown with `react-markdown` and `remark-gfm`. Raw HTML is not rendered, links open in a new tab, and images are shown as links rather than loaded, so injected content cannot leak the chat through an image URL. User text is shown as plain text.
+  - Assistant text parts, including streamed text, are rendered as GitHub-flavored Markdown with `react-markdown` and `remark-gfm`. Raw HTML is not rendered, links open in a new tab, and images show their alt text, full URL, and a load button instead of loading, so injected content cannot leak the chat through an image URL without the user choosing to load it. User text is shown as plain text.
   - Reasoning parts go in a closed `<details>`.
   - Tool calls and results go in a `<details>` with their JSON.
   - Sources are shown as a list of links.
@@ -45,7 +45,7 @@ Any route except `/login` and a shared route redirects to `/login` when `/api/me
 - **Message actions.** On user messages, edit, which opens the composer prefilled and sends a sibling. On assistant replies, regenerate, with an optional model change. While generating, stop.
 - **Composer.** A textarea, a model select from `/api/models`, an effort select for models with the reasoning capability, and an attach button. The attach button accepts images only for models with vision, plus any type an ingester supports. Attachments upload when chosen and show a progress state. Enter sends, and Shift+Enter adds a newline.
 - **Settings.**
-  - Preferences: default model, default effort, custom instructions, and generate titles.
+  - Preferences: default model, default effort, custom instructions, and generate titles. Saving also stores the browser's time zone, which the app saves on sign-in as well when it differs from the stored one.
   - API keys: add, list with the last four characters, and delete. For providers with user endpoints, a base URL field.
   - Plugin settings: one form per plugin with user settings, generated from its JSON schema.
   - Background sync: an on and off switch, shown only when the admin allows users to opt out.
@@ -93,7 +93,7 @@ After sending, the conversation subscribes to the reply's stream endpoint and ap
 - [ ] Settings save preferences, add and delete API keys, and save plugin settings through generated forms.
 - [ ] A shared link shows the conversation read-only to a permitted viewer.
 - [ ] Reasoning and tool details are collapsed by default.
-- [ ] Assistant text renders as Markdown, raw HTML in it is not rendered, images in it become links, and user text stays plain.
+- [ ] Assistant text renders as Markdown, raw HTML in it is not rendered, images in it load only on click and show their full URL first, and user text stays plain.
 - [ ] If the stream drops, the reply still appears through repeated refreshes.
 - [ ] The sync button syncs the conversation and shows changes written from another client.
 - [ ] The background sync switch appears only when the admin allows opting out, and saves the account setting.

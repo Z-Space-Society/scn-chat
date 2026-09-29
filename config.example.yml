@@ -17,6 +17,10 @@ turns:
   maxSteps: 8
   timeoutSeconds: 600
   backfillMinutes: 60
+  # Starts every turn's instructions. Placeholders: {{appName}}, {{date}}, {{time}}, {{timezone}}.
+  systemPrompt: >-
+    You are an AI assistant in {{appName}}. Today is {{date}} ({{timezone}}).
+    Replies are rendered as Markdown. Raw HTML is not rendered, and images load only when the user clicks them.
 
 sync:
   safetyNet: { enabled: true, intervalMinutes: 15, activeWithinHours: 24 }

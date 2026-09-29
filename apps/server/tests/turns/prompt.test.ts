@@ -1,11 +1,14 @@
 import { nsid } from '@scn-chat/lexicons'
 import type { BranchMessage, ModelProvider } from '@scn-chat/plugin-api'
-import { describe, expect, it } from 'vitest'
+import pino from 'pino'
+import { describe, expect, it, vi } from 'vitest'
 import {
   branchTo,
   buildInstructions,
+  fillBasePrompt,
   lastReplyModel,
   TurnInputError,
+  timeZoneOf,
   toModelMessages,
 } from '../../src/turns/prompt.ts'
 
@@ -58,11 +61,55 @@ describe('lastReplyModel', () => {
 })
 
 describe('buildInstructions', () => {
-  it('joins custom instructions and the system prompt with a blank line', () => {
+  it('joins the base prompt, custom instructions, and the system prompt with blank lines', () => {
     expect(
-      buildInstructions({ customInstructions: 'Metric units' }, { systemPrompt: 'Be brief' }),
-    ).toBe('Metric units\n\nBe brief')
-    expect(buildInstructions(null, null)).toBe('')
+      buildInstructions(
+        'Base',
+        { customInstructions: 'Metric units' },
+        { systemPrompt: 'Be brief' },
+      ),
+    ).toBe('Base\n\nMetric units\n\nBe brief')
+  })
+
+  it('returns an empty string when there is nothing to send', () => {
+    expect(buildInstructions('', null, null)).toBe('')
+  })
+})
+
+describe('fillBasePrompt', () => {
+  const now = new Date('2026-09-30T02:30:00Z')
+
+  it('fills the date, time, time zone, and app name in the given zone', () => {
+    const filled = fillBasePrompt('{{appName}}: {{date}} {{time}} {{timezone}}', {
+      appName: 'SCN Chat',
+      timeZone: 'America/Vancouver',
+      now,
+    })
+    expect(filled).toBe('SCN Chat: Tuesday, September 29, 2026 7:30 PM America/Vancouver')
+  })
+
+  it('keeps unknown placeholders as written', () => {
+    expect(fillBasePrompt('Hi {{name}}', { appName: 'A', timeZone: 'UTC', now })).toBe(
+      'Hi {{name}}',
+    )
+  })
+})
+
+describe('timeZoneOf', () => {
+  const logger = pino({ level: 'silent' })
+
+  it('returns the zone from preferences', () => {
+    expect(timeZoneOf({ timezone: 'Europe/Paris' }, logger)).toBe('Europe/Paris')
+  })
+
+  it('falls back to UTC when preferences have no zone', () => {
+    expect(timeZoneOf(null, logger)).toBe('UTC')
+  })
+
+  it('falls back to UTC and warns for a zone that does not exist', () => {
+    const warn = vi.spyOn(logger, 'warn')
+    expect(timeZoneOf({ timezone: 'Mars/Olympus' }, logger)).toBe('UTC')
+    expect(warn).toHaveBeenCalledOnce()
   })
 })
 

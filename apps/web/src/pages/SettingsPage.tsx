@@ -5,6 +5,7 @@ import { type ModelOption, modelKey } from '../components/Composer.tsx'
 import { SchemaForm } from '../components/SchemaForm.tsx'
 import { useAction } from '../components/useAction.ts'
 import { useSignOut } from '../components/useSignOut.ts'
+import { browserTimeZone } from '../lib/time-zone.ts'
 import { useStore } from '../store/react.tsx'
 import { useModels } from './ChatPage.tsx'
 
@@ -31,7 +32,9 @@ function Preferences({ models }: { models: ModelOption[] }) {
         const { $type: _type, updatedAt: _updated, ...record } = prefs
         setSaved(false)
         run(async () => {
-          await read(api.chats.preferences.$put({}, json(record)))
+          await read(
+            api.chats.preferences.$put({}, json({ ...record, timezone: browserTimeZone() })),
+          )
           setSaved(true)
         })
       }}

@@ -144,6 +144,59 @@ describe('TurnRunner.start', () => {
     expect(prompt).not.toContain('question 3uuuuuuuuuuuX')
   })
 
+  it("starts the instructions with the base prompt, dated in the user's time zone", async () => {
+    const script = scriptedModel(textReply('ok'))
+    const h = await turnsHarness({
+      model: () => script.model,
+      systemPrompt: '{{appName}} on {{date}}',
+      now: () => Date.parse('2026-09-30T02:30:00Z'),
+    })
+    const { skey } = await h.chats.createConversation({ systemPrompt: 'Be brief' })
+    await h.chats.putPreferences({ timezone: 'America/Vancouver' })
+    await sendUser(h, skey, '3uuuuuuuuuuu1')
+    await h.runner.start(ALICE, skey, '3uuuuuuuuuuu1')
+    await h.runner.idle()
+    expect(JSON.stringify(script.prompts.at(-1))).toContain(
+      'Test Chat on Tuesday, September 29, 2026\\n\\nBe brief',
+    )
+  })
+
+  it('gives hooks the names of the tools offered this turn', async () => {
+    let offered: string[] | undefined
+    const host = await loadPlugins(
+      [
+        definePlugin({
+          id: 'fetcher',
+          name: 'Fetcher',
+          apiVersion: 1,
+          setup: (ctx) => {
+            ctx.tools.register({
+              name: 'fetch',
+              description: 'Fetch a page',
+              inputSchema: z.object({}) as never,
+              run: async () => 'page',
+            })
+            ctx.hooks.on('messages:beforeModel', (value, turn) => {
+              offered = turn.tools
+              return value
+            })
+          },
+        }),
+      ],
+      {
+        services: {} as never,
+        logger: pino({ level: 'silent' }),
+        app: { name: 'T', publicUrl: 'http://x' },
+      },
+    )
+    const h = await turnsHarness({ host })
+    const { skey } = await h.chats.createConversation()
+    await sendUser(h, skey, '3uuuuuuuuuuu1', { generation: { tools: ['fetch'] } })
+    await h.runner.start(ALICE, skey, '3uuuuuuuuuuu1')
+    await h.runner.idle()
+    expect(offered).toEqual(['fetch'])
+  })
+
   it('ends with status error, a message without secrets, and the partial parts on a provider error', async () => {
     const parts = [
       { type: 'stream-start', warnings: [] },

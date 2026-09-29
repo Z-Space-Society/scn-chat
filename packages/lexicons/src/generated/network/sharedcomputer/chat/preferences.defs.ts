@@ -21,6 +21,11 @@ type Main = {
    */
   customInstructions?: string
   generateTitles?: boolean
+
+  /**
+   * IANA time zone name for the date given to the model.
+   */
+  timezone?: string
   updatedAt?: l.DatetimeString
 }
 
@@ -41,6 +46,9 @@ const main = /*#__PURE__*/ l.record<'literal:self', Main>(
     ),
     generateTitles: /*#__PURE__*/ l.optional(
       /*#__PURE__*/ l.withDefault(/*#__PURE__*/ l.boolean(), true),
+    ),
+    timezone: /*#__PURE__*/ l.optional(
+      /*#__PURE__*/ l.string({ maxLength: 100 }),
     ),
     updatedAt: /*#__PURE__*/ l.optional(
       /*#__PURE__*/ l.string({ format: 'datetime' }),

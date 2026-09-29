@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { type ReactNode, useState } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { StreamedReply } from './useReplyStream.ts'
@@ -18,14 +18,25 @@ export type MessageViewProps = {
 
 const kind = (part: Part) => part.$type.split('#')[1]
 
+/** An image from model output, loaded only on click, since loading it could leak the chat through its URL. */
+function MarkdownImage({ src, alt }: { src: string; alt?: string }) {
+  const [shown, setShown] = useState(false)
+  if (shown) return <img src={src} alt={alt ?? ''} referrerPolicy="no-referrer" />
+  return (
+    <span className="image-placeholder">
+      {alt && <>{alt} </>}
+      <code>{src}</code>{' '}
+      <button type="button" onClick={() => setShown(true)}>
+        Load image
+      </button>
+    </span>
+  )
+}
+
 const markdownComponents: Components = {
   a: ({ node: _node, ...props }) => <a {...props} target="_blank" rel="noreferrer" />,
-  // Images from model output would load without a click and could leak the chat through the URL.
-  img: ({ src, alt }) => (
-    <a href={src as string | undefined} target="_blank" rel="noreferrer">
-      {alt || 'Image'}
-    </a>
-  ),
+  img: ({ src, alt }) =>
+    typeof src === 'string' && src ? <MarkdownImage src={src} alt={alt} /> : null,
 }
 
 /** Assistant text as Markdown. Raw HTML in it is not rendered. */

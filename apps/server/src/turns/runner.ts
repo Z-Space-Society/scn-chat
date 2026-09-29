@@ -18,8 +18,10 @@ import {
   type BlobReader,
   branchTo,
   buildInstructions,
+  fillBasePrompt,
   lastReplyModel,
   TurnInputError,
+  timeZoneOf,
   toModelMessages,
 } from './prompt.ts'
 import type { StreamHub } from './stream-hub.ts'
@@ -36,7 +38,14 @@ export type TurnRunnerDeps = {
   host?: PluginHost
   hub: StreamHub
   blobs: TurnBlobs
-  config: { ratePerMinute: number; maxSteps: number; timeoutMs: number; backfillWindowMs: number }
+  config: {
+    ratePerMinute: number
+    maxSteps: number
+    timeoutMs: number
+    backfillWindowMs: number
+    systemPrompt: string
+  }
+  appName: string
   logger: Logger
   now?: () => number
 }
@@ -356,6 +365,7 @@ export class TurnRunner {
       reply: { rkey: replyRkey, record: placeholder as never },
       ...(model ? { model } : {}),
       effort: effort as never,
+      tools: [],
     }
     let status: 'complete' | 'error' | 'cancelled' = 'complete'
     let error: string | undefined
@@ -365,8 +375,21 @@ export class TurnRunner {
       const resolved = await this.deps.catalog.resolve(did, model)
       const hooks = this.deps.host?.hooks
       const branch = branchTo(loaded.messages, userMessage.rkey)
+      if (generation.tools?.length && !resolved.capabilities.tools)
+        throw new TurnInputError('This model cannot use tools. Choose a model that can.')
+      const tools = await this.tools(generation.tools, {
+        user: did,
+        conversation: conversationUri,
+        signal: controller.signal,
+      })
+      context.tools = Object.keys(tools ?? {})
+      const base = fillBasePrompt(this.deps.config.systemPrompt, {
+        appName: this.deps.appName,
+        timeZone: timeZoneOf(loaded.preferences, this.deps.logger),
+        now: new Date(this.now()),
+      })
       const initial = {
-        instructions: buildInstructions(loaded.preferences, loaded.info),
+        instructions: buildInstructions(base, loaded.preferences, loaded.info),
         messages: branch,
       }
       const prompt = hooks ? await hooks.filter('messages:beforeModel', initial, context) : initial
@@ -375,17 +398,11 @@ export class TurnRunner {
         capabilities: resolved.capabilities,
         readBlob: this.deps.blobs.reader(account, skey),
       })
-      if (generation.tools?.length && !resolved.capabilities.tools)
-        throw new TurnInputError('This model cannot use tools. Choose a model that can.')
       const result = streamText({
         model: resolved.model,
         instructions: prompt.instructions || undefined,
         messages,
-        tools: await this.tools(generation.tools, {
-          user: did,
-          conversation: conversationUri,
-          signal: controller.signal,
-        }),
+        tools,
         stopWhen: isStepCount(this.deps.config.maxSteps),
         reasoning: resolved.capabilities.reasoning
           ? mapEffort(effort, this.deps.logger)

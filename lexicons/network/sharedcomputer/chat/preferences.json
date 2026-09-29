@@ -16,6 +16,11 @@
             "description": "Added to the system prompt for each conversation."
           },
           "generateTitles": { "type": "boolean", "default": true },
+          "timezone": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "IANA time zone name, such as America/Vancouver, for the date given to the model."
+          },
           "updatedAt": { "type": "string", "format": "datetime" }
         }
       }

@@ -72,4 +72,24 @@ describe('SettingsPage preferences', () => {
       defaultModel: { provider: 'router', id: 'anthropic/claude' },
     })
   })
+
+  it("saves the browser's time zone with the preferences", async () => {
+    const fetch = stubServer({ '/api/preferences': () => Response.json({ preferences: null }) })
+    renderPage()
+    await screen.findByRole('heading', { name: 'Preferences' })
+    await userEvent.click(screen.getAllByRole('button', { name: 'Save' })[0] as HTMLElement)
+    await vi.waitFor(() =>
+      expect(
+        fetch.mock.calls.find(
+          ([url, init]) => url === '/api/preferences' && init?.method === 'PUT',
+        ),
+      ).toBeDefined(),
+    )
+    const put = fetch.mock.calls.find(
+      ([url, init]) => url === '/api/preferences' && init?.method === 'PUT',
+    )
+    expect(JSON.parse(String(put?.[1]?.body)).timezone).toBe(
+      Intl.DateTimeFormat().resolvedOptions().timeZone,
+    )
+  })
 })

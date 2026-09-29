@@ -2,7 +2,13 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { ConfigError, interpolate, loadConfig, readConfigFile } from '../src/config.ts'
+import {
+  ConfigError,
+  DEFAULT_SYSTEM_PROMPT,
+  interpolate,
+  loadConfig,
+  readConfigFile,
+} from '../src/config.ts'
 
 const SECRET_KEY = Buffer.alloc(32, 1).toString('base64')
 const env = { SECRET_KEY }
@@ -21,6 +27,7 @@ describe('loadConfig', () => {
       maxSteps: 8,
       timeoutMs: 600_000,
       backfillWindowMs: 3_600_000,
+      systemPrompt: DEFAULT_SYSTEM_PROMPT,
     })
   })
 

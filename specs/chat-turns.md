@@ -52,7 +52,7 @@ When sync emits `message:invalid` for a user message that carries a generation r
 3. **Rate limit.** A user may start `turns.ratePerMinute` turns per minute, default 10. Past that, the turn waits in an in-memory queue per user and starts when the limit allows, without claiming the reply yet. The web UI's stream shows a `queued` status meanwhile.
 4. **Claim.** It calls `createMessage` at the reply key with a placeholder: `role: "assistant"`, the parent key, empty `plainContent` parts, the chosen model and effort, `status: "pending"`, and `createdAt`. If that throws `RecordExists`, another runner, possibly another deployment watching the same space, owns the attempt, and `startTurn` stops. On success it records the reply URI in a local `turn_claim` table.
 5. **Resolve.** The providers spec resolves the model reference to an AI SDK model. A failure rewrites the placeholder with `status: "error"` and a message saying why.
-6. **Build the prompt.** The branch is the chain of parents from the user message to the root. The instructions are the `customInstructions` preference and the conversation's `systemPrompt`, joined by a blank line. Each message becomes an AI SDK message:
+6. **Build the prompt.** The branch is the chain of parents from the user message to the root. The instructions are the admin's base prompt, the `customInstructions` preference, and the conversation's `systemPrompt`, joined by blank lines. The base prompt is `turns.systemPrompt` with its placeholders filled: `{{appName}}`, `{{date}}`, `{{time}}`, and `{{timezone}}`, in the time zone from the user's `timezone` preference, or UTC when it is missing or unknown. The default names the app, gives the date, and says replies are rendered as Markdown without raw HTML and with images loaded only on click. An empty `turns.systemPrompt` leaves the base prompt out. Each message becomes an AI SDK message:
    - User text parts become text parts. Attachments follow the attachments spec.
    - Assistant replies with status `complete` or `cancelled` contribute their text parts, tool calls and results, and reasoning according to the provider's replay policy. Replies with status `error` or `pending` are skipped.
 7. **Filter.** It runs the `messages:beforeModel` hook.
@@ -97,11 +97,11 @@ The stream closes after `status`. If this server is not running that reply, the 
 
 ### Turn context
 
-Hooks receive a turn context holding the user's DID, the conversation's URI and info, the user's preferences, the user message, the reply record as it stands, the resolved model reference and provider, and the effort.
+Hooks receive a turn context holding the user's DID, the conversation's URI and info, the user's preferences, the user message, the reply record as it stands, the resolved model reference and provider, the effort, and the names of the tools offered this turn. Tools are resolved before `messages:beforeModel` runs, so a plugin can add guidance for its own tools only when they are offered.
 
 ### Configuration
 
-The `turns` section of `config.yml` sets `ratePerMinute`, `maxSteps`, `timeoutSeconds`, and `backfillMinutes`. The environment variables `TURN_RATE_PER_MINUTE`, `TURN_MAX_STEPS`, `TURN_TIMEOUT_SECONDS`, and `TURN_BACKFILL_MINUTES` override them.
+The `turns` section of `config.yml` sets `ratePerMinute`, `maxSteps`, `timeoutSeconds`, `backfillMinutes`, and `systemPrompt`. The environment variables `TURN_RATE_PER_MINUTE`, `TURN_MAX_STEPS`, `TURN_TIMEOUT_SECONDS`, and `TURN_BACKFILL_MINUTES` override them.
 
 ## Scope Boundaries
 
@@ -125,6 +125,8 @@ The `turns` section of `config.yml` sets `ratePerMinute`, `maxSteps`, `timeoutSe
 - Stream writes are chained and flushed before a stream closes, so the final status is never dropped.
 - The send route returns the user message key, the reply key, and whether the turn was claimed, queued, or already answered.
 - Tools from a tool source are named `<source id>_<tool name>`, since providers only accept letters, digits, underscores, and dashes.
+- The default base prompt gives the date but not the time. The time changes every turn, and a changing start of the prompt defeats provider prompt caching for the whole conversation. Admins who want it can add `{{time}}`.
+- The time zone is a preference so turns started from direct PDS writes still use it. The web app saves the browser's zone on sign-in and with every settings save.
 
 ## Acceptance Criteria
 
@@ -138,6 +140,8 @@ The `turns` section of `config.yml` sets `ratePerMinute`, `maxSteps`, `timeoutSe
 - [ ] An edit creates a sibling message with the same parent and its own reply.
 - [ ] Model resolution follows request, then last completed reply on the branch, then preferences, then the admin default.
 - [ ] The prompt contains only the branch from the root to the user message, with custom instructions and the system prompt as instructions.
+- [ ] The instructions start with the base prompt, with the date in the user's time zone, falling back to UTC for a missing or unknown zone.
+- [ ] Hooks receive the names of the tools offered this turn.
 - [ ] Error and pending replies are left out of the prompt.
 - [ ] Stream parts map to lexicon parts as in the table, with tool input and output JSON-encoded.
 - [ ] A provider error ends the turn with status `error`, a message without secrets, and the partial parts.

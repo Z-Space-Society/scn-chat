@@ -17,6 +17,11 @@ export class ConfigError extends Error {
 
 export const DEFAULT_DATABASE_URL = 'sqlite:./data/scn-chat.sqlite'
 
+/** The start of every turn's instructions. Placeholders: {{appName}}, {{date}}, {{time}}, {{timezone}}. */
+export const DEFAULT_SYSTEM_PROMPT =
+  'You are an AI assistant in {{appName}}. Today is {{date}} ({{timezone}}). ' +
+  'Replies are rendered as Markdown. Raw HTML is not rendered, and images load only when the user clicks them.'
+
 const key32 = z
   .string()
   .refine((value) => Buffer.from(value, 'base64').length === 32, 'must be 32 bytes, base64 encoded')
@@ -51,6 +56,7 @@ const fileSchema = z
         maxSteps: z.coerce.number().int().min(1).default(8),
         timeoutSeconds: z.coerce.number().int().min(1).default(600),
         backfillMinutes: z.coerce.number().int().min(0).default(60),
+        systemPrompt: z.string().default(DEFAULT_SYSTEM_PROMPT),
       })
       .prefault({}),
     sync: z
@@ -159,7 +165,13 @@ export type Config = Readonly<{
   oauthScopeMode: 'permission-set' | 'raw'
   sessionTtlDays: number
   plcUrl: string
-  turns: { ratePerMinute: number; maxSteps: number; timeoutMs: number; backfillWindowMs: number }
+  turns: {
+    ratePerMinute: number
+    maxSteps: number
+    timeoutMs: number
+    backfillWindowMs: number
+    systemPrompt: string
+  }
   configDir: string
   plugins: PluginEntry[]
   models: ModelConfig[]
@@ -294,6 +306,7 @@ export function loadConfig(options: {
       maxSteps: file.turns.maxSteps,
       timeoutMs: file.turns.timeoutSeconds * 1000,
       backfillWindowMs: file.turns.backfillMinutes * 60_000,
+      systemPrompt: file.turns.systemPrompt,
     },
     configDir: dirname(options.configPath ?? defaultConfigPath),
     plugins: file.plugins,

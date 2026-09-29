@@ -1,5 +1,6 @@
 import type { BranchMessage, Capabilities, ModelProvider, ModelRef } from '@scn-chat/plugin-api'
 import type { JSONValue, ModelMessage } from 'ai'
+import type { Logger } from '../logger.ts'
 import type { JsonRecord } from '../storage/records.ts'
 
 type Part = Record<string, unknown> & { $type: string }
@@ -50,8 +51,41 @@ export function lastReplyModel(branch: BranchMessage[]): ModelRef | undefined {
   return undefined
 }
 
-export function buildInstructions(preferences: JsonRecord | null, info: JsonRecord | null): string {
-  return [preferences?.customInstructions, info?.systemPrompt]
+/** Fill the admin's base prompt placeholders for the user's time zone. Unknown placeholders are kept. */
+export function fillBasePrompt(
+  template: string,
+  options: { appName: string; timeZone: string; now: Date },
+): string {
+  const { appName, timeZone, now } = options
+  const values: Record<string, string> = {
+    appName,
+    timezone: timeZone,
+    date: new Intl.DateTimeFormat('en-US', { timeZone, dateStyle: 'full' }).format(now),
+    time: new Intl.DateTimeFormat('en-US', { timeZone, timeStyle: 'short' }).format(now),
+  }
+  return template.replace(/\{\{(\w+)\}\}/g, (match, key: string) => values[key] ?? match)
+}
+
+/** The user's time zone from their preferences, or UTC when it is missing or not a real zone. */
+export function timeZoneOf(preferences: JsonRecord | null, logger: Logger): string {
+  const zone = preferences?.timezone
+  if (typeof zone !== 'string') return 'UTC'
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: zone })
+    return zone
+  } catch (err) {
+    if (!(err instanceof RangeError)) throw err
+    logger.warn({ zone }, 'unknown time zone in preferences, using UTC')
+    return 'UTC'
+  }
+}
+
+export function buildInstructions(
+  base: string,
+  preferences: JsonRecord | null,
+  info: JsonRecord | null,
+): string {
+  return [base, preferences?.customInstructions, info?.systemPrompt]
     .filter((value): value is string => typeof value === 'string' && value.trim() !== '')
     .join('\n\n')
 }
