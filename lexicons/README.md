@@ -27,6 +27,7 @@ A conversation can be held by writing records directly to the PDS without intera
 - When the app picks up a turn, it first writes the reply with `status: "pending"` and empty content, then updates it when generation ends. The write fails if the key already exists, so only one generation runs per attempt.
 - Only messages authored by the space owner trigger replies.
 - The default model is the model last used in the chat, or the user's default if this is the first message.
+- `generation.tools` lists the tools the model may use for this turn. Defaults to the tools the user has switched on.
 - `parent` holds the key of the previous message. Two messages with the same parent are an edit or a regeneration.
 
 ## Example

@@ -2,6 +2,7 @@ import type { BranchMessage, Capabilities, ModelProvider, ModelRef } from '@scn-
 import type { JSONValue, ModelMessage } from 'ai'
 import type { Logger } from '../logger.ts'
 import type { JsonRecord } from '../storage/records.ts'
+import { wrapUntrusted } from './untrusted.ts'
 
 type Part = Record<string, unknown> & { $type: string }
 type BlobRef = { ref: { $link: string }; mimeType: string }
@@ -124,7 +125,11 @@ async function userContent(parts: Part[], capabilities: Capabilities, readBlob: 
 }
 
 /** Convert assistant parts to AI SDK messages, splitting at tool results. */
-function assistantMessages(parts: Part[], replay: boolean): ModelMessage[] {
+function assistantMessages(
+  parts: Part[],
+  replay: boolean,
+  isUntrusted: (tool: string) => boolean,
+): ModelMessage[] {
   const messages: ModelMessage[] = []
   let assistant: Exclude<Extract<ModelMessage, { role: 'assistant' }>['content'], string> = []
   let tool: Extract<ModelMessage, { role: 'tool' }>['content'] = []
@@ -157,7 +162,7 @@ function assistantMessages(parts: Part[], replay: boolean): ModelMessage[] {
         toolName,
         output: part.isError
           ? { type: 'error-text', value: output }
-          : { type: 'text', value: output },
+          : { type: 'text', value: isUntrusted(toolName) ? wrapUntrusted(output) : output },
       })
       continue
     }
@@ -193,7 +198,12 @@ function assistantMessages(parts: Part[], replay: boolean): ModelMessage[] {
 /** Convert the branch to AI SDK messages, leaving out errored and pending replies. */
 export async function toModelMessages(
   branch: BranchMessage[],
-  options: { provider: ModelProvider; capabilities: Capabilities; readBlob: BlobReader },
+  options: {
+    provider: ModelProvider
+    capabilities: Capabilities
+    readBlob: BlobReader
+    isUntrusted: (tool: string) => boolean
+  },
 ): Promise<ModelMessage[]> {
   const messages: ModelMessage[] = []
   for (const { record } of branch) {
@@ -208,7 +218,11 @@ export async function toModelMessages(
     ) {
       const sameProvider = (json.model as ModelRef | undefined)?.provider === options.provider.id
       messages.push(
-        ...assistantMessages(parts, sameProvider && options.provider.replay === 'replay'),
+        ...assistantMessages(
+          parts,
+          sameProvider && options.provider.replay === 'replay',
+          options.isUntrusted,
+        ),
       )
     }
   }

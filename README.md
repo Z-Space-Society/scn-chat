@@ -22,11 +22,11 @@ Phase 1:
 - PDF text extraction
 - Automatic chat titles
 - Chat history search
+- Web search and page fetch plugins
 - User and admin model configuration
 
 ## TODO
 
-- Web search and URL fetch, as plugins
 - Image generation, as a plugin
 - PDF OCR
 - Speech to text and text to speech
@@ -35,6 +35,7 @@ Phase 1:
 - MCP servers as tools
 - Browser and push notifications, and an installable PWA
 - Move plugin settings and tool switches to the user's PDS, through a generic plugin settings lexicon
+- Migrate chats between local storage and spaces, in both directions
 - Provider-native tools, such as built-in web search, for the models that support them
 - Web search for models without tool calling, by generating queries before the reply
 - Web fetch through external services such as Firecrawl or Tavily extract, for pages that need JavaScript

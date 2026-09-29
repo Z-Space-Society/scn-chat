@@ -137,7 +137,7 @@ summary {
   flex-direction: column;
 }
 
-.chat-list {
+.sidebar {
   flex-basis: 16rem;
   display: flex;
   flex-direction: column;
@@ -148,14 +148,14 @@ summary {
   overflow-y: auto;
 }
 
-.chat-list ul {
+.sidebar ul {
   list-style: none;
   margin: 0.5rem 0;
   padding: 0;
   flex: 1;
 }
 
-.chat-list a {
+.sidebar a {
   display: block;
   padding: 0.4rem 0.6rem;
   border-radius: 0.5rem;
@@ -165,7 +165,8 @@ summary {
   text-overflow: ellipsis;
 }
 
-.chat-list a:hover {
+.sidebar a:hover,
+.sidebar a[aria-current="page"] {
   background: var(--hover);
 }
 
@@ -201,7 +202,7 @@ mark {
   border-radius: 0.2rem;
 }
 
-.chat-list > button {
+.sidebar > button {
   text-align: left;
 }
 
@@ -461,15 +462,15 @@ main > p {
   padding: 0.5rem;
 }
 
-.settings {
-  max-width: 60rem;
-  margin: 0 auto;
-  padding: 1.5rem 1rem 4rem;
+.settings > main {
+  padding: 0 1rem 4rem;
 }
 
-.settings section,
-.settings > form {
-  margin: 1.5rem 0;
+.settings main > section,
+.settings main > form {
+  width: 100%;
+  max-width: var(--column);
+  margin: 1.5rem auto 0;
   padding: 1.25rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -505,6 +506,21 @@ main > p {
   flex: 1 1 12rem;
 }
 
-.settings ul {
+.settings main ul {
   padding-left: 1.25rem;
+}
+
+.settings fieldset {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  border: none;
+}
+
+.settings legend {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
 }

@@ -125,6 +125,7 @@ export async function createServer(deps: ServerDeps) {
     blobs: turnBlobs(blobsFor, services),
     config: config.turns,
     appName: config.appName,
+    toolFetch: serviceFetch,
     logger,
   })
   runner.attach(events)

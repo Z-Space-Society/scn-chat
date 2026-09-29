@@ -92,7 +92,10 @@ export async function assertPublicHost(
   if (blocked) throw new PrivateNetworkError(blocked)
 }
 
-/** A fetch for user-supplied endpoints that cannot reach private networks or follow redirects. */
+/**
+ * A fetch for user-supplied endpoints that cannot reach private networks or follow redirects.
+ * With `redirect: 'manual'` it returns redirects for the caller to follow, each hop guarded again.
+ */
 export function createGuardedFetch(isBlocked: IsBlocked = isPrivateAddress): typeof fetch {
   const agent = new Agent({
     connect: guardConnector(
@@ -117,7 +120,7 @@ export function createGuardedFetch(isBlocked: IsBlocked = isPrivateAddress): typ
     return undiciFetch(url, {
       ...fromRequest,
       ...(init as object),
-      redirect: 'error',
+      redirect: init?.redirect === 'manual' ? 'manual' : 'error',
       dispatcher: agent,
     })
   }) as unknown as typeof fetch

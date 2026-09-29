@@ -56,7 +56,7 @@ When sync emits `message:invalid` for a user message that carries a generation r
    - User text parts become text parts. Attachments follow the attachments spec.
    - Assistant replies with status `complete` or `cancelled` contribute their text parts, tool calls and results, and reasoning according to the provider's replay policy. Replies with status `error` or `pending` are skipped.
 7. **Filter.** It runs the `messages:beforeModel` hook.
-8. **Generate.** It calls `streamText` with the model, instructions, messages, the requested tools that are registered, `stopWhen: isStepCount(turns.maxSteps)` (default 8), the mapped `reasoning` value, and an abort signal. The signal fires on cancel or after `turns.timeoutSeconds`, default 600.
+8. **Generate.** It calls `streamText` with the model, instructions, messages, the tools for the turn, `stopWhen: isStepCount(turns.maxSteps)` (default 8), the mapped `reasoning` value, and an abort signal. The signal fires on cancel or after `turns.timeoutSeconds`, default 600. The tools are the ones named in `generation.tools`, or, when a message names none, the tools the user has switched on, as the web-search spec describes.
 9. **Stream.** It reads `result.stream`, builds the reply's parts, and publishes events to the turn's stream buffer.
 10. **Finish.** It builds the final record: parts in the order the model produced them, usage from `result.usage` (input, output, and `outputTokenDetails.reasoningTokens`), and a status. It runs the `message:afterModel` hook, then writes the record with `putMessage`. After that it runs the `turn:after` hook.
 

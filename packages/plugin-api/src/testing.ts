@@ -1,26 +1,69 @@
-import type { ModelProvider, Plugin, PluginContext } from './index.ts'
+import {
+  type Citation,
+  type Ingester,
+  type ModelProvider,
+  matchIngester,
+  type Plugin,
+  type PluginContext,
+  type Tool,
+  type ToolContext,
+} from './index.ts'
 
 /** Run a plugin's setup against a recording context, for plugin tests. */
-export async function setupForTest(plugin: Plugin) {
+export async function setupForTest(
+  plugin: Plugin,
+  options: {
+    /** Ingesters from other plugins, which the plugin can reach through `ctx.ingesters`. */
+    ingesters?: Ingester[]
+    userSettings?: (user: string) => unknown
+    app?: { name: string; publicUrl: string }
+  } = {},
+) {
   const providers: ModelProvider[] = []
-  const ingesters: Parameters<PluginContext['ingesters']['register']>[0][] = []
+  const tools: Tool<unknown>[] = []
+  const ingesters: Ingester[] = []
   const hooks: { name: string; handler: unknown }[] = []
+  const reachable = () => [...ingesters, ...(options.ingesters ?? [])]
   const noop = () => {}
   const ctx = {
     providers: { register: (provider: ModelProvider) => void providers.push(provider) },
-    tools: { register: noop },
+    tools: { register: (tool: Tool<unknown>) => void tools.push(tool) },
     toolSources: { register: noop },
     ingesters: {
-      register: (ingester: (typeof ingesters)[number]) => void ingesters.push(ingester),
+      register: (ingester: Ingester) => void ingesters.push(ingester),
+      accepts: (mimeType: string) => matchIngester(reachable(), mimeType) !== undefined,
+      ingest: async (file: Parameters<Ingester['ingest']>[0]) =>
+        matchIngester(reachable(), file.mimeType)?.ingest(file),
     },
     hooks: { on: (name: string, handler: unknown) => void hooks.push({ name, handler }) },
     models: { generateText: async () => ({ text: '', finishReason: 'stop' }) },
     conversations: { updateInfo: async () => {} },
-    userSettings: async () => ({}),
+    userSettings: async (user: string) => options.userSettings?.(user) ?? {},
     logger: { debug: noop, info: noop, warn: noop, error: noop },
-    app: { name: 'Test', publicUrl: 'http://127.0.0.1:3000' },
+    app: options.app ?? { name: 'Test', publicUrl: 'http://127.0.0.1:3000' },
     onClose: noop,
   } as unknown as PluginContext
   await plugin.setup(ctx)
-  return { providers, ingesters, hooks, ctx }
+  return { providers, tools, ingesters, hooks, ctx }
+}
+
+/** A tool context that records citations, for tool tests. */
+export function toolContextForTest(
+  options: {
+    fetch?: typeof globalThis.fetch
+    user?: string
+    conversation?: string
+    signal?: AbortSignal
+  } = {},
+) {
+  const citations: Citation[] = []
+  const context: ToolContext = {
+    user: options.user ?? 'did:plc:alice',
+    conversation: options.conversation ?? 'at://did:plc:alice/space/c/1',
+    signal: options.signal ?? new AbortController().signal,
+    fetch: options.fetch ?? (() => Promise.reject(new Error('No fetch in this test'))),
+    cite: (source) => void citations.push(source),
+    turnCache: new Map(),
+  }
+  return { context, citations }
 }

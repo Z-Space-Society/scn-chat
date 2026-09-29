@@ -3,7 +3,7 @@
   gap: 1rem;
   min-height: 100vh;
 }
-.chat-list {
+.sidebar {
   flex: 0 0 16rem;
 }
 .layout > main {

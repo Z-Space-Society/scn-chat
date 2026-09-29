@@ -10,9 +10,31 @@ export type StreamEvent =
   | { type: 'part'; index: number; part: Part }
 
 const defs = (name: string) => `${nsid.defs}#${name}`
-const encode = (value: unknown) => (typeof value === 'string' ? value : JSON.stringify(value))
+export const encode = (value: unknown) =>
+  typeof value === 'string' ? value : JSON.stringify(value)
 const providerData = (metadata: object | undefined) =>
   metadata && Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : undefined
+
+const segmenter = new Intl.Segmenter()
+
+/** Cut a source title to the lexicon's 300 graphemes and 3000 bytes. */
+function clipTitle(title: string): string {
+  let clipped = ''
+  let count = 0
+  for (const { segment } of segmenter.segment(title)) {
+    if (count === 300 || Buffer.byteLength(clipped + segment) > 3000) break
+    clipped += segment
+    count++
+  }
+  return clipped
+}
+
+/** The URL in canonical form, for spotting repeats, when it is http or https. */
+function webUrlKey(url: string): string | undefined {
+  if (!URL.canParse(url)) return undefined
+  const parsed = new URL(url)
+  return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.href : undefined
+}
 
 /** Builds lexicon parts from an AI SDK stream, in the order the model produced them. */
 export class PartAccumulator {
@@ -20,6 +42,7 @@ export class PartAccumulator {
   usage: { inputTokens?: number; outputTokens?: number; reasoningTokens?: number } = {}
   private readonly open = new Map<string, number>()
   private readonly metadata = new Map<string, Record<string, Record<string, unknown>>>()
+  private readonly cited = new Set<string>()
   private readonly emit: (event: StreamEvent) => void
 
   constructor(emit: (event: StreamEvent) => void = () => {}) {
@@ -45,6 +68,15 @@ export class PartAccumulator {
   private add(part: Part): void {
     const index = this.parts.push(part) - 1
     this.emit({ type: 'part', index, part })
+  }
+
+  /** Add a source link, unless it is not a web URL or the reply already cites it. */
+  cite(source: { url: string; title?: string }): void {
+    const key = webUrlKey(source.url)
+    if (!key || this.cited.has(key)) return
+    this.cited.add(key)
+    const title = source.title && clipTitle(source.title)
+    this.add({ $type: defs('sourcePart'), url: source.url, ...(title ? { title } : {}) })
   }
 
   /** Feed one stream part, returning an error when the part ends the turn. */
@@ -114,13 +146,7 @@ export class PartAccumulator {
         break
       case 'source':
         // Only URL sources are in the lexicon.
-        if (chunk.sourceType === 'url') {
-          this.add({
-            $type: defs('sourcePart'),
-            url: chunk.url,
-            ...(chunk.title ? { title: chunk.title } : {}),
-          })
-        }
+        if (chunk.sourceType === 'url') this.cite({ url: chunk.url, title: chunk.title })
         break
       case 'finish':
         this.usage = {

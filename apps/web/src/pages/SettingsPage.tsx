@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'wouter'
+import { Link, Route, Switch, useLocation } from 'wouter'
 import { api, json, read } from '../api.ts'
 import { type ModelOption, modelKey } from '../components/Composer.tsx'
-import { SchemaForm } from '../components/SchemaForm.tsx'
+import { SchemaFields } from '../components/SchemaFields.tsx'
 import { useAction } from '../components/useAction.ts'
 import { useSignOut } from '../components/useSignOut.ts'
 import { browserTimeZone } from '../lib/time-zone.ts'
@@ -252,60 +252,124 @@ function PluginSettings() {
   type Entry = {
     id: string
     name: string
-    schema: object
+    tools: { name: string; description: string; enabled: boolean; userToggle: boolean }[]
+    schema: object | null
     values: Json
     secretFields: string[]
     secretsSet: string[]
     error: string | null
   }
   const [plugins, setPlugins] = useState<Entry[]>([])
+  const [drafts, setDrafts] = useState<Record<string, Json>>({})
+  const [switches, setSwitches] = useState<Record<string, boolean>>({})
+  const [saved, setSaved] = useState(false)
   const { error, run } = useAction()
   const reload = useCallback(
-    () => run(async () => setPlugins((await read(api.plugins.settings.$get())).plugins as Entry[])),
+    () =>
+      run(async () => {
+        const loaded = (await read(api.plugins.settings.$get())).plugins as Entry[]
+        setPlugins(loaded)
+        setDrafts(Object.fromEntries(loaded.map((plugin) => [plugin.id, plugin.values])))
+        setSwitches(
+          Object.fromEntries(
+            loaded.flatMap((plugin) => plugin.tools.map((tool) => [tool.name, tool.enabled])),
+          ),
+        )
+      }),
     [run],
   )
   useEffect(reload, [reload])
   if (plugins.length === 0) return error ? <p role="alert">{error}</p> : null
+  const save = () =>
+    run(async () => {
+      setSaved(false)
+      for (const plugin of plugins) {
+        if (plugin.schema && !plugin.error) {
+          const values = drafts[plugin.id] ?? plugin.values
+          await read(api.plugins[':id'].settings.$put({ param: { id: plugin.id } }, json(values)))
+        }
+        for (const tool of plugin.tools) {
+          const enabled = switches[tool.name] ?? tool.enabled
+          if (!tool.userToggle || enabled === tool.enabled) continue
+          await read(
+            api.plugins[':id'].tools[':name'].$put(
+              { param: { id: plugin.id, name: tool.name } },
+              json({ enabled }),
+            ),
+          )
+        }
+      }
+      reload()
+      setSaved(true)
+    })
   return (
     <section>
-      <h2>Plugin settings</h2>
+      <h2>Plugins</h2>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          save()
+        }}
+      >
+        {plugins.map((plugin) => {
+          const switchable = plugin.tools.filter((tool) => tool.userToggle)
+          const values = drafts[plugin.id] ?? plugin.values
+          return (
+            <fieldset key={plugin.id}>
+              <legend>{plugin.name}</legend>
+              {switchable.map((tool) => (
+                <label key={tool.name} title={tool.description}>
+                  <input
+                    type="checkbox"
+                    checked={switches[tool.name] ?? tool.enabled}
+                    onChange={(e) => {
+                      const enabled = e.target.checked
+                      setSwitches((current) => ({ ...current, [tool.name]: enabled }))
+                    }}
+                  />
+                  {switchable.length === 1 ? 'Enabled' : tool.name}
+                </label>
+              ))}
+              {plugin.error ? (
+                <p role="alert">
+                  {plugin.error}{' '}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      run(async () => {
+                        await read(
+                          api.plugins[':id'].settings.$delete({ param: { id: plugin.id } }),
+                        )
+                        reload()
+                      })
+                    }
+                  >
+                    Reset
+                  </button>
+                </p>
+              ) : (
+                plugin.schema && (
+                  <SchemaFields
+                    schema={plugin.schema}
+                    values={values}
+                    secretFields={plugin.secretFields}
+                    secretsSet={plugin.secretsSet}
+                    onChange={(key, value) =>
+                      setDrafts((current) => ({
+                        ...current,
+                        [plugin.id]: { ...values, [key]: value },
+                      }))
+                    }
+                  />
+                )
+              )}
+            </fieldset>
+          )
+        })}
+        <button type="submit">Save</button>
+        {saved && <span>Saved.</span>}
+      </form>
       {error && <p role="alert">{error}</p>}
-      {plugins.map((plugin) => (
-        <div key={plugin.id}>
-          <h3>{plugin.name}</h3>
-          {plugin.error ? (
-            <p role="alert">
-              {plugin.error}{' '}
-              <button
-                type="button"
-                onClick={() =>
-                  run(async () => {
-                    await read(api.plugins[':id'].settings.$delete({ param: { id: plugin.id } }))
-                    reload()
-                  })
-                }
-              >
-                Reset
-              </button>
-            </p>
-          ) : (
-            <SchemaForm
-              schema={plugin.schema}
-              values={plugin.values}
-              secretFields={plugin.secretFields}
-              secretsSet={plugin.secretsSet}
-              onSubmit={(values) =>
-                run(async () => {
-                  await read(
-                    api.plugins[':id'].settings.$put({ param: { id: plugin.id } }, json(values)),
-                  )
-                  reload()
-                })
-              }
-            />
-          )}
-        </div>
-      ))}
     </section>
   )
 }
@@ -356,22 +420,56 @@ function Device() {
   )
 }
 
+const sections = [
+  { path: '/', label: 'Preferences' },
+  { path: '/api-keys', label: 'API keys' },
+  { path: '/plugins', label: 'Plugins' },
+  { path: '/sync', label: 'Sync' },
+]
+
 export function SettingsPage() {
   const signOut = useSignOut()
+  const [location] = useLocation()
   const { models, error: modelsError } = useModels()
   const { error, run } = useAction()
   return (
-    <main className="settings">
-      <Link href="/">Back to chats</Link>
-      {modelsError && <p role="alert">{modelsError}</p>}
-      <Preferences models={models} />
-      <ApiKeys />
-      <PluginSettings />
-      <Device />
-      <button type="button" onClick={() => run(signOut)}>
-        Sign out
-      </button>
-      {error && <p role="alert">{error}</p>}
-    </main>
+    <div className="layout settings">
+      <nav className="sidebar">
+        <Link href="~/">Back to chats</Link>
+        <ul>
+          {sections.map((section) => (
+            <li key={section.path}>
+              <Link
+                href={section.path}
+                aria-current={location === section.path ? 'page' : undefined}
+              >
+                {section.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+        <button type="button" onClick={() => run(signOut)}>
+          Sign out
+        </button>
+        {error && <p role="alert">{error}</p>}
+      </nav>
+      <main>
+        <Switch>
+          <Route path="/api-keys">
+            <ApiKeys />
+          </Route>
+          <Route path="/plugins">
+            <PluginSettings />
+          </Route>
+          <Route path="/sync">
+            <Device />
+          </Route>
+          <Route>
+            {modelsError && <p role="alert">{modelsError}</p>}
+            <Preferences models={models} />
+          </Route>
+        </Switch>
+      </main>
+    </div>
   )
 }

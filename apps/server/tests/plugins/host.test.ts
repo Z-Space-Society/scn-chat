@@ -91,6 +91,41 @@ describe('loadPlugins', () => {
     await expect(loadPlugins([ingA, ingB], { services, logger, app })).rejects.toThrow(/pdf/)
   })
 
+  it("lets a plugin reach other plugins' ingesters by MIME type, with the highest priority winning", async () => {
+    const ingester = (id: string, priority: number) => ({
+      id,
+      accepts: ['application/pdf'],
+      priority,
+      method: 'text' as const,
+      ingest: async () => ({ text: id }),
+    })
+    let found: { accepts: boolean; text?: string; other?: unknown } | undefined
+    const pdf = plugin('pdf', (ctx) => ctx.ingesters.register(ingester('pdf-text', 0)))
+    const ocr = plugin('ocr', (ctx) => ctx.ingesters.register(ingester('ocr', 5)))
+    const fetcher = plugin('fetcher', (ctx) => {
+      ctx.onClose(async () => {
+        const file = { bytes: new Uint8Array(), mimeType: 'application/pdf' }
+        found = {
+          accepts: ctx.ingesters.accepts('application/pdf'),
+          text: (await ctx.ingesters.ingest(file))?.text,
+          other: await ctx.ingesters.ingest({ ...file, mimeType: 'image/tiff' }),
+        }
+      })
+    })
+    const host = await loadPlugins([fetcher, pdf, ocr], { services, logger, app })
+    await host.close()
+    expect(found).toEqual({ accepts: true, text: 'ocr', other: undefined })
+  })
+
+  it('says no ingester accepts a type none registered', async () => {
+    let accepts: boolean | undefined
+    const probe = plugin('probe', (ctx) => {
+      accepts = ctx.ingesters.accepts('application/pdf')
+    })
+    await loadPlugins([probe], { services, logger, app })
+    expect(accepts).toBe(false)
+  })
+
   it('gives plugins the services through their context', async () => {
     let seen: unknown
     const reader = plugin('reader', async (ctx) => {

@@ -1,0 +1,20 @@
+{
+  "name": "@scn-chat/plugin-web-fetch",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@mozilla/readability": "0.6.0",
+    "@scn-chat/plugin-api": "workspace:*",
+    "linkedom": "0.18.13",
+    "turndown": "7.2.4",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/turndown": "5.0.6"
+  }
+}

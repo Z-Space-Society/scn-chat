@@ -84,11 +84,15 @@ export async function loadPlugins(
       providers: {
         register: (provider: ModelProvider) => host.providers.register(provider, plugin.id),
       },
-      tools: { register: (tool: Tool<never>) => host.tools.register(tool, plugin.id) },
+      tools: { register: (tool) => host.tools.register(tool as Tool<never>, plugin.id) },
       toolSources: {
         register: (source: ToolSource) => host.toolSources.register(source, plugin.id),
       },
-      ingesters: { register: (ingester: Ingester) => host.ingesters.register(ingester, plugin.id) },
+      ingesters: {
+        register: (ingester: Ingester) => host.ingesters.register(ingester, plugin.id),
+        accepts: (mimeType) => host.ingesters.match(mimeType) !== undefined,
+        ingest: async (file) => host.ingesters.match(file.mimeType)?.ingest(file),
+      },
       hooks: {
         on: (name, handler, options) =>
           host.hooks.add(name, plugin.id, position, handler, options?.order),

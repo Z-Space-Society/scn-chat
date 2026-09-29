@@ -9,6 +9,12 @@ export type Database = {
     secrets_encrypted: string | null
     updated_at: string
   }
+  user_tool_settings: {
+    did: string
+    tool: string
+    enabled: number
+    updated_at: string
+  }
   account: {
     did: string
     handle: string | null

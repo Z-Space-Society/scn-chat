@@ -106,4 +106,39 @@ describe('PartAccumulator', () => {
     acc.push(part({ type: 'finish', totalUsage: { inputTokens: 3, outputTokenDetails: {} } }))
     expect(acc.lexiconUsage()).toEqual({ inputTokens: 3 })
   })
+
+  it('adds a cited source as a source part', () => {
+    const acc = new PartAccumulator()
+    acc.cite({ url: 'https://example.com/a', title: 'Example' })
+    expect(acc.parts).toEqual([
+      {
+        $type: 'network.sharedcomputer.chat.defs#sourcePart',
+        url: 'https://example.com/a',
+        title: 'Example',
+      },
+    ])
+  })
+
+  it('ignores cited URLs that are not http or https', () => {
+    const acc = new PartAccumulator()
+    acc.cite({ url: 'javascript:alert(1)' })
+    acc.cite({ url: 'not a url' })
+    acc.cite({ url: 'ftp://example.com/file' })
+    expect(acc.parts).toEqual([])
+  })
+
+  it('skips a URL the reply already cites, whether from a tool or the provider', () => {
+    const acc = new PartAccumulator()
+    acc.push(part({ type: 'source', sourceType: 'url', id: 's', url: 'https://example.com' }))
+    acc.cite({ url: 'https://example.com/' })
+    acc.cite({ url: 'https://example.com/b' })
+    acc.cite({ url: 'https://example.com/b', title: 'Again' })
+    expect(acc.parts.map((p) => p.url)).toEqual(['https://example.com', 'https://example.com/b'])
+  })
+
+  it("cuts a cited title to the lexicon's 300 graphemes", () => {
+    const acc = new PartAccumulator()
+    acc.cite({ url: 'https://example.com', title: 'e\u0301'.repeat(400) })
+    expect([...new Intl.Segmenter().segment(acc.parts[0]?.title as string)]).toHaveLength(300)
+  })
 })

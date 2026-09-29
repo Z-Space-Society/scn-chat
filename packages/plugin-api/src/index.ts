@@ -65,13 +65,29 @@ export type JsonValue =
   | JsonValue[]
   | { [key: string]: JsonValue }
 
-export type ToolContext = { user: string; conversation: string; signal: AbortSignal }
+export type Citation = { url: string; title?: string }
+
+export type ToolContext = {
+  user: string
+  conversation: string
+  signal: AbortSignal
+  /** Fetch function for retrieving URLs. */
+  fetch: typeof globalThis.fetch
+  cite(source: Citation): void
+  /** Scratch space for this tool during this turn. */
+  turnCache: Map<string, unknown>
+}
 
 export interface Tool<Input = unknown> {
   name: string
   description: string
   inputSchema: z.ZodType<Input>
   run(input: Input, context: ToolContext): Promise<JsonValue>
+  defaultEnabled?: boolean
+  /** Can users individually toggle this plugin on/off? */
+  userToggle?: boolean
+  /** Is the output from an untrusted source? */
+  untrusted?: boolean
 }
 
 export type ToolDefinition = {
@@ -96,6 +112,19 @@ export interface Ingester {
   priority?: number
   method: 'text' | 'ocr'
   ingest(file: IngestInput): Promise<{ text: string }>
+}
+
+const acceptsType = (pattern: string, mimeType: string) =>
+  pattern.endsWith('/*') ? mimeType.startsWith(pattern.slice(0, -1)) : pattern === mimeType
+
+/** Returns the highest priority ingester that accepts the MIME type. */
+export function matchIngester(ingesters: Ingester[], mimeType: string): Ingester | undefined {
+  let best: Ingester | undefined
+  for (const ingester of ingesters) {
+    if (!ingester.accepts.some((pattern) => acceptsType(pattern, mimeType))) continue
+    if (!best || (ingester.priority ?? 0) > (best.priority ?? 0)) best = ingester
+  }
+  return best
 }
 
 // Hooks
@@ -172,9 +201,15 @@ export type Logger = {
 
 export interface PluginContext<UserSettings = unknown> {
   providers: { register(provider: ModelProvider): void }
-  tools: { register(tool: Tool<never>): void }
+  tools: { register<Input>(tool: Tool<Input>): void }
   toolSources: { register(source: ToolSource): void }
-  ingesters: { register(ingester: Ingester): void }
+  ingesters: {
+    register(ingester: Ingester): void
+    /** True if a registered ingester accepts the MIME type. */
+    accepts(mimeType: string): boolean
+    /** Extract the text with whichever ingester handles its type. Returns undefined if there's no match. */
+    ingest(file: IngestInput): Promise<{ text: string } | undefined>
+  }
   hooks: {
     on<N extends HookName>(name: N, handler: HookHandler<N>, options?: { order?: HookOrder }): void
   }
@@ -193,6 +228,21 @@ export interface PluginContext<UserSettings = unknown> {
   logger: Logger
   app: Readonly<{ name: string; publicUrl: string }>
   onClose(fn: () => void | Promise<void>): void
+}
+
+/**
+ * A JSON Forms rule for a user settings field, set with `.meta({ rule })`. The condition is a
+ * JSON Schema tested against another field's value. See https://jsonforms.io/docs/uischema/rules.
+ */
+export type FieldRule = {
+  effect: 'SHOW' | 'HIDE' | 'ENABLE' | 'DISABLE'
+  condition: {
+    /** The other field, as `#/properties/<name>`. */
+    scope: string
+    /** Supports `const`, `enum`, `not`, and `minLength`. */
+    schema: Record<string, unknown>
+    failWhenUndefined?: boolean
+  }
 }
 
 export interface Plugin<UserSettings = unknown> {

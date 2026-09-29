@@ -41,6 +41,15 @@ All chat storage is routed through our `RecordStore` interface that's a represen
 - `SpaceRecordStore` calls the user's PDS.
 - `LocalRecordStore` uses the server's database, for users whose PDS doesn't support spaces.
 
+### Choosing the storage mode
+
+The storage type is chosen on first login and currently cannot be changed. So if a user switches away from a spaces-enabled PDS they'll lose access to the system.
+
+- **Detection:** Login always asks for space permissions (ignored by PDS's that don't support spaces). On login the server checks for if scope was granted to create a space and that answer decides if the user gest a `local` or `spaces` data store.
+- **Migration:** Moving chats between local storage and spaces is a future feature. Local records keep the same structure that a PDS would give them, so moving them to spaces should be a replay.
+
+See [specs/auth.md](../specs/auth.md).
+
 ## Plugins
 
 The system is built to support custom model providers, tools, file ingesters, and support a hook system. These are configured in `config.yml` and loaded startup. See [plugins.md](plugins.md).

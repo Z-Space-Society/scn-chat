@@ -1,4 +1,4 @@
-import type { Ingester } from '@scn-chat/plugin-api'
+import { type Ingester, matchIngester } from '@scn-chat/plugin-api'
 
 export class DuplicateRegistrationError extends Error {
   constructor(kind: string, key: string, pluginId: string, existingPluginId: string) {
@@ -31,13 +31,14 @@ export class Registry<T> {
     return this.items.get(key)?.item
   }
 
+  /** Returns the ID of the plugin that registered the key. */
+  owner(key: string): string | undefined {
+    return this.items.get(key)?.pluginId
+  }
+
   list(): T[] {
     return [...this.items.values()].map(({ item }) => item)
   }
-}
-
-function accepts(pattern: string, mimeType: string): boolean {
-  return pattern.endsWith('/*') ? mimeType.startsWith(pattern.slice(0, -1)) : pattern === mimeType
 }
 
 /** Ingesters, matched by MIME type with the highest priority winning. */
@@ -52,11 +53,6 @@ export class IngesterRegistry extends Registry<Ingester> {
   }
 
   match(mimeType: string): Ingester | undefined {
-    let best: Ingester | undefined
-    for (const ingester of this.list()) {
-      if (!ingester.accepts.some((pattern) => accepts(pattern, mimeType))) continue
-      if (!best || (ingester.priority ?? 0) > (best.priority ?? 0)) best = ingester
-    }
-    return best
+    return matchIngester(this.list(), mimeType)
   }
 }

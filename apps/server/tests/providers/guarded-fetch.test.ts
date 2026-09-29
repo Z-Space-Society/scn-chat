@@ -102,6 +102,13 @@ describe('createGuardedFetch', () => {
     expect(await (await allowAll(`http://localhost:${port}/ok`)).text()).toBe('ok')
     await expect(allowAll(`http://localhost:${port}/redirect`)).rejects.toThrow()
   })
+
+  it('returns a redirect unfollowed when the caller asks to follow it by hand', async () => {
+    const allowAll = createGuardedFetch(() => false)
+    const res = await allowAll(`http://localhost:${port}/redirect`, { redirect: 'manual' })
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('/ok')
+  })
 })
 
 describe('guardConnector', () => {
