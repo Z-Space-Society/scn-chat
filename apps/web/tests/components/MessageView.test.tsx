@@ -78,6 +78,27 @@ describe('MessageView', () => {
     expect(container.querySelector('a[href^="javascript"]')).toBeNull()
   })
 
+  it('shows Markdown images in assistant text as links instead of loading them', () => {
+    const { container } = render(
+      <MessageView
+        blobUrl={blobUrl}
+        record={{
+          role: 'assistant',
+          status: 'complete',
+          content: {
+            $type: d('plainContent'),
+            parts: [{ $type: d('textPart'), text: '![chart](https://example.com/c.png?q=secret)' }],
+          },
+        }}
+      />,
+    )
+    expect(container.querySelector('img')).toBeNull()
+    expect(screen.getByRole('link', { name: 'chart' })).toHaveAttribute(
+      'href',
+      'https://example.com/c.png?q=secret',
+    )
+  })
+
   it('shows user text as plain text', () => {
     render(
       <MessageView

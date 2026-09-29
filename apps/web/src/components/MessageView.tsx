@@ -20,6 +20,12 @@ const kind = (part: Part) => part.$type.split('#')[1]
 
 const markdownComponents: Components = {
   a: ({ node: _node, ...props }) => <a {...props} target="_blank" rel="noreferrer" />,
+  // Images from model output would load without a click and could leak the chat through the URL.
+  img: ({ src, alt }) => (
+    <a href={src as string | undefined} target="_blank" rel="noreferrer">
+      {alt || 'Image'}
+    </a>
+  ),
 }
 
 /** Assistant text as Markdown. Raw HTML in it is not rendered. */
