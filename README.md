@@ -62,6 +62,10 @@ Phase 1:
  1. Run `pnpm dev`
  2. Open http://127.0.0.1:5173 and sign in with your ATProto handle.
 
+## Deploying
+
+See [docs/deployment.md](docs/deployment.md).
+
 ## Extending
 
 Model providers, tools, file ingesters, and turn hooks are all plugins, so anyone can build their own integration.

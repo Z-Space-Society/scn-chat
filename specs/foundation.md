@@ -133,12 +133,12 @@ Biome handles both linting and formatting, configured in one `biome.json` at the
 - No database tables. Each later spec adds its own.
 - No plugin interfaces or plugin package. That is the plugins spec.
 - No atproto network calls and no vendored upstream lexicons yet.
-- No Docker image or deployment setup.
 - No CI configuration for any particular host.
 - No UI beyond the health status page.
 
 ## Edge Cases and Decisions
 
+- Deployment is a single `Dockerfile` on `node:24-slim` and a `docker-compose.yml`, described in `docs/deployment.md`. The image installs dependencies, builds the web app, and runs `pnpm start`. `config.yml` and `.env` are mounted from the host, data lives in a `/data` volume with absolute `DATA_DIR` and `DATABASE_URL`, since `pnpm start` runs from `apps/server` and relative paths would land there, and the port is published on `127.0.0.1` for a reverse proxy that terminates TLS.
 - The server runs TypeScript through Node's native type stripping instead of compiling to JavaScript. If the generated lexicon code turns out to use syntax Node cannot strip, the fallback is running the server through `tsx`.
 - Node refuses to strip types for files under `node_modules`. Workspace packages work because pnpm symlinks them there and Node resolves symlinks to their real paths by default. Never run with `--preserve-symlinks`.
 - SQLite uses `better-sqlite3`, not Node's built-in `node:sqlite`, because Kysely's SQLite dialect targets the `better-sqlite3` API. It ships prebuilt binaries for common platforms.

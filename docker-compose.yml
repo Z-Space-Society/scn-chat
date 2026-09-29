@@ -1,0 +1,11 @@
+services:
+  scn-chat:
+    build: .
+    restart: unless-stopped
+    # Only the reverse proxy on this host can reach the app.
+    ports:
+      - 127.0.0.1:3000:3000
+    volumes:
+      - ./config.yml:/app/config.yml:ro
+      - ./.env:/app/.env:ro
+      - ./data:/data
