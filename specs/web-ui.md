@@ -36,7 +36,7 @@ Any route except `/login` and a shared route redirects to `/login` when `/api/me
 - **ChatList.** Conversation titles from the browser store, newest first. Untitled conversations show "New chat". It has a button to start a new chat.
 - **Conversation.** It shows the messages on the current branch, from the root to the selected leaf. A message with siblings shows "‹ 2 / 3 ›" controls that switch branches. By default the branch follows the newest sibling at each level. It also has the title, with rename, the share control from the sharing spec, and a sync button that calls the conversation's sync route and then refreshes it in the browser store.
 - **Message.**
-  - Text parts are shown as plain text, with no Markdown rendering.
+  - Assistant text parts, including streamed text, are rendered as GitHub-flavored Markdown with `react-markdown` and `remark-gfm`. Raw HTML is not rendered, and links open in a new tab. User text is shown as plain text.
   - Reasoning parts go in a closed `<details>`.
   - Tool calls and results go in a `<details>` with their JSON.
   - Sources are shown as a list of links.
@@ -62,7 +62,7 @@ After sending, the conversation subscribes to the reply's stream endpoint and ap
 ## Scope Boundaries
 
 - No visual design, theming, dark mode, icons, or animations.
-- No Markdown or code highlighting.
+- No code highlighting.
 - No PWA, offline support, or notifications.
 - No mobile-specific layout beyond what the browser does.
 - No search box. That is the search spec.
@@ -70,7 +70,7 @@ After sending, the conversation subscribes to the reply's stream endpoint and ap
 
 ## Edge Cases and Decisions
 
-- Message text is plain text, so the designer chooses the Markdown renderer and its sanitizing.
+- The Markdown renderer builds React elements rather than injecting HTML, so it needs no separate sanitizer. The designer may replace it.
 - The typed Hono client comes from the server's route types, so the web app and server share one definition of the API.
 - The default branch is the newest sibling at each level, matching how ChatGPT shows the latest regeneration.
 - Write routes read JSON without validators, so the typed client sends bodies through its request options. Response types still come from the server's routes.
@@ -93,6 +93,7 @@ After sending, the conversation subscribes to the reply's stream endpoint and ap
 - [ ] Settings save preferences, add and delete API keys, and save plugin settings through generated forms.
 - [ ] A shared link shows the conversation read-only to a permitted viewer.
 - [ ] Reasoning and tool details are collapsed by default.
+- [ ] Assistant text renders as Markdown, raw HTML in it is not rendered, and user text stays plain.
 - [ ] If the stream drops, the reply still appears through repeated refreshes.
 - [ ] The sync button syncs the conversation and shows changes written from another client.
 - [ ] The background sync switch appears only when the admin allows opting out, and saves the account setting.

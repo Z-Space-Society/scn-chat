@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import ReactMarkdown, { type Components } from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import type { StreamedReply } from './useReplyStream.ts'
 
 type Part = Record<string, unknown> & { $type: string }
@@ -16,10 +18,37 @@ export type MessageViewProps = {
 
 const kind = (part: Part) => part.$type.split('#')[1]
 
-function PartView({ part, blobUrl }: { part: Part; blobUrl: MessageViewProps['blobUrl'] }) {
+const markdownComponents: Components = {
+  a: ({ node: _node, ...props }) => <a {...props} target="_blank" rel="noreferrer" />,
+}
+
+/** Assistant text as Markdown. Raw HTML in it is not rendered. */
+function Markdown({ text }: { text: string }) {
+  return (
+    <div className="markdown">
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+        {text}
+      </ReactMarkdown>
+    </div>
+  )
+}
+
+function Text({ text, role }: { text: string; role: unknown }) {
+  return role === 'assistant' ? <Markdown text={text} /> : <p className="text">{text}</p>
+}
+
+function PartView({
+  part,
+  role,
+  blobUrl,
+}: {
+  part: Part
+  role: unknown
+  blobUrl: MessageViewProps['blobUrl']
+}) {
   switch (kind(part)) {
     case 'textPart':
-      return <p className="text">{part.text as string}</p>
+      return <Text text={part.text as string} role={role} />
     case 'reasoningPart':
       return (
         <details>
@@ -109,7 +138,7 @@ export function MessageView({
         .filter((part) => kind(part) !== 'sourcePart')
         .map((part, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: a record's parts keep their order
-          <PartView key={i} part={part} blobUrl={blobUrl} />
+          <PartView key={i} part={part} role={record.role} blobUrl={blobUrl} />
         ))}
       {streaming !== undefined && record.status === 'pending' && (
         <>
@@ -119,14 +148,14 @@ export function MessageView({
               <p className="text">{streaming.reasoning}</p>
             </details>
           )}
-          {streaming.text && <p className="text">{streaming.text}</p>}
+          {streaming.text && <Markdown text={streaming.text} />}
         </>
       )}
       {sources.length > 0 && (
         <ul>
           {sources.map((part) => (
             <li key={part.url as string}>
-              <PartView part={part} blobUrl={blobUrl} />
+              <PartView part={part} role={record.role} blobUrl={blobUrl} />
             </li>
           ))}
         </ul>

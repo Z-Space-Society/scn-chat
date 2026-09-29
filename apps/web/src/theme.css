@@ -305,6 +305,36 @@ main > p {
   margin: 0;
 }
 
+.markdown :not(pre) > code {
+  background: var(--surface);
+  border-radius: 0.3rem;
+  padding: 0.1rem 0.3rem;
+  font-size: 0.85em;
+}
+
+.markdown pre {
+  white-space: pre;
+}
+
+.markdown table {
+  border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
+}
+
+.markdown th,
+.markdown td {
+  border: 1px solid var(--border);
+  padding: 0.3rem 0.6rem;
+}
+
+.markdown blockquote {
+  border-left: 3px solid var(--border);
+  color: var(--muted);
+  margin: 0;
+  padding-left: 1rem;
+}
+
 .siblings {
   display: inline-flex;
   align-items: center;

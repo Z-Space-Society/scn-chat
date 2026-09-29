@@ -6,7 +6,7 @@ const d = (name: string) => `network.sharedcomputer.chat.defs#${name}`
 const blobUrl = (cid: string) => `/blob/${cid}`
 
 describe('MessageView', () => {
-  it('shows text as plain text and keeps reasoning and tool details collapsed', () => {
+  it('keeps reasoning and tool details collapsed', () => {
     const { container } = render(
       <MessageView
         blobUrl={blobUrl}
@@ -18,14 +18,12 @@ describe('MessageView', () => {
             parts: [
               { $type: d('reasoningPart'), text: 'thinking' },
               { $type: d('toolCallPart'), callId: 'c', tool: 'search', input: '{}' },
-              { $type: d('textPart'), text: '**not markdown**' },
               { $type: d('sourcePart'), url: 'https://example.com', title: 'Example' },
             ],
           },
         }}
       />,
     )
-    expect(screen.getByText('**not markdown**')).toBeInTheDocument()
     for (const details of container.querySelectorAll('details')) expect(details.open).toBe(false)
     expect(screen.getByRole('link', { name: 'Example' })).toHaveAttribute(
       'href',
@@ -33,11 +31,71 @@ describe('MessageView', () => {
     )
   })
 
-  it('shows streamed text for a pending reply', () => {
+  it('renders assistant text as Markdown', () => {
+    const { container } = render(
+      <MessageView
+        blobUrl={blobUrl}
+        record={{
+          role: 'assistant',
+          status: 'complete',
+          content: {
+            $type: d('plainContent'),
+            parts: [
+              {
+                $type: d('textPart'),
+                text: '**bold** and [docs](https://example.com)\n\n| a |\n|---|\n| 1 |',
+              },
+            ],
+          },
+        }}
+      />,
+    )
+    expect(container.querySelector('.markdown strong')).toHaveTextContent('bold')
+    expect(screen.getByRole('link', { name: 'docs' })).toHaveAttribute('target', '_blank')
+    expect(screen.getByRole('table')).toBeInTheDocument()
+  })
+
+  it('does not render raw HTML or script links in assistant text', () => {
+    const { container } = render(
+      <MessageView
+        blobUrl={blobUrl}
+        record={{
+          role: 'assistant',
+          status: 'complete',
+          content: {
+            $type: d('plainContent'),
+            parts: [
+              {
+                $type: d('textPart'),
+                text: '<img src=x onerror="alert(1)"> [click](javascript:alert(1))',
+              },
+            ],
+          },
+        }}
+      />,
+    )
+    expect(container.querySelector('img')).toBeNull()
+    expect(container.querySelector('a[href^="javascript"]')).toBeNull()
+  })
+
+  it('shows user text as plain text', () => {
     render(
       <MessageView
         blobUrl={blobUrl}
-        streaming={{ text: 'Hel', reasoning: '' }}
+        record={{
+          role: 'user',
+          content: { $type: d('plainContent'), parts: [{ $type: d('textPart'), text: '**raw**' }] },
+        }}
+      />,
+    )
+    expect(screen.getByText('**raw**')).toBeInTheDocument()
+  })
+
+  it('shows streamed text for a pending reply as Markdown', () => {
+    render(
+      <MessageView
+        blobUrl={blobUrl}
+        streaming={{ text: '*Hel*', reasoning: '' }}
         record={{
           role: 'assistant',
           status: 'pending',
@@ -45,7 +103,7 @@ describe('MessageView', () => {
         }}
       />,
     )
-    expect(screen.getByText('Hel')).toBeInTheDocument()
+    expect(screen.getByText('Hel').tagName).toBe('EM')
   })
 
   it('shows an error and a stopped label', () => {
