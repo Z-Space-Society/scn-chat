@@ -4,6 +4,7 @@ import type { StoreClient } from './client.ts'
 import type { Conversation, ConversationSummary } from './core.ts'
 import { isStoreClosed } from './errors.ts'
 import type { HandoverState } from './handover.ts'
+import type { SearchResult } from './search.ts'
 
 const StoreContext = createContext<StoreClient | null>(null)
 
@@ -71,4 +72,38 @@ export function useConversation(skey: string): {
     )
   }, [store, state, skey])
   return { conversation, error }
+}
+
+/** Search the local copy, rerunning as the download and live changes add to it. */
+export function useSearch(query: string): {
+  results: SearchResult[]
+  remaining: number
+  error: string | null
+} {
+  const store = useStore()
+  const state = useStoreState()
+  const [found, setFound] = useState<{ results: SearchResult[]; remaining: number }>({
+    results: [],
+    remaining: 0,
+  })
+  const [error, setError] = useState<string | null>(null)
+  useEffect(() => {
+    if (state !== 'active' || !query.trim()) return
+    let current = true
+    const report = reportUnless(setError)
+    const load = () =>
+      void Promise.all([store.worker.search(query), store.worker.remainingDownloads()]).then(
+        ([results, remaining]) => {
+          if (current) setFound({ results, remaining })
+        },
+        report,
+      )
+    load()
+    const stop = store.onChange(load)
+    return () => {
+      current = false
+      stop()
+    }
+  }, [store, state, query])
+  return { ...found, error }
 }

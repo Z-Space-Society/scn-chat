@@ -2,6 +2,8 @@ import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { Router } from 'wouter'
+import { memoryLocation } from 'wouter/memory-location'
 import { BusyBanner } from '../../src/components/BusyBanner.tsx'
 import { ConversationView } from '../../src/components/ConversationView.tsx'
 import { MeContext } from '../../src/session.tsx'
@@ -117,6 +119,28 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('ConversationView', () => {
+  it('opens a linked message on its branch and scrolls to it', async () => {
+    const scrolled = vi.fn()
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled(this.id)
+    }
+    const store = fakeStore([
+      user('u', 'question'),
+      reply('u.r0', 'first answer', 'u'),
+      reply('u.r1', 'second answer', 'u'),
+    ])
+    const { hook, searchHook } = memoryLocation({ path: '/c/s1?m=u.r0' })
+    renderWith(
+      store,
+      <Router hook={hook} searchHook={searchHook}>
+        <ConversationView skey="s1" models={[]} />
+      </Router>,
+    )
+    expect(await screen.findByText('first answer')).toBeInTheDocument()
+    expect(screen.queryByText('second answer')).toBeNull()
+    expect(scrolled).toHaveBeenCalledWith('m-u.r0')
+  })
+
   it('shows the newest branch and switches branches with the sibling controls', async () => {
     const store = fakeStore([
       user('u', 'question'),

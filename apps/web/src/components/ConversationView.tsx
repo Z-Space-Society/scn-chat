@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useSearch } from 'wouter'
 import { api, json, read } from '../api.ts'
 import { blobUrlFor } from '../lib/blob-url.ts'
 import { useMe } from '../session.tsx'
@@ -32,7 +33,15 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
     for (const message of messages) if (message.record.status === 'pending') follow(message.rkey)
   }, [messages, follow])
 
-  const { branch, pick } = useBranch(messages)
+  const focus = new URLSearchParams(useSearch()).get('m')
+  const { branch, pick } = useBranch(messages, focus)
+  const scrolledTo = useRef<string | null>(null)
+  const focusShown = branch.some((step) => step.message.rkey === focus)
+  useEffect(() => {
+    if (!focus || !focusShown || scrolledTo.current === focus) return
+    scrolledTo.current = focus
+    document.getElementById(`m-${focus}`)?.scrollIntoView({ block: 'center' })
+  }, [focus, focusShown])
   const leaf = branch.at(-1)?.message
   const blobUrl = blobUrlFor(`/api/conversations/${skey}`)
   const title = (conversation?.info?.title as string | undefined) ?? 'New chat'
@@ -149,6 +158,7 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
         return (
           <MessageView
             key={message.rkey}
+            id={`m-${message.rkey}`}
             record={record}
             streaming={streams[message.rkey]}
             blobUrl={blobUrl}

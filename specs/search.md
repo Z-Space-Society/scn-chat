@@ -28,17 +28,18 @@ Only plaintext is indexed: the text parts of messages. Reasoning, tool input and
 - Words are ANDed, and a quoted phrase matches exactly.
 - User input is tokenized and quoted before it reaches FTS5, so no character can be read as query syntax.
 - Title matches rank first, then message matches by FTS5's `bm25` relevance, then newest first.
-- Each result has the conversation key and title, the message key and role, a snippet of about 30 words from FTS5's `snippet` function, and the message's creation time.
+- Each result has the conversation key and title, the message key and role, a snippet of about 30 words from FTS5's `snippet` function, and the message's creation time. A title match has no message key or role, and its time is when the conversation was last updated.
+- The last word matches as a prefix while it is still being typed, so results appear as the user types. A trailing space or a closing quote makes it exact. Both tables index two- and three-character prefixes so short prefixes stay fast.
 
 Snippets mark matches with private-use characters, which the UI turns into highlight elements. Message text is never inserted as HTML.
 
 ### Coverage
 
-Search covers every conversation the browser store has downloaded. On a new device, results fill in as the background download progresses, and the UI says how many conversations remain to download.
+Search covers every conversation the browser store has downloaded. On a new device, results fill in as the background download progresses, and the UI says how many conversations remain to download. `remainingDownloads()` in the worker returns that count, and open results rerun whenever the store changes.
 
 ### Web UI
 
-A search box above the chat list. Results replace the list while a query is active, and choosing one opens the conversation scrolled to that message.
+A search box above the chat list. Searching starts at two characters and waits for a 150 ms pause in typing. Results replace the list while a query is active, and choosing one opens the conversation scrolled to that message. Result links are `/c/<skey>?m=<rkey>`. When the message is on another branch, the conversation opens on the branch that holds it.
 
 ## Scope Boundaries
 
@@ -56,13 +57,13 @@ A search box above the chat list. Results replace the list while a query is acti
 
 ## Acceptance Criteria
 
-- [ ] A word from a user message finds that message.
-- [ ] A word from an assistant reply finds that reply.
-- [ ] A word in a conversation title finds the conversation, ranked above message matches.
-- [ ] Multiple words match only messages containing all of them.
-- [ ] A quoted phrase matches only that exact phrase.
-- [ ] Query syntax characters in user input are treated as plain text and never cause an error.
-- [ ] Editing or deleting a message updates or removes it from results.
-- [ ] Snippets mark the matched words without inserting HTML.
-- [ ] Search makes no server request.
-- [ ] While the background download is running, the UI shows how many conversations remain.
+- [x] A word from a user message finds that message.
+- [x] A word from an assistant reply finds that reply.
+- [x] A word in a conversation title finds the conversation, ranked above message matches.
+- [x] Multiple words match only messages containing all of them.
+- [x] A quoted phrase matches only that exact phrase.
+- [x] Query syntax characters in user input are treated as plain text and never cause an error.
+- [x] Editing or deleting a message updates or removes it from results.
+- [x] Snippets mark the matched words without inserting HTML.
+- [x] Search makes no server request.
+- [x] While the background download is running, the UI shows how many conversations remain.

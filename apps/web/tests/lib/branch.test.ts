@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { childrenByParent, currentBranch } from '../../src/lib/branch.ts'
+import { childrenByParent, choicesFor, currentBranch } from '../../src/lib/branch.ts'
 
 const m = (rkey: string, parent?: string, createdAt = '2026-09-26T00:00:00Z') => ({
   rkey,
@@ -56,5 +56,23 @@ describe('childrenByParent', () => {
         .get(null)
         ?.map((r) => r.rkey),
     ).toEqual(['orphan'])
+  })
+})
+
+describe('choicesFor', () => {
+  const messages = [
+    m('a', undefined, '2026-09-26T00:00:00Z'),
+    m('a.r0', 'a', '2026-09-26T00:01:00Z'),
+    m('a.r1', 'a', '2026-09-26T00:02:00Z'),
+    m('c', 'a.r0', '2026-09-26T00:04:00Z'),
+  ]
+
+  it('chooses every ancestor of the message, so the branch passes through it', () => {
+    const choices = choicesFor(messages, 'c')
+    expect(currentBranch(messages, choices).map((s) => s.message.rkey)).toEqual(['a', 'a.r0', 'c'])
+  })
+
+  it('chooses nothing for an unknown message', () => {
+    expect(choicesFor(messages, 'gone')).toEqual({})
   })
 })
