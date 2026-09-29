@@ -20,7 +20,7 @@ export function createWebSearch(list: SearchEngine[]) {
 
   const optionsSchema = z
     .object({
-      engine: z.enum(ids).default(ids[0]),
+      engine: z.enum(ids),
       apiKey: z.string().min(1).optional(),
       baseURL: z.url({ protocol: /^https?$/ }).optional(),
       enabledByDefault: z.boolean().default(false),
@@ -90,7 +90,7 @@ export function createWebSearch(list: SearchEngine[]) {
   }
 
   /** Let the model search the web with the admin's engine, or the user's own. */
-  function webSearch(config: z.input<typeof optionsSchema> = {}) {
+  function webSearch(config: z.input<typeof optionsSchema>) {
     const options = optionsSchema.parse(config)
     return definePlugin<UserSettings | undefined>({
       id: 'web-search',

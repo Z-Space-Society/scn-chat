@@ -8,10 +8,13 @@ import webSearch, { createWebSearch, optionsSchema } from '../src/index.ts'
 const tavilyBody = (urls: string[]) =>
   Response.json({ results: urls.map((url) => ({ title: `Title ${url}`, url, content: 'text' })) })
 
+type Options = Parameters<typeof webSearch>[0]
+
+/** Set up the plugin on DuckDuckGo unless the options name another engine. */
 async function setup(
-  options: Parameters<typeof webSearch>[0] = {},
+  options: Partial<Options> = {},
   user: Record<string, unknown> = { engine: 'default', apiKey: '', baseURL: '' },
-  plugin = webSearch(options),
+  plugin = webSearch({ engine: 'duckduckgo', ...options } as Options),
 ) {
   const { tools } = await setupForTest(plugin, { userSettings: () => user })
   const contextFetch = vi.fn(async () => Response.json({ results: [] }))
@@ -38,9 +41,12 @@ function stubGlobalFetch(response: () => Response) {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('web-search options', () => {
-  it('defaults to DuckDuckGo, off by default, switchable, with user engines', () => {
-    expect(optionsSchema.parse({})).toMatchObject({
-      engine: 'duckduckgo',
+  it('requires an engine', () => {
+    expect(optionsSchema.safeParse({}).error?.issues[0]?.path).toEqual(['engine'])
+  })
+
+  it('is off by default, switchable, with user engines', () => {
+    expect(optionsSchema.parse({ engine: 'duckduckgo' })).toMatchObject({
       enabledByDefault: false,
       userToggle: true,
       userEngines: true,

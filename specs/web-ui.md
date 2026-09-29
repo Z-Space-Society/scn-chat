@@ -59,6 +59,8 @@ Any route except `/login` and a shared route redirects to `/login` when `/api/me
 
 After sending, the conversation subscribes to the reply's stream endpoint and appends deltas to the pending reply. On the `status` event, it asks the browser store to refresh the conversation, which fetches the final record. If the stream fails, it refreshes the conversation every two seconds until the reply leaves `pending`.
 
+While the reader is at the bottom of the conversation, it stays scrolled to the bottom as replies stream and messages arrive. Once they scroll up it stops following, until they scroll back down or send a message, which always scrolls to the bottom. A conversation opened on a linked message scrolls to that message instead.
+
 ## Scope Boundaries
 
 - No visual design, theming, dark mode, icons, or animations.
@@ -95,5 +97,6 @@ After sending, the conversation subscribes to the reply's stream endpoint and ap
 - [ ] Reasoning and tool details are collapsed by default.
 - [ ] Assistant text renders as Markdown, raw HTML in it is not rendered, images in it load only on click and show their full URL first, and user text stays plain.
 - [ ] If the stream drops, the reply still appears through repeated refreshes.
+- [ ] The conversation follows a streaming reply while the reader is at the bottom, not after they scroll up, and scrolls to the bottom on send.
 - [ ] The sync button syncs the conversation and shows changes written from another client.
 - [ ] The background sync switch appears only when the admin allows opting out, and saves the account setting.

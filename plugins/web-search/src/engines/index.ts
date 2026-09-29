@@ -5,5 +5,5 @@ import { searxng } from './searxng.ts'
 import { tavily } from './tavily.ts'
 import type { SearchEngine } from './types.ts'
 
-/** Every engine the plugin offers. The first is the default. */
+/** Every engine the plugin offers. */
 export const engines: SearchEngine[] = [duckduckgo, brave, tavily, searxng, kagi]

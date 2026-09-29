@@ -106,7 +106,7 @@ The plugin API version stays 1, since every change is additive. `@scn-chat/plugi
 ```yaml
 - package: '@scn-chat/plugin-web-search'
   options:
-    engine: tavily            # duckduckgo (default), brave, tavily, searxng, or kagi
+    engine: tavily            # required: duckduckgo, brave, tavily, searxng, or kagi
     apiKey: ${TAVILY_API_KEY} # required for brave, tavily, and kagi
     baseURL: https://searx.example.org # required for searxng
     enabledByDefault: false   # default false
@@ -115,7 +115,7 @@ The plugin API version stays 1, since every change is additive. `@scn-chat/plugi
     maxResults: 5             # 1 to 20, default 5
 ```
 
-Options that name an engine needing a key without one, or `searxng` without `baseURL`, fail startup.
+There is no default engine, so options without `engine` fail startup, as do options that name an engine needing a key without one, or `searxng` without `baseURL`.
 
 When `userEngines` is true, the plugin has user settings:
 
@@ -245,7 +245,8 @@ The remaining channel is the model putting conversation text into a URL it fetch
 
 ## Edge Cases and Decisions
 
-- Web search is off by default because DuckDuckGo, the no-key default, is scraped and gets rate limited when every user's searches come from one server address.
+- The admin must name an engine, since none is right for every site: the free ones are scraped or self-hosted, and the rest need an account.
+- Web search is off by default because DuckDuckGo, the no-key engine, is scraped and gets rate limited when every user's searches come from one server address.
 - Tool switches are stored in the app database next to plugin settings for now. They are user data and belong on the PDS once a generic plugin settings lexicon exists.
 - A missing `generation.tools` means "the user's enabled tools", and an explicit list, even an empty one, means exactly that list. Direct-PDS clients that name tools keep working unchanged.
 - When tools come from the user's settings and the model cannot use tools, the turn runs without them instead of failing, since the user did not ask for tools on that message.
@@ -285,7 +286,7 @@ Web search:
 - [ ] Each engine adapter maps a recorded response to results, with HTML stripped and snippets cut to 500 characters.
 - [ ] DuckDuckGo redirect links are unwrapped and ads are skipped.
 - [ ] A DuckDuckGo block page is an error, not an empty result.
-- [ ] Options naming a keyed engine without a key, or SearXNG without a base URL, fail startup.
+- [ ] Options without an engine, naming a keyed engine without a key, or SearXNG without a base URL, fail startup.
 - [ ] With the user engine on `default`, the admin's engine and key are used.
 - [ ] A user engine uses the user's key, falls back to the admin's key only for the admin's engine, and errors when a required key is missing.
 - [ ] A user's SearXNG base URL goes through the guarded fetch, and the admin's does not.

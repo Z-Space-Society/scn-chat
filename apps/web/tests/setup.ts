@@ -9,3 +9,10 @@ const appName = document.createElement('meta')
 appName.name = 'application-name'
 appName.content = 'SCN Chat'
 document.head.append(appName)
+
+// jsdom has no ResizeObserver. Tests that need resize callbacks stub their own.
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+} as unknown as typeof ResizeObserver

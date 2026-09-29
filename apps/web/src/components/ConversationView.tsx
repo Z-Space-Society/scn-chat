@@ -11,6 +11,7 @@ import { ShareControl } from './ShareControl.tsx'
 import { useAction } from './useAction.ts'
 import { useBranch } from './useBranch.ts'
 import { useReplyStream } from './useReplyStream.ts'
+import { useStickToBottom } from './useStickToBottom.ts'
 
 export function ConversationView({ skey, models }: { skey: string; models: ModelOption[] }) {
   const me = useMe()
@@ -34,6 +35,9 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
   }, [messages, follow])
 
   const focus = new URLSearchParams(useSearch()).get('m')
+  const section = useRef<HTMLElement>(null)
+  // A link to a message scrolls to that message instead.
+  const { pin } = useStickToBottom(section, !focus)
   const { branch, pick } = useBranch(messages, focus)
   const scrolledTo = useRef<string | null>(null)
   const focusShown = branch.some((step) => step.message.rkey === focus)
@@ -83,7 +87,7 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
   }
 
   return (
-    <section className="conversation">
+    <section className="conversation" ref={section}>
       <header>
         {renaming === null ? (
           <h2>
@@ -179,6 +183,7 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
           models={models}
           initialText={editing.text}
           onSent={(sent) => {
+            pin()
             setEditing(null)
             pick(editing.parent ?? null, sent.rkey)
             if (sent.replyRkey) follow(sent.replyRkey)
@@ -193,6 +198,7 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
           parent={leaf?.rkey}
           models={models}
           onSent={(sent) => {
+            pin()
             if (sent.replyRkey) follow(sent.replyRkey)
             run(refresh)
           }}
