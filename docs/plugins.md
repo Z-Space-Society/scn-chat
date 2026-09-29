@@ -90,6 +90,8 @@ Context passed to the plugins `setup` handler can include the following data. Pl
 | `ctx.tools.register(tool)` | Add a tool the model can call. |
 | `ctx.toolSources.register(source)` | Add a set of tools. |
 | `ctx.ingesters.register(ingester)` | Add a file ingester. |
+| `ctx.ingesters.accepts(mimeType)` | Check if a file type is handled by an available ingester. |
+| `ctx.ingesters.ingest(file)` | Extract a file's text. |
 | `ctx.hooks.on(name, handler, options?)` | Implement a hook. |
 | `ctx.models.generateText(request)` | Make a one-off model call on a user's behalf. |
 | `ctx.conversations.updateInfo(user, conversation, patch)` | Change a conversation's `info` record, such as its title or tags. |
@@ -121,13 +123,24 @@ A tool supports:
  - `name`
  - `description`
  - zod `inputSchema`
- - `run(input, context)` - returns a string or JSON-encodable data. `context` includes the user's DID and conversation URI.
+ - `run(input, context)` - returns a string or JSON-encodable data.
+ - `defaultEnabled` - When set, enabled by default unless the user explicitly disables it.
+ - `userToggle` - Can the user toggle the tool on/off?
+ - `untrusted` - Does the tool return untrusted output?
 
-Tools are opt-in per message: a conversation turn can only use tools that were sent as part of `generation.tools`.
+`context` includes:
+ - `user` - the user's DID.
+ - `conversation` - the conversation URI.
+ - `signal` - aborts when the turn is cancelled or times out.
+ - `fetch` - use instead of the global fetch for URLs a user or the model chose.
+ - `cite({ url, title })` - adds a source link to the reply.
+ - `turnCache` - a map for keeping data between calls to the tool during one turn, such as a page read in parts.
+
+The model gets tools listed in `generation.tools`. Defaults to tools the user has switched on.
 
 ## File ingesters
 
-An ingester converts uploaded files into text the model can read.
+An ingester converts uploaded files into text.
 
 - `accepts`: a list of MIME types, where patterns like `text/*` are allowed.
 - `method`: either `'text'` or `'ocr'`.
@@ -156,6 +169,7 @@ See [`plugins/pdf-text`](../plugins/pdf-text/src/index.ts) as an example.
 If `userSettings` is configured users will see a settings form for the plugin on the settings page, generated from the defined zod schema.
 
 - **Secrets:** Mark a field with `.meta({ secret: true })` to store it encrypted.
+- **Conditional fields:** Add a [JSON Forms rule](https://jsonforms.io/docs/uischema/rules) to a field with `.meta({ rule })` to show, hide, enable, or disable it based on another field's value. Conditions support `const`, `enum`, `not`, and `minLength`.
 - **Reading settings:** `ctx.userSettings(user)` returns the user's settings.
 - **Invalid values:** If stored values no longer match the schema an exception is raised.
 

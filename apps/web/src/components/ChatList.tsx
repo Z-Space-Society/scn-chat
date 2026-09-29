@@ -22,7 +22,7 @@ export function ChatList() {
     navigate(`/c/${created.skey}`)
   }
   return (
-    <nav className="chat-list">
+    <nav className="sidebar chat-list">
       <button type="button" onClick={() => run(create)}>
         New chat
       </button>

@@ -23,7 +23,7 @@ type Main = {
   generateTitles?: boolean
 
   /**
-   * IANA time zone name for the date given to the model.
+   * IANA time zone name, such as America/Vancouver, for the date given to the model.
    */
   timezone?: string
   updatedAt?: l.DatetimeString

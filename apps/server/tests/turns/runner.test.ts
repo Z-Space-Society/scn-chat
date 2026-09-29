@@ -1,13 +1,26 @@
 import { nsid } from '@scn-chat/lexicons'
-import { definePlugin, type TurnContext } from '@scn-chat/plugin-api'
+import {
+  definePlugin,
+  type Tool,
+  type ToolContext,
+  type ToolSource,
+  type TurnContext,
+} from '@scn-chat/plugin-api'
 import pino from 'pino'
 import { describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { loadPlugins } from '../../src/plugins/host.ts'
+import { writeToolChoice } from '../../src/plugins/user-tools.ts'
 import { safeErrorMessage } from '../../src/safe-error.ts'
 import { LocalRecordStore } from '../../src/storage/local-record-store.ts'
 import { ALICE, textContent, userMessage } from '../helpers/spaces.ts'
-import { scriptedModel, sequenceModel, textReply, turnsHarness } from '../helpers/turns.ts'
+import {
+  scriptedModel,
+  sequenceModel,
+  textReply,
+  toolCall,
+  turnsHarness,
+} from '../helpers/turns.ts'
 
 const partsOf = (record: Record<string, unknown> | undefined) =>
   ((record?.content as { parts: { text?: string }[] })?.parts ?? []).map((p) => p.text).join('')
@@ -761,5 +774,236 @@ describe('safeErrorMessage', () => {
     expect(safeErrorMessage(new Error('bad key sk-proj-abc12345678 and Bearer abc.def.ghi'))).toBe(
       'bad key [redacted] and Bearer [redacted]',
     )
+  })
+})
+
+const tool = (name: string, fields: Partial<Tool<never>> = {}): Tool<never> => ({
+  name,
+  description: `The ${name} tool`,
+  inputSchema: z.object({}) as never,
+  run: async () => `output of ${name}`,
+  ...fields,
+})
+
+function hostWith(tools: Tool<never>[], sources: ToolSource[] = []) {
+  return loadPlugins(
+    [
+      definePlugin({
+        id: 'tools',
+        name: 'Tools',
+        apiVersion: 1,
+        setup: (ctx) => {
+          for (const item of tools) ctx.tools.register(item)
+          for (const source of sources) ctx.toolSources.register(source)
+        },
+      }),
+    ],
+    {
+      services: {} as never,
+      logger: pino({ level: 'silent' }),
+      app: { name: 'T', publicUrl: 'http://x' },
+    },
+  )
+}
+
+/** Send one message and wait for its reply. */
+async function turn(
+  h: Awaited<ReturnType<typeof turnsHarness>>,
+  generation: Record<string, unknown> = {},
+  skey?: string,
+  rkey = '3uuuuuuuuuuu1',
+) {
+  const conversation = skey ?? (await h.chats.createConversation()).skey
+  await sendUser(h, conversation, rkey, { generation })
+  await h.runner.start(ALICE, conversation, rkey)
+  await h.runner.idle()
+  return { skey: conversation, reply: (await h.messages(conversation)).get(`${rkey}.r0`) }
+}
+
+const replyParts = (reply: unknown) =>
+  (reply as { content: { parts: Record<string, unknown>[] } }).content.parts
+
+describe('TurnRunner tools', () => {
+  it('offers default-enabled tools when the message names none', async () => {
+    const script = sequenceModel([textReply('ok')])
+    const host = await hostWith([tool('on', { defaultEnabled: true }), tool('off')])
+    const h = await turnsHarness({ host, model: () => script.model })
+    await turn(h)
+    expect(script.offered[0]).toEqual(['on'])
+  })
+
+  it("uses the user's choice for a switchable tool and ignores it for others", async () => {
+    const script = sequenceModel([textReply('ok')])
+    const host = await hostWith([
+      tool('chosen', { userToggle: true }),
+      tool('forced', { defaultEnabled: true }),
+    ])
+    const h = await turnsHarness({ host, model: () => script.model })
+    await writeToolChoice(h.db, ALICE, 'chosen', true)
+    await writeToolChoice(h.db, ALICE, 'forced', false)
+    await turn(h)
+    expect(script.offered[0]).toEqual(['chosen', 'forced'])
+  })
+
+  it('uses an explicit tool list exactly, including an empty one', async () => {
+    const script = sequenceModel([textReply('ok')])
+    const host = await hostWith([tool('on', { defaultEnabled: true }), tool('off')])
+    const h = await turnsHarness({ host, model: () => script.model })
+    const { skey } = await turn(h, { tools: ['off'] })
+    await turn(h, { tools: [] }, skey, '3uuuuuuuuuuu2')
+    expect(script.offered).toEqual([['off'], []])
+  })
+
+  it('runs without enabled tools, instead of failing, on a model that cannot use tools', async () => {
+    const script = sequenceModel([textReply('ok')])
+    const host = await hostWith([tool('on', { defaultEnabled: true })])
+    const h = await turnsHarness({
+      host,
+      model: () => script.model,
+      adminModels: [
+        {
+          id: 'plain',
+          default: true,
+          capabilities: { vision: false, reasoning: false, tools: false },
+        },
+      ],
+    })
+    const { reply } = await turn(h)
+    expect(reply?.status).toBe('complete')
+    expect(script.offered[0]).toEqual([])
+  })
+
+  it('wraps untrusted tool output for the model and stores it raw', async () => {
+    const script = sequenceModel([toolCall('web'), textReply('Done.')])
+    const host = await hostWith([tool('web', { defaultEnabled: true, untrusted: true })])
+    const h = await turnsHarness({ host, model: () => script.model })
+    const { reply } = await turn(h)
+    const sent = JSON.stringify(script.prompts[1])
+    expect(sent).toMatch(/<untrusted_tool_output id=\\"[0-9a-f]{32}\\">/)
+    expect(sent).toContain('output of web')
+    const result = replyParts(reply).find((p) => String(p.$type).endsWith('toolResultPart'))
+    expect(result?.output).toBe('output of web')
+  })
+
+  it('does not wrap output from a tool without untrusted', async () => {
+    const script = sequenceModel([toolCall('calc'), textReply('Done.')])
+    const host = await hostWith([tool('calc', { defaultEnabled: true })])
+    const h = await turnsHarness({ host, model: () => script.model })
+    await turn(h)
+    expect(JSON.stringify(script.prompts[1])).not.toContain('untrusted_tool_output')
+  })
+
+  it('wraps untrusted output again, with a new boundary, when a later turn replays it', async () => {
+    const script = sequenceModel([toolCall('web'), textReply('Done.'), textReply('Again.')])
+    const host = await hostWith([tool('web', { defaultEnabled: true, untrusted: true })])
+    const h = await turnsHarness({ host, model: () => script.model })
+    const { skey } = await turn(h)
+    await sendUser(h, skey, '3uuuuuuuuuuu2', { parent: '3uuuuuuuuuuu1.r0', generation: {} })
+    await h.runner.start(ALICE, skey, '3uuuuuuuuuuu2')
+    await h.runner.idle()
+    const boundary = (prompt: unknown) =>
+      JSON.stringify(prompt).match(/untrusted_tool_output id=\\"([0-9a-f]{32})/)?.[1]
+    expect(boundary(script.prompts[2])).toBeDefined()
+    expect(boundary(script.prompts[2])).not.toBe(boundary(script.prompts[1]))
+  })
+
+  it('wraps replayed output from a tool that is no longer registered', async () => {
+    const first = sequenceModel([toolCall('calc'), textReply('Done.')])
+    const h = await turnsHarness({
+      host: await hostWith([tool('calc', { defaultEnabled: true })]),
+      model: () => first.model,
+    })
+    const { skey } = await turn(h)
+    const later = sequenceModel([textReply('Again.')])
+    const without = await turnsHarness({ model: () => later.model })
+    const messages = (await h.chats.getConversation(skey)).messages
+    const replay = await without.chats.createConversation()
+    for (const message of messages)
+      await without.chats.createMessage(replay.skey, message.rkey, message.value as never)
+    await sendUser(without, replay.skey, '3uuuuuuuuuuu2', {
+      parent: '3uuuuuuuuuuu1.r0',
+      generation: {},
+    })
+    await without.runner.start(ALICE, replay.skey, '3uuuuuuuuuuu2')
+    await without.runner.idle()
+    expect(JSON.stringify(later.prompts[0])).toContain('untrusted_tool_output')
+  })
+
+  it('wraps output from tool sources', async () => {
+    const script = sequenceModel([toolCall('mcp_lookup'), textReply('Done.')])
+    const source: ToolSource = {
+      id: 'mcp',
+      list: async () => [
+        { name: 'lookup', description: 'Look up', inputSchema: { type: 'object' } },
+      ],
+      call: async () => 'from the source',
+    }
+    const h = await turnsHarness({ host: await hostWith([], [source]), model: () => script.model })
+    await turn(h, { tools: ['mcp_lookup'] })
+    expect(JSON.stringify(script.prompts[1])).toContain('untrusted_tool_output')
+  })
+
+  it('gives tools a context that cites sources into the reply', async () => {
+    const script = sequenceModel([toolCall('web'), textReply('Done.')])
+    const web = tool('web', {
+      defaultEnabled: true,
+      run: async (_input, context) => {
+        context.cite({ url: 'https://example.com', title: 'Example' })
+        return 'page'
+      },
+    })
+    const h = await turnsHarness({ host: await hostWith([web]), model: () => script.model })
+    const { reply } = await turn(h)
+    expect(replyParts(reply)).toContainEqual({
+      $type: `${nsid.defs}#sourcePart`,
+      url: 'https://example.com',
+      title: 'Example',
+    })
+  })
+
+  it("gives tools the runner's tool fetch", async () => {
+    const script = sequenceModel([toolCall('web'), textReply('Done.')])
+    let seen: typeof fetch | undefined
+    const web = tool('web', {
+      defaultEnabled: true,
+      run: async (_input, context) => {
+        seen = context.fetch
+        return 'page'
+      },
+    })
+    const h = await turnsHarness({ host: await hostWith([web]), model: () => script.model })
+    await turn(h)
+    expect(seen).toBe(fetch)
+  })
+
+  it('keeps a turn cache private to each tool, and empty in the next turn', async () => {
+    const script = sequenceModel([
+      toolCall('a', 'c1'),
+      toolCall('a', 'c2'),
+      toolCall('b', 'c3'),
+      textReply('Done.'),
+      toolCall('a', 'c4'),
+      textReply('Again.'),
+    ])
+    const seen: Record<string, unknown[]> = { a: [], b: [] }
+    const counter = (name: string) =>
+      tool(name, {
+        defaultEnabled: true,
+        run: async (_input, context: ToolContext) => {
+          const count = ((context.turnCache.get('count') as number | undefined) ?? 0) + 1
+          context.turnCache.set('count', count)
+          seen[name]?.push(count)
+          return String(count)
+        },
+      })
+    const h = await turnsHarness({
+      host: await hostWith([counter('a'), counter('b')]),
+      model: () => script.model,
+    })
+    const { skey } = await turn(h)
+    await sendUser(h, skey, '3uuuuuuuuuuu2', { parent: '3uuuuuuuuuuu1.r0', generation: {} })
+    await h.runner.start(ALICE, skey, '3uuuuuuuuuuu2')
+    await h.runner.idle()
+    expect(seen).toEqual({ a: [1, 2, 1], b: [1] })
   })
 })

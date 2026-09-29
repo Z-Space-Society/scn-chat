@@ -28,6 +28,7 @@ const caps = { vision: true, reasoning: true, tools: true }
 const provider = (id: string, replay: 'replay' | 'drop' = 'replay') =>
   ({ id, replay }) as ModelProvider
 const noBlobs = async () => ({ bytes: new Uint8Array(), mimeType: 'text/plain' })
+const trusted = () => false
 
 describe('branchTo', () => {
   it('follows parent keys from the root to the message, leaving out other branches', () => {
@@ -137,6 +138,7 @@ describe('toModelMessages', () => {
       provider: provider('p'),
       capabilities: caps,
       readBlob: noBlobs,
+      isUntrusted: trusted,
     })
     expect(JSON.stringify(messages)).not.toContain('boom')
     expect(JSON.stringify(messages)).toContain('partial')
@@ -162,6 +164,7 @@ describe('toModelMessages', () => {
       provider: provider('anthropic'),
       capabilities: caps,
       readBlob: noBlobs,
+      isUntrusted: trusted,
     })
     expect(JSON.stringify(same)).toContain('SIG')
     expect(JSON.stringify(same)).toContain('"type":"reasoning"')
@@ -169,6 +172,7 @@ describe('toModelMessages', () => {
       provider: provider('openai'),
       capabilities: caps,
       readBlob: noBlobs,
+      isUntrusted: trusted,
     })
     expect(JSON.stringify(other)).not.toContain('SIG')
     expect(JSON.stringify(other)).not.toContain('reasoning')
@@ -176,6 +180,7 @@ describe('toModelMessages', () => {
       provider: provider('local', 'drop'),
       capabilities: caps,
       readBlob: noBlobs,
+      isUntrusted: trusted,
     })
     expect(JSON.stringify(dropping)).not.toContain('thinking')
   })
@@ -202,6 +207,7 @@ describe('toModelMessages', () => {
       provider: provider('p'),
       capabilities: caps,
       readBlob: noBlobs,
+      isUntrusted: trusted,
     })
     expect(messages.map((m) => m.role)).toEqual(['assistant', 'tool', 'assistant'])
     expect(JSON.stringify(messages[0])).toContain('"lat":49.28')
@@ -235,6 +241,7 @@ describe('toModelMessages', () => {
       provider: provider('p'),
       capabilities: caps,
       readBlob: async (cid) => blobs[cid] as never,
+      isUntrusted: trusted,
     })
     const parts = user?.content as { type: string; text?: string; mediaType?: string }[]
     expect(parts[0]).toMatchObject({ type: 'file', mediaType: 'image/png' })
@@ -254,6 +261,7 @@ describe('toModelMessages', () => {
         provider: provider('p'),
         capabilities: { ...caps, vision: false },
         readBlob: noBlobs,
+        isUntrusted: trusted,
       }),
     ).rejects.toBeInstanceOf(TurnInputError)
   })
@@ -267,7 +275,12 @@ describe('toModelMessages', () => {
       }),
     ]
     await expect(
-      toModelMessages(branch, { provider: provider('p'), capabilities: caps, readBlob: noBlobs }),
+      toModelMessages(branch, {
+        provider: provider('p'),
+        capabilities: caps,
+        readBlob: noBlobs,
+        isUntrusted: trusted,
+      }),
     ).rejects.toThrow(/c9 has no tool call/)
   })
 
@@ -283,14 +296,24 @@ describe('toModelMessages', () => {
       }),
     ]
     await expect(
-      toModelMessages(branch, { provider: provider('p'), capabilities: caps, readBlob: noBlobs }),
+      toModelMessages(branch, {
+        provider: provider('p'),
+        capabilities: caps,
+        readBlob: noBlobs,
+        isUntrusted: trusted,
+      }),
     ).rejects.toBeInstanceOf(SyntaxError)
   })
 
   it('fails with a readable error on encrypted content', async () => {
     const branch = [msg('a', { role: 'user', content: { $type: d('encryptedContent') } })]
     await expect(
-      toModelMessages(branch, { provider: provider('p'), capabilities: caps, readBlob: noBlobs }),
+      toModelMessages(branch, {
+        provider: provider('p'),
+        capabilities: caps,
+        readBlob: noBlobs,
+        isUntrusted: trusted,
+      }),
     ).rejects.toThrow(/encrypted/)
   })
 
@@ -312,6 +335,7 @@ describe('toModelMessages', () => {
       provider: provider('p'),
       capabilities: caps,
       readBlob: noBlobs,
+      isUntrusted: trusted,
     })
     expect(JSON.stringify(messages)).not.toContain('tool-call')
     expect(JSON.stringify(messages)).toContain('Let me look')

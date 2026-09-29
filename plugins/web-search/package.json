@@ -1,0 +1,15 @@
+{
+  "name": "@scn-chat/plugin-web-search",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@scn-chat/plugin-api": "workspace:*",
+    "linkedom": "0.18.13",
+    "zod": "4.6.5"
+  }
+}

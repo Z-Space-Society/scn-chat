@@ -44,18 +44,29 @@ export function scriptedModel(parts: unknown[], options: { delayMs?: number; fai
   return { model, prompts }
 }
 
-/** A model that answers each call with the next response in the list. */
+/** A model that answers each call with the next response in the list, recording prompts and offered tool names. */
 export function sequenceModel(responses: unknown[][]) {
   let call = 0
   const prompts: unknown[] = []
+  const offered: string[][] = []
   const model = new MockLanguageModelV4({
     doStream: async (options) => {
       prompts.push(options.prompt)
+      offered.push((options.tools ?? []).map((tool) => tool.name))
       const parts = responses[Math.min(call++, responses.length - 1)] ?? []
       return { stream: simulateReadableStream({ chunks: parts as never[], chunkDelayInMs: 0 }) }
     },
   })
-  return { model, prompts }
+  return { model, prompts, offered }
+}
+
+/** Stream parts for a model step that calls a tool. */
+export function toolCall(toolName: string, toolCallId = 'c1') {
+  return [
+    { type: 'stream-start', warnings: [] },
+    { type: 'tool-call', toolCallId, toolName, input: '{}' },
+    { type: 'finish', usage, finishReason: { unified: 'tool-calls', raw: 'tool_use' } },
+  ]
 }
 
 export async function turnsHarness(
@@ -139,6 +150,7 @@ export async function turnsHarness(
       systemPrompt: options.systemPrompt ?? '',
     },
     appName: 'Test Chat',
+    toolFetch: fetch,
     logger: h.logger,
     ...(options.now ? { now: options.now } : {}),
   })

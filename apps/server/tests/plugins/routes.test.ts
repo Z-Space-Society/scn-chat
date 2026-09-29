@@ -19,7 +19,52 @@ const search = definePlugin({
     engine: z.string().default('duckduckgo'),
     apiKey: z.string().default('').meta({ secret: true }),
   }),
-  setup: () => {},
+  setup: (ctx) =>
+    ctx.tools.register({
+      name: 'web_search',
+      description: 'Search the web',
+      inputSchema: z.object({}) as never,
+      run: async () => 'results',
+      userToggle: true,
+    }),
+})
+
+/** A plugin with no user settings: one tool users may switch, and one they may not. */
+const fetcher = definePlugin({
+  id: 'fetcher',
+  name: 'Fetcher',
+  apiVersion: 1,
+  setup: (ctx) => {
+    ctx.tools.register({
+      name: 'web_fetch',
+      description: 'Fetch a page',
+      inputSchema: z.object({}) as never,
+      run: async () => 'page',
+      defaultEnabled: true,
+      userToggle: true,
+    })
+    ctx.tools.register({
+      name: 'forced',
+      description: 'Always on',
+      inputSchema: z.object({}) as never,
+      run: async () => 'on',
+      defaultEnabled: true,
+    })
+  },
+})
+
+const forcedOnly = definePlugin({
+  id: 'forced-only',
+  name: 'Forced only',
+  apiVersion: 1,
+  setup: (ctx) =>
+    ctx.tools.register({
+      name: 'clock',
+      description: 'Tell the time',
+      inputSchema: z.object({}) as never,
+      run: async () => 'noon',
+      defaultEnabled: true,
+    }),
 })
 
 async function setup() {
@@ -27,7 +72,12 @@ async function setup() {
   await migrateToLatest(db)
   const box = new SecretBox(Buffer.alloc(32, 3))
   const host = await loadPlugins(
-    [search, definePlugin({ id: 'plain', name: 'Plain', apiVersion: 1, setup: () => {} })],
+    [
+      search,
+      fetcher,
+      forcedOnly,
+      definePlugin({ id: 'plain', name: 'Plain', apiVersion: 1, setup: () => {} }),
+    ],
     {
       services: {} as never,
       logger,
@@ -48,11 +98,31 @@ async function setup() {
 type Settings = {
   plugins: {
     id: string
+    tools: { name: string; description: string; enabled: boolean; userToggle: boolean }[]
     values: Record<string, unknown>
     secretsSet: string[]
     error: string | null
-    schema: object
+    schema: object | null
   }[]
+}
+
+async function settings(app: Awaited<ReturnType<typeof setup>>['app'], cookie: string) {
+  return (await (
+    await app.request('/api/plugins/settings', { headers: { cookie } })
+  ).json()) as Settings
+}
+
+async function switchTool(
+  app: Awaited<ReturnType<typeof setup>>['app'],
+  cookie: string,
+  path: string,
+  enabled: unknown,
+) {
+  return app.request(`/api/plugins/${path}`, {
+    method: 'PUT',
+    headers: { cookie, origin: ORIGIN, 'content-type': 'application/json' },
+    body: JSON.stringify({ enabled }),
+  })
 }
 
 describe('plugin settings API', () => {
@@ -61,13 +131,54 @@ describe('plugin settings API', () => {
     expect((await app.request('/api/plugins/settings')).status).toBe(401)
   })
 
-  it('lists only plugins with user settings, with a JSON schema for the form', async () => {
+  it('lists plugins with user settings or switchable tools, with a JSON schema for the form', async () => {
     const { app, cookie } = await setup()
-    const body = (await (
-      await app.request('/api/plugins/settings', { headers: { cookie } })
-    ).json()) as Settings
-    expect(body.plugins.map((plugin) => plugin.id)).toEqual(['search'])
+    const body = await settings(app, cookie)
+    expect(body.plugins.map((plugin) => plugin.id)).toEqual(['search', 'fetcher'])
     expect(body.plugins[0]?.schema).toMatchObject({ type: 'object' })
+    expect(body.plugins[1]?.schema).toBeNull()
+  })
+
+  it("lists each plugin's tools with their enabled state and whether users may switch them", async () => {
+    const { app, cookie } = await setup()
+    const fetcherEntry = (await settings(app, cookie)).plugins.find((p) => p.id === 'fetcher')
+    expect(fetcherEntry?.tools).toEqual([
+      { name: 'web_fetch', description: 'Fetch a page', enabled: true, userToggle: true },
+      { name: 'forced', description: 'Always on', enabled: true, userToggle: false },
+    ])
+  })
+
+  it("stores a user's tool choice", async () => {
+    const { app, cookie } = await setup()
+    expect((await switchTool(app, cookie, 'fetcher/tools/web_fetch', false)).status).toBe(200)
+    const fetcherEntry = (await settings(app, cookie)).plugins.find((p) => p.id === 'fetcher')
+    expect(fetcherEntry?.tools[0]).toMatchObject({ name: 'web_fetch', enabled: false })
+  })
+
+  it('returns 404 for a tool that belongs to another plugin', async () => {
+    const { app, cookie } = await setup()
+    expect((await switchTool(app, cookie, 'search/tools/web_fetch', false)).status).toBe(404)
+  })
+
+  it('returns 400 for a tool users may not switch', async () => {
+    const { app, cookie } = await setup()
+    expect((await switchTool(app, cookie, 'fetcher/tools/forced', false)).status).toBe(400)
+  })
+
+  it('returns 400 for a tool choice that is not a boolean', async () => {
+    const { app, cookie } = await setup()
+    expect((await switchTool(app, cookie, 'fetcher/tools/web_fetch', 'no')).status).toBe(400)
+  })
+
+  it("keeps tool choices when the plugin's settings are reset", async () => {
+    const { app, cookie } = await setup()
+    await switchTool(app, cookie, 'search/tools/web_search', true)
+    await app.request('/api/plugins/search/settings', {
+      method: 'DELETE',
+      headers: { cookie, origin: ORIGIN },
+    })
+    const searchEntry = (await settings(app, cookie)).plugins.find((p) => p.id === 'search')
+    expect(searchEntry?.tools[0]).toMatchObject({ name: 'web_search', enabled: true })
   })
 
   it('refuses settings that are not a JSON object', async () => {

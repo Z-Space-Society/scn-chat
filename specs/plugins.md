@@ -99,11 +99,11 @@ The plugin the factory returns:
 Registries hold implementations picked by ID or by match. Registering a duplicate ID fails startup.
 
 - **Providers**, picked by provider ID. The providers spec defines the interface.
-- **Tools**, picked by name. A tool has a `name`, a `description`, a zod `inputSchema`, and `run(input, context)`, which returns text or JSON-encodable data. A result that would push the record past the size cap is stored as a blob.
+- **Tools**, picked by name. A tool has a `name`, a `description`, a zod `inputSchema`, and `run(input, context)`, which returns text or JSON-encodable data. A result that would push the record past the size cap is stored as a blob. The web-search spec adds tool switches, untrusted output, and the tool context's `fetch`, `cite`, and `turnCache`.
 - **Tool sources**, each with `list(user)` and `call(user, name, input)`. Their tools are merged with registered tools, with names prefixed by the source ID.
 - **Ingesters**, matched by MIME type. The attachments spec defines the interface.
 
-In phase 1 no tools are registered. The interfaces exist so web search, fetch, and MCP plugins can be added without core changes.
+The web search and fetch plugins are the first tools. MCP servers are expected to arrive as tool sources.
 
 ### Hooks
 

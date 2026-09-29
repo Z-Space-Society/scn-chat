@@ -1,10 +1,17 @@
 import { nsid } from '@scn-chat/lexicons'
-import type { BranchMessage, InfoRecord, ModelRef, TurnContext } from '@scn-chat/plugin-api'
+import type {
+  BranchMessage,
+  InfoRecord,
+  ModelRef,
+  ToolContext,
+  TurnContext,
+} from '@scn-chat/plugin-api'
 import { isStepCount, jsonSchema, streamText, type ToolSet, tool } from 'ai'
 import { type Account, getAccount } from '../auth/accounts.ts'
 import type { Db } from '../db/index.ts'
 import type { Logger } from '../logger.ts'
 import type { PluginHost } from '../plugins/host.ts'
+import { isToolEnabled, readToolChoices } from '../plugins/user-tools.ts'
 import type { ModelCatalog } from '../providers/catalog.ts'
 import { mapEffort } from '../providers/effort.ts'
 import { safeErrorMessage } from '../safe-error.ts'
@@ -13,7 +20,7 @@ import { RecordExists } from '../storage/record-store.ts'
 import { type JsonRecord, parseSpaceUri } from '../storage/records.ts'
 import type { ChatServices } from '../storage/services.ts'
 import type { SyncEventBus, SyncEvents } from '../sync/events.ts'
-import { PartAccumulator } from './accumulator.ts'
+import { encode, PartAccumulator } from './accumulator.ts'
 import {
   type BlobReader,
   branchTo,
@@ -25,6 +32,7 @@ import {
   toModelMessages,
 } from './prompt.ts'
 import type { StreamHub } from './stream-hub.ts'
+import { wrapUntrusted } from './untrusted.ts'
 
 export type TurnBlobs = {
   reader(account: Account, skey: string): BlobReader
@@ -46,6 +54,8 @@ export type TurnRunnerDeps = {
     systemPrompt: string
   }
   appName: string
+  /** Fetch function passed to tools for retrieving URLs. */
+  toolFetch: typeof fetch
   logger: Logger
   now?: () => number
 }
@@ -278,30 +288,62 @@ export class TurnRunner {
     return true
   }
 
+  /** The tools switched on for the user, for messages that name none. */
+  private async enabledTools(did: string): Promise<string[]> {
+    const registered = this.deps.host?.tools.list() ?? []
+    if (!registered.length) return []
+    const choices = await readToolChoices(this.deps.db, did)
+    return registered.filter((item) => isToolEnabled(item, choices)).map((item) => item.name)
+  }
+
+  /** Whether a tool's output is wrapped before the model sees it. Unknown tools count as untrusted. */
+  private isUntrusted(name: string): boolean {
+    const registered = this.deps.host?.tools.get(name)
+    return !registered || registered.untrusted === true
+  }
+
   private async tools(
-    requested: string[] | undefined,
-    context: { user: string; conversation: string; signal: AbortSignal },
+    requested: string[],
+    base: { user: string; conversation: string; signal: AbortSignal },
+    accumulator: PartAccumulator,
   ) {
-    if (!requested?.length) return undefined
+    if (!requested.length) return undefined
     const host = this.deps.host
     const set: ToolSet = {}
+    // Each tool gets its own context, so its turn cache is private and lasts only this turn.
+    const contextFor = (): ToolContext => ({
+      ...base,
+      fetch: this.deps.toolFetch,
+      cite: (source) => accumulator.cite(source),
+      turnCache: new Map(),
+    })
+    const wrapped = {
+      toModelOutput: ({ output }: { output: unknown }) => ({
+        type: 'text',
+        value: wrapUntrusted(encode(output)),
+      }),
+    }
     for (const registered of host?.tools.list() ?? []) {
       if (!requested.includes(registered.name)) continue
+      const context = contextFor()
       set[registered.name] = tool({
         description: registered.description,
         inputSchema: registered.inputSchema as never,
         execute: async (input: never) => registered.run(input, context),
+        ...(registered.untrusted ? wrapped : {}),
       } as never)
     }
     for (const source of host?.toolSources.list() ?? []) {
-      for (const definition of await source.list(context.user)) {
+      for (const definition of await source.list(base.user)) {
         const name = `${source.id}_${definition.name}`
         if (!requested.includes(name)) continue
+        const context = contextFor()
         set[name] = tool({
           description: definition.description,
           inputSchema: jsonSchema(definition.inputSchema as never),
           execute: async (input: unknown) =>
-            source.call(context.user, definition.name, input, context),
+            source.call(base.user, definition.name, input, context),
+          ...wrapped,
         } as never)
       }
     }
@@ -375,13 +417,15 @@ export class TurnRunner {
       const resolved = await this.deps.catalog.resolve(did, model)
       const hooks = this.deps.host?.hooks
       const branch = branchTo(loaded.messages, userMessage.rkey)
-      if (generation.tools?.length && !resolved.capabilities.tools)
+      const requested = generation.tools
+      if (requested?.length && !resolved.capabilities.tools)
         throw new TurnInputError('This model cannot use tools. Choose a model that can.')
-      const tools = await this.tools(generation.tools, {
-        user: did,
-        conversation: conversationUri,
-        signal: controller.signal,
-      })
+      const names = requested ?? (resolved.capabilities.tools ? await this.enabledTools(did) : [])
+      const tools = await this.tools(
+        names,
+        { user: did, conversation: conversationUri, signal: controller.signal },
+        accumulator,
+      )
       context.tools = Object.keys(tools ?? {})
       const base = fillBasePrompt(this.deps.config.systemPrompt, {
         appName: this.deps.appName,
@@ -397,6 +441,7 @@ export class TurnRunner {
         provider: resolved.provider,
         capabilities: resolved.capabilities,
         readBlob: this.deps.blobs.reader(account, skey),
+        isUntrusted: (name) => this.isUntrusted(name),
       })
       const result = streamText({
         model: resolved.model,

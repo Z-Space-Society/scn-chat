@@ -27,7 +27,8 @@ A separate designer will build the production interface. The phase 1 UI exists t
 | `/` | Chat list sidebar, and a new chat |
 | `/c/:skey` | Chat list sidebar and a conversation |
 | `/s/:ownerDid/:skey` | A shared conversation, read-only |
-| `/settings` | Preferences, API keys, and plugin settings |
+| `/settings` | Preferences, with a sidebar linking to each settings section |
+| `/settings/api-keys`, `/settings/plugins`, `/settings/sync` | The other settings sections |
 
 Any route except `/login` and a shared route redirects to `/login` when `/api/me` returns 401. A shared route shows a sign-in prompt instead.
 
@@ -44,16 +45,15 @@ Any route except `/login` and a shared route redirects to `/login` when `/api/me
   - A pending reply shows streamed text as it arrives. An errored reply shows its error, and a cancelled reply is labeled as stopped.
 - **Message actions.** On user messages, edit, which opens the composer prefilled and sends a sibling. On assistant replies, regenerate, with an optional model change. While generating, stop.
 - **Composer.** A textarea, a model select from `/api/models`, an effort select for models with the reasoning capability, and an attach button. The attach button accepts images only for models with vision, plus any type an ingester supports. Attachments upload when chosen and show a progress state. Enter sends, and Shift+Enter adds a newline.
-- **Settings.**
+- **Settings.** A sidebar links back to the chats and to each section, marks the current one, and holds sign out. Only the current section is shown.
   - Preferences: default model, default effort, custom instructions, and generate titles. Saving also stores the browser's time zone, which the app saves on sign-in as well when it differs from the stored one.
   - API keys: add, list with the last four characters, and delete. For providers with user endpoints, a base URL field.
-  - Plugin settings: one form per plugin with user settings, generated from its JSON schema.
-  - Background sync: an on and off switch, shown only when the admin allows users to opt out.
-  - This device: a button that deletes and rebuilds the browser store.
+  - Plugins: one form with a group per plugin and a single Save at the end, which saves every plugin's settings and any tool switches that changed. A group has a checkbox for each tool the user may switch, labeled "Enabled" when it is the plugin's only one and by tool name otherwise, then the fields generated from the plugin's JSON schema.
+  - Sync: the background sync switch, shown only when the admin allows users to opt out, and a button that deletes and rebuilds the browser store.
 
 ### Schema forms
 
-`SchemaForm` renders a JSON schema object as labeled inputs. It supports strings, as text inputs or password inputs for secret fields, plus numbers, booleans as checkboxes, and string enums as selects. Any other type is shown as unsupported, not guessed at.
+`SchemaFields` renders a JSON schema object as labeled inputs, reporting each change to its parent form. It supports strings, as text inputs or password inputs for secret fields, plus numbers, booleans as checkboxes, and string enums as selects. Any other type is shown as unsupported, not guessed at. A field's schema may carry a [JSON Forms rule](https://jsonforms.io/docs/uischema/rules) under `rule`, whose effect is `SHOW`, `HIDE`, `ENABLE`, or `DISABLE`. Its condition names another top-level field as `#/properties/<name>` and tests that field's value with a JSON Schema limited to `const`, `enum`, `not`, and `minLength`, honoring `failWhenUndefined`. A rule with any other scope, keyword, or effect is ignored with a console warning, so the field stays shown and enabled.
 
 ### Streaming
 

@@ -71,6 +71,8 @@ describe('config.example.yml', () => {
       'openai-compatible-custom',
       'pdf-text',
       'titles',
+      'web-search',
+      'web-fetch',
     ])
   })
 })

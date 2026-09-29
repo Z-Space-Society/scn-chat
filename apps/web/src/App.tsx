@@ -55,7 +55,7 @@ function SignedIn({ me }: { me: Me }) {
       <StoreProvider store={store}>
         <Switch>
           <Route path="/c/:skey">{(params) => <ChatPage skey={params.skey} />}</Route>
-          <Route path="/settings">
+          <Route path="/settings" nest>
             <SettingsPage />
           </Route>
           <Route path="/login">

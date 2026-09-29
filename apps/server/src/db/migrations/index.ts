@@ -4,6 +4,7 @@ import * as m0002 from './0002_auth.ts'
 import * as m0003 from './0003_storage.ts'
 import * as m0004 from './0004_providers.ts'
 import * as m0005 from './0005_turns.ts'
+import * as m0006 from './0006_user_tool_settings.ts'
 
 /** App migrations in order. Keys sort in the order they run. */
 export const migrations: Record<string, Migration> = {
@@ -12,4 +13,5 @@ export const migrations: Record<string, Migration> = {
   '0003_storage': m0003,
   '0004_providers': m0004,
   '0005_turns': m0005,
+  '0006_user_tool_settings': m0006,
 }
