@@ -1,4 +1,5 @@
 import { nsid } from '@scn-chat/lexicons/nsid'
+import { type SearchResult, search } from './search.ts'
 import type { SqlDb } from './sql.ts'
 
 type Json = Record<string, unknown>
@@ -274,6 +275,15 @@ export class StoreCore {
         'select skey from conversation where fetched_at is null or updated_at > fetched_at order by updated_at desc',
       )
       .map((row) => row.skey)
+  }
+
+  /** How many conversations are left to download before search covers them all. */
+  remainingDownloads(): number {
+    return this.staleConversations().length
+  }
+
+  search(query: string, options?: { limit?: number; offset?: number }): SearchResult[] {
+    return search(this.db, query, options)
   }
 
   /** Fetch every stale conversation, a few at a time, so search covers the whole history. */

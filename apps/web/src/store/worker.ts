@@ -122,6 +122,9 @@ const api = {
   reconcileIndex: () => guard((store) => store.reconcileIndex()),
   reconcileConversation: (skey: string) => guard((store) => store.reconcileConversation(skey)),
   backgroundDownload: () => guard((store) => store.backgroundDownload()),
+  search: (query: string, options?: { limit?: number; offset?: number }) =>
+    guard((store) => store.search(query, options)),
+  remainingDownloads: () => guard((store) => store.remainingDownloads()),
 }
 
 export type WorkerApi = typeof api

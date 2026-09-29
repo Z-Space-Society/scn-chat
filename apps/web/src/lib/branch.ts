@@ -52,3 +52,16 @@ export function currentBranch(
     parent = message.rkey
   }
 }
+
+/** Return a map of the current message and all of its parents on the branch. */
+export function choicesFor(messages: BranchMessage[], rkey: string): Record<string, string> {
+  const byKey = new Map(messages.map((m) => [m.rkey, m]))
+  const choices: Record<string, string> = {}
+  for (let message = byKey.get(rkey); message; ) {
+    const recorded = message.record.parent as string | undefined
+    const parent = recorded ? byKey.get(recorded) : undefined
+    choices[parent ? parent.rkey : ''] = message.rkey
+    message = parent
+  }
+  return choices
+}

@@ -5,6 +5,7 @@ type Part = Record<string, unknown> & { $type: string }
 type Blob = { ref: { $link: string }; mimeType: string }
 
 export type MessageViewProps = {
+  id?: string
   record: Record<string, unknown>
   /** Text and reasoning streamed so far for a pending reply. */
   streaming?: StreamedReply
@@ -68,13 +69,20 @@ function PartView({ part, blobUrl }: { part: Part; blobUrl: MessageViewProps['bl
 }
 
 /** One message: its parts, its state, sibling controls, and actions. */
-export function MessageView({ record, streaming, blobUrl, siblings, actions }: MessageViewProps) {
+export function MessageView({
+  id,
+  record,
+  streaming,
+  blobUrl,
+  siblings,
+  actions,
+}: MessageViewProps) {
   const content = record.content as { $type: string; parts?: Part[] }
   const encrypted = content.$type.endsWith('#encryptedContent')
   const parts = content.parts ?? []
   const sources = parts.filter((part) => kind(part) === 'sourcePart')
   return (
-    <article className={`message ${record.role as string}`}>
+    <article id={id} className={`message ${record.role as string}`}>
       <header>
         <strong>{record.role === 'user' ? 'You' : 'Assistant'}</strong>
         {siblings && siblings.count > 1 && (

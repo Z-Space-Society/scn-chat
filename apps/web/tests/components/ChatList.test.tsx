@@ -9,7 +9,15 @@ afterEach(() => vi.unstubAllGlobals())
 
 function fakeStore() {
   return {
-    worker: { listConversations: vi.fn(async () => []) },
+    worker: {
+      listConversations: vi.fn(async () => [
+        { skey: 'a', uri: 'u', title: 'Tiles', tags: [], updatedAt: 't' },
+      ]),
+      search: vi.fn(async () => [
+        { skey: 'b', title: 'Paint', rkey: 'm1', role: 'user', snippet: 'blue', time: 't' },
+      ]),
+      remainingDownloads: vi.fn(async () => 2),
+    },
     state: () => 'active',
     onState: () => () => {},
     onChange: () => () => {},
@@ -18,6 +26,77 @@ function fakeStore() {
 }
 
 describe('ChatList', () => {
+  it('replaces the list with local search results while a query is active', async () => {
+    const fetch = vi.fn(async () => Response.json({}))
+    vi.stubGlobal('fetch', fetch)
+    const store = fakeStore()
+    render(
+      <StoreProvider store={store as unknown as StoreClient}>
+        <ChatList />
+      </StoreProvider>,
+    )
+    expect(await screen.findByText('Tiles')).toBeInTheDocument()
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search chats' }), 'blue')
+    expect(await screen.findByText('Paint')).toBeInTheDocument()
+    expect(screen.queryByText('Tiles')).toBeNull()
+    expect(screen.getByRole('status')).toHaveTextContent('Still downloading 2 conversations.')
+    expect(store.worker.search).toHaveBeenLastCalledWith('blue')
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('waits for two characters before searching', async () => {
+    const store = fakeStore()
+    render(
+      <StoreProvider store={store as unknown as StoreClient}>
+        <ChatList />
+      </StoreProvider>,
+    )
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search chats' }), 'b')
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(store.worker.search).not.toHaveBeenCalled()
+    expect(screen.getByText('Tiles')).toBeInTheDocument()
+  })
+
+  it('shows the list again when the query drops below two characters', async () => {
+    const store = fakeStore()
+    render(
+      <StoreProvider store={store as unknown as StoreClient}>
+        <ChatList />
+      </StoreProvider>,
+    )
+    const box = screen.getByRole('searchbox', { name: 'Search chats' })
+    await userEvent.type(box, 'bl')
+    expect(await screen.findByText('Paint')).toBeInTheDocument()
+    await userEvent.type(box, '{Backspace}')
+    expect(await screen.findByText('Tiles')).toBeInTheDocument()
+  })
+
+  it('searches once typing pauses, not on every character', async () => {
+    const store = fakeStore()
+    render(
+      <StoreProvider store={store as unknown as StoreClient}>
+        <ChatList />
+      </StoreProvider>,
+    )
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search chats' }), 'blue')
+    expect(await screen.findByText('Paint')).toBeInTheDocument()
+    expect(store.worker.search.mock.calls).toEqual([['blue']])
+  })
+
+  it('shows the list again when the query is cleared', async () => {
+    const store = fakeStore()
+    render(
+      <StoreProvider store={store as unknown as StoreClient}>
+        <ChatList />
+      </StoreProvider>,
+    )
+    const box = screen.getByRole('searchbox', { name: 'Search chats' })
+    await userEvent.type(box, 'blue')
+    expect(await screen.findByText('Paint')).toBeInTheDocument()
+    await userEvent.clear(box)
+    expect(await screen.findByText('Tiles')).toBeInTheDocument()
+  })
+
   it('signs out and deletes the local copy', async () => {
     const fetch = vi.fn(async () => Response.json({ ok: true }))
     vi.stubGlobal('fetch', fetch)

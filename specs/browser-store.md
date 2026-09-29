@@ -55,6 +55,7 @@ getConversation(skey): Promise<{ info; messages }>
 refreshConversation(skey): Promise<void>
 syncIndex(): Promise<void>
 search(query, opts): Promise<SearchResult[]>   // see the search spec
+remainingDownloads(): Promise<number>          // conversations not yet fetched
 reset(): Promise<void>                          // delete and rebuild the database
 ```
 

@@ -169,6 +169,38 @@ summary {
   background: var(--hover);
 }
 
+.chat-list > input[type="search"] {
+  margin: 0.25rem 0;
+}
+
+.search-results {
+  flex: 1;
+}
+
+.search-results > p {
+  color: var(--muted);
+  font-size: 0.85rem;
+  padding: 0 0.6rem;
+}
+
+.search-results a {
+  white-space: normal;
+}
+
+.search-results small {
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+mark {
+  background: light-dark(#fff3a3, #5c4d00);
+  color: inherit;
+  border-radius: 0.2rem;
+}
+
 .chat-list > button {
   text-align: left;
 }
