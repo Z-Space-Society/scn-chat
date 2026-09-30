@@ -1,3 +1,4 @@
+import { DidError, OAuthResolverError } from '@atproto/oauth-client-node'
 import pino from 'pino'
 import { describe, expect, it, vi } from 'vitest'
 import { createApp } from '../../src/app.ts'
@@ -67,6 +68,43 @@ describe('GET /oauth/login', () => {
     const { app } = await setup({ oauth })
     const res = await app.request('/oauth/login?identifier=alice.test')
     expect(decodeURIComponent(res.headers.get('location') ?? '')).toContain('invalid_scope')
+  })
+
+  /** The login page's error after authorize throws. */
+  async function loginErrorFor(error: unknown, identifier = 'alice.test') {
+    const oauth = fakeOAuth({
+      authorize: vi.fn(async () => {
+        throw error
+      }),
+    })
+    const { app } = await setup({ oauth })
+    const res = await app.request(`/oauth/login?identifier=${identifier}`)
+    return new URL(res.headers.get('location') ?? '', 'http://x').searchParams.get('error')
+  }
+
+  it("suggests the DID when a handle doesn't resolve", async () => {
+    const cause = Object.assign(new Error('Handle "alice.test" does not resolve to a DID'), {
+      name: 'IdentityResolverError',
+    })
+    const error = new OAuthResolverError('Failed to resolve identity: alice.test', { cause })
+    expect(await loginErrorFor(error)).toBe(
+      "We couldn't find an account for that handle. Check the spelling, or sign in with your DID instead.",
+    )
+  })
+
+  it("says the DID wasn't found when a DID doesn't resolve", async () => {
+    const cause = new DidError('did:plc:nobody', 'DID not found', 'did-unknown', 404)
+    const error = new OAuthResolverError('Failed to resolve identity: did:plc:nobody', { cause })
+    expect(await loginErrorFor(error, 'did:plc:nobody')).toBe(
+      "We couldn't find an account for that DID.",
+    )
+  })
+
+  it("keeps the resolver's message for failures after the account was found", async () => {
+    const error = new OAuthResolverError(
+      'Failed to resolve OAuth server metadata for https://pds.test',
+    )
+    expect(await loginErrorFor(error)).toContain('Failed to resolve OAuth server metadata')
   })
 })
 

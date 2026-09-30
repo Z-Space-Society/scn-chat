@@ -10,6 +10,7 @@ import type { Db } from '../src/db/index.ts'
 import type { Database } from '../src/db/schema.ts'
 import { testConfig } from './helpers/config.ts'
 import { createSqliteDb, dialects } from './helpers/db.ts'
+import { pdsError } from './helpers/pds-errors.ts'
 
 const config = testConfig()
 const logger = pino({ level: 'silent' })
@@ -76,5 +77,49 @@ describe('production static serving', () => {
     const res = await app.request('/api/nope')
     expect(res.status).toBe(404)
     expect(await res.json()).toEqual({ error: 'NotFound' })
+  })
+})
+
+describe('error responses', () => {
+  /** An app with a route that throws the error, and the log lines it writes. */
+  function throwing(err: unknown, nodeEnv: 'development' | 'production' = 'production') {
+    const lines: Record<string, unknown>[] = []
+    const logger = pino(
+      { level: 'info' },
+      { write: (line: string) => lines.push(JSON.parse(line)) },
+    )
+    const app = createApp({ config: { ...config, nodeEnv }, db: createSqliteDb(), logger })
+    app.get('/boom', () => {
+      throw err
+    })
+    return { request: () => app.request('/boom'), lines }
+  }
+
+  it('gives an unexpected error a reference that matches its log line, without its details', async () => {
+    const { request, lines } = throwing(new Error('table secret_stuff is locked'))
+    const res = await request()
+    const body = (await res.json()) as { error: string; message: string }
+    expect(res.status).toBe(500)
+    expect(body.error).toBe('InternalServerError')
+    expect(body.message).not.toContain('secret_stuff')
+    const reference = /reference ([0-9a-f]{8})/.exec(body.message)?.[1]
+    expect(lines.find((line) => line.msg === 'unhandled error')?.reference).toBe(reference)
+  })
+
+  it("includes the error's redacted message in development", async () => {
+    const { request } = throwing(new Error('table busy, key sk-live-abcdef123456'), 'development')
+    const body = (await (await request()).json()) as { message: string }
+    expect(body.message).toContain('table busy')
+    expect(body.message).not.toContain('sk-live-abcdef123456')
+  })
+
+  it('tells the user to sign in again when their session lacks a PDS scope', async () => {
+    const { request, lines } = throwing(
+      pdsError(403, 'ScopeMissingError', 'Missing required scope'),
+    )
+    const res = await request()
+    expect(res.status).toBe(403)
+    expect(await res.json()).toMatchObject({ error: 'ScopeMissing' })
+    expect(lines.find((line) => line.msg === 'a PDS call failed')).toBeDefined()
   })
 })

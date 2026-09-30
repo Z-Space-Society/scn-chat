@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto'
+import { DidError, OAuthResolverError } from '@atproto/oauth-client-node'
 import type { Context } from 'hono'
 import { Hono, type MiddlewareHandler } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
@@ -39,6 +40,15 @@ export type AuthDeps = {
 }
 
 const loginError = (message: string) => `/login?error=${encodeURIComponent(message)}`
+
+/** What to tell the user when sign-in can't start, in their terms when the account can't be found. */
+function authorizeFailure(err: unknown): string {
+  if (!(err instanceof OAuthResolverError)) return safeErrorMessage(err)
+  if (err.cause instanceof Error && err.cause.name === 'IdentityResolverError')
+    return "We couldn't find an account for that handle. Check the spelling, or sign in with your DID instead."
+  if (err.cause instanceof DidError) return "We couldn't find an account for that DID."
+  return safeErrorMessage(err)
+}
 
 /** Ties an OAuth callback to the browser that started the sign-in. */
 const LOGIN_COOKIE = 'scn_login'
@@ -131,7 +141,7 @@ export function oauthRoutes(deps: AuthDeps) {
         return c.redirect(url.toString())
       } catch (err) {
         deps.logger.warn({ err, identifier }, 'oauth authorize failed')
-        return c.redirect(loginError(safeErrorMessage(err)))
+        return c.redirect(loginError(authorizeFailure(err)))
       }
     })
     .get('/oauth/callback', async (c) => {

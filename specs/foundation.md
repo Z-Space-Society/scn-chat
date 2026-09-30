@@ -96,6 +96,16 @@ Migrations and queries stay within what both databases support. Timestamps are I
 - In production the server also serves the built web app from `apps/web/dist`, with an `index.html` fallback for client-side routes. In development Vite serves the web app and proxies `/api` to the server. `index.html` carries an `__APP_NAME__` placeholder in its title and `application-name` meta tag, filled with the configured app name by the server in production and by a Vite plugin, which asks the server, in development. The web app reads the name from the meta tag.
 - Logging uses pino, with request logging through a small Hono middleware.
 
+### Error responses
+
+API errors are JSON with an `error` code and, usually, a `message` the web app shows as is.
+
+- Errors the server expects, such as invalid input or an expired session, have their own status and message.
+- A failed call to the user's PDS is passed on. A missing OAuth scope (`InsufficientScope` or `ScopeMissingError`) becomes 403 `ScopeMissing`, telling the user to sign out and back in. Any other PDS error response becomes 502 `PdsError` with the PDS's code and redacted message, and an unreachable PDS becomes 502 `PdsUnreachable`.
+- Anything else is 500 `InternalServerError`, with a short random reference in the message and in the log line, so a report can be matched to the log. The error's details stay in the log, except in development, where the redacted message is appended.
+
+The web app logs every failed API call except a 401 to the browser console, with its status, URL, and message.
+
 ### Web app
 
 `apps/web` is a Vite React app with no router, state library, or CSS framework. The single `App` component fetches `/api/health` and shows the app name and whether the server is reachable. There is no styling beyond browser defaults.
@@ -152,6 +162,8 @@ Biome handles both linting and formatting, configured in one `biome.json` at the
 
 ## Acceptance Criteria
 
+- [ ] An unexpected error returns 500 with a reference that matches its log line, and its details only in development.
+- [ ] A PDS scope error returns 403 `ScopeMissing` asking the user to sign in again, and other PDS errors return 502 with the PDS's code.
 - [ ] `pnpm install` on a clean clone succeeds with the committed lockfile, and resolves no `@atproto/*` package to a plain `0.0.0` release.
 - [ ] Config parsing returns typed values from `config.yml`, and fails naming the setting when a value is missing or invalid.
 - [ ] Environment variables override the settings in the overrides table.

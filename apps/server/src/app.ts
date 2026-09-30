@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { serveStatic } from '@hono/node-server/serve-static'
@@ -16,10 +17,12 @@ import { InvalidBody } from './body.ts'
 import type { Config } from './config.ts'
 import type { Db } from './db/index.ts'
 import type { AppEnv } from './env.ts'
+import { pdsFailure } from './lex-errors.ts'
 import type { Logger } from './logger.ts'
 import { type PluginRoutesDeps, pluginRoutes } from './plugins/routes.ts'
 import { ModelUnavailable } from './providers/catalog.ts'
 import { type ProviderRoutesDeps, providerRoutes } from './providers/routes.ts'
+import { safeErrorMessage } from './safe-error.ts'
 import { sharingRoutes } from './sharing/routes.ts'
 import type { SharingService } from './sharing/service.ts'
 import {
@@ -113,8 +116,22 @@ export function createApp(deps: AppDeps) {
       return c.json({ error: 'ModelUnavailable', message: err.message }, 400)
     if (err instanceof SpaceNotFound)
       return c.json({ error: 'NotFound', message: err.message }, 404)
-    logger.error({ err, path: c.req.path }, 'unhandled error')
-    return c.json({ error: 'InternalServerError' }, 500)
+    const pds = pdsFailure(err)
+    if (pds) {
+      logger.warn({ err, path: c.req.path }, 'a PDS call failed')
+      return c.json({ error: pds.error, message: pds.message }, pds.status)
+    }
+    // The reference ties what the user sees to this log line. Details stay in the log outside development.
+    const reference = randomBytes(4).toString('hex')
+    logger.error({ err, path: c.req.path, reference }, 'unhandled error')
+    const detail = config.nodeEnv === 'development' ? `: ${safeErrorMessage(err)}` : '.'
+    return c.json(
+      {
+        error: 'InternalServerError',
+        message: `Something went wrong on the server (reference ${reference})${detail}`,
+      },
+      500,
+    )
   })
   app.all('/api/*', (c) => c.json({ error: 'NotFound' }, 404))
 

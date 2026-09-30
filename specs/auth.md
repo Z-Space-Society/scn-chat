@@ -122,6 +122,7 @@ A `pnpm keys` script prints a fresh `OAUTH_PRIVATE_KEYS` value and a `SECRET_KEY
 
 - The permission set still lists a `blob` permission, which PDSs ignore. It stays because published lexicons are never tightened, and the separate `blob:*/*` scope is what grants uploads.
 - Login depends on the published permission set. An unpublished or unresolvable permission set makes every login fail with `invalid_scope`, and the login page shows that error.
+- A handle that doesn't resolve to an account shows "We couldn't find an account for that handle. Check the spelling, or sign in with your DID instead." Some PDSs serve handles that can't be resolved, such as a wildcard domain whose certificate doesn't cover it, and the DID works for those. A DID that doesn't resolve says the DID wasn't found. The sign-in form itself only asks for a handle.
 - A spaces account that loses spaces support fails login loudly instead of falling back to local storage.
 - Loopback development uses a public client, because atproto OAuth does not allow confidential loopback clients.
 - **To verify during implementation:** that a PDS without spaces accepts the permission set and skips its space permissions, as the research into the alpha source suggests.
@@ -139,6 +140,7 @@ A `pnpm keys` script prints a fresh `OAUTH_PRIVATE_KEYS` value and a `SECRET_KEY
 - [ ] Production startup fails without valid `OAUTH_PRIVATE_KEYS` or with a non-HTTPS `PUBLIC_URL`.
 - [ ] The requested scope includes the permission set, with its NSID taken from the lexicon module.
 - [ ] An `invalid_scope` error from the PDS is shown on the login page.
+- [ ] A handle that doesn't resolve shows an error suggesting the DID, and a DID that doesn't resolve says it wasn't found.
 - [ ] `auth.scopeMode: raw` requests raw space and blob scopes equivalent to the permission set, and production startup refuses it.
 - [ ] A new account whose granted scope allows spaces gets storage mode `space`.
 - [ ] A new account whose granted scope lacks spaces gets storage mode `local`.

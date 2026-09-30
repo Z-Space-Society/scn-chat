@@ -59,6 +59,10 @@ export async function read<R extends ClientResponse<unknown, number, string>>(
 ): Promise<SuccessBody<R>> {
   const res = await response
   if (res.status === 401) for (const listener of unauthorized) listener()
-  if (!res.ok) throw new ApiError(res.status, await errorMessage(res))
+  if (!res.ok) {
+    const message = await errorMessage(res)
+    if (res.status !== 401) console.error(`Request failed: ${res.status} ${res.url}`, message)
+    throw new ApiError(res.status, message)
+  }
   return (await res.json()) as SuccessBody<R>
 }
