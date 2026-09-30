@@ -10,9 +10,12 @@ function spaceScope(type: string, params: string[]): string {
   return `space:${type}?${params.join('&')}`
 }
 
+const BLOBS = 'blob:*/*'
+
 /** The OAuth scope the app requests, built from the lexicon module. */
 export function buildScope(mode: ScopeMode): string {
-  if (mode === 'permission-set') return `atproto include:${nsid.permissions}`
+  // PDSs drop blob permissions from permission sets, so blobs are requested alongside.
+  if (mode === 'permission-set') return `atproto include:${nsid.permissions} ${BLOBS}`
   return [
     'atproto',
     spaceScope(nsid.conversation, [
@@ -29,7 +32,7 @@ export function buildScope(mode: ScopeMode): string {
       ...recordActions,
       ...manageOps,
     ]),
-    'blob:*/*',
+    BLOBS,
   ].join(' ')
 }
 

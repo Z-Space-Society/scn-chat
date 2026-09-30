@@ -21,7 +21,7 @@ The OAuth state and session stores are `oauth_state` and `oauth_session` tables,
 
 ### Scope
 
-The requested scope is `atproto include:network.sharedcomputer.chat.permissions`, with the permission set NSID taken from the lexicon module, never typed as a literal. The permission set grants the conversation, shared-read, settings, and blob permissions. The PDS resolves it through the lexicon's DNS record, so the lexicons must be published under `sharedcomputer.network` before anyone can log in. A fork publishes its own lexicons under its own domain.
+The requested scope is `atproto include:network.sharedcomputer.chat.permissions blob:*/*`, with the permission set NSID taken from the lexicon module, never typed as a literal. The permission set grants the conversation, shared-read, and settings permissions. Blob access is requested as its own `blob:*/*` scope, because PDSs only take `space`, `repo`, and `rpc` permissions from a permission set and drop the rest. The PDS resolves it through the lexicon's DNS record, so the lexicons must be published under `sharedcomputer.network` before anyone can log in. A fork publishes its own lexicons under its own domain.
 
 Before the lexicons are published, setting `auth.scopeMode` to `raw` lets a PDS without spaces sign users in, for testing the local fallback. It requests the equivalent raw scopes instead, built from the same lexicon module: `space:` scopes for the conversation, shared-read, and settings permissions with every collection listed, plus `blob:*/*`. The default is `permission-set`, and production startup refuses `raw`.
 
@@ -120,6 +120,7 @@ A `pnpm keys` script prints a fresh `OAUTH_PRIVATE_KEYS` value and a `SECRET_KEY
 
 ## Edge Cases and Decisions
 
+- The permission set still lists a `blob` permission, which PDSs ignore. It stays because published lexicons are never tightened, and the separate `blob:*/*` scope is what grants uploads.
 - Login depends on the published permission set. An unpublished or unresolvable permission set makes every login fail with `invalid_scope`, and the login page shows that error.
 - A spaces account that loses spaces support fails login loudly instead of falling back to local storage.
 - Loopback development uses a public client, because atproto OAuth does not allow confidential loopback clients.

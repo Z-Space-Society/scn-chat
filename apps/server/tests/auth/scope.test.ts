@@ -6,8 +6,8 @@ import { buildScope, scopeAllowsSpaces } from '../../src/auth/scope.ts'
 const did = 'did:plc:alice'
 
 describe('buildScope', () => {
-  it('includes the permission set by default, with its NSID from the lexicon module', () => {
-    expect(buildScope('permission-set')).toBe(`atproto include:${nsid.permissions}`)
+  it('includes the permission set by default, with its NSID from the lexicon module, and blobs alongside', () => {
+    expect(buildScope('permission-set')).toBe(`atproto include:${nsid.permissions} blob:*/*`)
   })
 
   it('builds raw space and blob scopes that parse as valid permissions', () => {
