@@ -24,6 +24,11 @@ The overview at the end of this file lists every spec and whether it is active, 
 
 ### Planned
 
+- [[admin]]
+- [[admin-plugins]]
+- [[admin-settings]]
+- [[encrypted-conversations]]
+
 ### Completed
 
 Phase 1, initial build-out, implemented and tested, awaiting a check against a real spaces PDS:

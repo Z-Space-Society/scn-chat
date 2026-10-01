@@ -30,7 +30,7 @@ Phase 1:
 - Image generation, as a plugin
 - PDF OCR
 - Speech to text and text to speech
-- E2EE support for chat history
+- Encrypted conversations. See [specs/encrypted-conversations.md](specs/encrypted-conversations.md)
 - Memories
 - MCP servers as tools
 - Browser and push notifications, and an installable PWA
