@@ -10,7 +10,7 @@ export function ShareControl({ skey, ownerDid }: { skey: string; ownerDid: strin
   const [mode, setMode] = useState<Mode>('private')
   const [members, setMembers] = useState('')
   const { error, run } = useAction()
-  const link = `${location.origin}/s/${ownerDid}/${skey}`
+  const link = `${location.origin}/shared/${ownerDid}/${skey}`
 
   useEffect(() => {
     if (!open) return

@@ -1,5 +1,5 @@
+import { useSearch } from '@tanstack/react-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useSearch } from 'wouter'
 import { api, json, read } from '../api.ts'
 import { blobUrlFor } from '../lib/blob-url.ts'
 import { useMe } from '../session.tsx'
@@ -34,7 +34,7 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
     for (const message of messages) if (message.record.status === 'pending') follow(message.rkey)
   }, [messages, follow])
 
-  const focus = new URLSearchParams(useSearch()).get('m')
+  const focus = useSearch({ strict: false }).m
   const section = useRef<HTMLElement>(null)
   // A link to a message scrolls to that message instead.
   const { pin } = useStickToBottom(section, !focus)

@@ -1,4 +1,4 @@
-import { Link } from 'wouter'
+import { Link } from '@tanstack/react-router'
 import { MATCH_END, MATCH_START, type SearchResult } from '../store/search.ts'
 
 /** A snippet with its marked matches as highlight elements. */
@@ -38,7 +38,11 @@ export function SearchResults({
         <ul>
           {results.map((result) => (
             <li key={`${result.skey}/${result.rkey ?? ''}`}>
-              <Link href={`/c/${result.skey}${result.rkey ? `?m=${result.rkey}` : ''}`}>
+              <Link
+                to="/chat/$skey"
+                params={{ skey: result.skey }}
+                search={result.rkey ? { m: result.rkey } : {}}
+              >
                 {result.rkey ? (
                   <>
                     <strong>{result.title || 'New chat'}</strong>

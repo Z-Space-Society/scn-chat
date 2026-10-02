@@ -9,8 +9,8 @@ export function BusyBanner() {
   return (
     <div role="status" className="banner">
       {state === 'busy'
-        ? `${appName} is busy in another tab.`
-        : `${appName} couldn't open this device's copy of your chats.`}{' '}
+        ? `${appName()} is busy in another tab.`
+        : `${appName()} couldn't open this device's copy of your chats.`}{' '}
       <button type="button" onClick={() => void store.claim()}>
         {state === 'busy' ? 'Use here' : 'Try again'}
       </button>

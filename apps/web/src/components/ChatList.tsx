@@ -1,5 +1,5 @@
+import { Link, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
-import { Link, useLocation } from 'wouter'
 import { api, read } from '../api.ts'
 import { useConversations, useSearch } from '../store/react.tsx'
 import { SearchResults } from './SearchResults.tsx'
@@ -16,10 +16,10 @@ export function ChatList() {
   const found = useSearch(searching ? typed : '')
   const { error, run } = useAction()
   const signOut = useSignOut()
-  const [, navigate] = useLocation()
+  const navigate = useNavigate()
   const create = async () => {
     const created = await read(api.chats.conversations.$post())
-    navigate(`/c/${created.skey}`)
+    await navigate({ to: '/chat/$skey', params: { skey: created.skey } })
   }
   return (
     <nav className="sidebar chat-list">
@@ -42,12 +42,14 @@ export function ChatList() {
         <ul>
           {conversations.map((c) => (
             <li key={c.skey}>
-              <Link href={`/c/${c.skey}`}>{c.title || 'New chat'}</Link>
+              <Link to="/chat/$skey" params={{ skey: c.skey }}>
+                {c.title || 'New chat'}
+              </Link>
             </li>
           ))}
         </ul>
       )}
-      <Link href="/settings">Settings</Link>
+      <Link to="/settings">Settings</Link>
       <button type="button" onClick={() => run(signOut)}>
         Sign out
       </button>

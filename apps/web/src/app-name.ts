@@ -1,4 +1,4 @@
-/** The configured app name, used in index.html. */
-const meta = document.querySelector<HTMLMetaElement>('meta[name="application-name"]')
-if (!meta) throw new Error('index.html has no application-name meta tag')
-export const appName = meta.content
+/** The configured app name, from the meta tag the root route renders on the server. */
+export function appName(): string {
+  return document.querySelector<HTMLMetaElement>('meta[name="application-name"]')?.content ?? ''
+}

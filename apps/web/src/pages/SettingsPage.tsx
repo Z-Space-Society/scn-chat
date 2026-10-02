@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Link, Route, Switch, useLocation } from 'wouter'
+import { Link } from '@tanstack/react-router'
+import { type ReactNode, useCallback, useEffect, useState } from 'react'
 import { api, json, read } from '../api.ts'
 import { type ModelOption, modelKey } from '../components/Composer.tsx'
 import { SchemaFields } from '../components/SchemaFields.tsx'
@@ -91,7 +91,7 @@ function Preferences({ models }: { models: ModelOption[] }) {
   )
 }
 
-function ApiKeys() {
+export function ApiKeys() {
   const [providers, setProviders] = useState<
     { id: string; name: string; userEndpoints: boolean; listsModels: boolean }[]
   >([])
@@ -248,7 +248,7 @@ function ApiKeys() {
   )
 }
 
-function PluginSettings() {
+export function PluginSettings() {
   type Entry = {
     id: string
     name: string
@@ -374,7 +374,7 @@ function PluginSettings() {
   )
 }
 
-function Device() {
+export function Device() {
   const store = useStore()
   const [account, setAccount] = useState<{
     backgroundSync: boolean
@@ -421,28 +421,36 @@ function Device() {
 }
 
 const sections = [
-  { path: '/', label: 'Preferences' },
-  { path: '/api-keys', label: 'API keys' },
-  { path: '/plugins', label: 'Plugins' },
-  { path: '/sync', label: 'Sync' },
-]
+  { to: '/settings', label: 'Preferences' },
+  { to: '/settings/api-keys', label: 'API keys' },
+  { to: '/settings/plugins', label: 'Plugins' },
+  { to: '/settings/sync', label: 'Sync' },
+] as const
 
-export function SettingsPage() {
+export function PreferencesSettings() {
+  const { models, error } = useModels()
+  return (
+    <>
+      {error && <p role="alert">{error}</p>}
+      <Preferences models={models} />
+    </>
+  )
+}
+
+/** The settings sidebar around the current section. */
+export function SettingsLayout({ children }: { children: ReactNode }) {
   const signOut = useSignOut()
-  const [location] = useLocation()
-  const { models, error: modelsError } = useModels()
   const { error, run } = useAction()
   return (
     <div className="layout settings">
       <nav className="sidebar">
-        <Link href="~/">Back to chats</Link>
+        <Link to="/" activeOptions={{ exact: true }}>
+          Back to chats
+        </Link>
         <ul>
           {sections.map((section) => (
-            <li key={section.path}>
-              <Link
-                href={section.path}
-                aria-current={location === section.path ? 'page' : undefined}
-              >
+            <li key={section.to}>
+              <Link to={section.to} activeOptions={{ exact: true }}>
                 {section.label}
               </Link>
             </li>
@@ -453,23 +461,7 @@ export function SettingsPage() {
         </button>
         {error && <p role="alert">{error}</p>}
       </nav>
-      <main>
-        <Switch>
-          <Route path="/api-keys">
-            <ApiKeys />
-          </Route>
-          <Route path="/plugins">
-            <PluginSettings />
-          </Route>
-          <Route path="/sync">
-            <Device />
-          </Route>
-          <Route>
-            {modelsError && <p role="alert">{modelsError}</p>}
-            <Preferences models={models} />
-          </Route>
-        </Switch>
-      </main>
+      <main>{children}</main>
     </div>
   )
 }
