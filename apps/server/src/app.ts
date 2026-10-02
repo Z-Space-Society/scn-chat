@@ -31,8 +31,11 @@ import { type StorageRoutesDeps, storageRoutes } from './storage/routes.ts'
 import { type SyncRoutesDeps, syncRoutes } from './sync/routes.ts'
 import { type TurnRoutesDeps, turnRoutes } from './turns/routes.ts'
 
-/** What the web app's server-side routes receive with each request. */
-export type WebContext = { appName: string }
+/**
+ * What the web app's server-side routes receive with each request: the app name, and a `fetch`
+ * that calls this app in process as the requesting user, for rendering pages with their data.
+ */
+export type WebContext = { appName: string; fetch: typeof fetch }
 
 /** The web app: its built client assets, if any, and a handler that renders every other page. */
 export type Web = {
@@ -126,10 +129,29 @@ export function createApp(deps: AppDeps) {
   const web = deps.web
   if (web) {
     if (web.assets) app.use('*', serveStatic({ root: web.assets }))
-    app.get('*', (c) => web.fetch(c.req.raw, { appName: config.appName }))
+    app.get('*', (c) =>
+      web.fetch(c.req.raw, { appName: config.appName, fetch: inProcessFetch(app, c.req.raw) }),
+    )
   }
 
   return app
 }
 
 export type AppType = ReturnType<typeof createApp>
+
+/**
+ * A `fetch` that calls the app directly, resolving paths against the incoming request and sending
+ * its cookie, so a page renders with the requesting user's session. Pages only read during
+ * rendering, and the session cookie is only set at login, so no response cookies need passing on.
+ */
+export function inProcessFetch(app: Hono<AppEnv>, incoming: Request): typeof fetch {
+  return (input, init) => {
+    const request =
+      input instanceof Request
+        ? new Request(input, init)
+        : new Request(new URL(input, incoming.url), init)
+    const cookie = incoming.headers.get('cookie')
+    if (cookie && !request.headers.has('cookie')) request.headers.set('cookie', cookie)
+    return Promise.resolve(app.fetch(request))
+  }
+}

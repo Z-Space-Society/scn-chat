@@ -2,12 +2,14 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import SqliteDatabase from 'better-sqlite3'
+import { Hono } from 'hono'
 import { Kysely, SqliteDialect } from 'kysely'
 import pino from 'pino'
 import { afterAll, describe, expect, it } from 'vitest'
-import { createApp, type WebContext } from '../src/app.ts'
+import { createApp, inProcessFetch, type WebContext } from '../src/app.ts'
 import type { Db } from '../src/db/index.ts'
 import type { Database } from '../src/db/schema.ts'
+import type { AppEnv } from '../src/env.ts'
 import { testConfig } from './helpers/config.ts'
 import { createSqliteDb, dialects } from './helpers/db.ts'
 
@@ -61,15 +63,47 @@ describe('web app serving', () => {
   })
 
   it('hands other paths to the web app with the app name', async () => {
-    const res = await app.request('/c/some-chat')
+    const res = await app.request('/chat/some-chat')
     expect(res.status).toBe(200)
     expect(await res.text()).toBe('<title>page</title>')
-    expect(rendered.at(-1)).toEqual({ path: '/c/some-chat', context: { appName: 'Test Chat' } })
+    expect(rendered.at(-1)).toMatchObject({
+      path: '/chat/some-chat',
+      context: { appName: 'Test Chat' },
+    })
+  })
+
+  it('lets the web app call the API in process', async () => {
+    await app.request('/settings')
+    const { fetch } = rendered.at(-1)!.context
+    const res = await fetch('/api/health')
+    expect(await res.json()).toEqual({ status: 'ok', appName: 'Test Chat' })
   })
 
   it('returns 404 for unknown API paths', async () => {
     const res = await app.request('/api/nope')
     expect(res.status).toBe(404)
     expect(await res.json()).toEqual({ error: 'NotFound' })
+  })
+})
+
+describe('inProcessFetch', () => {
+  const echo = new Hono<AppEnv>().get('/api/echo', (c) =>
+    c.json({ url: c.req.url, cookie: c.req.header('cookie') ?? null }),
+  )
+
+  it('resolves paths against the page request and sends its cookie', async () => {
+    const page = new Request('https://chat.example/settings', {
+      headers: { cookie: 'session=abc' },
+    })
+    const res = await inProcessFetch(echo, page)('/api/echo')
+    expect(await res.json()).toEqual({
+      url: 'https://chat.example/api/echo',
+      cookie: 'session=abc',
+    })
+  })
+
+  it('sends no cookie when the page request had none', async () => {
+    const res = await inProcessFetch(echo, new Request('https://chat.example/'))('/api/echo')
+    expect(await res.json()).toMatchObject({ cookie: null })
   })
 })
