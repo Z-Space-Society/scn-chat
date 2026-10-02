@@ -35,7 +35,7 @@ The server process runs Hono, and Hono runs Start, so the server and plugins sta
 
 - **Server data.** Query wraps every typed-client call, keyed by route, such as `['models']` or `['preferences']`, from the factories in `src/queries.ts`. Writes are mutations that invalidate the keys they change. A 401 from any call ends the session as before. Queries do not retry or refetch on window focus, so failures show at once, as they did before Query.
 - **Chats.** The chat list is the query `['conversations']`, a conversation is `['conversation', skey]`, and a search is `['search', q]`, all read from the browser store's worker. `StoreProvider` turns the store's change events into invalidations: an `index` change invalidates the chat list, a `conversation` change invalidates that conversation, and any change invalidates searches. Queries wait while the store is held by another tab. Opening a conversation also refreshes it from the PDS through the query `['conversation', skey, 'refresh']`, whose changes come back as store events.
-- **URL state.** On chat routes, `m` names a focused message and `q` holds the search term. Choosing a sibling replaces `m` with that sibling, so the URL always names the branch on screen, and reloading, going back, or sharing the link keeps it.
+- **URL state.** On a conversation, and on a shared conversation, `m` names a focused message, and the branch on screen is its ancestors, then the newest sibling at each level below it. Choosing a sibling, regenerating, or editing replaces `m` with the chosen message, so the URL always names the branch on screen, and reloading or sharing the link keeps it. On every chat route, `q` holds the sidebar search: the box starts from it, and the search goes back into it once typing pauses. Both replace the history entry rather than adding one, and the routes validate them in `src/lib/search-params.ts`.
 
 ### Routes
 
@@ -102,7 +102,10 @@ While the reader is at the bottom of the conversation, it stays scrolled to the 
 - Unknown paths get a 404 from the server, and the client then redirects them to `/`.
 - Chats are never server-rendered. Doing so would read the conversation from the PDS on every navigation and duplicate the browser store.
 - The default branch is the newest sibling at each level, matching how ChatGPT shows the latest regeneration.
-- `m` keeps the name search links already used. One focused message is enough to name a branch, since its ancestors are fixed and everything below it follows the newest sibling.
+- `m` keeps the name search links already used. One focused message is enough to name a branch, since its ancestors are fixed and everything below it follows the newest sibling. So choosing a sibling high in the conversation resets the levels below it to their newest, rather than remembering earlier choices there.
+- Opening a conversation with `m`, from a link or a reload, scrolls to that message. Choosing a message on screen does not, so switching siblings keeps the reader's place.
+- The router parses search values as JSON, so the validators turn a number back into text, as for a search of `2024`.
+- The store's search hook is `useChatSearch`, apart from the router's `useSearch`.
 - Write routes read JSON without validators, so the typed client sends bodies through its request options. Response types still come from the server's routes.
 - The `read` helper returns the body of the successful responses and throws an `ApiError` with the server's message otherwise.
 - Where a screen shows one error for several actions, it shows the error of the action that ran last, so a later success clears an earlier failure.
@@ -120,6 +123,7 @@ While the reader is at the bottom of the conversation, it stays scrolled to the 
 - [ ] Creating a chat, sending a message, and watching the reply stream works end to end.
 - [ ] The chat list shows new titles once they are generated.
 - [ ] Sibling controls switch branches and show the matching replies, and reloading the page keeps the chosen branch.
+- [ ] Reloading during a search keeps the search and its results.
 - [ ] Regenerating adds a sibling reply and selects it.
 - [ ] Editing a message adds a sibling user message with its own reply.
 - [ ] Stop cancels a generating reply, which then shows as stopped.
