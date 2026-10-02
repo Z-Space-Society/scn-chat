@@ -6,4 +6,4 @@ The web app is built on TanStack Start with SSR, but Hono stays the process owne
 
 - Hono stays the only API. There are no Start server functions, so auth, origin checks, and error mapping live in one place. During SSR, loaders reach Hono in process through the request context, never by importing server code.
 - Only the shell, login, settings, and the session redirect are server-rendered. Chat and shared routes are `ssr: false`, since their data lives in the browser's local copy, and rendering them on the server would mean reading chats from the PDS on every navigation.
-- The dev setup depends on Start's undocumented `installDevServerMiddleware` option, so Start is pinned to an exact version. If it disappears, the fallback is importing Start's server entry through Vite's SSR runner, as the plugin does internally.
+- In development the server imports Start's server entry through Vite's SSR runner, by Start's internal virtual module ID, as Start's own dev middleware does. That middleware cannot pass a request context, so Start is pinned to an exact version in case the ID changes.

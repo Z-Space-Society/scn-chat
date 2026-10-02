@@ -2,7 +2,7 @@
 
 ## Summary
 
-A conversation's owner can share it read-only with specific people, by handle, or with anyone who has an atproto account. Sharing changes the conversation space's read policy and member list through `com.atproto.simplespace`, so the owner's PDS enforces it for every app, not just ours. A shared conversation opens at `/s/<ownerDid>/<skey>`. The viewer signs in, and the server reads the conversation with the viewer's own space credential, so the owner's PDS decides whether the viewer may see it. Sharing needs spaces on both sides: fallback users can neither share nor view shared chats.
+A conversation's owner can share it read-only with specific people, by handle, or with anyone who has an atproto account. Sharing changes the conversation space's read policy and member list through `com.atproto.simplespace`, so the owner's PDS enforces it for every app, not just ours. A shared conversation opens at `/shared/<ownerDid>/<skey>`. The viewer signs in, and the server reads the conversation with the viewer's own space credential, so the owner's PDS decides whether the viewer may see it. Sharing needs spaces on both sides: fallback users can neither share nor view shared chats.
 
 ## Motivation
 
@@ -45,7 +45,7 @@ Attachments in a shared conversation are fetched the same way, with `getBlob` an
 
 ### Web UI
 
-The conversation view has a share control showing the mode and members, with a copyable `/s/<ownerDid>/<skey>` link. It is hidden for fallback users. The shared view shows the conversation with branch navigation, the owner's handle, and no composer, regenerate, or edit controls.
+The conversation view has a share control showing the mode and members, with a copyable `/shared/<ownerDid>/<skey>` link. It is hidden for fallback users. The shared view shows the conversation with branch navigation, the owner's handle, and no composer, regenerate, or edit controls.
 
 ## Scope Boundaries
 

@@ -27,9 +27,9 @@ The first build used Vite and React with `wouter` and hand-written data hooks. I
 The server process runs Hono, and Hono runs Start, so the server and plugins stay unbundled on Node's type stripping.
 
 - **Production.** `vite build` writes `apps/web/dist/client` and `apps/web/dist/server/server.js`, whose default export is a fetch handler. Hono answers `/api`, `/oauth`, `/oauth-client-metadata.json`, `/xrpc`, and `/.well-known` first, then serves files from `dist/client`, then passes every other request to Start's handler.
-- **Development.** The same server entry creates Vite in middleware mode with Start's `installDevServerMiddleware` option, and passes every request Hono does not answer to Vite's middlewares. `pnpm dev` runs one process on one port, with no proxy.
+- **Development.** The same server entry creates Vite in middleware mode on the server's HTTP server, so HMR shares its port. Each request goes through Vite's middlewares first, which serve modules and call on for everything else. Pages go to Start's server entry, which the server imports through Vite's SSR runner on each request, so web edits apply without a restart. `pnpm dev` runs one process on one port, with no proxy.
 - **Request context.** Hono passes Start a context holding the Hono app and the configured app name. During server rendering, the typed client calls the Hono app in process through it, forwarding the request's cookie, and the root route reads the app name from it for the page title and `application-name` meta tag.
-- `@tanstack/react-start` is pinned to an exact version, since the dev setup relies on an undocumented option.
+- `@tanstack/react-start` is pinned to an exact version, since the dev setup imports Start's server entry by its internal virtual module ID, `virtual:tanstack-start-server-entry`, as Start's own dev middleware does.
 
 ### Data
 
@@ -43,8 +43,8 @@ The server process runs Hono, and Hono runs Start, so the server and plugins sta
 |---|---|---|
 | `/login` | A handle field and a sign-in button that goes to `/oauth/login` | Yes |
 | `/` | Chat list sidebar, and a new chat | No |
-| `/c/:skey` | Chat list sidebar and a conversation | No |
-| `/s/:ownerDid/:skey` | A shared conversation, read-only | No |
+| `/chat/:skey` | Chat list sidebar and a conversation | No |
+| `/shared/:ownerDid/:skey` | A shared conversation, read-only | No |
 | `/settings` | Preferences, with a sidebar linking to each settings section | Yes |
 | `/settings/api-keys`, `/settings/plugins`, `/settings/sync` | The other settings sections | Yes |
 
@@ -94,6 +94,10 @@ While the reader is at the bottom of the conversation, it stays scrolled to the 
 - The Markdown renderer builds React elements rather than injecting HTML, so it needs no separate sanitizer. A theme may restyle it.
 - The typed Hono client comes from the server's route types, so the web app and server share one definition of the API. On the server it calls the Hono app in process, and in the browser it uses `fetch`, so there is one client for both.
 - The web app never imports server code. Start reaches Hono only through the request context, so the server never enters Vite's module graph or reloads on HMR.
+- In development the server imports Start's server entry itself rather than letting Start install its dev middleware, because that middleware calls the entry without a request context.
+- Vite loads its config through its module runner. The default loader imports a temporary bundle of the config, which `node --watch` sees and restarts on in a loop.
+- With no `index.html`, Vite's dependency scan starts from the route files. Otherwise a dependency first seen when a split route loads makes Vite re-optimize mid-load, and that route fails to import.
+- Unknown paths get a 404 from the server, and the client then redirects them to `/`.
 - Chats are never server-rendered. Doing so would read the conversation from the PDS on every navigation and duplicate the browser store.
 - The default branch is the newest sibling at each level, matching how ChatGPT shows the latest regeneration.
 - `m` keeps the name search links already used. One focused message is enough to name a branch, since its ancestors are fixed and everything below it follows the newest sibling.
