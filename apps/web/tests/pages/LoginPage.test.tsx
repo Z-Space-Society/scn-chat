@@ -1,8 +1,6 @@
 import { render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { LoginPage } from '../../src/pages/LoginPage.tsx'
-
-afterEach(() => window.history.replaceState(null, '', '/'))
 
 describe('LoginPage', () => {
   it('starts OAuth with the handle', () => {
@@ -13,8 +11,7 @@ describe('LoginPage', () => {
   })
 
   it('shows a sign-in error from the server', () => {
-    window.history.replaceState(null, '', '/login?error=invalid_scope')
-    render(<LoginPage />)
+    render(<LoginPage error="invalid_scope" />)
     expect(screen.getByRole('alert')).toHaveTextContent('invalid_scope')
   })
 })
