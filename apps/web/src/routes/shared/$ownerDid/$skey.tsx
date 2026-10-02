@@ -1,8 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { validateBranchSearch } from '../../../lib/search-params.ts'
 import { SharedPage } from '../../../pages/SharedPage.tsx'
 import { useSession } from '../../../session.tsx'
 
-export const Route = createFileRoute('/shared/$ownerDid/$skey')({ component: Shared })
+export const Route = createFileRoute('/shared/$ownerDid/$skey')({
+  validateSearch: validateBranchSearch,
+  component: Shared,
+})
 
 function Shared() {
   const { ownerDid, skey } = Route.useParams()
