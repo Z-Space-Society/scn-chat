@@ -43,7 +43,7 @@ async function readLimited(
 export type BlobRoutesDeps = {
   blobsFor: (account: Parameters<ChatServices['forAccount']>[0]) => BlobStore
   services: ChatServices
-  ingesters: IngesterRegistry
+  ingesters: () => IngesterRegistry
   logger: Logger
 }
 
@@ -52,7 +52,7 @@ export function blobRoutes(deps: BlobRoutesDeps) {
   return new Hono<AppEnv>()
     .use(requireUser)
     .get('/attachments/types', (c) =>
-      c.json({ images: [...IMAGE_TYPES], files: deps.ingesters.accepted() }),
+      c.json({ images: [...IMAGE_TYPES], files: deps.ingesters().accepted() }),
     )
     .post('/attachments', async (c) => {
       const { account } = signedInUser(c)
@@ -67,7 +67,7 @@ export function blobRoutes(deps: BlobRoutesDeps) {
       if (name.length > MAX_NAME_LENGTH)
         return c.json({ error: 'InvalidRequest', message: 'Filename is too long' }, 400)
       const image = IMAGE_TYPES.has(mimeType)
-      const ingester = image ? undefined : deps.ingesters.match(mimeType)
+      const ingester = image ? undefined : deps.ingesters().match(mimeType)
       if (!image && !ingester)
         return c.json(
           { error: 'UnsupportedMediaType', message: `Files of type ${mimeType} are not supported` },

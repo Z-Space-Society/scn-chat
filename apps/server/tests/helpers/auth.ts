@@ -3,11 +3,11 @@ import pino from 'pino'
 import { vi } from 'vitest'
 import type { IdentityResolver } from '../../src/auth/identity.ts'
 import type { OAuthClientLike } from '../../src/auth/oauth-client.ts'
-import { createRoles } from '../../src/auth/roles.ts'
 import type { AuthDeps } from '../../src/auth/routes.ts'
 import { buildScope } from '../../src/auth/scope.ts'
 import type { Db } from '../../src/db/index.ts'
 import { testConfig } from './config.ts'
+import { testAccess } from './settings.ts'
 
 export const ORIGIN = 'http://127.0.0.1:3000'
 
@@ -52,7 +52,7 @@ export function authDeps(db: Db, overrides: Partial<AuthDeps> = {}): AuthDeps {
     logger: pino({ level: 'silent' }),
     oauth: fakeOAuth(),
     identity: fakeIdentity(),
-    roles: createRoles({ staff: ['did:plc:alice'] }),
+    ...testAccess(db),
     scope: buildScope('raw'),
     ...overrides,
   }

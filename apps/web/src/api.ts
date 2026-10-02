@@ -1,4 +1,5 @@
 import type {
+  AdminApi,
   AuthApi,
   BlobsApi,
   PluginsApi,
@@ -9,7 +10,7 @@ import type {
 } from '@scn-chat/server/api-types'
 import { type ClientResponse, hc } from 'hono/client'
 import type { SuccessStatusCode } from 'hono/utils/http-status'
-import { errorMessage } from './lib/response.ts'
+import { errorDetails, type Issue } from './lib/response.ts'
 
 /** Clients for calling the hono server's /api routes. **/
 export const api = {
@@ -20,6 +21,7 @@ export const api = {
   plugins: hc<PluginsApi>('/api/plugins'),
   blobs: hc<BlobsApi>('/api'),
   sharing: hc<SharingApi>('/api'),
+  admin: hc<AdminApi>('/api/admin'),
 }
 
 /** Build the request options for a JSON body with api calls. */
@@ -37,11 +39,14 @@ export function onUnauthorized(listener: () => void): () => void {
 
 export class ApiError extends Error {
   readonly status: number
+  /** Problems with individual form fields. */
+  readonly issues: Issue[]
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, issues: Issue[] = []) {
     super(message)
     this.name = 'ApiError'
     this.status = status
+    this.issues = issues
   }
 }
 
@@ -60,9 +65,9 @@ export async function read<R extends ClientResponse<unknown, number, string>>(
   const res = await response
   if (res.status === 401) for (const listener of unauthorized) listener()
   if (!res.ok) {
-    const message = await errorMessage(res)
+    const { message, issues } = await errorDetails(res)
     if (res.status !== 401) console.error(`Request failed: ${res.status} ${res.url}`, message)
-    throw new ApiError(res.status, message)
+    throw new ApiError(res.status, message, issues)
   }
   return (await res.json()) as SuccessBody<R>
 }

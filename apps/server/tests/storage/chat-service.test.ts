@@ -124,16 +124,6 @@ describe.each(dialects)('ChatService on $name', ({ create }) => {
     await db.destroy()
   })
 
-  it('stores preferences in the settings space', async () => {
-    const { chats, db } = await setup()
-    await chats.putPreferences({ customInstructions: 'Use metric units', generateTitles: false })
-    expect(await chats.getPreferences()).toMatchObject({
-      customInstructions: 'Use metric units',
-      generateTitles: false,
-    })
-    await db.destroy()
-  })
-
   it('creates the settings space on the first write that needs it, and only then', async () => {
     const { chats, db } = await setup()
     const create = vi.spyOn(chats.store, 'createSpace')

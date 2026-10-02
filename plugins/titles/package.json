@@ -1,6 +1,10 @@
 {
   "name": "@scn-chat/plugin-titles",
   "version": "0.0.0",
+  "description": "Writes a short title for each conversation after its first reply.",
+  "keywords": [
+    "scn-chat-plugin"
+  ],
   "private": true,
   "type": "module",
   "exports": "./src/index.ts",

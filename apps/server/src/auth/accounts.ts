@@ -9,7 +9,13 @@ export type Account = {
   storageMode: StorageMode
   backgroundSync: boolean
   lastActiveAt: string
+  /** Signed in only to view shared chats, and never set up for the chat app. */
+  viewerOnly: boolean
+  suspension: Suspension | null
 }
+
+/** Who suspended an account, an admin's DID or plugin:<id>, and why. */
+export type Suspension = { at: string; by: string; reason: string | null }
 
 export class SpacesLostError extends Error {
   constructor() {
@@ -27,6 +33,10 @@ type AccountRow = {
   storage_mode: StorageMode
   background_sync: number
   last_active_at: string
+  viewer_only: number
+  suspended_at: string | null
+  suspended_by: string | null
+  suspended_reason: string | null
 }
 
 function toAccount(row: AccountRow): Account {
@@ -37,22 +47,46 @@ function toAccount(row: AccountRow): Account {
     storageMode: row.storage_mode,
     backgroundSync: row.background_sync === 1,
     lastActiveAt: row.last_active_at,
+    viewerOnly: row.viewer_only === 1,
+    suspension: row.suspended_at
+      ? { at: row.suspended_at, by: row.suspended_by ?? '', reason: row.suspended_reason }
+      : null,
   }
 }
 
 export async function getAccount(db: Db, did: string): Promise<Account | undefined> {
   const row = await db
     .selectFrom('account')
-    .select(['did', 'handle', 'pds_url', 'storage_mode', 'background_sync', 'last_active_at'])
+    .select([
+      'did',
+      'handle',
+      'pds_url',
+      'storage_mode',
+      'background_sync',
+      'last_active_at',
+      'viewer_only',
+      'suspended_at',
+      'suspended_by',
+      'suspended_reason',
+    ])
     .where('did', '=', did)
     .executeTakeFirst()
   return row ? toAccount(row) : undefined
 }
 
-/** Record a login, choosing the storage mode for new accounts and keeping it for existing ones. */
+/**
+ * Record a login, choosing the storage mode for new accounts and keeping it for existing ones.
+ * A viewer login marks a new account viewer-only, and a full login clears the mark.
+ */
 export async function recordLogin(
   db: Db,
-  login: { did: string; handle: string | null; pdsUrl: string; spacesAllowed: boolean },
+  login: {
+    did: string
+    handle: string | null
+    pdsUrl: string
+    spacesAllowed: boolean
+    viewer?: boolean
+  },
   now = new Date(),
 ): Promise<Account> {
   const existing = await getAccount(db, login.did)
@@ -71,6 +105,7 @@ export async function recordLogin(
       created_at: at,
       last_login_at: at,
       last_active_at: at,
+      viewer_only: login.viewer ? 1 : 0,
     })
     .onConflict((oc) =>
       oc.column('did').doUpdateSet({
@@ -78,6 +113,7 @@ export async function recordLogin(
         pds_url: login.pdsUrl,
         last_login_at: at,
         last_active_at: at,
+        ...(login.viewer ? {} : { viewer_only: 0 }),
       }),
     )
     .execute()
@@ -102,4 +138,35 @@ export async function setBackgroundSync(db: Db, did: string, enabled: boolean): 
     .set({ background_sync: enabled ? 1 : 0 })
     .where('did', '=', did)
     .execute()
+}
+
+/** Suspend an account that isn't suspended yet. Returns true if status changed. */
+export async function suspendAccount(
+  db: Db,
+  did: string,
+  by: string,
+  reason?: string,
+): Promise<boolean> {
+  const result = await db
+    .updateTable('account')
+    .set({
+      suspended_at: new Date().toISOString(),
+      suspended_by: by,
+      suspended_reason: reason?.trim() || null,
+    })
+    .where('did', '=', did)
+    .where('suspended_at', 'is', null)
+    .executeTakeFirst()
+  return result.numUpdatedRows > 0n
+}
+
+/** Restore a suspended account. Returns whether it changed. */
+export async function restoreAccount(db: Db, did: string): Promise<boolean> {
+  const result = await db
+    .updateTable('account')
+    .set({ suspended_at: null, suspended_by: null, suspended_reason: null })
+    .where('did', '=', did)
+    .where('suspended_at', 'is not', null)
+    .executeTakeFirst()
+  return result.numUpdatedRows > 0n
 }

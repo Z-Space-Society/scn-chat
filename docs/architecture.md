@@ -50,6 +50,12 @@ The storage type is chosen on first login and currently cannot be changed. So if
 
 See [specs/auth.md](../specs/auth.md).
 
+## Settings and the admin area
+
+Configure `.env` before first run. Bootstrap settings and secrets. The rest of the settings, plugins, models, roles, users, etc., can be configured in **Settings** > **Admin**.
+
+Changes in the admin area apply without restarting the server.
+
 ## Plugins
 
-The system is built to support custom model providers, tools, file ingesters, and support a hook system. These are configured in `config.yml` and loaded startup. See [plugins.md](plugins.md).
+The system is built to support custom model providers, tools, file ingesters, and support a hook system. Plugins are installed with the server and configured in the admin area. See [plugins.md](plugins.md).

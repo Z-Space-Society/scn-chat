@@ -62,22 +62,14 @@ describe('isPrivateAddress', () => {
 })
 
 describe('createGuardedFetch', () => {
-  it('refuses a private IP literal before connecting', async () => {
-    await expect(createGuardedFetch()(`http://127.0.0.1:${port}/ok`)).rejects.toBeInstanceOf(
+  it.each([
+    ['an IPv4', '127.0.0.1'],
+    ['a bracketed IPv6', '[::1]'],
+    ['an IPv4-mapped IPv6', '[::ffff:127.0.0.1]'],
+  ])('refuses %s private literal before connecting', async (_kind, host) => {
+    await expect(createGuardedFetch()(`http://${host}:${port}/ok`)).rejects.toBeInstanceOf(
       PrivateNetworkError,
     )
-  })
-
-  it('refuses a bracketed IPv6 loopback literal', async () => {
-    await expect(createGuardedFetch()('http://[::1]:8080/')).rejects.toBeInstanceOf(
-      PrivateNetworkError,
-    )
-  })
-
-  it('refuses an IPv4-mapped IPv6 literal', async () => {
-    await expect(
-      createGuardedFetch()(`http://[::ffff:127.0.0.1]:${port}/ok`),
-    ).rejects.toBeInstanceOf(PrivateNetworkError)
   })
 
   it('refuses a hostname that resolves to a private address', async () => {

@@ -3,6 +3,7 @@ import { Redirect, Route, Switch, useLocation } from 'wouter'
 import { ApiError, api, onUnauthorized, read } from './api.ts'
 import { messageOf } from './components/useAction.ts'
 import { syncTimeZone } from './lib/time-zone.ts'
+import { AdminPage } from './pages/AdminPage.tsx'
 import { ChatPage } from './pages/ChatPage.tsx'
 import { LoginPage } from './pages/LoginPage.tsx'
 import { SettingsPage } from './pages/SettingsPage.tsx'
@@ -58,6 +59,9 @@ function SignedIn({ me }: { me: Me }) {
           <Route path="/settings" nest>
             <SettingsPage />
           </Route>
+          <Route path="/admin" nest>
+            {me.admin ? <AdminPage /> : <Redirect to="~/" />}
+          </Route>
           <Route path="/login">
             <Redirect to="/" />
           </Route>
@@ -83,8 +87,31 @@ export function App() {
           <SharedPage ownerDid={params.ownerDid} skey={params.skey} signedIn={signedIn} />
         )}
       </Route>
-      <Route>{signedIn ? <SignedIn me={session.me} /> : <SignedOut />}</Route>
+      <Route>
+        {!signedIn ? (
+          <SignedOut />
+        ) : session.me.access === 'viewer' ? (
+          <ViewerOnly message={session.me.accessMessage} />
+        ) : (
+          <SignedIn me={session.me} />
+        )}
+      </Route>
     </Switch>
+  )
+}
+
+/** UI fo users signed in only to view shared chats. */
+function ViewerOnly({ message }: { message: string | null }) {
+  const signOut = () =>
+    read(api.auth.logout.$post())
+      .catch((err: unknown) => console.error('Could not sign out', err))
+      .finally(() => location.assign('/login'))
+  return (
+    <LoginPage notice={message}>
+      <button type="button" onClick={signOut}>
+        Sign out
+      </button>
+    </LoginPage>
   )
 }
 

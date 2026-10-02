@@ -11,7 +11,7 @@ An AI assistant chat app where each conversation is an atproto permissioned spac
 - `plugins/` holds the shipped plugins.
 - `docs/architecture.md` is the human-facing architecture overview, and `docs/plugins.md` the plugin author guide. Update them when a change affects what they describe.
 - `pnpm dev` runs the server and Vite together. `pnpm check` runs lint, type checking, and every test. `pnpm codegen` regenerates the lexicon code after a lexicon change, and `pnpm publish-lexicons <handle>` publishes the lexicons from the lexicon authority account. `pnpm keys` prints fresh secrets.
-- Local setup: copy `config.example.yml` to `config.yml` for public settings and plugins, and `.env.example` to `.env` for secrets, filled in from `pnpm keys`. Secrets never go in `config.yml`; it references them as `${NAME}`.
+- Local setup: copy `.env.example` to `.env`, fill in the secrets from `pnpm keys`, and put your DID in `ADMIN_DIDS`. Plugins, models, roles, and every other runtime setting are configured in the admin area at `/admin`.
 - Server tests run on both SQLite and PGlite through `tests/helpers/db.ts`. `tests/helpers/fake-pds.ts` is a fake spaces PDS with real error codes, policies, and signed commits.
 
 ## The founding principle
@@ -30,7 +30,8 @@ These are settled. Raise a concern before working against any of them.
 - The browser keeps its own local copy of the user's chats in SQLite compiled to WebAssembly, for the chat list, the open conversation, and search. That copy lives on the user's device, not on the server.
 - BYO API keys are stored encrypted in the app database, never in records.
 - Providers, tools, file ingesters, and turn hooks are plugins. Web search, fetch, and image generation are plugins, not core.
-- The project is meant to be forked. Code refers to lexicon NSIDs only through one generated module, and app name, URLs, OAuth metadata, and admin models come from `config.yml`.
+- The project is meant to be forked. Code refers to lexicon NSIDs only through one generated module. URLs and OAuth settings come from the environment, and the app name and admin models from the admin area.
+- Each setting lives in exactly one place: the environment for what the server needs before its database is open, and the app database, edited in the admin area, for everything else. Never let both hold the same setting.
 
 ## Planned stack
 
@@ -38,7 +39,7 @@ TypeScript throughout, as a pnpm workspace on Node 24 LTS, run natively with Nod
 
 Prefer existing libraries over writing our own, especially the official `@atproto/*` packages for anything protocol related. Dependencies must have licenses compatible with MIT.
 
-Admins configure plugins, global models, roles, and every other public setting in `config.yml`, with secrets in `.env`. Roles gate which admin models a user may use. There is no admin UI yet.
+Admins configure plugins, global models, roles, access, and every other runtime setting in the admin area, and changes apply without a restart. `.env` holds the secrets and the settings needed at startup, including `ADMIN_DIDS`, the admins no edit can remove. A registration mode decides who may create an account, and once someone has one they keep access until suspended. Roles gate invites, admin models, and admin-paid tools such as the admin's web search engine. Installing plugin packages stays outside the web UI: a plugin is a dependency of the root `package.json` with the `scn-chat-plugin` keyword.
 
 The web UI must stay barebones with minimal code and styling. A separate designer will build the real interface on top of it.
 

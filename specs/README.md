@@ -24,9 +24,6 @@ The overview at the end of this file lists every spec and whether it is active, 
 
 ### Planned
 
-- [[admin]]
-- [[admin-plugins]]
-- [[admin-settings]]
 - [[encrypted-conversations]]
 
 ### Completed
@@ -49,3 +46,6 @@ After the initial build-out:
 
 - [[search]]
 - [[web-search]]
+- [[admin]]
+- [[admin-plugins]]
+- [[admin-settings]]

@@ -3,7 +3,7 @@ import { sql } from 'kysely'
 import { describe, expect, it, vi } from 'vitest'
 import { createApp } from '../../src/app.ts'
 import { buildScope } from '../../src/auth/scope.ts'
-import { resolveSyncConfig } from '../../src/sync/scheduler.ts'
+import { settingSchemas } from '../../src/settings/schemas.ts'
 import {
   authDeps,
   fakeOAuth,
@@ -38,7 +38,7 @@ async function setup(storageMode: 'space' | 'local', syncOptions = {}) {
       services: h.services,
       events: h.events,
       engine: engine as never,
-      syncConfig: resolveSyncConfig(syncOptions),
+      sync: () => settingSchemas.sync.parse(syncOptions),
       logger: h.logger,
     },
   })

@@ -7,18 +7,23 @@ import pino from 'pino'
 import { afterAll, describe, expect, it } from 'vitest'
 import { createApp } from '../src/app.ts'
 import type { Db } from '../src/db/index.ts'
+import { migrateToLatest } from '../src/db/migrate.ts'
 import type { Database } from '../src/db/schema.ts'
+import { SettingsStore } from '../src/settings/store.ts'
 import { testConfig } from './helpers/config.ts'
 import { createSqliteDb, dialects } from './helpers/db.ts'
 import { pdsError } from './helpers/pds-errors.ts'
 
 const config = testConfig()
 const logger = pino({ level: 'silent' })
+const named = (db: Db, appName: string) => new SettingsStore(db, logger, { general: { appName } })
 
 describe.each(dialects)('GET /api/health on $name', ({ create }) => {
   it('returns 200 with the app name when the database is reachable', async () => {
     const db = create()
-    const res = await createApp({ config, db, logger }).request('/api/health')
+    const res = await createApp({ config, db, logger, settings: named(db, 'Test Chat') }).request(
+      '/api/health',
+    )
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ status: 'ok', appName: 'Test Chat' })
     await db.destroy()
@@ -39,37 +44,30 @@ describe('GET /api/health', () => {
 describe('production static serving', () => {
   const webDist = mkdtempSync(join(tmpdir(), 'scn-web-'))
   writeFileSync(join(webDist, 'index.html'), '<!doctype html><title>index</title>')
-  writeFileSync(join(webDist, 'app.js'), 'console.log(1)')
   afterAll(() => rmSync(webDist, { recursive: true, force: true }))
   const db = createSqliteDb()
   const app = createApp({ config, db, logger, webDist })
 
-  it('serves built files', async () => {
-    const res = await app.request('/app.js')
-    expect(res.status).toBe(200)
-    expect(await res.text()).toBe('console.log(1)')
-  })
-
-  it('falls back to index.html for unknown non-API paths', async () => {
-    const res = await app.request('/c/some-chat')
-    expect(res.status).toBe(200)
-    expect(await res.text()).toContain('<title>index</title>')
-  })
-
-  it('fills the app name into index.html, escaped', async () => {
+  it('serves index.html for app paths, with the app name filled in and escaped', async () => {
     const dist = mkdtempSync(join(tmpdir(), 'scn-web-'))
     writeFileSync(join(dist, 'index.html'), '<title>__APP_NAME__</title>')
-    const named = createApp({
-      config: { ...config, appName: 'Chat & <Co>' },
-      db,
-      logger,
-      webDist: dist,
-    })
+    const app = createApp({ config, db, logger, settings: named(db, 'Chat & <Co>'), webDist: dist })
     for (const path of ['/', '/index.html', '/c/some-chat']) {
-      expect(await (await named.request(path)).text()).toBe(
-        '<title>Chat &#38; &#60;Co&#62;</title>',
-      )
+      expect(await (await app.request(path)).text()).toBe('<title>Chat &#38; &#60;Co&#62;</title>')
     }
+    rmSync(dist, { recursive: true, force: true })
+  })
+
+  it('shows a renamed app without a restart', async () => {
+    const dist = mkdtempSync(join(tmpdir(), 'scn-web-'))
+    writeFileSync(join(dist, 'index.html'), '<title>__APP_NAME__</title>')
+    const migrated = createSqliteDb()
+    await migrateToLatest(migrated)
+    const settings = named(migrated, 'Before')
+    const app = createApp({ config, db: migrated, logger, settings, webDist: dist })
+    await settings.set('general', { appName: 'After' }, 'did:plc:admin')
+    expect(await (await app.request('/')).text()).toBe('<title>After</title>')
+    expect(await (await app.request('/api/health')).json()).toMatchObject({ appName: 'After' })
     rmSync(dist, { recursive: true, force: true })
   })
 

@@ -20,7 +20,7 @@ A restart on every save would drop every reply being streamed. Rebuilding the pl
 
 A plugin package is installed when it is listed in the `dependencies` of the root `package.json` and its own `package.json` has the keyword `scn-chat-plugin`. Every shipped plugin gets the keyword. Packages are resolved from the repository root. A fork adds a plugin with `pnpm add`, or with a `workspace:` or `file:` dependency for a local one. Local `./` specifiers are no longer supported, since a dependency covers them.
 
-`apps/server/src/plugins/installed.ts` lists the installed plugins at startup, importing each package once. Each entry has the package name, the `description` and `version` from its `package.json`, and the JSON schema of its `optionsSchema`, from `z.toJSONSchema`. A package without `optionsSchema` gets an empty schema and takes no options. A dependency with the keyword but no default export factory is logged as an error and left out.
+`apps/server/src/plugins/installed.ts` lists the installed plugins at startup, importing each package once. Each entry has the package name, the `description` and `version` from its `package.json`, and the JSON schema of its `optionsSchema`, from `z.toJSONSchema`. A package without `optionsSchema` gets an empty schema and takes no options. A package can be added once, unless it exports `multipleInstances = true`, as the OpenAI-compatible plugin does for each endpoint. Adding a second instance of any other package is refused with "<package> is already added, and can only be added once". A dependency with the keyword but no default export factory is logged as an error and left out.
 
 ### Plugin instances
 
@@ -62,12 +62,12 @@ interface RuntimeHolder {
 
 ### Saving
 
-Every change to plugin instances, whether adding, editing, reordering, enabling, disabling, or deleting, goes through one path:
+Every change to plugin instances, whether adding, editing, reordering, enabling, disabling, or deleting, goes through one path, one change at a time:
 
-1. Validate the changed instance's options against the package's `optionsSchema`. Failures return 400 with `{ error: 'InvalidRequest', issues }`, with issue paths pointing at option fields. Refinements that span fields, like web search requiring a key for Brave, come back the same way.
-2. Build a candidate runtime from the full proposed instance list. A factory or `setup` that throws, a duplicate plugin ID, a duplicate provider, tool, or ingester, or an unsupported plugin API version returns 400 with the error, and nothing changes. The candidate is closed.
+1. Build a candidate runtime from the full proposed instance list, the same way startup does, recording each instance that fails.
+2. Refuse the change, with 400 and nothing changed, when the changed instance failed, or an instance that is loaded now would fail, or a loaded instance's plugin ID would change. Invalid options come back with `{ error: 'InvalidRequest', issues }`, with issue paths pointing at option fields. Refinements that span fields, like web search requiring a key for Brave, come back the same way. A factory or `setup` that throws, a duplicate plugin ID, a duplicate provider, tool, role source, or ingester, or an unsupported plugin API version comes back as the message.
 3. Check the admin models against the candidate, as described below. A model left without its provider refuses the change.
-4. Write the instances in one transaction, then swap the candidate in.
+4. Write the instances in one transaction, then swap the candidate in. A refused candidate is closed.
 
 ### Startup
 
@@ -103,13 +103,13 @@ admin_model (
 | Route | Purpose |
 |---|---|
 | `GET /api/admin/plugins/installed` | Installed plugin packages, with description, version, and options schema. |
-| `GET /api/admin/plugins` | Plugin instances in order, each with its ID, package, plugin ID and name when loaded, enabled flag, options without secrets, the names of secret fields that are set, the options schema, and its status, `loaded`, `disabled`, or `failed` with the error. |
+| `GET /api/admin/plugins` | Plugin instances in order, each with its ID, package, plugin ID and name when loaded, enabled flag, options without secrets, the names of secret fields that are set, the options schema, the providers it registered, and its status, `loaded`, `disabled`, or `failed` with the error and issues. |
 | `POST /api/admin/plugins` | Add an instance from `{ package, options }`, at the end. |
 | `PUT /api/admin/plugins/:id` | Change `{ options, clearSecrets, enabled }`. |
 | `DELETE /api/admin/plugins/:id` | Remove an instance. |
 | `PUT /api/admin/plugins/order` | Reorder from `{ ids }`, which must list every instance. |
 | `GET /api/admin/models` | Admin models in order, with a warning on any whose provider isn't loaded. |
-| `POST /api/admin/models`, `PUT /api/admin/models/:provider/:id`, `DELETE /api/admin/models/:provider/:id` | Add, change, and remove admin models. |
+| `POST /api/admin/models`, `PUT /api/admin/models`, `DELETE /api/admin/models` | Add, change, and remove admin models. The provider and model ID are in the body. |
 | `PUT /api/admin/models/order` | Reorder from a list of `{ provider, id }`. |
 | `POST /api/admin/plugins/list-models` | A provider's models from `{ package, instanceId?, options }`, using the form's options, with blank secrets taken from the instance. |
 
@@ -117,8 +117,10 @@ admin_model (
 
 Two sections join the admin sidebar:
 
-- **Plugins** (`/admin/plugins`). One block per instance, in order, with the plugin's name and package, its status and error, the options form generated from the schema with `SchemaFields`, an Enabled checkbox, up and down buttons, and Remove. Each block has its own Save, since each save rebuilds the runtime and can fail on its own. Secret fields show "set" when a value is stored, and a "Clear" checkbox. An "Add plugin" control at the end picks an installed package and shows its form.
-- **Models in provider blocks.** A provider's block lists its admin models below the options form, each with name, capabilities, roles, and Remove, plus the Refresh button and the list of models to tick. Models save through the models routes, separately from the plugin's options.
+- **Plugins** (`/admin/plugins`). The instances in load order, each with its name linking to its page, its package, its status and error, and up and down buttons, then an "Add plugin" link.
+- **A plugin's page** (`/admin/plugins/:id`). A link back to the list, the plugin's status and error, the options form generated from the schema with `SchemaFields`, an Enabled checkbox, Save, and "Remove plugin", which goes back to the list. Each plugin saves on its own, since each save rebuilds the runtime and can fail on its own. Secret fields show "set" when a value is stored, and a "Clear" checkbox.
+- **Adding a plugin** (`/admin/plugins/new`). A link back to the list, a picker of the installed packages that aren't added yet or allow more than one instance, the chosen package's description and form, and Add, which opens the new plugin's page.
+- **Models on a provider's page.** A provider plugin's page lists its admin models below the options form, each with name, capabilities, roles, and Remove, plus the Refresh button and the list of models to tick. Models save through the models routes, separately from the plugin's options.
 - **Models** (`/admin/models`). The admin models from every provider in one list, for picking the default and setting the order across providers, with a link to each model's provider block.
 
 Admin option forms support the same JSON Forms rules as user settings. Web search adds rules to its options, showing `apiKey` for engines that need a key and `baseURL` for SearXNG.
@@ -144,10 +146,15 @@ Admin option forms support the same JSON Forms rules as user settings. Web searc
 - Saving is strict and startup is lenient. A save that would break a plugin is refused, but a plugin that breaks at startup, for example after an upgrade, is skipped so the admin area stays reachable to fix it.
 - A plugin ID can't change through an edit, because records and user data refer to it.
 - Turns acquire one runtime for their whole run, so a save mid-turn never changes the tools or hooks a turn is using.
+- Each plugin has its own page, so a long list of plugins doesn't become one long form.
+- Most plugins register fixed IDs, so a second instance could only fail. A package opts in to more than one instance with `multipleInstances`.
 - Each instance saves on its own. A combined save would fail as a whole on one bad plugin and leave the admin guessing which one it was.
 - Admin models are read from the database on each call, like roles, so they need no rebuild.
 - Deleting an instance keeps user settings, so removing and re-adding a plugin loses nothing.
 - Installed plugins come from the root `package.json`, not from scanning `node_modules`, which is unreliable under pnpm.
+- An instance that is already broken, such as one whose package was removed, doesn't block saving the others. A save is only refused for what it breaks.
+- Model routes take the provider and model ID in the body, since model IDs like `meta-llama/Llama-3` contain slashes.
+- A model offered from the provider's list starts with the `user` role and the capabilities the list reports, which the admin can change before or after.
 
 ## Acceptance Criteria
 
@@ -163,6 +170,7 @@ Instances and secrets:
 - [ ] Secret options are stored encrypted and never returned, and the API names the secret fields that are set.
 - [ ] A blank secret on save keeps the stored value, and `clearSecrets` removes it.
 - [ ] An edit that would change the plugin ID is refused.
+- [ ] A second instance of a package without `multipleInstances` is refused, and one with it can be added again.
 - [ ] A disabled instance isn't loaded and keeps its options.
 - [ ] Reordering changes the load order and the hook order.
 - [ ] Deleting an instance keeps its users' settings.
@@ -192,7 +200,9 @@ Models:
 
 Admin area:
 
-- [ ] The plugins section adds, edits, enables, disables, reorders, and removes instances, and shows each instance's status and errors.
+- [ ] The plugins list shows each instance's status and errors, links to its page, and reorders instances.
+- [ ] A plugin's page edits, enables, disables, and removes the instance, and links back to the list.
+- [ ] Adding a plugin offers only packages not added yet or allowing more than one instance, and opens the new plugin's page.
 - [ ] A provider block's Refresh fills the model list, and ticked models are added as admin models.
 - [ ] The models section sets the default and the order across providers.
 

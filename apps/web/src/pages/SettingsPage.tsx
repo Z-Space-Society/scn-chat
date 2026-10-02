@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useContext, useEffect, useState } from 'react'
 import { Link, Route, Switch, useLocation } from 'wouter'
 import { api, json, read } from '../api.ts'
 import { type ModelOption, modelKey } from '../components/Composer.tsx'
@@ -6,6 +6,7 @@ import { SchemaFields } from '../components/SchemaFields.tsx'
 import { useAction } from '../components/useAction.ts'
 import { useSignOut } from '../components/useSignOut.ts'
 import { browserTimeZone } from '../lib/time-zone.ts'
+import { MeContext } from '../session.tsx'
 import { useStore } from '../store/react.tsx'
 import { useModels } from './ChatPage.tsx'
 
@@ -432,10 +433,12 @@ export function SettingsPage() {
   const [location] = useLocation()
   const { models, error: modelsError } = useModels()
   const { error, run } = useAction()
+  const admin = useContext(MeContext)?.admin
   return (
     <div className="layout settings">
       <nav className="sidebar">
         <Link href="~/">Back to chats</Link>
+        {admin && <Link href="~/admin">Admin</Link>}
         <ul>
           {sections.map((section) => (
             <li key={section.path}>

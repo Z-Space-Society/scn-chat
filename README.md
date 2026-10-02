@@ -51,16 +51,15 @@ Phase 1:
 
 ### Setup
  1. Install dependencies: `pnpm install`
- 2. `cp .env.example .env`
+ 2. `cp .env.example .env`.
  3. Run `pnpm keys` to generate secret keys. Copy `OAUTH_PRIVATE_KEYS` and `SECRET_KEY` into your `.env`.
- 4. Set your AI inference provider API keys.
- 5. Copy config.example.yml to config.yml. The defaults are setup for local development.
- 6. Configure your supported AI models.
+ 4. Put your DID in `ADMIN_DIDS` so you can login and configure the application.
 
 ### Start the app
 
  1. Run `pnpm dev`
  2. Open http://127.0.0.1:5173 and sign in with your ATProto handle.
+ 3. Open Settings > Admin to add your plugins and models, and choose who else can sign in.
 
 ## Deploying
 

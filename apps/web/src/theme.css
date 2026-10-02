@@ -14,6 +14,7 @@
   --danger: light-dark(#c62828, #f28b82);
   --radius: 0.75rem;
   --column: 48rem;
+  --settings-column: 92rem;
   font-family:
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   font-size: 15px;
@@ -469,7 +470,7 @@ main > p {
 .settings main > section,
 .settings main > form {
   width: 100%;
-  max-width: var(--column);
+  max-width: var(--settings-column);
   margin: 1.5rem auto 0;
   padding: 1.25rem;
   border: 1px solid var(--border);

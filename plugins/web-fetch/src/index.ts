@@ -14,16 +14,27 @@ const hostname = z
 
 export const optionsSchema = z
   .object({
-    /** When set, only these domains and their subdomains may be fetched. */
-    allowDomains: z.array(hostname).default([]),
-    /** Block these domains from being fetch. */
-    denyDomains: z.array(hostname).default([]),
-    userToggle: z.boolean().default(true),
-    maxCharacters: z.number().int().min(1000).default(20_000),
-    maxBytes: z.number().int().min(1).default(5_000_000),
-    /** Largest file passed to an ingester. */
-    maxFileBytes: z.number().int().min(1).default(20_000_000),
-    timeoutSeconds: z.number().int().min(1).default(20),
+    allowDomains: z.array(hostname).default([]).meta({
+      title: 'Allowed domains',
+      description: 'Restrict web fetch to these domains.',
+    }),
+    denyDomains: z
+      .array(hostname)
+      .default([])
+      .meta({ title: 'Denied domains', description: 'Block these domains from web fetch.' }),
+    userToggle: z.boolean().default(true).meta({ title: 'Allow users to toggle web fetch' }),
+    maxCharacters: z
+      .number()
+      .int()
+      .min(1000)
+      .default(20_000)
+      .meta({ title: 'Characters of text per call' }),
+    maxBytes: z.number().int().min(1).default(5_000_000).meta({ title: 'Largest page in bytes' }),
+    maxFileBytes: z.number().int().min(1).default(20_000_000).meta({
+      title: 'Largest file in bytes',
+      description: 'Files such as PDFs are passed to an ingester for their text.',
+    }),
+    timeoutSeconds: z.number().int().min(1).default(20).meta({ title: 'Timeout in seconds' }),
   })
   .strict()
 

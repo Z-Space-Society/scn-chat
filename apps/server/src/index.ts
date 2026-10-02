@@ -1,33 +1,38 @@
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { serve } from '@hono/node-server'
-import { defaultConfigPath, loadConfig, readConfigFile } from './config.ts'
+import { loadConfig } from './config.ts'
 import { createDb } from './db/index.ts'
 import { createLogger } from './logger.ts'
-import { importPlugins } from './plugins/import.ts'
+import { findInstalledPlugins } from './plugins/installed.ts'
 import { createServer } from './server.ts'
 
 if (existsSync('.env')) process.loadEnvFile('.env')
 else if (existsSync('../../.env')) process.loadEnvFile('../../.env')
 
-const configPath = process.env.SCN_CHAT_CONFIG || defaultConfigPath
-const config = loadConfig({ env: process.env, file: readConfigFile(configPath), configPath })
+const config = loadConfig(process.env)
 const logger = createLogger(config.logLevel)
 process.on('unhandledRejection', (err) => logger.error({ err }, 'unhandled promise rejection'))
 const db = createDb(config.databaseUrl)
-const plugins = await importPlugins(config.plugins, config.configDir)
+const installed = await findInstalledPlugins(
+  fileURLToPath(new URL('../../..', import.meta.url)),
+  logger,
+)
 const webDist = fileURLToPath(new URL('../../web/dist', import.meta.url))
 
 const server = await createServer({
   config,
-  appConfig: { plugins, models: config.models, roles: config.roles, sync: config.sync },
   db,
   logger,
+  installed,
   webDist: config.nodeEnv === 'production' ? webDist : undefined,
 })
 
 const http = serve({ fetch: server.app.fetch, port: config.port }, ({ port }) => {
-  logger.info({ port, publicUrl: config.publicUrl }, `${config.appName} server listening`)
+  logger.info(
+    { port, publicUrl: config.publicUrl },
+    `${server.settings.get('general').appName} server listening`,
+  )
 })
 
 const shutdown = async () => {

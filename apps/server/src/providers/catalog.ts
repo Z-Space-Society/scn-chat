@@ -1,18 +1,10 @@
 import type { Capabilities, LanguageModelV4, ModelProvider, ModelRef } from '@scn-chat/plugin-api'
-import type { Roles } from '../auth/roles.ts'
-import type { ModelConfig } from '../config.ts'
 import type { Db } from '../db/index.ts'
 import type { Logger } from '../logger.ts'
 import type { Registry } from '../plugins/registry.ts'
 import type { SecretBox } from '../secrets.ts'
+import { type AdminModel, listAdminModels, servesAdminModels } from './admin-models.ts'
 import { credentialFor, listCredentials, USER_PROVIDER_PREFIX } from './user-credentials.ts'
-
-export class ProviderConfigError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'ProviderConfigError'
-  }
-}
 
 export class ModelUnavailable extends Error {
   readonly ref: ModelRef
@@ -40,41 +32,12 @@ export type ResolvedModel = {
   capabilities: Capabilities
 }
 
-/** Check the admin models against the registered providers and defined roles. */
-export function validateAdminModels(
-  models: ModelConfig[],
-  registry: Registry<ModelProvider>,
-  roles: Roles,
-): ModelConfig[] {
-  for (const model of models) {
-    const name = `${model.provider}/${model.id}`
-    const provider = registry.get(model.provider)
-    if (!provider)
-      throw new ProviderConfigError(
-        `Admin model ${name} names provider "${model.provider}", which no plugin registered`,
-      )
-    if (!provider.hasAdminKey)
-      throw new ProviderConfigError(
-        `Admin model ${name} uses provider "${model.provider}", which has no admin key`,
-      )
-    if (!Array.isArray(model.roles) || model.roles.length === 0) {
-      throw new ProviderConfigError(`Admin model ${name} must list the roles allowed to use it`)
-    }
-    const undefinedRole = model.roles.find((role) => !roles.defined.has(role))
-    if (undefinedRole)
-      throw new ProviderConfigError(`Admin model ${name} names undefined role "${undefinedRole}"`)
-  }
-  if (models.filter((model) => model.default).length > 1)
-    throw new ProviderConfigError('More than one admin model is marked default')
-  return models
-}
-
 export type CatalogDeps = {
   db: Db
   box: SecretBox
   providers: Registry<ModelProvider>
-  adminModels: ModelConfig[]
-  roles: Roles
+  /** The user's roles, which decide the admin models they may use. */
+  rolesOf: (did: string) => Promise<string[]>
   guardedFetch: typeof fetch
   logger: Logger
 }
@@ -87,19 +50,28 @@ export class ModelCatalog {
     this.deps = deps
   }
 
-  private adminModelsFor(did: string): ModelConfig[] {
-    const userRoles = new Set(this.deps.roles.rolesFor(did))
-    return this.deps.adminModels.filter((model) => model.roles.some((role) => userRoles.has(role)))
+  /** Admin models whose provider is loaded with an admin key. */
+  private async availableAdminModels(): Promise<AdminModel[]> {
+    return (await listAdminModels(this.deps.db)).filter((model) =>
+      servesAdminModels(this.deps.providers, model.provider),
+    )
   }
 
-  defaultModel(): ModelRef | undefined {
-    const model = this.deps.adminModels.find((m) => m.default)
+  private async adminModelsFor(did: string): Promise<AdminModel[]> {
+    const userRoles = new Set(await this.deps.rolesOf(did))
+    return (await this.availableAdminModels()).filter((model) =>
+      model.roles.some((role) => userRoles.has(role)),
+    )
+  }
+
+  async defaultModel(): Promise<ModelRef | undefined> {
+    const model = (await this.availableAdminModels()).find((m) => m.default)
     return model ? { provider: model.provider, id: model.id } : undefined
   }
 
   async listForUser(did: string): Promise<ListedModel[]> {
     const listed = new Map<string, ListedModel>()
-    for (const model of this.adminModelsFor(did)) {
+    for (const model of await this.adminModelsFor(did)) {
       listed.set(`${model.provider}/${model.id}`, {
         provider: model.provider,
         id: model.id,
@@ -146,7 +118,7 @@ export class ModelCatalog {
       })
       return { ref, provider, model, capabilities: own.info.capabilities }
     }
-    const admin = this.adminModelsFor(did).find(
+    const admin = (await this.adminModelsFor(did)).find(
       (m) => m.provider === ref.provider && m.id === ref.id,
     )
     if (!admin) throw new ModelUnavailable(ref)

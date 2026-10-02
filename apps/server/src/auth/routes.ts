@@ -8,6 +8,8 @@ import type { Db } from '../db/index.ts'
 import type { AppEnv, AuthUser } from '../env.ts'
 import type { Logger } from '../logger.ts'
 import { safeErrorMessage } from '../safe-error.ts'
+import type { SettingsStore } from '../settings/store.ts'
+import type { Access } from './access.ts'
 import {
   type Account,
   getAccount,
@@ -16,8 +18,9 @@ import {
   touchActivity,
 } from './accounts.ts'
 import type { IdentityResolver } from './identity.ts'
+import { removeInvite } from './invites.ts'
 import type { OAuthClientLike } from './oauth-client.ts'
-import type { Roles } from './roles.ts'
+import { ADMIN_ROLE, type Roles } from './roles.ts'
 import { scopeAllowsSpaces } from './scope.ts'
 import {
   createWebSession,
@@ -34,6 +37,8 @@ export type AuthDeps = {
   oauth: OAuthClientLike
   identity: IdentityResolver
   roles: Roles
+  access: Access
+  settings: SettingsStore
   scope: string
   /** Runs after each login to set up the user's storage. */
   onLogin?: (account: Account) => Promise<void>
@@ -58,6 +63,19 @@ const NEXT_COOKIE = 'scn_next'
 /** Is this a path on this site, and not a link to another one? */
 const isLocalPath = (path: string) => /^\/(?![/\\])/.test(path)
 
+/** Is this the path of a shared chat, where anyone may sign in as a viewer? */
+const isSharePath = (path: string) => /^\/s\/[^/]+\/[^/]+$/.test(path)
+
+/** API paths a viewer may use. */
+const VIEWER_PATHS = [/^\/api\/me$/, /^\/api\/logout$/, /^\/api\/shared\//, /^\/api\/health$/]
+
+class AccessDenied extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'AccessDenied'
+  }
+}
+
 class LoginMismatch extends Error {
   constructor() {
     super('This sign-in was started in a different browser. Sign in again here.')
@@ -65,13 +83,13 @@ class LoginMismatch extends Error {
   }
 }
 
-function setSessionCookie(c: Context, token: string, config: Config) {
+function setSessionCookie(c: Context, token: string, config: Config, ttlDays: number) {
   setCookie(c, SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: 'Lax',
     path: '/',
     secure: config.publicUrl.startsWith('https://'),
-    maxAge: config.sessionTtlDays * 86_400,
+    maxAge: ttlDays * 86_400,
   })
 }
 
@@ -81,17 +99,46 @@ export function sessionMiddleware(deps: AuthDeps): MiddlewareHandler<AppEnv> {
     c.set('user', null)
     const token = getCookie(c, SESSION_COOKIE)
     if (token) {
-      const session = await resolveWebSession(deps.db, token, deps.config.sessionTtlDays)
+      const { ttlDays } = deps.settings.get('sessions')
+      const session = await resolveWebSession(deps.db, token, ttlDays)
       if (session) {
         const account = await getAccount(deps.db, session.did)
         if (!account) throw new Error(`A web session names ${session.did}, which has no account`)
-        if (session.renewed) setSessionCookie(c, token, deps.config)
-        c.set('user', { did: account.did, account, roles: deps.roles.rolesFor(account.did) })
+        if (session.renewed) setSessionCookie(c, token, deps.config, ttlDays)
+        const { roles, access } = await deps.access.forAccount(account)
+        c.set('user', {
+          did: account.did,
+          account,
+          roles,
+          access,
+          admin: roles.includes(ADMIN_ROLE),
+        })
         await touchActivity(deps.db, account)
       }
     }
     await next()
   }
+}
+
+/** Why a signed-in user without full access can't use the chat app. */
+const accessMessage = (deps: AuthDeps, user: AuthUser) =>
+  deps.access.deniedMessage(user.did, user.account, user.roles)
+
+/** Keep viewers to the routes for shared chats. */
+export function accessGate(deps: AuthDeps): MiddlewareHandler<AppEnv> {
+  return async (c, next) => {
+    const user = c.get('user')
+    if (user && user.access !== 'full' && !VIEWER_PATHS.some((path) => path.test(c.req.path)))
+      return c.json({ error: 'AccessDenied', message: await accessMessage(deps, user) }, 403)
+    await next()
+  }
+}
+
+export const requireAdmin: MiddlewareHandler<AppEnv> = async (c, next) => {
+  const user = c.get('user')
+  if (!user) return c.json({ error: 'Unauthorized' }, 401)
+  if (!user.admin) return c.json({ error: 'Forbidden' }, 403)
+  await next()
 }
 
 /** Refuse state-changing API requests from other origins. */
@@ -120,7 +167,15 @@ export function signedInUser(c: { get(key: 'user'): AuthUser | null }): AuthUser
 export function oauthRoutes(deps: AuthDeps) {
   const secure = deps.config.publicUrl.startsWith('https://')
   return new Hono()
-    .get('/oauth-client-metadata.json', (c) => c.json(deps.oauth.clientMetadata))
+    .get('/oauth-client-metadata.json', (c) => {
+      const metadata = deps.oauth.clientMetadata
+      // The app name can change while the server runs.
+      return c.json(
+        'client_name' in metadata
+          ? { ...metadata, client_name: deps.settings.get('general').appName }
+          : metadata,
+      )
+    })
     .get('/oauth/jwks.json', (c) => c.json(deps.oauth.jwks))
     .get('/oauth/login', async (c) => {
       const identifier = c.req.query('identifier')?.trim()
@@ -156,26 +211,40 @@ export function oauthRoutes(deps: AuthDeps) {
         if (!expected || state !== expected) throw new LoginMismatch()
         const { scope } = await session.getTokenInfo(false)
         const identity = await deps.identity.resolve(session.did)
+        const existing = await getAccount(deps.db, session.did)
+        const roles = await deps.roles.rolesFor(identity)
+        const full = await deps.access.allowsSignIn(session.did, existing, roles)
+        if (!full && !(next && isSharePath(next)))
+          throw new AccessDenied(await deps.access.deniedMessage(session.did, existing, roles))
         const account = await recordLogin(deps.db, {
           did: session.did,
           handle: identity.handle,
           pdsUrl: identity.pdsUrl,
           spacesAllowed: scopeAllowsSpaces(scope, session.did),
+          viewer: !full,
         })
         if (account.storageMode === 'local')
           deps.logger.info({ did: account.did, scope }, 'signed in with local storage')
-        if (deps.onLogin) {
+        if (!full) deps.logger.info({ did: account.did }, 'signed in as a viewer')
+        else await removeInvite(deps.db, account.did)
+        if (full && deps.onLogin) {
           await deps
             .onLogin(account)
             .catch((err) => deps.logger.error({ err, did: account.did }, 'login setup failed'))
         }
-        const token = await createWebSession(deps.db, account.did, deps.config.sessionTtlDays)
-        setSessionCookie(c, token, deps.config)
+        const { ttlDays } = deps.settings.get('sessions')
+        const token = await createWebSession(deps.db, account.did, ttlDays)
+        setSessionCookie(c, token, deps.config, ttlDays)
         return c.redirect(next && isLocalPath(next) ? next : '/')
       } catch (err) {
         deps.logger.warn({ err, did }, 'oauth callback failed')
         // Revoke the tokens the OAuth client already stored for a sign-in that can't be used.
-        if (did && (err instanceof SpacesLostError || err instanceof LoginMismatch))
+        if (
+          did &&
+          (err instanceof SpacesLostError ||
+            err instanceof LoginMismatch ||
+            err instanceof AccessDenied)
+        )
           await deps.oauth
             .revoke(did)
             .catch((revokeErr: unknown) =>
@@ -189,14 +258,18 @@ export function oauthRoutes(deps: AuthDeps) {
 /** The signed-in user's details, and logout. */
 export function authApiRoutes(deps: AuthDeps) {
   return new Hono<AppEnv>()
-    .get('/me', requireUser, (c) => {
-      const { did, account, roles } = signedInUser(c)
+    .get('/me', requireUser, async (c) => {
+      const user = signedInUser(c)
+      const { did, account, roles, access, admin } = user
       return c.json({
         did,
         handle: account.handle,
         storageMode: account.storageMode,
         backgroundSync: account.backgroundSync,
         roles,
+        admin,
+        access,
+        accessMessage: access === 'full' ? null : await accessMessage(deps, user),
       })
     })
     .post('/logout', async (c) => {

@@ -5,6 +5,7 @@ import {
   matchIngester,
   type Plugin,
   type PluginContext,
+  type RoleSource,
   type Tool,
   type ToolContext,
 } from './index.ts'
@@ -22,6 +23,8 @@ export async function setupForTest(
   const providers: ModelProvider[] = []
   const tools: Tool<unknown>[] = []
   const ingesters: Ingester[] = []
+  const roleSources: RoleSource[] = []
+  const accountChanges: { action: 'suspend' | 'restore'; did: string; reason?: string }[] = []
   const hooks: { name: string; handler: unknown }[] = []
   const reachable = () => [...ingesters, ...(options.ingesters ?? [])]
   const noop = () => {}
@@ -29,6 +32,17 @@ export async function setupForTest(
     providers: { register: (provider: ModelProvider) => void providers.push(provider) },
     tools: { register: (tool: Tool<unknown>) => void tools.push(tool) },
     toolSources: { register: noop },
+    roleSources: { register: (source: RoleSource) => void roleSources.push(source) },
+    accounts: {
+      suspend: async (did: string, options?: { reason?: string }) => {
+        accountChanges.push({ action: 'suspend', did, ...options })
+        return true
+      },
+      restore: async (did: string) => {
+        accountChanges.push({ action: 'restore', did })
+        return true
+      },
+    },
     ingesters: {
       register: (ingester: Ingester) => void ingesters.push(ingester),
       accepts: (mimeType: string) => matchIngester(reachable(), mimeType) !== undefined,
@@ -44,7 +58,7 @@ export async function setupForTest(
     onClose: noop,
   } as unknown as PluginContext
   await plugin.setup(ctx)
-  return { providers, tools, ingesters, hooks, ctx }
+  return { providers, tools, ingesters, roleSources, accountChanges, hooks, ctx }
 }
 
 /** A tool context that records citations, for tool tests. */
@@ -53,6 +67,7 @@ export function toolContextForTest(
     fetch?: typeof globalThis.fetch
     user?: string
     conversation?: string
+    roles?: string[]
     signal?: AbortSignal
   } = {},
 ) {
@@ -60,6 +75,7 @@ export function toolContextForTest(
   const context: ToolContext = {
     user: options.user ?? 'did:plc:alice',
     conversation: options.conversation ?? 'at://did:plc:alice/space/c/1',
+    roles: options.roles ?? ['user'],
     signal: options.signal ?? new AbortController().signal,
     fetch: options.fetch ?? (() => Promise.reject(new Error('No fetch in this test'))),
     cite: (source) => void citations.push(source),

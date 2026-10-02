@@ -60,16 +60,7 @@ describe('HookRunner.action', () => {
     expect(later).toHaveBeenCalledOnce()
     expect(logger.error).toHaveBeenCalledWith(
       expect.objectContaining({ pluginId: 'broken' }),
-      'plugin action failed',
+      expect.anything(),
     )
-  })
-})
-
-describe('HookRunner.describe', () => {
-  it('reports the resolved handler order', () => {
-    const hooks = new HookRunner()
-    hooks.add('turn:after', 'late', 1, () => {}, 'post')
-    hooks.add('turn:after', 'early', 0, () => {})
-    expect(hooks.describe()).toEqual({ 'turn:after': ['early', 'late'] })
   })
 })

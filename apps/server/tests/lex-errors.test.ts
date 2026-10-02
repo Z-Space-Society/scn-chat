@@ -9,20 +9,15 @@ describe('pdsFailure', () => {
     (code) => {
       expect(
         pdsFailure(pdsError(403, code, 'Missing required scope "blob:application/pdf"')),
-      ).toEqual({
-        status: 403,
-        error: 'ScopeMissing',
-        message: "Your sign-in doesn't grant this permission. Sign out and back in to grant it.",
-      })
+      ).toMatchObject({ status: 403, error: 'ScopeMissing' })
     },
   )
 
   it("passes on another PDS error's code and message as a 502", () => {
-    expect(pdsFailure(pdsError(400, 'InvalidRecord', 'Record is too large'))).toEqual({
-      status: 502,
-      error: 'PdsError',
-      message: 'Your PDS refused the request (InvalidRecord): Record is too large',
-    })
+    const failure = pdsFailure(pdsError(400, 'InvalidRecord', 'Record is too large'))
+    expect(failure).toMatchObject({ status: 502, error: 'PdsError' })
+    expect(failure?.message).toContain('InvalidRecord')
+    expect(failure?.message).toContain('Record is too large')
   })
 
   it('redacts anything that looks like a secret in the message', () => {

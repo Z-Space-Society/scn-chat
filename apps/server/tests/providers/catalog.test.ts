@@ -1,30 +1,25 @@
 import pino from 'pino'
 import { describe, expect, it } from 'vitest'
-import { createRoles } from '../../src/auth/roles.ts'
-import type { ModelConfig } from '../../src/config.ts'
 import { migrateToLatest } from '../../src/db/migrate.ts'
 import { Registry } from '../../src/plugins/registry.ts'
-import {
-  ModelCatalog,
-  ModelUnavailable,
-  ProviderConfigError,
-  validateAdminModels,
-} from '../../src/providers/catalog.ts'
+import { type AdminModel, saveAdminModel } from '../../src/providers/admin-models.ts'
+import { ModelCatalog, ModelUnavailable } from '../../src/providers/catalog.ts'
 import { saveCredential } from '../../src/providers/user-credentials.ts'
 import { SecretBox } from '../../src/secrets.ts'
 import { createSqliteDb } from '../helpers/db.ts'
 import { fakeProvider } from '../helpers/providers.ts'
 
 const caps = { vision: true, reasoning: true, tools: true }
-const model = (overrides: Partial<ModelConfig> = {}): ModelConfig => ({
+const model = (overrides: Partial<AdminModel> = {}): AdminModel => ({
   provider: 'fake',
   id: 'big',
   name: 'Big',
   capabilities: caps,
   roles: ['user'],
+  default: false,
   ...overrides,
 })
-const roles = createRoles({ staff: ['did:plc:staff'] })
+const rolesOf = async (did: string) => (did === 'did:plc:staff' ? ['user', 'staff'] : ['user'])
 const guardedFetch = (async () => new Response()) as unknown as typeof fetch
 
 function registryWith(...providers: ReturnType<typeof fakeProvider>['provider'][]) {
@@ -33,43 +28,13 @@ function registryWith(...providers: ReturnType<typeof fakeProvider>['provider'][
   return registry
 }
 
-describe('validateAdminModels', () => {
-  const registry = registryWith(
-    fakeProvider().provider,
-    fakeProvider({ id: 'keyless', hasAdminKey: false }).provider,
-  )
-
-  it('accepts valid models', () => {
-    expect(validateAdminModels([model()], registry, roles)).toHaveLength(1)
-  })
-
-  it.each([
-    ['an unregistered provider', model({ provider: 'nope' }), /no plugin registered/],
-    ['a provider without an admin key', model({ provider: 'keyless' }), /no admin key/],
-    ['missing roles', model({ roles: undefined as never }), /must list the roles/],
-    ['empty roles', model({ roles: [] }), /must list the roles/],
-    ['an undefined role', model({ roles: ['vip'] }), /undefined role "vip"/],
-  ])('fails for %s', (_name, bad, message) => {
-    expect(() => validateAdminModels([bad], registry, roles)).toThrow(message)
-  })
-
-  it('fails when more than one model is marked default', () => {
-    expect(() =>
-      validateAdminModels(
-        [model({ default: true }), model({ id: 'b', default: true })],
-        registry,
-        roles,
-      ),
-    ).toThrow(ProviderConfigError)
-  })
-})
-
 async function catalogWith(
-  adminModels: ModelConfig[],
+  adminModels: AdminModel[],
   ...providers: ReturnType<typeof fakeProvider>['provider'][]
 ) {
   const db = createSqliteDb()
   await migrateToLatest(db)
+  for (const adminModel of adminModels) await saveAdminModel(db, adminModel, 'did:plc:admin')
   const box = new SecretBox(Buffer.alloc(32, 4))
   const registry = registryWith(...providers)
   return {
@@ -79,8 +44,7 @@ async function catalogWith(
       db,
       box,
       providers: registry,
-      adminModels,
-      roles,
+      rolesOf,
       guardedFetch,
       logger: pino({ level: 'silent' }),
     }),
@@ -183,6 +147,28 @@ describe('ModelCatalog.listForUser', () => {
     })
     const models = await catalog.listForUser('did:plc:alice')
     expect(models.map((m) => `${m.source}:${m.id}`)).toEqual(['admin:big', 'user:mine'])
-    expect(catalog.defaultModel()).toEqual({ provider: 'fake', id: 'big' })
+    expect(await catalog.defaultModel()).toEqual({ provider: 'fake', id: 'big' })
+  })
+
+  it('hides admin models whose provider is not loaded or has no admin key', async () => {
+    const { catalog } = await catalogWith(
+      [
+        model({ provider: 'ghost', default: true }),
+        model({ provider: 'keyless', id: 'k' }),
+        model({ id: 'ok' }),
+      ],
+      fakeProvider().provider,
+      fakeProvider({ id: 'keyless', hasAdminKey: false }).provider,
+    )
+    const models = await catalog.listForUser('did:plc:alice')
+    expect(models.map((m) => `${m.provider}/${m.id}`)).toEqual(['fake/ok'])
+    expect(await catalog.defaultModel()).toBeUndefined()
+  })
+
+  it('applies a model change on the next call', async () => {
+    const { db, catalog } = await catalogWith([], fakeProvider().provider)
+    expect(await catalog.listForUser('did:plc:alice')).toEqual([])
+    await saveAdminModel(db, model(), 'did:plc:admin')
+    expect((await catalog.listForUser('did:plc:alice')).map((m) => m.id)).toEqual(['big'])
   })
 })

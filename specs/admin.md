@@ -2,13 +2,13 @@
 
 ## Summary
 
-SCN Chat gets an admin area in the web app, and the database starts holding the settings that used to live in `config.yml`. This spec builds the foundation the other admin specs sit on: a store for admin settings, a built-in `admin` role seeded from the environment, the admin area itself, and user access control. Roles move from `config.yml` into the database. A role's members can be listed one by one, matched by the PDS they use or their handle's domain, or decided by a plugin, such as one that checks an external membership system. The admin decides which roles may use the chat app. Anyone else who signs in from the login page is turned away with a message telling them to ask an admin. Someone who signs in from a shared chat link gets a viewer session that can open shared chats and nothing else. A user who loses access loses it on their next request.
+SCN Chat gets an admin area in the web app, and the database starts holding the settings that used to live in `config.yml`. This spec builds the foundation the other admin specs sit on: a store for admin settings, a built-in `admin` role seeded from the environment, the admin area itself, and user access control. Roles move from `config.yml` into the database. A role's members can be listed one by one, matched by the PDS they use or their handle's domain, or decided by a plugin, such as one that checks an external membership system. A registration setting decides who can create an account: anyone, members of chosen roles, or only people an admin adds. Once someone has an account they keep it whatever the setting says, until an admin or a plugin suspends it. Anyone turned away is told why and given their DID to pass to an admin. Someone who signs in from a shared chat link gets a viewer session that can open shared chats and nothing else.
 
 This is the first of three specs. [[admin-plugins]] moves plugins and admin models into the admin area, and [[admin-settings]] moves the remaining settings and removes `config.yml`.
 
 ## Motivation
 
-Today anyone with an atproto account can sign in. Admin models are already gated by role, but a stranger can still fill the database and blob disk through the local fallback, spend the admin's web search key, and use the server's resources with their own keys. Keeping roles as DID lists in `config.yml` doesn't scale either: every change means editing a file and restarting the server, and the admin has to find each person's DID by hand.
+Until now anyone with an atproto account could sign in, and a server had no way to limit that. SCN Chat is a community project, so servers differ: some are open to anyone, some only to a community's members, and some only to people an admin picks. Admin models and the admin's web search engine are gated by role either way, so an open server doesn't pay for strangers. Keeping roles as DID lists in `config.yml` doesn't scale either: every change means editing a file and restarting the server, and the admin has to find each person's DID by hand.
 
 A community running its own PDS, or handing out handles under its own domain, wants all of its people let in without listing anyone. Explicit members cover everyone else. Some communities already decide membership elsewhere. SCN members apply through a public record and are approved by admins in HappyView, and the server should honor that without an admin copying each approval by hand. Plugins can therefore act as role sources. Groups are otherwise kept in a plain internal schema for now. Once an atproto group model settles, likely on spaces, roles migrate to it, either directly or through a role source plugin.
 
@@ -76,15 +76,46 @@ ctx.roleSources.register(source)
 - **Plugin runtime.** Role sources live in the plugin host alongside providers and tools, so in [[admin-plugins]] they come from the current runtime, and saving a plugin's options changes them without a restart.
 - **The admin area** shows a role granted by a source with the source's ID, and it can't be removed there.
 
-### Access
+### Registration
 
-The `access` setting decides who may use the chat app:
+The `access` setting decides who can create an account:
 
 ```ts
-access: { signInRoles: string[] } // default ['admin']
+access: {
+  registration: 'open' | 'invite' | 'closed' // default 'open'
+  inviteRoles: string[] // default [], used by 'invite'
+}
 ```
 
-A user has access when they hold any role in `signInRoles`, or the `admin` role. `signInRoles: ['user']` opens the server to anyone with an atproto account. A fresh install defaults to `['admin']`, so it is closed until an admin opens it, and a mistake leaves the server closed rather than open. Every name must be an existing role, checked on save.
+| Mode | Who can create an account |
+|---|---|
+| `open` | Anyone with an atproto account. |
+| `invite` | Anyone holding a role in `inviteRoles`, from any role source, and anyone an admin added. |
+| `closed` | Only people an admin added. |
+
+Creating an account means a first full sign-in, which records the account and runs the login hook. Admins can always create one. Every name in `inviteRoles` must be an existing role, checked on save.
+
+**Access follows the account.** A user has full access to the chat app when they are an admin, or have an account that is neither viewer-only nor suspended. Changing the mode, or a user losing a role, doesn't take access away from anyone who already has an account. Removing someone is a suspension.
+
+### Added users
+
+An admin adds a person by handle or DID, and that person can then create an account in any mode. That is what makes `closed` usable, and it's a shortcut in `invite` mode.
+
+```
+account_invite (did text primary key, added_by, added_at)
+```
+
+The row is deleted when the person creates their account. Adding a DID that already has a full account is refused, since they already have access. An added person who hasn't signed in yet can be removed again.
+
+### Suspension
+
+A suspended account keeps its data and its OAuth session but loses access, so the server stops acting for it. Its owner can still sign in to view chats shared with them. The `account` table gains `suspended_at`, `suspended_by`, and `suspended_reason`, all null when the account isn't suspended. `suspended_by` is an admin's DID, or `plugin:<id>` for a plugin.
+
+- **Admins** suspend and restore accounts on the Users page, with an optional reason.
+- **Plugins** call `ctx.accounts.suspend(did, { reason })` and `ctx.accounts.restore(did)`, so a plugin that tracks membership elsewhere can act on a revocation. Core doesn't suspend anyone by itself. Both return whether an account changed.
+- **Admins can't be suspended**, by an admin or a plugin, so nobody can lock the admins out. Remove the admin role first. Suspending someone who has no account is a no-op.
+- **Reasons are admin notes.** They are shown on the Users page and never to the suspended user, so they can hold internal details.
+- **The Users page** shows who suspended an account and why, and an admin can restore any suspension, including a plugin's. A plugin that still disagrees can suspend the account again.
 
 ### Viewers
 
@@ -92,28 +123,41 @@ Anyone can sign in to view a chat shared with them, whether or not they have acc
 
 - **Shared routes.** A viewer can reach `GET /api/me`, `POST /api/logout`, and the `/api/shared` routes from the sharing spec, and nothing else. The owner's PDS still decides whether they may see the chat.
 - **No setup.** A viewer's sign-in skips the login hook, so the server creates no settings space for them, doesn't register for their notifications, and never syncs, stores, or runs turns for them.
-- **Account flag.** The `account` table gains `viewer_only`, set when an account is created by a viewer sign-in, and cleared by their first sign-in with access, which runs the login hook. A user with access whose account is still `viewer_only` is treated as a viewer until they sign in again, so the login hook always runs before they use the chat app.
+- **Account flag.** The `account` table gains `viewer_only`, set when an account is created by a viewer sign-in, and cleared when they create a full account, which runs the login hook. A viewer who later may create an account is asked to sign in again, so the login hook always runs before they use the chat app.
 
 ### Checking access
 
 Access is checked in three places:
 
-- **Sign-in.** `GET /oauth/callback` resolves the identity, as it does today, then checks access before it creates or updates the account or a web session.
-  - With access, sign-in proceeds as today, clears `viewer_only`, and runs the login hook.
-  - Without access, when the `next` parameter is a share path, `/s/<ownerDid>/<skey>`, the user signs in as a viewer and returns to the shared chat.
-  - Without access otherwise, their new OAuth session is revoked and they are sent back to the login page with "This server is invite-only. Ask an admin to add you, and give them your DID: did:plc:...". No account row is created for them.
-- **Every `/api` request.** The session middleware resolves the account, then checks access for every route a viewer can't reach. A user without access, or with a `viewer_only` account, gets 403 `{ error: 'AccessDenied', message }`. The message is the invite-only one, or "Sign in again to start using chat." for a `viewer_only` account that now has access. Their web session is kept, so shared chats still open. `GET /api/me` gains `access: 'full' | 'viewer'`, and the web app shows the message, with sign-out and sign-in buttons, in place of the chat app on every route except shared chats.
-- **Background work.** The turn runner doesn't start a turn for a user without access or with a `viewer_only` account, and logs the skip at info. The sync scheduler, discovery, and notification registration skip them the same way. A user who loses access keeps their OAuth session, so restoring their access picks up where they left off.
+- **Sign-in.** `GET /oauth/callback` resolves the identity, as it does today, then decides before it creates or updates the account or a web session:
+  - An admin, or an existing full account that isn't suspended, signs in as today.
+  - Anyone else who may create an account under the current mode creates it: the sign-in clears `viewer_only`, runs the login hook, and deletes their `account_invite` row.
+  - Anyone else whose `next` parameter is a share path, `/s/<ownerDid>/<skey>`, signs in as a viewer and returns to the shared chat.
+  - Anyone else has their new OAuth session revoked and goes back to the login page with a message. No account row is created for them.
+- **Every `/api` request.** The session middleware resolves the account, then checks access for every route a viewer can't reach. A user without full access gets 403 `{ error: 'AccessDenied', message }`. Their web session is kept, so shared chats still open. The web app shows the message, with sign-out and sign-in buttons, in place of the chat app on every route except shared chats.
+- **Background work.** The turn runner doesn't start a turn for a user without full access, and logs the skip at info. The sync scheduler, discovery, and notification registration skip them the same way.
+
+The messages, which name the user's DID so they can pass it to an admin:
+
+| Situation | Message |
+|---|---|
+| Suspended | "Your account has been suspended. Contact an admin for details." |
+| A viewer who may now create an account | "Sign in again to start using chat." |
+| `invite` mode | "This server is invite-only. Ask an admin to add you, and give them your DID: did:plc:..." |
+| `closed` mode | "This server isn't taking new accounts. Ask an admin to add you, and give them your DID: did:plc:..." |
 
 ### Admin checks
 
-`requireAdmin` middleware guards every `/api/admin` route and returns 403 `{ error: 'Forbidden' }` when the user doesn't hold `admin`. `GET /api/me` gains `admin: boolean`.
+`requireAdmin` middleware guards every `/api/admin` route and returns 403 `{ error: 'Forbidden' }` when the user doesn't hold `admin`. `GET /api/me` gains `admin: boolean`, `access`, and `accessMessage`, the message a viewer sees, or null.
 
 ### Admin API
 
 | Route | Purpose |
 |---|---|
-| `GET /api/admin/users?q=&cursor=` | Accounts, 50 at a time, newest activity first. Each has the DID, handle, storage mode, whether it is a viewer, roles, and each role's source, including role sources, which are asked for each listed account, plus created and last-active times. `q` matches the start of a handle or DID. |
+| `GET /api/admin/users?q=&cursor=` | Accounts, 50 at a time, newest activity first. Each has the DID, handle, storage mode, whether it is a viewer, its suspension, roles, and each role's source, including role sources, which are asked for each listed account, plus created and last-active times. `q` matches the start of a handle or DID. |
+| `POST /api/admin/users` | Add a person from `{ identifier }`, a handle or DID, so they can create an account. |
+| `GET /api/admin/invites`, `DELETE /api/admin/invites/:did` | People added who haven't created an account yet, and removing one. |
+| `POST /api/admin/users/:did/suspend`, `POST /api/admin/users/:did/restore` | Suspend an account with an optional `{ reason }`, or restore it. |
 | `GET /api/admin/roles` | Every role, with its description, explicit members with their handles, PDS hosts, and handle domains. `admin` also lists the DIDs from the environment, marked as such. |
 | `POST /api/admin/roles` | Create a role from `{ name, description }`. |
 | `PATCH /api/admin/roles/:name` | Change `description`, `pdsHosts`, or `handleDomains`. Hosts and domains must be valid hostnames. |
@@ -130,9 +174,9 @@ The web app gets an admin area at `/admin`, visible only to admins. It reuses th
 
 Sections in this spec:
 
-- **Users** (`/admin/users`, the default). A search box and a table of accounts with their handle, DID, storage mode, roles, and last activity, with viewers marked, and a "Load more" button. Each row can add the user to a role or remove them from one they hold explicitly. Roles that come from a PDS host, handle domain, or role source are shown with their source but can't be removed there.
+- **Users** (`/admin/users`, the default). A form to add a person by handle or DID, the list of people added who haven't signed in yet, a search box, and a table of accounts with their handle, DID, storage mode, roles, last activity, and suspension, with viewers marked, and a "Load more" button. Each row can add the user to a role, remove them from one they hold explicitly, and suspend or restore them. Roles that come from a PDS host, handle domain, or role source are shown with their source but can't be removed there.
 - **Roles** (`/admin/roles`). One block per role: its description, explicit members with a remove button, an input to add a member by handle or DID, and the PDS hosts and handle domains, one per line. A form at the end creates a role.
-- **Access** (`/admin/access`). A checkbox per role for `signInRoles`, with a note that `user` means anyone with an atproto account, and a Save button.
+- **Access** (`/admin/access`). The registration mode, a checkbox per role for `inviteRoles`, shown in `invite` mode, and a Save button.
 
 The UI stays as bare as the rest of the web app.
 
@@ -144,12 +188,13 @@ The UI stays as bare as the rest of the web app.
 
 ### Docs
 
-`docs/architecture.md` gains a section on the admin area, access and viewers, and the split between environment and database settings. `docs/plugins.md` and the plugins spec document `ctx.roleSources.register`, and `setupForTest` records role sources like other registrations. `docs/deployment.md` explains `ADMIN_DIDS` and that a new server is closed until an admin opens it. The sharing spec notes that viewers don't need access.
+`docs/architecture.md` gains a section on the admin area, access and viewers, and the split between environment and database settings. `docs/plugins.md` and the plugins spec document `ctx.roleSources.register`, and `setupForTest` records role sources like other registrations. `docs/deployment.md` explains `ADMIN_DIDS` and that a new server is open until an admin changes the registration mode. `docs/plugins.md` and the plugins spec document `ctx.accounts`. The sharing spec notes that viewers don't need access.
 
 ## Scope Boundaries
 
 - No anonymous viewing. Viewers sign in, since the owner's PDS only grants reads to a user.
-- No invite codes, and no sign-up requests for admins to approve.
+- No invite codes or links, and no sign-up requests for admins to approve.
+- No suspending accounts automatically in core. A plugin can do it.
 - No per-role limits on usage, quotas, or billing.
 - No audit log table. Admin changes are written to the server log.
 - No built-in roles from atproto lists, follows, or external group services. A role source plugin can provide them, and none ships with this spec.
@@ -161,19 +206,25 @@ The UI stays as bare as the rest of the web app.
 ## Edge Cases and Decisions
 
 - `ADMIN_DIDS` is the one role source in the environment, so a broken database state or a mistaken edit can't lock every admin out.
-- A new server defaults to `signInRoles: ['admin']`. A mistake leaves it closed rather than open to everyone.
-- Admins always have access, whatever `signInRoles` says.
-- Access is checked at sign-in, on every request, and before background work, so removing someone takes effect without waiting for their session to end.
-- A user who loses access keeps their OAuth session and their data. The server only stops acting for them, and they can still view chats shared with them.
+- A new server is open, since servers run by different communities want different things, and an open server is what most people expect when they try it.
+- The mode only decides who can create an account. Access follows the account, so changing the mode never cuts anyone off, and a lost role doesn't either. Removing someone is an explicit suspension, by an admin or a plugin.
+- A plugin acts on a revocation elsewhere by suspending the account, on its own schedule. Vetoing access on every request instead would mean an outage of the plugin's backend either locked members out or let revoked people in.
+- Admins always have access and can't be suspended.
+- The suspended message is fixed. Sign-in errors travel in the login page's query string, so they end up in browser history and proxy logs, and a reason could hold internal details or text from a plugin's external system.
+- A suspended user keeps their OAuth session and their data. The server only stops acting for them, and they can still view chats shared with them.
 - A user turned away at sign-in has their OAuth session revoked, so the server never holds tokens for people it turned away. Viewers keep theirs, since reading a shared chat needs it.
 - The access check happens at the callback, not before the redirect, because only the callback proves which DID signed in.
-- Only a share path in `next` makes a viewer, so the login page stays invite-only.
-- A `viewer_only` account that gains access must sign in again, so the login hook creates their settings space before they use the chat app.
+- Only a share path in `next` makes a viewer, so the login page never creates one.
+- A viewer who later may create an account must sign in again, so the login hook creates their settings space before they use the chat app.
 - PDS host matching uses the PDS from the DID document. Handle domains match the verified handle stored at each sign-in, so someone who moves to a handle outside the domain keeps the role until they next sign in.
 - Role names are fixed at creation, since other settings refer to them by name.
+- Admin error messages are shown to the admin as they are, so `InvalidBody` carries the message without a prefix, and its `issues` with the field paths.
+- The users list pages with an offset cursor. Accounts are few enough that keyset paging isn't worth it.
+- The user search matches the lowercased query against handles and DIDs with `LIKE`, escaping `%` and `_`.
 - Role sources are asked on every check instead of storing what they grant, so a revocation in the external system applies without anyone removing a stored membership.
 - A failing role source grants nothing, so an outage can lock its members out once the plugin's own cache runs out. Granting stale roles from core would hide the outage and keep revoked users in.
 - Role sources can't grant `admin`, so a plugin can't hand out admin rights.
+- An added person's row is kept until they create an account, so adding someone in `open` mode, where they don't need it, does no harm.
 - Deleting a role that a plugin's options name isn't checked, since core can't tell which options are role names. The source's grants of it are then ignored with a warning.
 
 ## Acceptance Criteria
@@ -187,7 +238,7 @@ Settings store:
 Bootstrap admins:
 
 - [ ] Startup fails when `ADMIN_DIDS` is empty or holds an invalid DID.
-- [ ] A DID in `ADMIN_DIDS` holds `admin`, has access whatever `signInRoles` says, and can't be removed through the API.
+- [ ] A DID in `ADMIN_DIDS` holds `admin`, has access whatever the registration mode says, and can't be removed through the API.
 
 Roles:
 
@@ -201,29 +252,41 @@ Roles:
 
 Role sources:
 
-- [ ] Roles a source grants are included in `rolesFor`, and count for the access check at sign-in.
+- [ ] Roles a source grants are included in `rolesFor`, and count as invite roles at sign-in.
 - [ ] A source's change in answer applies on the user's next request.
 - [ ] A source that throws or takes longer than 2 seconds contributes no roles and logs a warning, and the other sources still count.
 - [ ] Unknown role names and `admin` from a source are ignored with a warning.
 - [ ] Registering two role sources with the same ID fails, like other registries.
 - [ ] The users list shows roles from a source with the source's ID, and doesn't offer to remove them.
 
-Access:
+Registration and access:
 
-- [ ] A fresh install gives only admins access.
-- [ ] `signInRoles: ['user']` gives anyone access.
-- [ ] A user without access who signs in from the login page is sent back with the invite-only message naming their DID, their OAuth session is revoked, and no account row is created.
-- [ ] An `/api` request outside the viewer routes from a user who lost access returns 403 `AccessDenied`, and their web session still opens shared chats.
-- [ ] The turn runner doesn't start a turn for a user without access, and the sync scheduler and discovery skip them.
-- [ ] `signInRoles` naming a role that doesn't exist is refused.
+- [ ] A fresh install is open, and anyone can create an account.
+- [ ] In `invite` mode, holders of an invite role and added people can create an account, and anyone else is turned away with the invite-only message naming their DID.
+- [ ] In `closed` mode, only added people and admins can create an account, and anyone else is turned away with the closed message.
+- [ ] A turned-away user's OAuth session is revoked and no account row is created.
+- [ ] An existing account keeps access when the mode changes and when it loses a role.
+- [ ] Creating an account deletes the added person's row.
+- [ ] `inviteRoles` naming a role that doesn't exist is refused.
+- [ ] The turn runner doesn't start a turn for a user without full access, and the sync scheduler and discovery skip them.
+
+Added users and suspension:
+
+- [ ] An admin adds a person by handle or DID, and adding someone who already has an account is refused.
+- [ ] An added person who hasn't signed in can be removed.
+- [ ] A suspended account gets 403 `AccessDenied` with the suspended message, never its reason, keeps its web session for shared chats, and gets no turns or sync.
+- [ ] A suspended user who signs in from the login page is turned away with the suspended message, and from a share link gets a viewer session.
+- [ ] Restoring an account gives it access again on its next request.
+- [ ] Admins can't be suspended, by an admin or a plugin.
+- [ ] `ctx.accounts.suspend` and `restore` change the account, record `plugin:<id>`, and return whether an account changed.
 
 Viewers:
 
-- [ ] A user without access who signs in with a share path in `next` gets a viewer session and returns to the shared chat.
+- [ ] A user who may not create an account and signs in with a share path in `next` gets a viewer session and returns to the shared chat.
 - [ ] A viewer can open a chat shared with them and gets 403 `AccessDenied` from every other route except `/api/me` and logout.
 - [ ] A viewer sign-in creates no settings space and runs no sync.
 - [ ] `GET /api/me` reports `access: 'viewer'` for a viewer and `'full'` for a user with access.
-- [ ] A `viewer_only` account that gains access is told to sign in again, and that sign-in runs the login hook and clears the flag.
+- [ ] A viewer who may now create an account is told to sign in again, and that sign-in runs the login hook and clears the flag.
 - [ ] A user with access who signs in through a share link gets a full session.
 
 Admin API and area:
@@ -234,18 +297,19 @@ Admin API and area:
 - [ ] The users list pages 50 at a time and filters by handle or DID prefix.
 - [ ] The admin area redirects non-admins to `/`, and the settings sidebar shows the Admin link only to admins.
 - [ ] The roles section adds and removes members, and saves PDS hosts and handle domains.
-- [ ] The access section saves `signInRoles`.
+- [ ] The access section saves the registration mode and invite roles.
+- [ ] The users section adds people, removes added people, and suspends and restores accounts.
 - [ ] The web app shows the access message in place of the chat app for viewers, and still opens shared chats.
 
 ## Files
 
 - `apps/server/src/settings/store.ts`, `apps/server/src/settings/schemas.ts`
-- `apps/server/src/auth/roles.ts`, `apps/server/src/auth/access.ts`, `apps/server/src/auth/accounts.ts`
+- `apps/server/src/auth/roles.ts`, `apps/server/src/auth/access.ts`, `apps/server/src/auth/accounts.ts`, `apps/server/src/auth/invites.ts`
 - `packages/plugin-api/src/index.ts`, `packages/plugin-api/src/testing.ts`, `apps/server/src/plugins/host.ts`
 - `apps/server/src/auth/routes.ts`, `apps/server/src/auth/web-session.ts`
 - `apps/server/src/admin/routes.ts`
 - `apps/server/src/turns/runner.ts`, `apps/server/src/sync/scheduler.ts`
 - `apps/server/src/config.ts`, `apps/server/src/server.ts`
-- `apps/server/src/db/migrations/0007_admin.ts`
+- `apps/server/src/db/migrations/0007_admin.ts`, `apps/server/src/db/migrations/0009_registration.ts`
 - `apps/web/src/pages/AdminPage.tsx`, `apps/web/src/pages/SettingsPage.tsx`, `apps/web/src/App.tsx`
 - `.env.example`, `docs/architecture.md`, `docs/deployment.md`, `docs/plugins.md`, `specs/sharing.md`, `specs/plugins.md`

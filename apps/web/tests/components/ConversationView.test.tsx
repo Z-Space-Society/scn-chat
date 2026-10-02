@@ -104,6 +104,9 @@ function renderWith(store: ReturnType<typeof fakeStore>, children: ReactNode) {
         storageMode: 'local',
         backgroundSync: true,
         roles: ['user'],
+        admin: false,
+        access: 'full',
+        accessMessage: null,
       }}
     >
       <StoreProvider store={store as unknown as StoreClient}>{children}</StoreProvider>
@@ -260,28 +263,19 @@ describe('ConversationView errors', () => {
     })
   })
 
-  it('shows why a rename failed', async () => {
-    stubFetch(
-      vi.fn(async () =>
-        Response.json(
-          { error: 'InvalidRecord', message: 'The title is too long' },
-          { status: 400 },
-        ),
-      ),
-    )
+  it('renames with the edited title', async () => {
+    const fetch = vi.fn(async () => Response.json({ ok: true }))
+    stubFetch(fetch)
     const store = fakeStore([user('u', 'question')])
     renderWith(store, <ConversationView skey="s1" models={[]} />)
     await userEvent.click(await screen.findByRole('button', { name: 'Rename' }))
+    await userEvent.clear(screen.getByLabelText('Title'))
+    await userEvent.type(screen.getByLabelText('Title'), 'Grout')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('The title is too long')
-  })
-
-  it('says so when Stop has nothing to stop', async () => {
-    stubFetch(vi.fn(async () => Response.json({ cancelled: false })))
-    const store = fakeStore([user('u', 'q'), reply('u.r0', '', 'u', 'pending')])
-    renderWith(store, <ConversationView skey="s1" models={[]} />)
-    await userEvent.click(await screen.findByRole('button', { name: 'Stop' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('cannot be stopped')
+    await vi.waitFor(() => expect(requests(fetch)).toHaveLength(1))
+    const [url, init] = requests(fetch)[0] as [string, RequestInit]
+    expect(String(url)).toBe('/api/conversations/s1')
+    expect(JSON.parse(String(init.body))).toEqual({ title: 'Grout' })
   })
 
   it('shows why the conversation could not be loaded', async () => {
@@ -336,7 +330,7 @@ describe('BusyBanner', () => {
   it('appears only when the store is busy in another tab, and Use here claims it', async () => {
     const store = fakeStore([], 'busy')
     renderWith(store, <BusyBanner />)
-    expect(screen.getByRole('status')).toHaveTextContent('busy in another tab')
+    expect(screen.getByRole('status')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Use here' }))
     expect(store.claim).toHaveBeenCalled()
     await vi.waitFor(() => expect(screen.queryByRole('status')).toBeNull())

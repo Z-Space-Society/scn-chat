@@ -1,6 +1,6 @@
 import { setupForTest } from '@scn-chat/plugin-api/testing'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import plugin, { optionsSchema } from '../src/index.ts'
+import plugin from '../src/index.ts'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -30,40 +30,42 @@ async function keyUsed(
 }
 
 describe('google plugin', () => {
-  it('registers the Google provider with its replay policy', async () => {
-    const { providers } = await setupForTest(plugin({ apiKey: 'admin-key' }))
-    expect(providers).toMatchObject([
-      { id: 'google', name: 'Google', hasAdminKey: true, userKeys: true, replay: 'replay' },
-    ])
-  })
-
-  it('reports no admin key when none is configured', async () => {
-    const { providers } = await setupForTest(plugin())
-    expect(providers[0]?.hasAdminKey).toBe(false)
-  })
-
-  it('can turn off user keys', async () => {
-    const { providers } = await setupForTest(plugin({ userKeys: false }))
-    expect(providers[0]?.userKeys).toBe(false)
-  })
-
-  it('uses the admin key when no user key is given', async () => {
-    const { providers } = await setupForTest(plugin({ apiKey: 'admin-key' }))
-    expect(await keyUsed(providers[0]!)).toContain('admin-key')
-  })
-
   it('uses the user key over the admin key', async () => {
     const { providers } = await setupForTest(plugin({ apiKey: 'admin-key' }))
-    expect(await keyUsed(providers[0]!, 'user-key')).toContain('user-key')
+    expect(await keyUsed(providers[0]!, 'user-key')).toBe('user-key')
   })
 })
 
-describe('google optionsSchema', () => {
-  it('accepts valid options', () => {
-    expect(optionsSchema.safeParse({ userKeys: true }).success).toBe(true)
+describe('google listModels', () => {
+  it('lists the models that generate content, with the admin key', async () => {
+    const fetch = vi.fn(async (_url: string, _init?: RequestInit) =>
+      Response.json({
+        models: [
+          {
+            name: 'models/gemini-3-pro',
+            displayName: 'Gemini 3 Pro',
+            supportedGenerationMethods: ['generateContent'],
+          },
+          { name: 'models/embedding-001', supportedGenerationMethods: ['embedContent'] },
+        ],
+      }),
+    )
+    const { providers } = await setupForTest(plugin({ apiKey: 'admin-key' }))
+    const models = await providers[0]?.listModels?.({ fetch: fetch as never })
+    expect(models).toEqual([
+      {
+        id: 'gemini-3-pro',
+        name: 'Gemini 3 Pro',
+        capabilities: { vision: false, reasoning: false, tools: false },
+      },
+    ])
+    expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('x-goog-api-key')).toBe('admin-key')
   })
 
-  it('rejects invalid or unknown options', () => {
-    expect(optionsSchema.safeParse({ key: 'typo' }).success).toBe(false)
+  it('fails without a key, before fetching', async () => {
+    const fetch = vi.fn()
+    const { providers } = await setupForTest(plugin())
+    await expect(providers[0]?.listModels?.({ fetch: fetch as never })).rejects.toThrow()
+    expect(fetch).not.toHaveBeenCalled()
   })
 })

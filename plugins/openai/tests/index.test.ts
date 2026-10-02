@@ -1,6 +1,6 @@
 import { setupForTest } from '@scn-chat/plugin-api/testing'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import plugin, { optionsSchema } from '../src/index.ts'
+import plugin from '../src/index.ts'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -38,40 +38,33 @@ async function keyUsed(
 }
 
 describe('openai plugin', () => {
-  it('registers the OpenAI provider with its replay policy', async () => {
-    const { providers } = await setupForTest(plugin({ apiKey: 'admin-key' }))
-    expect(providers).toMatchObject([
-      { id: 'openai', name: 'OpenAI', hasAdminKey: true, userKeys: true, replay: 'replay' },
-    ])
-  })
-
-  it('reports no admin key when none is configured', async () => {
-    const { providers } = await setupForTest(plugin())
-    expect(providers[0]?.hasAdminKey).toBe(false)
-  })
-
-  it('can turn off user keys', async () => {
-    const { providers } = await setupForTest(plugin({ userKeys: false }))
-    expect(providers[0]?.userKeys).toBe(false)
-  })
-
-  it('uses the admin key when no user key is given', async () => {
-    const { providers } = await setupForTest(plugin({ apiKey: 'admin-key' }))
-    expect(await keyUsed(providers[0]!)).toContain('admin-key')
-  })
-
   it('uses the user key over the admin key', async () => {
     const { providers } = await setupForTest(plugin({ apiKey: 'admin-key' }))
-    expect(await keyUsed(providers[0]!, 'user-key')).toContain('user-key')
+    expect(await keyUsed(providers[0]!, 'user-key')).toBe('Bearer user-key')
   })
 })
 
-describe('openai optionsSchema', () => {
-  it('accepts valid options', () => {
-    expect(optionsSchema.safeParse({ apiKey: 'k' }).success).toBe(true)
+describe('openai listModels', () => {
+  it('lists models with the admin key', async () => {
+    const fetch = vi.fn(async (_url: string, _init?: RequestInit) =>
+      Response.json({ data: [{ id: 'gpt-x' }] }),
+    )
+    const { providers } = await setupForTest(plugin({ apiKey: 'admin-key' }))
+    expect(await providers[0]?.listModels?.({ fetch: fetch as never })).toEqual([
+      {
+        id: 'gpt-x',
+        name: 'gpt-x',
+        capabilities: { vision: false, reasoning: false, tools: false },
+      },
+    ])
+    expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('authorization')).toBe(
+      'Bearer admin-key',
+    )
   })
 
-  it('rejects invalid or unknown options', () => {
-    expect(optionsSchema.safeParse({ apiKey: 42 }).success).toBe(false)
+  it('reports a response that is not a model list', async () => {
+    const fetch = vi.fn(async () => Response.json({ nope: true }))
+    const { providers } = await setupForTest(plugin({ apiKey: 'admin-key' }))
+    await expect(providers[0]?.listModels?.({ fetch: fetch as never })).rejects.toThrow()
   })
 })

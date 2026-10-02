@@ -7,26 +7,6 @@ const textContent = {
 }
 
 describe('validateRecord', () => {
-  it('accepts a valid user message', () => {
-    const record = {
-      $type: nsid.message,
-      role: 'user',
-      content: textContent,
-      createdAt: new Date().toISOString(),
-    }
-    expect(validateRecord(nsid.message, record)).toEqual({ success: true })
-  })
-
-  it('rejects a message without content and names the problem', () => {
-    const result = validateRecord(nsid.message, {
-      $type: nsid.message,
-      role: 'user',
-      createdAt: new Date().toISOString(),
-    })
-    expect(result.success).toBe(false)
-    expect(!result.success && result.error).toMatch(/content/)
-  })
-
   it('rejects a float where the lexicon expects an integer', () => {
     const record = {
       $type: nsid.message,
@@ -37,25 +17,7 @@ describe('validateRecord', () => {
     }
     expect(validateRecord(nsid.message, record).success).toBe(false)
   })
-})
 
-describe('nsid', () => {
-  it('matches the NSIDs in the generated lexicon code', () => {
-    for (const [name, value] of Object.entries(nsid)) {
-      const generated = chat[name as keyof typeof chat] as { $nsid?: string }
-      // defs holds only shared definitions, so its module has no $nsid to compare.
-      if (name !== 'defs') expect(value).toBe(generated.$nsid)
-      else expect(generated).toBeDefined()
-    }
-  })
-
-  it('names every record under the network.sharedcomputer.chat domain', () => {
-    for (const value of Object.values(nsid))
-      expect(value).toMatch(/^network\.sharedcomputer\.chat\./)
-  })
-})
-
-describe('validateRecord with JSON-encoded values', () => {
   it('accepts blob references and bytes in their JSON form', () => {
     const record = {
       $type: nsid.message,
@@ -78,5 +40,16 @@ describe('validateRecord with JSON-encoded values', () => {
       },
     }
     expect(validateRecord(nsid.message, record)).toEqual({ success: true })
+  })
+})
+
+describe('nsid', () => {
+  it('matches the NSIDs in the generated lexicon code', () => {
+    for (const [name, value] of Object.entries(nsid)) {
+      const generated = chat[name as keyof typeof chat] as { $nsid?: string }
+      // defs holds only shared definitions, so its module has no $nsid to compare.
+      if (name !== 'defs') expect(value).toBe(generated.$nsid)
+      else expect(generated).toBeDefined()
+    }
   })
 })

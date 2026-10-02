@@ -11,8 +11,8 @@ import { type Account, getAccount } from '../auth/accounts.ts'
 import type { Db } from '../db/index.ts'
 import type { Logger } from '../logger.ts'
 import type { PluginHost } from '../plugins/host.ts'
+import type { PluginRuntime, RuntimeLease } from '../plugins/runtime.ts'
 import { isToolEnabled, readToolChoices } from '../plugins/user-tools.ts'
-import type { ModelCatalog } from '../providers/catalog.ts'
 import { mapEffort } from '../providers/effort.ts'
 import { safeErrorMessage } from '../safe-error.ts'
 import type { ChatService } from '../storage/chat-service.ts'
@@ -39,21 +39,28 @@ export type TurnBlobs = {
   put(account: Account, bytes: Uint8Array, mimeType: string): Promise<JsonRecord>
 }
 
+export type TurnSettings = {
+  ratePerMinute: number
+  maxSteps: number
+  timeoutMs: number
+  backfillWindowMs: number
+  systemPrompt: string
+}
+
 export type TurnRunnerDeps = {
   db: Db
   services: ChatServices
-  catalog: ModelCatalog
-  host?: PluginHost
+  /** Hold the current plugin runtime for the length of a turn. */
+  plugins: { acquire(): RuntimeLease }
   hub: StreamHub
   blobs: TurnBlobs
-  config: {
-    ratePerMinute: number
-    maxSteps: number
-    timeoutMs: number
-    backfillWindowMs: number
-    systemPrompt: string
-  }
-  appName: string
+  /** The current turn settings, read when each turn starts. */
+  settings: () => TurnSettings
+  appName: () => string
+  /** Whether the server may act for the user, checked before starting a turn. */
+  hasAccess: (did: string) => Promise<boolean>
+  /** The user's roles, given to tools when a turn starts. */
+  rolesOf: (did: string) => Promise<string[]>
   /** Fetch function passed to tools for retrieving URLs. */
   toolFetch: typeof fetch
   logger: Logger
@@ -168,6 +175,10 @@ export class TurnRunner {
 
   /** Start the turn a user message asks for, if it still needs one. */
   async start(did: string, skey: string, userRkey: string): Promise<StartResult> {
+    if (!(await this.deps.hasAccess(did))) {
+      this.deps.logger.info({ did, skey }, 'skipping a turn for a user without access')
+      return { status: 'skipped' }
+    }
     const loaded = await this.load(did, skey)
     const userMessage = loaded.messages.get(userRkey)
     const record = userMessage?.record as unknown as JsonRecord | undefined
@@ -193,7 +204,7 @@ export class TurnRunner {
       .execute()
 
     const starts = this.recentStarts(did)
-    if (starts.length >= this.deps.config.ratePerMinute) {
+    if (starts.length >= this.deps.settings().ratePerMinute) {
       const queue = this.queued.get(did) ?? []
       if (!queue.some((turn) => turn.skey === skey && turn.userRkey === userRkey))
         queue.push({ skey, userRkey, replyRkey, attempt })
@@ -203,12 +214,37 @@ export class TurnRunner {
       return { status: 'queued', replyRkey }
     }
 
+    const lease = this.deps.plugins.acquire()
+    let handedOff = false
+    try {
+      const result = await this.claim(loaded, skey, userRkey, generation, attempt, starts, lease)
+      handedOff = result.status === 'claimed'
+      return result
+    } finally {
+      if (!handedOff) lease.release()
+    }
+  }
+
+  /** Write the placeholder reply and start generating it, on the leased runtime. */
+  private async claim(
+    loaded: Loaded,
+    skey: string,
+    userRkey: string,
+    generation: { model?: ModelRef; effort?: string; tools?: string[] },
+    attempt: number,
+    starts: number[],
+    lease: RuntimeLease,
+  ): Promise<StartResult> {
+    const did = loaded.account.did
+    const replyRkey = replyKey(userRkey, attempt)
+    const conversationUri = loaded.chats.conversationUri(skey)
+    const userMessage = loaded.messages.get(userRkey) as BranchMessage
     const branch = branchTo(loaded.messages, userRkey)
     const model =
       generation.model ??
       lastReplyModel(branch) ??
       (loaded.preferences?.defaultModel as ModelRef | undefined) ??
-      this.deps.catalog.defaultModel()
+      (await lease.runtime.catalog.defaultModel())
     const effort = generation.effort ?? (loaded.preferences?.defaultEffort as string | undefined)
     const placeholder: JsonRecord = {
       $type: nsid.message,
@@ -244,9 +280,10 @@ export class TurnRunner {
     await this.clearRequest(conversationUri, userRkey, attempt)
 
     const work = this.generate(
+      lease.runtime,
       loaded,
       skey,
-      userMessage as BranchMessage,
+      userMessage,
       replyRkey,
       placeholder,
       model,
@@ -256,7 +293,10 @@ export class TurnRunner {
       .catch((err) =>
         this.deps.logger.error({ err, did, skey, replyRkey }, 'turn failed outside generation'),
       )
-      .finally(() => this.background.delete(work))
+      .finally(() => {
+        lease.release()
+        this.background.delete(work)
+      })
     this.background.add(work)
     return { status: 'claimed', replyRkey }
   }
@@ -289,26 +329,26 @@ export class TurnRunner {
   }
 
   /** The tools switched on for the user, for messages that name none. */
-  private async enabledTools(did: string): Promise<string[]> {
-    const registered = this.deps.host?.tools.list() ?? []
+  private async enabledTools(host: PluginHost, did: string): Promise<string[]> {
+    const registered = host.tools.list()
     if (!registered.length) return []
     const choices = await readToolChoices(this.deps.db, did)
     return registered.filter((item) => isToolEnabled(item, choices)).map((item) => item.name)
   }
 
   /** Whether a tool's output is wrapped before the model sees it. Unknown tools count as untrusted. */
-  private isUntrusted(name: string): boolean {
-    const registered = this.deps.host?.tools.get(name)
+  private isUntrusted(host: PluginHost, name: string): boolean {
+    const registered = host.tools.get(name)
     return !registered || registered.untrusted === true
   }
 
   private async tools(
+    host: PluginHost,
     requested: string[],
-    base: { user: string; conversation: string; signal: AbortSignal },
+    base: { user: string; conversation: string; roles: string[]; signal: AbortSignal },
     accumulator: PartAccumulator,
   ) {
     if (!requested.length) return undefined
-    const host = this.deps.host
     const set: ToolSet = {}
     // Each tool gets its own context, so its turn cache is private and lasts only this turn.
     const contextFor = (): ToolContext => ({
@@ -323,7 +363,7 @@ export class TurnRunner {
         value: wrapUntrusted(encode(output)),
       }),
     }
-    for (const registered of host?.tools.list() ?? []) {
+    for (const registered of host.tools.list()) {
       if (!requested.includes(registered.name)) continue
       const context = contextFor()
       set[registered.name] = tool({
@@ -333,7 +373,7 @@ export class TurnRunner {
         ...(registered.untrusted ? wrapped : {}),
       } as never)
     }
-    for (const source of host?.toolSources.list() ?? []) {
+    for (const source of host.toolSources.list()) {
       for (const definition of await source.list(base.user)) {
         const name = `${source.id}_${definition.name}`
         if (!requested.includes(name)) continue
@@ -376,6 +416,7 @@ export class TurnRunner {
   }
 
   private async generate(
+    runtime: PluginRuntime,
     loaded: Loaded,
     skey: string,
     userMessage: BranchMessage,
@@ -389,12 +430,11 @@ export class TurnRunner {
     const did = account.did
     const conversationUri = chats.conversationUri(skey)
     const key = this.streamKey(did, skey, replyRkey)
+    const { host, catalog } = runtime
+    const settings = this.deps.settings()
     const controller = new AbortController()
     this.running.set(key, controller)
-    const timeout = setTimeout(
-      () => controller.abort(new Error('timeout')),
-      this.deps.config.timeoutMs,
-    )
+    const timeout = setTimeout(() => controller.abort(new Error('timeout')), settings.timeoutMs)
     const accumulator = new PartAccumulator((event) => this.deps.hub.publish(key, event))
     const context: TurnContext = {
       user: did,
@@ -414,21 +454,27 @@ export class TurnRunner {
     try {
       if (!model)
         throw new Error('No model selected. Choose a model or set a default in your preferences.')
-      const resolved = await this.deps.catalog.resolve(did, model)
-      const hooks = this.deps.host?.hooks
+      const resolved = await catalog.resolve(did, model)
       const branch = branchTo(loaded.messages, userMessage.rkey)
       const requested = generation.tools
       if (requested?.length && !resolved.capabilities.tools)
         throw new TurnInputError('This model cannot use tools. Choose a model that can.')
-      const names = requested ?? (resolved.capabilities.tools ? await this.enabledTools(did) : [])
+      const names =
+        requested ?? (resolved.capabilities.tools ? await this.enabledTools(host, did) : [])
       const tools = await this.tools(
+        host,
         names,
-        { user: did, conversation: conversationUri, signal: controller.signal },
+        {
+          user: did,
+          conversation: conversationUri,
+          roles: await this.deps.rolesOf(did),
+          signal: controller.signal,
+        },
         accumulator,
       )
       context.tools = Object.keys(tools ?? {})
-      const base = fillBasePrompt(this.deps.config.systemPrompt, {
-        appName: this.deps.appName,
+      const base = fillBasePrompt(settings.systemPrompt, {
+        appName: this.deps.appName(),
         timeZone: timeZoneOf(loaded.preferences, this.deps.logger),
         now: new Date(this.now()),
       })
@@ -436,19 +482,19 @@ export class TurnRunner {
         instructions: buildInstructions(base, loaded.preferences, loaded.info),
         messages: branch,
       }
-      const prompt = hooks ? await hooks.filter('messages:beforeModel', initial, context) : initial
+      const prompt = await host.hooks.filter('messages:beforeModel', initial, context)
       const messages = await toModelMessages(prompt.messages, {
         provider: resolved.provider,
         capabilities: resolved.capabilities,
         readBlob: this.deps.blobs.reader(account, skey),
-        isUntrusted: (name) => this.isUntrusted(name),
+        isUntrusted: (name) => this.isUntrusted(host, name),
       })
       const result = streamText({
         model: resolved.model,
         instructions: prompt.instructions || undefined,
         messages,
         tools,
-        stopWhen: isStepCount(this.deps.config.maxSteps),
+        stopWhen: isStepCount(settings.maxSteps),
         reasoning: resolved.capabilities.reasoning
           ? mapEffort(effort, this.deps.logger)
           : undefined,
@@ -477,9 +523,9 @@ export class TurnRunner {
     }
 
     let content: JsonRecord = { $type: defs('plainContent'), parts: accumulator.parts }
-    if ((status === 'complete' || status === 'cancelled') && this.deps.host) {
+    if (status === 'complete' || status === 'cancelled') {
       try {
-        content = (await this.deps.host.hooks.filter(
+        content = (await host.hooks.filter(
           'message:afterModel',
           content as never,
           context,
@@ -525,13 +571,11 @@ export class TurnRunner {
       .where('conversation_uri', '=', conversationUri)
       .where('reply_rkey', '=', replyRkey)
       .execute()
-    if (this.deps.host) {
-      await this.deps.host.hooks.action(
-        'turn:after',
-        { ...context, reply: { rkey: replyRkey, record: final as never } },
-        this.deps.logger,
-      )
-    }
+    await host.hooks.action(
+      'turn:after',
+      { ...context, reply: { rkey: replyRkey, record: final as never } },
+      this.deps.logger,
+    )
   }
 
   /** Reply with an error to a user message that failed validation. */
@@ -562,7 +606,7 @@ export class TurnRunner {
       const record = event.record
       if (record.role !== 'user' || !record.generation) return
       const recent =
-        Date.parse(String(record.createdAt)) >= this.now() - this.deps.config.backfillWindowMs
+        Date.parse(String(record.createdAt)) >= this.now() - this.deps.settings().backfillWindowMs
       if (!event.live && !recent) return
       this.start(event.did, event.skey, event.rkey).catch((err) =>
         this.deps.logger.error(
@@ -607,7 +651,7 @@ export class TurnRunner {
         this.deps.logger.warn({ err, claim }, 'could not mark an interrupted reply')
       }
     }
-    const cutoff = new Date(this.now() - this.deps.config.backfillWindowMs).toISOString()
+    const cutoff = new Date(this.now() - this.deps.settings().backfillWindowMs).toISOString()
     await this.deps.db.deleteFrom('turn_request').where('requested_at', '<', cutoff).execute()
     const requests = await this.deps.db.selectFrom('turn_request').selectAll().execute()
     for (const request of requests) {

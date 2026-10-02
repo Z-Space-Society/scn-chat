@@ -23,7 +23,7 @@ The OAuth state and session stores are `oauth_state` and `oauth_session` tables,
 
 The requested scope is `atproto include:network.sharedcomputer.chat.permissions blob:*/*`, with the permission set NSID taken from the lexicon module, never typed as a literal. The permission set grants the conversation, shared-read, and settings permissions. Blob access is requested as its own `blob:*/*` scope, because PDSs only take `space`, `repo`, and `rpc` permissions from a permission set and drop the rest. The PDS resolves it through the lexicon's DNS record, so the lexicons must be published under `sharedcomputer.network` before anyone can log in. A fork publishes its own lexicons under its own domain.
 
-Before the lexicons are published, setting `auth.scopeMode` to `raw` lets a PDS without spaces sign users in, for testing the local fallback. It requests the equivalent raw scopes instead, built from the same lexicon module: `space:` scopes for the conversation, shared-read, and settings permissions with every collection listed, plus `blob:*/*`. The default is `permission-set`, and production startup refuses `raw`.
+Before the lexicons are published, setting `OAUTH_SCOPE_MODE` to `raw` lets a PDS without spaces sign users in, for testing the local fallback. It requests the equivalent raw scopes instead, built from the same lexicon module: `space:` scopes for the conversation, shared-read, and settings permissions with every collection listed, plus `blob:*/*`. The default is `permission-set`, and production startup refuses `raw`.
 
 ### Login
 
@@ -45,7 +45,7 @@ The `account` table holds the DID, current handle, PDS URL, storage mode (`space
 
 ### Web sessions
 
-The browser gets an `scn_session` cookie holding 32 random bytes, base64url encoded. It is `HttpOnly`, `SameSite=Lax`, `Path=/`, and `Secure` whenever `PUBLIC_URL` is HTTPS. The `web_session` table stores the token's SHA-256 hash, the DID, and creation and expiry times. Sessions last `auth.sessionTtlDays` days, default 30, and are extended when used in the last half of their life.
+The browser gets an `scn_session` cookie holding 32 random bytes, base64url encoded. It is `HttpOnly`, `SameSite=Lax`, `Path=/`, and `Secure` whenever `PUBLIC_URL` is HTTPS. The `web_session` table stores the token's SHA-256 hash, the DID, and creation and expiry times. Sessions last `sessions.ttlDays` days, an admin setting with a default of 30, and are extended when used in the last half of their life.
 
 Hono middleware resolves the cookie to the account on every `/api` request. Routes that need a user return 401 without one.
 
@@ -61,21 +61,9 @@ getPdsClient(did): Promise<Client>
 
 It calls `client.restore(did)` and wraps the session in `@atproto/lex-client`'s `Client`. Token refresh happens inside the OAuth library. If the session is gone or refresh fails, it throws `SessionExpired`. The web UI answers that by sending the user to log in again, and a background turn records it as the reply's error.
 
-### Roles
+### Roles and access
 
-Roles decide what a user may do beyond using their own API keys. In phase 1 they only gate admin models, as the providers spec describes.
-
-Roles are defined in `config.yml`:
-
-```yaml
-roles:
-  staff: ['did:plc:abc...', 'did:plc:def...']
-  beta: ['did:plc:ghi...']
-```
-
-- Every signed-in user has the implicit `user` role. The name `user` cannot be defined in the config.
-- Role names match `^[a-z][a-z0-9-]*$`, and every entry must be a valid DID. Startup fails otherwise, naming the role or entry.
-- `rolesFor(did)` returns `user` plus every configured role listing the DID. Roles are read from the config on each call, so they apply without a new login once the server restarts with a changed config.
+Roles, access, and viewers are described in the admin spec. Roles live in the database, and the session middleware works out a user's roles and access level on every request. The callback checks access before it creates the account or a web session.
 
 ### Logout
 
@@ -89,32 +77,26 @@ roles:
 | `GET /oauth/jwks.json` | Public signing keys |
 | `GET /oauth/login` | Start login |
 | `GET /oauth/callback` | Finish login |
-| `GET /api/me` | The signed-in user's DID, handle, storage mode, and roles |
+| `GET /api/me` | The signed-in user's DID, handle, storage mode, roles, whether they are an admin, and their access level |
 | `POST /api/logout` | Sign out |
 
 ### Configuration
 
-Public settings, in `config.yml`:
-
-| Setting | Override | Purpose |
-|---|---|---|
-| `auth.scopeMode` | `OAUTH_SCOPE_MODE` | `permission-set` (default) or `raw`, for local development only. |
-| `auth.sessionTtlDays` | `SESSION_TTL_DAYS` | Web session lifetime. Default 30. |
-| `auth.plcUrl` | `PLC_URL` | The PLC directory. Default `https://plc.directory`. |
-
-Secrets, in `.env`:
+In the environment:
 
 | Variable | Purpose |
 |---|---|
+| `OAUTH_SCOPE_MODE` | `permission-set` (default) or `raw`, for local development only. |
+| `PLC_URL` | The PLC directory. Default `https://plc.directory`. |
 | `OAUTH_PRIVATE_KEYS` | JSON array of ES256 private JWKs, each with a `kid`. Required in production. |
+
+The web session lifetime is the `sessions.ttlDays` admin setting, default 30. A change applies to sessions created or extended after it.
 
 A `pnpm keys` script prints a fresh `OAUTH_PRIVATE_KEYS` value and a `SECRET_KEY` for the providers spec.
 
 ## Scope Boundaries
 
 - No accounts outside atproto, and no passwords.
-- No admin role or admin screens in phase 1. Admin configuration lives in the config file.
-- No roles stored in the database, and no UI for assigning them.
 - No migration of `local` accounts to spaces.
 - No revoking the OAuth session on ordinary logout.
 
@@ -141,7 +123,7 @@ A `pnpm keys` script prints a fresh `OAUTH_PRIVATE_KEYS` value and a `SECRET_KEY
 - [ ] The requested scope includes the permission set, with its NSID taken from the lexicon module.
 - [ ] An `invalid_scope` error from the PDS is shown on the login page.
 - [ ] A handle that doesn't resolve shows an error suggesting the DID, and a DID that doesn't resolve says it wasn't found.
-- [ ] `auth.scopeMode: raw` requests raw space and blob scopes equivalent to the permission set, and production startup refuses it.
+- [ ] `OAUTH_SCOPE_MODE=raw` requests raw space and blob scopes equivalent to the permission set, and production startup refuses it.
 - [ ] A new account whose granted scope allows spaces gets storage mode `space`.
 - [ ] A new account whose granted scope lacks spaces gets storage mode `local`.
 - [ ] A `space` account whose granted scope lacks spaces fails login with an explanation.
@@ -151,6 +133,4 @@ A `pnpm keys` script prints a fresh `OAUTH_PRIVATE_KEYS` value and a `SECRET_KEY
 - [ ] Sessions expire after the TTL and are extended when used in the second half of it.
 - [ ] `getPdsClient` throws `SessionExpired` when the OAuth session cannot be restored.
 - [ ] Logout clears the web session and keeps the OAuth session, and logout everywhere revokes it.
-- [ ] `rolesFor` returns `user` plus every configured role that lists the DID.
-- [ ] A config defining a role named `user`, an invalid role name, or an invalid DID fails startup, naming it.
 - [ ] `GET /api/me` includes the user's roles.

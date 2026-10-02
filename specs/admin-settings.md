@@ -112,6 +112,7 @@ Provider IDs appear in the model references stored in users' records, so each pr
 - Every setting lives in either the environment or the database, never both, so nothing is silently ignored the way Open WebUI's persistent config is.
 - `ALLOW_PRIVATE_NETWORKS` stays in the environment. It decides what the server's fetchers may reach, which is a property of the deployment, not something to change from a browser.
 - Session lifetime changes don't touch existing sessions.
+- `config.yml` is dropped from `.gitignore`, so a leftover local file shows up in `git status` to be deleted.
 
 ## Acceptance Criteria
 

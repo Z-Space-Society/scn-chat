@@ -8,8 +8,23 @@ import { z } from 'zod'
 
 export const optionsSchema = z
   .object({
-    model: z.object({ provider: z.string().min(1), id: z.string().min(1) }).optional(),
-    maxWords: z.number().int().min(1).max(20).optional(),
+    model: z
+      .object({
+        provider: z.string().min(1).meta({ title: 'Provider' }),
+        id: z.string().min(1).meta({ title: 'Model ID' }),
+      })
+      .optional()
+      .meta({
+        title: 'Title model',
+        description: 'Leave empty to use the chat model.',
+      }),
+    maxWords: z
+      .number()
+      .int()
+      .min(1)
+      .max(20)
+      .optional()
+      .meta({ title: 'Maximum number of words in a chat title' }),
   })
   .strict()
 

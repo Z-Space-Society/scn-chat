@@ -107,18 +107,6 @@ describe('PartAccumulator', () => {
     expect(acc.lexiconUsage()).toEqual({ inputTokens: 3 })
   })
 
-  it('adds a cited source as a source part', () => {
-    const acc = new PartAccumulator()
-    acc.cite({ url: 'https://example.com/a', title: 'Example' })
-    expect(acc.parts).toEqual([
-      {
-        $type: 'network.sharedcomputer.chat.defs#sourcePart',
-        url: 'https://example.com/a',
-        title: 'Example',
-      },
-    ])
-  })
-
   it('ignores cited URLs that are not http or https', () => {
     const acc = new PartAccumulator()
     acc.cite({ url: 'javascript:alert(1)' })

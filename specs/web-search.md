@@ -2,7 +2,7 @@
 
 ## Summary
 
-Two plugins give the model access to the web through tool calls. `@scn-chat/plugin-web-search` registers `web_search`, which queries a search engine and returns titles, URLs, and snippets. `@scn-chat/plugin-web-fetch` registers `web_fetch`, which downloads a page and returns its readable text as Markdown. The model decides when to call them. The admin picks a default search engine and key in `config.yml`, and a user can override it with their own engine and key unless the admin locks it. Search is off until a user or the admin turns it on. Fetch is on whenever the admin lists the plugin, limited by an optional domain allow or deny list. Users can switch either tool off in their settings when the admin allows it. Both tools cite what they used, which the web UI shows as source links, and both are marked untrusted, so core wraps their output before the model sees it.
+Two plugins give the model access to the web through tool calls. `@scn-chat/plugin-web-search` registers `web_search`, which queries a search engine and returns titles, URLs, and snippets. `@scn-chat/plugin-web-fetch` registers `web_fetch`, which downloads a page and returns its readable text as Markdown. The model decides when to call them. The admin picks a default search engine and key in the admin area, and a user can override it with their own engine and key unless the admin locks it. Search is off until a user or the admin turns it on. Fetch is on whenever the admin lists the plugin, limited by an optional domain allow or deny list. Users can switch either tool off in their settings when the admin allows it. Both tools cite what they used, which the web UI shows as source links, and both are marked untrusted, so core wraps their output before the model sees it.
 
 This spec also adds things to core that any tool plugin can use: per-user tool switches, a network-guarded `fetch` for tools, a way for tools to cite sources, wrapping of untrusted tool output, a cache that lasts one turn, and access to file ingesters.
 
@@ -65,6 +65,8 @@ In the web UI, each plugin's settings block shows a checkbox per tool with `user
 type ToolContext = {
   user: string
   conversation: string
+  /** The user's roles when the turn started. */
+  roles: string[]
   signal: AbortSignal
   /** Fetch for URLs from users or the model, refused for private network addresses. */
   fetch: typeof globalThis.fetch
@@ -75,7 +77,8 @@ type ToolContext = {
 }
 ```
 
-- `fetch` is the server's guarded fetch, or plain `fetch` when `app.allowPrivateNetworks` is set. The guard checks the connected socket's address and refuses redirects. A caller that passes `redirect: 'manual'` gets the redirect back and follows it itself, so each hop goes through the guard again. URLs the admin wrote in `config.yml` are trusted, and plugins use plain `fetch` for them.
+- `fetch` is the server's guarded fetch, or plain `fetch` when `ALLOW_PRIVATE_NETWORKS` is set. The guard checks the connected socket's address and refuses redirects. A caller that passes `redirect: 'manual'` gets the redirect back and follows it itself, so each hop goes through the guard again. URLs the admin set in a plugin's options are trusted, and plugins use plain `fetch` for them.
+- `roles` are the user's roles, worked out once when the turn starts, so a tool can gate what the admin pays for, such as an admin key.
 - `turnCache` is a map private to the tool, created when the turn starts and dropped when it ends, whether it completes, errors, or is cancelled. Nothing in it outlives the turn, as the founding principle requires.
 - `cite` adds a `sourcePart` to the reply being written, through the same accumulator that handles provider `source` events. Only `http` and `https` URLs are accepted, and others are dropped. A URL already cited in the reply, by a tool or by the provider, is not added again. Titles are cut to the lexicon's 300 graphemes.
 
@@ -101,21 +104,20 @@ The plugin API version stays 1, since every change is additive. `@scn-chat/plugi
 
 ### Plugin: web search
 
-`plugins/web-search` exports a factory and an `optionsSchema`:
+`plugins/web-search` exports a factory and an `optionsSchema`, edited in the admin area:
 
-```yaml
-- package: '@scn-chat/plugin-web-search'
-  options:
-    engine: tavily            # required: duckduckgo, brave, tavily, searxng, or kagi
-    apiKey: ${TAVILY_API_KEY} # required for brave, tavily, and kagi
-    baseURL: https://searx.example.org # required for searxng
-    enabledByDefault: false   # default false
-    userToggle: true          # default true
-    userEngines: true         # default true
-    maxResults: 5             # 1 to 20, default 5
-```
+| Option | Default | Meaning |
+|---|---|---|
+| `engine` | required | `duckduckgo`, `brave`, `tavily`, `searxng`, or `kagi`. |
+| `apiKey` | | Secret. Required for brave, tavily, and kagi. |
+| `baseURL` | | Required for searxng. |
+| `adminEngineRoles` | `['user']` | The roles that may search with the admin's engine and key. |
+| `enabledByDefault` | `false` | |
+| `userToggle` | `true` | |
+| `userEngines` | `true` | |
+| `maxResults` | `5` | 1 to 20. |
 
-There is no default engine, so options without `engine` fail startup, as do options that name an engine needing a key without one, or `searxng` without `baseURL`.
+There is no default engine, so options without `engine` are refused, as do options that name an engine needing a key without one, or `searxng` without `baseURL`.
 
 When `userEngines` is true, the plugin has user settings:
 
@@ -127,8 +129,10 @@ When `userEngines` is true, the plugin has user settings:
 
 Each call resolves an engine this way:
 
-1. User engine `default`: the admin's engine, key, and `baseURL`, with plain `fetch`.
+1. User engine `default`, or user engines off: the admin's engine, key, and `baseURL`, with plain `fetch`.
 2. Any other user engine: the user's key and `baseURL`. When the user picked the admin's engine and left a field blank, the admin's value fills it. A user `baseURL` is reached through `context.fetch`. A missing required key or `baseURL` is a tool error such as "Add your Kagi API key in the web search settings."
+
+The admin's engine, key, and `baseURL` are only used for users holding a role in `adminEngineRoles`, from `context.roles`. Anyone else gets a tool error: "Add your own search engine in the web search settings to search the web." with user engines on, or "Web search isn't available to you." with them off. The admin's values never fill a blank for them either.
 
 The tool:
 
@@ -226,7 +230,7 @@ The remaining channel is the model putting conversation text into a URL it fetch
 
 ### Config and docs
 
-- `config.example.yml` lists both plugins, with web search on DuckDuckGo and `enabledByDefault: false`.
+- Both plugins describe their options with titles for the admin form. Web search marks its admin `apiKey` secret, and shows the key and base URL only for engines that use them.
 - `docs/plugins.md` documents `defaultEnabled`, `userToggle`, `context.fetch`, `context.cite`, `untrusted`, and `toolContextForTest`.
 - The web search README notes that Brave's free credit requires crediting Brave Search on the site, and that DuckDuckGo is scraped and best effort.
 
@@ -275,7 +279,7 @@ Core:
 - [ ] `GET /api/plugins/settings` lists each plugin's tools with their enabled state and `userToggle`.
 - [ ] `PUT /api/plugins/:id/tools/:name` stores the choice, returns 404 for another plugin's tool, and 400 for a tool without `userToggle`.
 - [ ] The settings page shows a checkbox per switchable tool and saves changes.
-- [ ] `context.fetch` refuses private network addresses, including through redirects, unless `app.allowPrivateNetworks` is set.
+- [ ] `context.fetch` refuses private network addresses, including through redirects, unless `ALLOW_PRIVATE_NETWORKS` is set.
 - [ ] `context.cite` adds a `sourcePart` to the reply, ignores non-HTTP URLs, and skips URLs already cited.
 - [ ] `context.turnCache` keeps values between calls of the same tool in a turn, is separate for each tool, and is empty in the next turn.
 - [ ] `ctx.ingesters.ingest` uses the highest priority ingester for the type and returns undefined when none accepts it, and `accepts` agrees with it.
@@ -294,6 +298,8 @@ Web search:
 - [ ] Results are cut to `maxResults`, and each is cited.
 - [ ] The tool description lists the admin's engine's operators.
 - [ ] With `userEngines: false`, the plugin exposes no engine settings and always uses the admin's engine.
+- [ ] A user outside `adminEngineRoles` can't search with the admin's engine, and the admin's key never fills a blank for them, but they can use their own engine.
+- [ ] `context.roles` holds the user's roles when the turn started.
 - [ ] The key field is shown only for engines that need a key, and the base URL field only for engines that need one, so neither shows for `default`.
 
 Prompt injection:
@@ -331,4 +337,4 @@ Web fetch:
 - `apps/server/src/db/migrations/0006_user_tool_settings.ts`
 - `apps/web/src/pages/SettingsPage.tsx`
 - `plugins/web-search/`, `plugins/web-fetch/`
-- `config.example.yml`, `docs/plugins.md`
+- `docs/plugins.md`

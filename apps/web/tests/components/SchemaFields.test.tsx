@@ -6,34 +6,11 @@ import { SchemaFields } from '../../src/components/SchemaFields.tsx'
 const schema = {
   properties: {
     engine: { type: 'string', enum: ['duckduckgo', 'kagi'] },
-    apiKey: { type: 'string' },
-    results: { type: 'integer' },
     safe: { type: 'boolean' },
-    weird: { type: 'object' },
   },
 }
 
 describe('SchemaFields', () => {
-  it('renders an input for each supported type, a password for secrets, and marks unsupported types', () => {
-    render(
-      <SchemaFields
-        schema={schema}
-        values={{ engine: 'kagi' }}
-        secretFields={['apiKey']}
-        secretsSet={['apiKey']}
-        onChange={() => {}}
-      />,
-    )
-    expect(screen.getByRole('combobox')).toHaveValue('kagi')
-    expect(screen.getByPlaceholderText('Saved. Leave blank to keep.')).toHaveAttribute(
-      'type',
-      'password',
-    )
-    expect(screen.getByRole('spinbutton')).toBeInTheDocument()
-    expect(screen.getByRole('checkbox')).toBeInTheDocument()
-    expect(screen.getByText('Unsupported setting type')).toBeInTheDocument()
-  })
-
   it('reports each change with its field name', async () => {
     const onChange = vi.fn()
     render(
@@ -80,5 +57,74 @@ describe('SchemaFields', () => {
     rerender(<SchemaFields {...props} values={{ engine: 'kagi' }} />)
     expect(screen.getByLabelText('apiKey')).toBeInTheDocument()
     expect(screen.getByLabelText('region')).toBeEnabled()
+  })
+
+  it('edits a list of strings one per line, leaving out blank lines', async () => {
+    const onChange = vi.fn()
+    render(
+      <SchemaFields
+        schema={{ properties: { domains: { type: 'array', items: { type: 'string' } } } }}
+        values={{ domains: ['a.example'] }}
+        onChange={onChange}
+      />,
+    )
+    const box = screen.getByRole('textbox')
+    expect(box).toHaveValue('a.example')
+    await userEvent.type(box, '{Enter}{Enter}b.example')
+    expect(onChange).toHaveBeenLastCalledWith('domains', ['a.example', 'b.example'])
+  })
+
+  it('shows issues for a nested field and reports the whole object on change', async () => {
+    const onChange = vi.fn()
+    render(
+      <SchemaFields
+        schema={{
+          properties: {
+            safetyNet: {
+              type: 'object',
+              title: 'Safety net',
+              properties: { enabled: { type: 'boolean' }, minutes: { type: 'integer' } },
+            },
+          },
+        }}
+        values={{ safetyNet: { enabled: false, minutes: 15 } }}
+        issues={[{ path: ['safetyNet', 'minutes'], message: 'Too small' }]}
+        onChange={onChange}
+      />,
+    )
+    expect(screen.getByRole('alert')).toHaveTextContent('Too small')
+    await userEvent.click(screen.getByRole('checkbox'))
+    expect(onChange).toHaveBeenCalledWith('safetyNet', { enabled: true, minutes: 15 })
+  })
+
+  it('offers to clear a stored secret when the form supports it', async () => {
+    const onClear = vi.fn()
+    render(
+      <SchemaFields
+        schema={{ properties: { apiKey: { type: 'string' } } }}
+        values={{}}
+        secretFields={['apiKey']}
+        secretsSet={['apiKey']}
+        cleared={['apiKey']}
+        onClear={onClear}
+        onChange={() => {}}
+      />,
+    )
+    expect(screen.getByPlaceholderText('Saved. Leave blank to keep.')).toBeDisabled()
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Clear' }))
+    expect(onClear).toHaveBeenCalledWith('apiKey', false)
+  })
+
+  it('leaves a number field empty when it has no value, and reports clearing it as unset', async () => {
+    const onChange = vi.fn()
+    render(
+      <SchemaFields
+        schema={{ properties: { words: { type: 'integer' } } }}
+        values={{ words: 5 }}
+        onChange={onChange}
+      />,
+    )
+    await userEvent.clear(screen.getByRole('spinbutton'))
+    expect(onChange).toHaveBeenLastCalledWith('words', undefined)
   })
 })

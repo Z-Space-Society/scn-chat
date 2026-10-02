@@ -101,7 +101,7 @@ Hooks receive a turn context holding the user's DID, the conversation's URI and 
 
 ### Configuration
 
-The `turns` section of `config.yml` sets `ratePerMinute`, `maxSteps`, `timeoutSeconds`, `backfillMinutes`, and `systemPrompt`. The environment variables `TURN_RATE_PER_MINUTE`, `TURN_MAX_STEPS`, `TURN_TIMEOUT_SECONDS`, and `TURN_BACKFILL_MINUTES` override them.
+The `turns` admin setting, from the admin-settings spec, holds `ratePerMinute`, `maxSteps`, `timeoutSeconds`, `backfillMinutes`, and `systemPrompt`. A turn reads them when it starts, so a change applies to the next turn. Each turn holds the plugin runtime it started with until it ends, as the admin-plugins spec describes, and the runner starts no turn for a user without access.
 
 ## Scope Boundaries
 

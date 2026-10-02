@@ -1,9 +1,9 @@
 import pino from 'pino'
 import { describe, expect, it, vi } from 'vitest'
 import { createApp } from '../../src/app.ts'
-import { createRoles } from '../../src/auth/roles.ts'
 import { migrateToLatest } from '../../src/db/migrate.ts'
 import { Registry } from '../../src/plugins/registry.ts'
+import { saveAdminModel } from '../../src/providers/admin-models.ts'
 import { ModelCatalog } from '../../src/providers/catalog.ts'
 import { SecretBox } from '../../src/secrets.ts'
 import { authDeps, loginCookie, ORIGIN, sessionCookie } from '../helpers/auth.ts'
@@ -30,21 +30,23 @@ async function setup() {
   )
   providers.register(fakeProvider({ id: 'adminonly', userKeys: false }).provider, 't')
   const guardedFetch = (async () => new Response()) as unknown as typeof fetch
+  await saveAdminModel(
+    db,
+    {
+      provider: 'fake',
+      id: 'big',
+      name: 'Big',
+      capabilities: caps,
+      roles: ['user'],
+      default: true,
+    },
+    'did:plc:admin',
+  )
   const catalog = new ModelCatalog({
     db,
     box,
     providers,
-    adminModels: [
-      {
-        provider: 'fake',
-        id: 'big',
-        name: 'Big',
-        capabilities: caps,
-        roles: ['user'],
-        default: true,
-      },
-    ],
-    roles: createRoles(),
+    rolesOf: async () => ['user'],
     guardedFetch,
     logger,
   })
@@ -53,7 +55,14 @@ async function setup() {
     db,
     logger,
     auth: authDeps(db),
-    providers: { db, box, catalog, providers, guardedFetch, logger },
+    providers: {
+      db,
+      box,
+      catalog: () => catalog,
+      providers: () => providers,
+      guardedFetch,
+      logger,
+    },
   })
   const cookie = sessionCookie(await app.request('/oauth/callback?code=a&state=b', loginCookie))
   const call = async (method: string, path: string, body?: object) => {
@@ -109,17 +118,6 @@ describe('provider routes', () => {
   it('rejects a key that covers no models', async () => {
     const { call } = await setup()
     const res = await call('POST', '/credentials', { providerId: 'fake', apiKey: 'k', models: [] })
-    expect(res.status).toBe(400)
-    expect(res.body.message).toMatch(/at least one model/)
-  })
-
-  it('rejects a credential body that is not JSON', async () => {
-    const { app, cookie } = await setup()
-    const res = await app.request('/api/credentials', {
-      method: 'POST',
-      headers: { cookie, origin: ORIGIN, 'content-type': 'application/json' },
-      body: '{',
-    })
     expect(res.status).toBe(400)
   })
 

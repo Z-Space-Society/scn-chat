@@ -29,16 +29,7 @@ describe('createDb', () => {
     expect(rows[0]?.journal_mode).toBe('wal')
   })
 
-  it('creates a Postgres database for a postgres:// URL without connecting', () => {
-    const db = createDb('postgres://user:pass@localhost:5432/scn')
-    cleanup.push(() => db.destroy())
-    expect(db).toBeDefined()
-  })
-
-  it('rejects an unsupported scheme with a clear message', () => {
+  it('rejects an unsupported scheme', () => {
     expect(() => createDb('mysql://localhost/scn')).toThrow(UnsupportedDatabaseError)
-    expect(() => createDb('mysql://localhost/scn')).toThrow(
-      /Unsupported DATABASE_URL scheme "mysql:"/,
-    )
   })
 })

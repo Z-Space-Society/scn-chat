@@ -18,16 +18,39 @@ export function createWebSearch(list: SearchEngine[]) {
   const ids = list.map((engine) => engine.id) as [string, ...string[]]
   const find = (id: string) => list.find((engine) => engine.id === id) as SearchEngine
 
+  // The key and base URL fields only appear for engines that use them, so not for 'default'.
+  const shownFor = (need: 'needsKey' | 'needsBaseURL'): FieldRule => ({
+    effect: 'SHOW',
+    condition: {
+      scope: '#/properties/engine',
+      schema: { enum: list.filter((engine) => engine[need]).map((engine) => engine.id) },
+    },
+  })
+
   const optionsSchema = z
     .object({
-      engine: z.enum(ids),
-      apiKey: z.string().min(1).optional(),
-      baseURL: z.url({ protocol: /^https?$/ }).optional(),
-      enabledByDefault: z.boolean().default(false),
-      userToggle: z.boolean().default(true),
-      /** Let users pick their own engine and key. */
-      userEngines: z.boolean().default(true),
-      maxResults: z.number().int().min(1).max(20).default(5),
+      engine: z.enum(ids).meta({ title: 'Engine' }),
+      apiKey: z
+        .string()
+        .min(1)
+        .optional()
+        .meta({ title: 'API key', secret: true, rule: shownFor('needsKey') }),
+      baseURL: z
+        .url({ protocol: /^https?$/ })
+        .optional()
+        .meta({ title: 'Base URL', rule: shownFor('needsBaseURL') }),
+      adminEngineRoles: z.array(z.string().min(1)).min(1).default(['user']).meta({
+        title: 'List of roles that can use this search engine',
+        description:
+          'Any users not in the above role will need to configure their own search engine.',
+      }),
+      enabledByDefault: z.boolean().default(false).meta({ title: 'On for new users' }),
+      userToggle: z.boolean().default(true).meta({ title: 'Users can toggle the web search tool' }),
+      userEngines: z
+        .boolean()
+        .default(true)
+        .meta({ title: 'Allow users to choose their own search engine' }),
+      maxResults: z.number().int().min(1).max(20).default(5).meta({ title: 'Results per search' }),
     })
     .strict()
     .superRefine((options, issues) => {
@@ -46,14 +69,6 @@ export function createWebSearch(list: SearchEngine[]) {
         })
     })
 
-  // The key and base URL fields only appear for engines that use them, so not for 'default'.
-  const shownFor = (need: 'needsKey' | 'needsBaseURL'): FieldRule => ({
-    effect: 'SHOW',
-    condition: {
-      scope: '#/properties/engine',
-      schema: { enum: list.filter((engine) => engine[need]).map((engine) => engine.id) },
-    },
-  })
   const userSettings = z.object({
     engine: z.enum(['default', ...ids]).default('default'),
     apiKey: z
@@ -66,13 +81,23 @@ export function createWebSearch(list: SearchEngine[]) {
   type Options = z.infer<typeof optionsSchema>
   type UserSettings = z.infer<typeof userSettings>
 
-  /** The engine, key, and base URL for a user, with the admin's filling blanks for the admin's engine. */
-  function resolve(options: Options, user: UserSettings | undefined) {
+  /**
+   * The engine, key, and base URL for a user.
+   */
+  function resolve(options: Options, user: UserSettings | undefined, roles: string[]) {
     const admin = find(options.engine)
-    if (!user || user.engine === 'default')
+    const allowed = roles.some((role) => options.adminEngineRoles.includes(role))
+    if (!user || user.engine === 'default') {
+      if (!allowed)
+        throw new SearchError(
+          user
+            ? 'Add your own search engine in the web search settings to search the web.'
+            : "Web search isn't available for your roles.",
+        )
       return { engine: admin, apiKey: options.apiKey, baseURL: options.baseURL, userURL: false }
+    }
     const engine = find(user.engine)
-    const same = engine.id === admin.id
+    const same = allowed && engine.id === admin.id
     const apiKey = user.apiKey || (same ? options.apiKey : undefined)
     const baseURL = user.baseURL || (same ? options.baseURL : undefined)
     if (engine.needsKey && !apiKey)
@@ -107,7 +132,7 @@ export function createWebSearch(list: SearchEngine[]) {
           untrusted: true,
           run: async ({ query }, context) => {
             const user = options.userEngines ? await ctx.userSettings(context.user) : undefined
-            const { engine, apiKey, baseURL, userURL } = resolve(options, user)
+            const { engine, apiKey, baseURL, userURL } = resolve(options, user, context.roles)
             const results = await runSearch(
               engine,
               {

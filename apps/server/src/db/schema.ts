@@ -24,7 +24,12 @@ export type Database = {
     created_at: string
     last_login_at: string
     last_active_at: string
+    viewer_only: Generated<number>
+    suspended_at: string | null
+    suspended_by: string | null
+    suspended_reason: string | null
   }
+  account_invite: { did: string; added_by: string; added_at: string }
   web_session: { token_hash: string; did: string; created_at: string; expires_at: string }
   oauth_state: { key: string; value: string; updated_at: string }
   oauth_session: { key: string; value: string; updated_at: string }
@@ -79,5 +84,38 @@ export type Database = {
     reply_rkey: string
     owner_did: string
     claimed_at: string
+  }
+  app_setting: { key: string; value_json: string; updated_at: string; updated_by: string }
+  role: {
+    name: string
+    description: string
+    pds_hosts_json: string
+    handle_domains_json: string
+    created_at: string
+    updated_at: string
+  }
+  role_member: { role: string; did: string; added_at: string; added_by: string }
+  plugin_instance: {
+    id: string
+    package: string
+    position: number
+    enabled: number
+    options_json: string
+    secrets_encrypted: string | null
+    created_at: string
+    updated_at: string
+    updated_by: string
+  }
+  admin_model: {
+    provider: string
+    model_id: string
+    name: string
+    capabilities_json: string
+    roles_json: string
+    is_default: number
+    position: number
+    created_at: string
+    updated_at: string
+    updated_by: string
   }
 }

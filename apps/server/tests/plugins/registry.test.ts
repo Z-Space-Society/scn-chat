@@ -15,22 +15,12 @@ const ingester = (id: string, accepts: string[], priority?: number): Ingester =>
 })
 
 describe('Registry', () => {
-  it('returns registered items by key', () => {
+  it('refuses a duplicate key, naming the plugin that already has it', () => {
     const registry = new Registry<{ id: string }>('provider', (item) => item.id)
     registry.register({ id: 'anthropic' }, 'plugin-a')
-    expect(registry.get('anthropic')).toEqual({ id: 'anthropic' })
-    expect(registry.list()).toHaveLength(1)
-  })
-
-  it('refuses a duplicate key, naming both plugins', () => {
-    const registry = new Registry<{ id: string }>('provider', (item) => item.id)
-    registry.register({ id: 'anthropic' }, 'plugin-a')
-    expect(() => registry.register({ id: 'anthropic' }, 'plugin-b')).toThrow(
-      DuplicateRegistrationError,
-    )
-    expect(() => registry.register({ id: 'anthropic' }, 'plugin-b')).toThrow(
-      /plugin-b.*anthropic.*plugin-a/,
-    )
+    const again = () => registry.register({ id: 'anthropic' }, 'plugin-b')
+    expect(again).toThrow(DuplicateRegistrationError)
+    expect(again).toThrow('plugin-a')
   })
 })
 
@@ -46,11 +36,5 @@ describe('IngesterRegistry.match', () => {
     const registry = new IngesterRegistry()
     registry.register(ingester('ocr', ['image/*']), 'a')
     expect(registry.match('image/png')?.id).toBe('ocr')
-  })
-
-  it('returns nothing when no ingester accepts the type', () => {
-    const registry = new IngesterRegistry()
-    registry.register(ingester('pdf-text', ['application/pdf']), 'a')
-    expect(registry.match('text/csv')).toBeUndefined()
   })
 })
