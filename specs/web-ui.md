@@ -14,7 +14,7 @@ The first build used Vite and React with `wouter` and hand-written data hooks. I
 
 ### Stack
 
-- TanStack Start with React, server-rendering only the routes marked below.
+- TanStack Start with React. Routes render on the server unless they opt out, and the chat and shared routes do.
 - TanStack Router with file-based routes in `src/routes/`. Each route validates its search params.
 - `hono/client`'s `hc` with the server's exported route types, for a typed API client with no hand-written API types. There are no Start server functions: Hono is the only API.
 - TanStack Query for all data, both server calls and chats read from the browser store through its worker API.
@@ -28,7 +28,7 @@ The server process runs Hono, and Hono runs Start, so the server and plugins sta
 
 - **Production.** `vite build` writes `apps/web/dist/client` and `apps/web/dist/server/server.js`, whose default export is a fetch handler. Hono answers `/api`, `/oauth`, `/oauth-client-metadata.json`, `/xrpc`, and `/.well-known` first, then serves files from `dist/client`, then passes every other request to Start's handler.
 - **Development.** The same server entry creates Vite in middleware mode on the server's HTTP server, so HMR shares its port. Each request goes through Vite's middlewares first, which serve modules and call on for everything else. Pages go to Start's server entry, which the server imports through Vite's SSR runner on each request, so web edits apply without a restart. `pnpm dev` runs one process on one port, with no proxy.
-- **Request context.** Hono passes Start a context holding the Hono app and the configured app name. During server rendering, the typed client calls the Hono app in process through it, forwarding the request's cookie, and the root route reads the app name from it for the page title and `application-name` meta tag.
+- **Request context.** Hono passes Start a context holding the configured app name and a `fetch` that calls the Hono app in process, resolving paths against the page request and sending its cookie. During server rendering, the typed client in `api.ts` calls the API through that `fetch`, found with Start's `getGlobalStartContext`, and in the browser it uses the browser's `fetch`. The root route reads the app name from the context for the page title and `application-name` meta tag.
 - `@tanstack/react-start` is pinned to an exact version, since the dev setup imports Start's server entry by its internal virtual module ID, `virtual:tanstack-start-server-entry`, as Start's own dev middleware does.
 
 ### Data
@@ -48,7 +48,7 @@ The server process runs Hono, and Hono runs Start, so the server and plugins sta
 | `/settings` | Preferences, with a sidebar linking to each settings section | Yes |
 | `/settings/api-keys`, `/settings/plugins`, `/settings/sync` | The other settings sections | Yes |
 
-The signed-in routes share a layout route that is server-rendered and checks `/api/me` in its `beforeLoad`, redirecting to `/login` on a 401 before any page is sent. Its child chat routes render on the client, since chats live in the browser store. A shared route shows a sign-in prompt instead of redirecting.
+The root route's `beforeLoad` asks `/api/me` who is signed in, through the query cache, so on the server the answer reaches the browser with the page. A 401 means signed out, and any other failure shows the root's error. The signed-in routes share the layout `_app`, whose `beforeLoad` redirects signed-out requests to `/login`, so the server answers them with a redirect before rendering anything. `/login` redirects signed-in users to `/`. Inside `_app`, the chat routes share a client-only layout, `_app/_chats`, which opens the browser store, since chats live there. The settings routes are server-rendered, and each prefetches its section's queries in its loader, so the section renders with its data. They open the browser store only for an action that needs it, signing out or rebuilding the device's copy. A shared route shows a sign-in prompt instead of redirecting.
 
 ### Components
 
@@ -101,6 +101,10 @@ While the reader is at the bottom of the conversation, it stays scrolled to the 
 - With no `index.html`, Vite's dependency scan starts from the route files. Otherwise a dependency first seen when a split route loads makes Vite re-optimize mid-load, and that route fails to import.
 - Unknown paths get a 404 from the server, and the client then redirects them to `/`.
 - Chats are never server-rendered. Doing so would read the conversation from the PDS on every navigation and duplicate the browser store.
+- The settings routes do not open the browser store just by rendering, so a settings tab does not take the store from a chat tab. `useOpenStore` gives them the provided store, as in tests, or opens it when the action runs.
+- `api.ts` checks for a window before asking Start for the request context. Outside Start's compiler, as in tests, that lookup always takes its server branch.
+- In-process calls only read, and the session cookie is only set at login, so responses from them have no cookies to pass on to the browser.
+- The login page reads `error` and `next` from validated search params, since there is no `location` on the server.
 - The default branch is the newest sibling at each level, matching how ChatGPT shows the latest regeneration.
 - `m` keeps the name search links already used. One focused message is enough to name a branch, since its ancestors are fixed and everything below it follows the newest sibling. So choosing a sibling high in the conversation resets the levels below it to their newest, rather than remembering earlier choices there.
 - Opening a conversation with `m`, from a link or a reload, scrolls to that message. Choosing a message on screen does not, so switching siblings keeps the reader's place.
