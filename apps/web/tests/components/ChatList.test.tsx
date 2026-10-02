@@ -27,6 +27,28 @@ function fakeStore() {
 }
 
 describe('ChatList', () => {
+  it('reloads the list when the store reports a change to the chat index', async () => {
+    const listeners = new Set<(change: { type: string }) => void>()
+    const store = {
+      ...fakeStore(),
+      onChange: (listener: (change: { type: string }) => void) => {
+        listeners.add(listener)
+        return () => void listeners.delete(listener)
+      },
+    }
+    await renderAt(
+      <StoreProvider store={store as unknown as StoreClient}>
+        <ChatList />
+      </StoreProvider>,
+    )
+    expect(await screen.findByText('Tiles')).toBeInTheDocument()
+    store.worker.listConversations.mockResolvedValue([
+      { skey: 'c', uri: 'u', title: 'Grout', tags: [], updatedAt: 't' },
+    ])
+    for (const listener of listeners) listener({ type: 'index' })
+    expect(await screen.findByText('Grout')).toBeInTheDocument()
+  })
+
   it('replaces the list with local search results while a query is active', async () => {
     const fetch = vi.fn(async () => Response.json({}))
     vi.stubGlobal('fetch', fetch)

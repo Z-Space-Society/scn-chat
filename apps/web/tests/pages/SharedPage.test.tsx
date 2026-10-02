@@ -1,7 +1,8 @@
-import { render, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SharedPage } from '../../src/pages/SharedPage.tsx'
+import { renderAt } from '../helpers/router.tsx'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -33,7 +34,7 @@ describe('SharedPage', () => {
         }),
       ),
     )
-    render(<SharedPage ownerDid="did:plc:alice" skey="3abc" signedIn />)
+    await renderAt(<SharedPage ownerDid="did:plc:alice" skey="3abc" signedIn />)
     expect(await screen.findByRole('heading', { name: 'Tile quotes' })).toBeInTheDocument()
     expect(screen.getByText('Shared by alice.test')).toBeInTheDocument()
     expect(screen.getByText('Roughly $450')).toBeInTheDocument()
@@ -41,8 +42,8 @@ describe('SharedPage', () => {
     expect(screen.getByText('About $500')).toBeInTheDocument()
   })
 
-  it('asks a signed-out viewer to sign in, returning to the shared link', () => {
-    render(<SharedPage ownerDid="did:plc:alice" skey="3abc" signedIn={false} />)
+  it('asks a signed-out viewer to sign in, returning to the shared link', async () => {
+    await renderAt(<SharedPage ownerDid="did:plc:alice" skey="3abc" signedIn={false} />)
     expect(screen.getByRole('link', { name: 'Sign in' }).getAttribute('href')).toMatch(
       /^\/login\?next=/,
     )

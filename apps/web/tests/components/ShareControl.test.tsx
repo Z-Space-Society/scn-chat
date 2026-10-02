@@ -1,7 +1,8 @@
-import { render, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ShareControl } from '../../src/components/ShareControl.tsx'
+import { renderAt } from '../helpers/router.tsx'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -21,7 +22,7 @@ describe('ShareControl', () => {
             }),
       ),
     )
-    render(<ShareControl skey="3abc" ownerDid="did:plc:alice" />)
+    await renderAt(<ShareControl skey="3abc" ownerDid="did:plc:alice" />)
     await userEvent.click(screen.getByRole('button', { name: 'Share' }))
     expect(await screen.findByDisplayValue('bob.test')).toBeInTheDocument()
     await userEvent.type(screen.getByLabelText('People'), ', nobody.test')

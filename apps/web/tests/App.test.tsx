@@ -1,16 +1,13 @@
-import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router'
+import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
 import { render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { routeTree } from '../src/routeTree.gen.ts'
+import { getRouter } from '../src/router.tsx'
 
 afterEach(() => vi.unstubAllGlobals())
 
 /** Render the whole app at a path. */
 function renderApp(path: string) {
-  const router = createRouter({
-    routeTree,
-    history: createMemoryHistory({ initialEntries: [path] }),
-  })
+  const router = getRouter({ history: createMemoryHistory({ initialEntries: [path] }) })
   render(<RouterProvider router={router} />)
   return router
 }

@@ -33,8 +33,8 @@ The server process runs Hono, and Hono runs Start, so the server and plugins sta
 
 ### Data
 
-- **Server data.** Query wraps every typed-client call, keyed by route, such as `['models']` or `['preferences']`. Writes are mutations that invalidate the keys they change. A 401 from any call ends the session as before.
-- **Chats.** The chat list is the query `['conversations']` and a conversation is `['conversation', skey]`, both read from the browser store's worker. The store's change events invalidate them: an `index` change invalidates the chat list, and a `conversation` change invalidates that conversation. Queries wait while the store is held by another tab.
+- **Server data.** Query wraps every typed-client call, keyed by route, such as `['models']` or `['preferences']`, from the factories in `src/queries.ts`. Writes are mutations that invalidate the keys they change. A 401 from any call ends the session as before. Queries do not retry or refetch on window focus, so failures show at once, as they did before Query.
+- **Chats.** The chat list is the query `['conversations']`, a conversation is `['conversation', skey]`, and a search is `['search', q]`, all read from the browser store's worker. `StoreProvider` turns the store's change events into invalidations: an `index` change invalidates the chat list, a `conversation` change invalidates that conversation, and any change invalidates searches. Queries wait while the store is held by another tab. Opening a conversation also refreshes it from the PDS through the query `['conversation', skey, 'refresh']`, whose changes come back as store events.
 - **URL state.** On chat routes, `m` names a focused message and `q` holds the search term. Choosing a sibling replaces `m` with that sibling, so the URL always names the branch on screen, and reloading, going back, or sharing the link keeps it.
 
 ### Routes
@@ -103,6 +103,9 @@ While the reader is at the bottom of the conversation, it stays scrolled to the 
 - `m` keeps the name search links already used. One focused message is enough to name a branch, since its ancestors are fixed and everything below it follows the newest sibling.
 - Write routes read JSON without validators, so the typed client sends bodies through its request options. Response types still come from the server's routes.
 - The `read` helper returns the body of the successful responses and throws an `ApiError` with the server's message otherwise.
+- Where a screen shows one error for several actions, it shows the error of the action that ran last, so a later success clears an earlier failure.
+- Invalidating a conversation is exact, so its own refresh query, which causes those invalidations, does not rerun in a loop.
+- Adding or deleting an API key also invalidates the model list, since a user's keys add their own models.
 - Shared links show a sign-in prompt when signed out, and every other route sends signed-out users to `/login`.
 
 ## Acceptance Criteria
