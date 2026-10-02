@@ -18,7 +18,7 @@ The first build used Vite and React with `wouter` and hand-written data hooks. I
 - TanStack Router with file-based routes in `src/routes/`. Each route validates its search params.
 - `hono/client`'s `hc` with the server's exported route types, for a typed API client with no hand-written API types. There are no Start server functions: Hono is the only API.
 - TanStack Query for all data, both server calls and chats read from the browser store through its worker API.
-- TanStack Form for the settings forms and schema forms.
+- TanStack Form for the settings and sharing forms, including the plugin form built from schemas.
 - `EventSource` for reply streams, read through Query's `streamedQuery`, which Query still exports as `experimental_streamedQuery`.
 - One small stylesheet carried over from the first build, for layout and a stand-in look. No component library or CSS framework yet. The styling stack is the themes spec's decision.
 
@@ -71,7 +71,7 @@ The signed-in routes share a layout route that is server-rendered and checks `/a
 
 ### Schema forms
 
-`SchemaFields` renders a JSON schema object as labeled inputs bound to a TanStack Form field each, so the parent form owns values, validation, and which fields changed. It supports strings, as text inputs or password inputs for secret fields, plus numbers, booleans as checkboxes, and string enums as selects. Any other type is shown as unsupported, not guessed at. A field's schema may carry a [JSON Forms rule](https://jsonforms.io/docs/uischema/rules) under `rule`, whose effect is `SHOW`, `HIDE`, `ENABLE`, or `DISABLE`. Its condition names another top-level field as `#/properties/<name>` and tests that field's value with a JSON Schema limited to `const`, `enum`, `not`, and `minLength`, honoring `failWhenUndefined`. A rule with any other scope, keyword, or effect is ignored with a console warning, so the field stays shown and enabled.
+`SchemaFields` renders one plugin's settings, a JSON schema object, as labeled inputs, reporting each change to its parent. The plugin form binds each plugin's settings object as one TanStack Form field, and each switchable tool as another. It supports strings, as text inputs or password inputs for secret fields, plus numbers, booleans as checkboxes, and string enums as selects. Any other type is shown as unsupported, not guessed at. A field's schema may carry a [JSON Forms rule](https://jsonforms.io/docs/uischema/rules) under `rule`, whose effect is `SHOW`, `HIDE`, `ENABLE`, or `DISABLE`. Its condition names another top-level field as `#/properties/<name>` and tests that field's value with a JSON Schema limited to `const`, `enum`, `not`, and `minLength`, honoring `failWhenUndefined`. A rule with any other scope, keyword, or effect is ignored with a console warning, so the field stays shown and enabled.
 
 ### Streaming
 
@@ -109,6 +109,9 @@ While the reader is at the bottom of the conversation, it stays scrolled to the 
 - Write routes read JSON without validators, so the typed client sends bodies through its request options. Response types still come from the server's routes.
 - The `read` helper returns the body of the successful responses and throws an `ApiError` with the server's message otherwise.
 - Where a screen shows one error for several actions, it shows the error of the action that ran last, so a later success clears an earlier failure.
+- Each form starts from the stored values once they load. Submitting runs a mutation, which holds any error for display, so submitting never rejects. The preferences form saves the stored record with its own fields changed, so fields it does not show, like the time zone, are kept.
+- The plugin form addresses fields by position, as `plugins[i].values` and `plugins[i].tools[j]`, since tool names and setting keys are the plugins' own and may contain the dots TanStack Form uses in field paths. For the same reason a plugin's settings are one field rather than one per setting.
+- The forms check nothing beyond required inputs. The server validates every save against the plugin's or the record's schema and returns the error to show.
 - Invalidating a conversation is exact, so its own refresh query, which causes those invalidations, does not rerun in a loop.
 - Adding or deleting an API key also invalidates the model list, since a user's keys add their own models.
 - A pending reply keeps showing its streamed text after its stream drops, until the final record arrives, instead of going back to "Thinking...".
