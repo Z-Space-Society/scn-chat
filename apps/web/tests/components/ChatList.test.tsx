@@ -1,9 +1,10 @@
-import { render, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ChatList } from '../../src/components/ChatList.tsx'
 import type { StoreClient } from '../../src/store/client.ts'
 import { StoreProvider } from '../../src/store/react.tsx'
+import { renderAt } from '../helpers/router.tsx'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -30,7 +31,7 @@ describe('ChatList', () => {
     const fetch = vi.fn(async () => Response.json({}))
     vi.stubGlobal('fetch', fetch)
     const store = fakeStore()
-    render(
+    await renderAt(
       <StoreProvider store={store as unknown as StoreClient}>
         <ChatList />
       </StoreProvider>,
@@ -46,7 +47,7 @@ describe('ChatList', () => {
 
   it('waits for two characters before searching', async () => {
     const store = fakeStore()
-    render(
+    await renderAt(
       <StoreProvider store={store as unknown as StoreClient}>
         <ChatList />
       </StoreProvider>,
@@ -59,7 +60,7 @@ describe('ChatList', () => {
 
   it('shows the list again when the query drops below two characters', async () => {
     const store = fakeStore()
-    render(
+    await renderAt(
       <StoreProvider store={store as unknown as StoreClient}>
         <ChatList />
       </StoreProvider>,
@@ -73,7 +74,7 @@ describe('ChatList', () => {
 
   it('searches once typing pauses, not on every character', async () => {
     const store = fakeStore()
-    render(
+    await renderAt(
       <StoreProvider store={store as unknown as StoreClient}>
         <ChatList />
       </StoreProvider>,
@@ -85,7 +86,7 @@ describe('ChatList', () => {
 
   it('shows the list again when the query is cleared', async () => {
     const store = fakeStore()
-    render(
+    await renderAt(
       <StoreProvider store={store as unknown as StoreClient}>
         <ChatList />
       </StoreProvider>,
@@ -101,7 +102,7 @@ describe('ChatList', () => {
     const fetch = vi.fn(async () => Response.json({ ok: true }))
     vi.stubGlobal('fetch', fetch)
     const store = fakeStore()
-    render(
+    await renderAt(
       <StoreProvider store={store as unknown as StoreClient}>
         <ChatList />
       </StoreProvider>,
@@ -119,7 +120,7 @@ describe('ChatList', () => {
       ),
     )
     const store = fakeStore()
-    render(
+    await renderAt(
       <StoreProvider store={store as unknown as StoreClient}>
         <ChatList />
       </StoreProvider>,
@@ -136,7 +137,7 @@ describe('ChatList', () => {
     )
     const store = fakeStore()
     store.deleteLocalCopy.mockRejectedValue(new Error('Another tab is using this device copy.'))
-    render(
+    await renderAt(
       <StoreProvider store={store as unknown as StoreClient}>
         <ChatList />
       </StoreProvider>,

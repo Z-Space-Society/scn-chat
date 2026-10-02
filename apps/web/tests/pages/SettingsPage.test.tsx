@@ -1,11 +1,16 @@
-import { render, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Route, Router } from 'wouter'
-import { memoryLocation } from 'wouter/memory-location'
-import { SettingsPage } from '../../src/pages/SettingsPage.tsx'
+import {
+  ApiKeys,
+  Device,
+  PluginSettings,
+  PreferencesSettings,
+  SettingsLayout,
+} from '../../src/pages/SettingsPage.tsx'
 import type { StoreClient } from '../../src/store/client.ts'
 import { StoreProvider } from '../../src/store/react.tsx'
+import { renderAt } from '../helpers/router.tsx'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -41,31 +46,39 @@ function stubServer(overrides: Record<string, () => Response>) {
   return fetch
 }
 
-/** Render the settings routes at a section's path, such as '/plugins'. */
-const renderPage = (section = '') =>
-  render(
-    <Router hook={memoryLocation({ path: `/settings${section}` }).hook}>
-      <Route path="/settings" nest>
-        <StoreProvider store={store}>
-          <SettingsPage />
-        </StoreProvider>
-      </Route>
-    </Router>,
+const sections = {
+  '': PreferencesSettings,
+  '/api-keys': ApiKeys,
+  '/plugins': PluginSettings,
+  '/sync': Device,
+}
+
+/** Render a settings section at its path, such as '/plugins'. */
+const renderPage = (section: keyof typeof sections = '') => {
+  const Section = sections[section]
+  return renderAt(
+    <StoreProvider store={store}>
+      <SettingsLayout>
+        <Section />
+      </SettingsLayout>
+    </StoreProvider>,
+    `/settings${section}`,
   )
+}
 
 describe('SettingsPage preferences', () => {
   it('shows the load error and no form when preferences cannot be read', async () => {
     stubServer({
       '/api/preferences': () => Response.json({ error: 'InternalServerError' }, { status: 500 }),
     })
-    renderPage()
+    await renderPage()
     expect(await screen.findByText(/Could not load preferences/)).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Preferences' })).toBeNull()
   })
 
   it('saves a default model whose ID contains a slash', async () => {
     const fetch = stubServer({ '/api/preferences': () => Response.json({ preferences: null }) })
-    renderPage()
+    await renderPage()
     await screen.findByRole('heading', { name: 'Preferences' })
     await vi.waitFor(() =>
       expect(screen.getByRole('option', { name: 'Claude' })).toBeInTheDocument(),
@@ -82,7 +95,7 @@ describe('SettingsPage preferences', () => {
 
   it("saves the browser's time zone with the preferences", async () => {
     const fetch = stubServer({ '/api/preferences': () => Response.json({ preferences: null }) })
-    renderPage()
+    await renderPage()
     await screen.findByRole('heading', { name: 'Preferences' })
     await userEvent.click(screen.getAllByRole('button', { name: 'Save' })[0] as HTMLElement)
     await vi.waitFor(() =>
@@ -104,7 +117,7 @@ describe('SettingsPage preferences', () => {
 describe('SettingsPage sections', () => {
   it('links to each section from the sidebar and marks the current one', async () => {
     stubServer({})
-    renderPage('/plugins')
+    await renderPage('/plugins')
     const nav = screen.getByRole('navigation')
     expect(screen.getByRole('link', { name: 'Back to chats' })).toHaveAttribute('href', '/')
     expect(screen.getByRole('link', { name: 'API keys' })).toHaveAttribute(
@@ -117,14 +130,14 @@ describe('SettingsPage sections', () => {
 
   it('shows only the current section', async () => {
     stubServer({})
-    renderPage('/sync')
+    await renderPage('/sync')
     expect(await screen.findByRole('heading', { name: 'Sync' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Preferences' })).toBeNull()
   })
 
   it('opens on preferences', async () => {
     stubServer({ '/api/preferences': () => Response.json({ preferences: null }) })
-    renderPage()
+    await renderPage()
     expect(await screen.findByRole('heading', { name: 'Preferences' })).toBeInTheDocument()
   })
 })
@@ -161,7 +174,7 @@ describe('SettingsPage plugins', () => {
 
   it("labels a plugin's one switchable tool Enabled, and hides tools users cannot switch", async () => {
     stubServer({ '/api/plugins/settings': () => Response.json({ plugins: [fetcher] }) })
-    renderPage('/plugins')
+    await renderPage('/plugins')
     const group = await screen.findByRole('group', { name: 'web-fetch' })
     expect(group.querySelectorAll('input[type="checkbox"]')).toHaveLength(1)
     expect(screen.getByRole('checkbox', { name: 'Enabled' })).toBeChecked()
@@ -170,7 +183,7 @@ describe('SettingsPage plugins', () => {
   it('labels switchable tools by name when a plugin has several', async () => {
     const both = plugin('tools', { tools: [tool('one'), tool('two')] })
     stubServer({ '/api/plugins/settings': () => Response.json({ plugins: [both] }) })
-    renderPage('/plugins')
+    await renderPage('/plugins')
     expect(await screen.findByRole('checkbox', { name: 'one' })).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: 'two' })).toBeInTheDocument()
   })
@@ -179,7 +192,7 @@ describe('SettingsPage plugins', () => {
     const fetch = stubServer({
       '/api/plugins/settings': () => Response.json({ plugins: [search, fetcher] }),
     })
-    renderPage('/plugins')
+    await renderPage('/plugins')
     const fetchGroup = await screen.findByRole('group', { name: 'web-fetch' })
     await userEvent.selectOptions(screen.getByRole('combobox'), 'kagi')
     await userEvent.click(fetchGroup.querySelector('input[type="checkbox"]') as HTMLElement)

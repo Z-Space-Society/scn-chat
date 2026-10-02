@@ -16,3 +16,6 @@ globalThis.ResizeObserver ??= class {
   unobserve() {}
   disconnect() {}
 } as unknown as typeof ResizeObserver
+
+// jsdom has no scrolling. The router restores scroll positions on navigation.
+window.scrollTo = () => {}

@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { SearchResults, Snippet } from '../../src/components/SearchResults.tsx'
 import { MATCH_END, MATCH_START, type SearchResult } from '../../src/store/search.ts'
+import { renderAt } from '../helpers/router.tsx'
 
 const result = (overrides: Partial<SearchResult>): SearchResult => ({
   skey: 'a',
@@ -27,23 +28,23 @@ describe('Snippet', () => {
 })
 
 describe('SearchResults', () => {
-  it('links a message match to its message', () => {
-    render(<SearchResults results={[result({})]} remaining={0} />)
-    expect(screen.getByRole('link')).toHaveAttribute('href', '/c/a?m=u1')
+  it('links a message match to its message', async () => {
+    await renderAt(<SearchResults results={[result({})]} remaining={0} />)
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/chat/a?m=u1')
   })
 
-  it('links a title match to its conversation', () => {
-    render(<SearchResults results={[result({ rkey: null, role: null })]} remaining={0} />)
-    expect(screen.getByRole('link')).toHaveAttribute('href', '/c/a')
+  it('links a title match to its conversation', async () => {
+    await renderAt(<SearchResults results={[result({ rkey: null, role: null })]} remaining={0} />)
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/chat/a')
   })
 
-  it('says how many conversations are left to download', () => {
-    render(<SearchResults results={[]} remaining={3} />)
+  it('says how many conversations are left to download', async () => {
+    await renderAt(<SearchResults results={[]} remaining={3} />)
     expect(screen.getByRole('status')).toHaveTextContent('Still downloading 3 conversations.')
   })
 
-  it('says when nothing matched', () => {
-    render(<SearchResults results={[]} remaining={0} />)
+  it('says when nothing matched', async () => {
+    await renderAt(<SearchResults results={[]} remaining={0} />)
     expect(screen.getByText('No matches.')).toBeInTheDocument()
   })
 })

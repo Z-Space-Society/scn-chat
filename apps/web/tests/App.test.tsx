@@ -1,11 +1,19 @@
+import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router'
 import { render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { App } from '../src/App.tsx'
+import { routeTree } from '../src/routeTree.gen.ts'
 
-afterEach(() => {
-  vi.unstubAllGlobals()
-  window.history.replaceState(null, '', '/')
-})
+afterEach(() => vi.unstubAllGlobals())
+
+/** Render the whole app at a path. */
+function renderApp(path: string) {
+  const router = createRouter({
+    routeTree,
+    history: createMemoryHistory({ initialEntries: [path] }),
+  })
+  render(<RouterProvider router={router} />)
+  return router
+}
 
 describe('App', () => {
   it('sends signed-out users to the login page', async () => {
@@ -13,10 +21,9 @@ describe('App', () => {
       'fetch',
       vi.fn(async () => Response.json({ error: 'Unauthorized' }, { status: 401 })),
     )
-    window.history.replaceState(null, '', '/c/abc')
-    render(<App />)
+    const router = renderApp('/chat/abc')
     expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
-    expect(window.location.pathname).toBe('/login')
+    expect(router.state.location.pathname).toBe('/login')
   })
 
   it('shows a sign-in prompt on a shared link when signed out', async () => {
@@ -24,8 +31,7 @@ describe('App', () => {
       'fetch',
       vi.fn(async () => Response.json({ error: 'Unauthorized' }, { status: 401 })),
     )
-    window.history.replaceState(null, '', '/s/did:plc:alice/3aaa')
-    render(<App />)
+    renderApp('/shared/did:plc:alice/3aaa')
     expect(
       await screen.findByText(/Sign in with your atproto account to view this shared chat/),
     ).toBeInTheDocument()
@@ -36,9 +42,8 @@ describe('App', () => {
       'fetch',
       vi.fn(async () => new Response('<html>Bad gateway</html>', { status: 502 })),
     )
-    window.history.replaceState(null, '', '/c/abc')
-    render(<App />)
+    const router = renderApp('/chat/abc')
     expect(await screen.findByRole('alert')).toHaveTextContent('Request failed with 502')
-    expect(window.location.pathname).toBe('/c/abc')
+    expect(router.state.location.pathname).toBe('/chat/abc')
   })
 })
