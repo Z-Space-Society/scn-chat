@@ -114,6 +114,59 @@ describe('SettingsPage preferences', () => {
   })
 })
 
+describe('SettingsPage preferences fields', () => {
+  it('starts from the stored preferences and keeps the ones the form does not show', async () => {
+    const fetch = stubServer({
+      '/api/preferences': () =>
+        Response.json({
+          preferences: {
+            $type: 'network.sharedcomputer.chat.preferences',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+            customInstructions: 'Metric units',
+            somethingNewer: 'kept',
+          },
+        }),
+    })
+    await renderPage()
+    expect(await screen.findByLabelText('Custom instructions')).toHaveValue('Metric units')
+    await userEvent.click(screen.getAllByRole('button', { name: 'Save' })[0] as HTMLElement)
+    await vi.waitFor(() => expect(screen.getByText('Saved.')).toBeInTheDocument())
+    const put = fetch.mock.calls.find(
+      ([url, init]) => url === '/api/preferences' && init?.method === 'PUT',
+    )
+    const body = JSON.parse(String(put?.[1]?.body))
+    expect(body).toMatchObject({ customInstructions: 'Metric units', somethingNewer: 'kept' })
+    expect(body).not.toHaveProperty('$type')
+    expect(body).not.toHaveProperty('updatedAt')
+  })
+})
+
+describe('SettingsPage API keys', () => {
+  it('adds a key and clears the form once it is saved', async () => {
+    const fetch = stubServer({
+      '/api/providers': () =>
+        Response.json({
+          providers: [{ id: 'openai', name: 'OpenAI', userEndpoints: false, listsModels: false }],
+        }),
+    })
+    await renderPage('/api-keys')
+    await screen.findByRole('option', { name: 'OpenAI' })
+    await userEvent.selectOptions(screen.getByLabelText('Provider'), 'openai')
+    await userEvent.type(screen.getByLabelText('API key'), 'sk-test')
+    await userEvent.click(screen.getByRole('button', { name: 'Add key' }))
+    await vi.waitFor(() => expect(screen.getByLabelText('API key')).toHaveValue(''))
+    const post = fetch.mock.calls.find(
+      ([url, init]) => url === '/api/credentials' && init?.method === 'POST',
+    )
+    expect(JSON.parse(String(post?.[1]?.body))).toEqual({
+      providerId: 'openai',
+      apiKey: 'sk-test',
+      models: [],
+    })
+    expect(screen.getByLabelText('Provider')).toHaveValue('')
+  })
+})
+
 describe('SettingsPage sections', () => {
   it('links to each section from the sidebar and marks the current one', async () => {
     stubServer({})
