@@ -1,0 +1,3 @@
+# No third-party code runs in the browser at runtime
+
+The browser holds the user's whole chat history and a signed-in session, so any script it runs can read every chat and act as the user. Only code a forker built into their fork runs there. Plugins' web halves are registered in the fork's source and switched on by which plugins the server loaded, never fetched at runtime. What end users can plug in is a theme, and a theme is design tokens checked against their types, with no CSS or code and nothing that loads a URL. Custom CSS was rejected because attribute selectors with `url()` can leak data, and the CSP that would block that also blocks the click-to-load images in Markdown replies.

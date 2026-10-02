@@ -22,7 +22,14 @@ The overview at the end of this file lists every spec and whether it is active, 
 
 ### Active
 
+- [[web-ui]]: rebuilding the web app on TanStack Start inside Hono, at parity with its acceptance criteria. Phase 1 of the web rebuild.
+
 ### Planned
+
+The later phases of the web rebuild, each spec written before its phase starts:
+
+- web-plugins: Renderers, Slots, and settings panels from plugins' web halves, registered in a fork. Lifts the plugins spec's "no UI" boundary.
+- themes: the styling stack, the design token contract, a default theme, and Overrides, then themes users pick or import, saved in their settings.
 
 ### Completed
 
@@ -38,7 +45,6 @@ Phase 1, initial build-out, implemented and tested, awaiting a check against a r
 - [[titles]]
 - [[sharing]]
 - [[browser-store]]
-- [[web-ui]]
 
 After the initial build-out:
 

@@ -130,7 +130,7 @@ A `pnpm keys` script prints a fresh `OAUTH_PRIVATE_KEYS` value and a `SECRET_KEY
 - Login calls an `onLogin` hook, which creates the settings space and, for spaces users, registers for notifications, runs discovery, and syncs the index in the background. A failure is logged and does not block the login.
 - A handle is stored only when it resolves back to the same DID.
 - `JoseKey` comes from `@atproto/oauth-client-node`'s re-export, so key types cannot come from two package versions.
-- In development `PUBLIC_URL` is the Vite dev server, which proxies the server routes, so the OAuth callback returns to the web app.
+- In development `PUBLIC_URL` is the server, which also serves the web app through Vite, so the OAuth callback returns to the web app.
 
 ## Acceptance Criteria
 

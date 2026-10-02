@@ -7,10 +7,11 @@ An AI assistant chat app where each conversation is an atproto permissioned spac
 - `lexicons/` holds our lexicon JSON, and `lexicons/upstream/` the vendored `com.atproto` lexicons the server calls.
 - `packages/lexicons` is the generated lexicon code and the `nsid` module. `packages/plugin-api` is what plugins build against.
 - `apps/server` is the Hono server. `src/server.ts` wires every service together.
-- `apps/web` is the React app. `src/store/` is the browser's local SQLite copy.
+- `apps/web` is the TanStack Start app, which the server runs inside Hono. `src/store/` is the browser's local SQLite copy.
 - `plugins/` holds the shipped plugins.
 - `docs/architecture.md` is the human-facing architecture overview, and `docs/plugins.md` the plugin author guide. Update them when a change affects what they describe.
-- `pnpm dev` runs the server and Vite together. `pnpm check` runs lint, type checking, and every test. `pnpm codegen` regenerates the lexicon code after a lexicon change, and `pnpm publish-lexicons <handle>` publishes the lexicons from the lexicon authority account. `pnpm keys` prints fresh secrets.
+- `GLOSSARY.md` holds the project's terms, and `docs/adr/` the decisions behind its less obvious choices. Read the relevant ADR before changing what it decided.
+- `pnpm dev` runs the server, which serves the web app through Vite, as one process. `pnpm check` runs lint, type checking, and every test. `pnpm codegen` regenerates the lexicon code after a lexicon change, and `pnpm publish-lexicons <handle>` publishes the lexicons from the lexicon authority account. `pnpm keys` prints fresh secrets.
 - Local setup: copy `config.example.yml` to `config.yml` for public settings and plugins, and `.env.example` to `.env` for secrets, filled in from `pnpm keys`. Secrets never go in `config.yml`; it references them as `${NAME}`.
 - Server tests run on both SQLite and PGlite through `tests/helpers/db.ts`. `tests/helpers/fake-pds.ts` is a fake spaces PDS with real error codes, policies, and signed commits.
 
@@ -30,17 +31,19 @@ These are settled. Raise a concern before working against any of them.
 - The browser keeps its own local copy of the user's chats in SQLite compiled to WebAssembly, for the chat list, the open conversation, and search. That copy lives on the user's device, not on the server.
 - BYO API keys are stored encrypted in the app database, never in records.
 - Providers, tools, file ingesters, and turn hooks are plugins. Web search, fetch, and image generation are plugins, not core.
+- The browser runs only code built into the fork. A plugin's web half is registered in the fork's source, and what end users can add is a theme, which is design tokens only.
+- Messages in the browser come from the local copy. No chat client library holds them, and the stream is an overlay until the record arrives.
 - The project is meant to be forked. Code refers to lexicon NSIDs only through one generated module, and app name, URLs, OAuth metadata, and admin models come from `config.yml`.
 
 ## Planned stack
 
-TypeScript throughout, as a pnpm workspace on Node 24 LTS, run natively with Node's type stripping and no compile step. Hono server with server-sent events for streaming. Kysely over SQLite and Postgres. Vite and React for the frontend, with no framework on top. Vitest for tests. Provider plugins use the Vercel AI SDK internally, behind our own plugin interface.
+TypeScript throughout, as a pnpm workspace on Node 24 LTS, run natively with Node's type stripping and no compile step. Hono server with server-sent events for streaming. Kysely over SQLite and Postgres. TanStack Start with React for the frontend, run inside the Hono server, with TanStack Router, Query, and Form. Hono is the only API, so there are no Start server functions. Vitest for tests. Provider plugins use the Vercel AI SDK internally, behind our own plugin interface.
 
 Prefer existing libraries over writing our own, especially the official `@atproto/*` packages for anything protocol related. Dependencies must have licenses compatible with MIT.
 
 Admins configure plugins, global models, roles, and every other public setting in `config.yml`, with secrets in `.env`. Roles gate which admin models a user may use. There is no admin UI yet.
 
-The web UI must stay barebones with minimal code and styling. A separate designer will build the real interface on top of it.
+The web UI stays plain, with minimal code and styling. Its look will come from a theme, which a designer will build, so core components carry as few visual decisions as possible.
 
 ## Lexicons
 

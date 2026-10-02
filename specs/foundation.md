@@ -93,7 +93,7 @@ Migrations and queries stay within what both databases support. Timestamps are I
 
 - `GET /api/health` returns `{ "status": "ok", "appName": "..." }` after a trivial database query succeeds. It returns 503 with `{ "status": "error" }` when the query fails, and logs the error.
 - Every route under `/api` is private to our web app. None of it is a public API.
-- In production the server also serves the built web app from `apps/web/dist`, with an `index.html` fallback for client-side routes. In development Vite serves the web app and proxies `/api` to the server. `index.html` carries an `__APP_NAME__` placeholder in its title and `application-name` meta tag, filled with the configured app name by the server in production and by a Vite plugin, which asks the server, in development. The web app reads the name from the meta tag.
+- The server also serves the web app, which the web-ui spec describes: Start's built handler in production, and Vite in middleware mode in development.
 - Logging uses pino, with request logging through a small Hono middleware.
 
 ### Web app
@@ -112,7 +112,7 @@ Vitest runs every package from the root config. Tests live in a `tests/` directo
 
 | Root script | Does |
 |---|---|
-| `pnpm dev` | Runs the server with `node --watch` and the Vite dev server together |
+| `pnpm dev` | Runs the server with `node --watch`, serving the web app through Vite in the same process |
 | `pnpm build` | Builds the web app |
 | `pnpm start` | Runs the server in production mode, serving the built web app |
 | `pnpm test` | Runs all tests once |

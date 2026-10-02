@@ -6,6 +6,12 @@ This document describes the SCN Chat architecture at a high level. Each feature 
 
 This in an AI assistant chat app that uses the users' spaces-enabled PDS as a source of truth for their chat history. Due to the alpha nature of spaces the app will also store the chat history in its own database. This feature will be removed when spaces are in widespread production use.
 
+## The web app
+
+The web app is built on [TanStack Start](https://tanstack.com/start), but the Hono server owns the process. Hono answers `/api`, `/oauth`, `/xrpc`, and `/.well-known` itself, serves the web app's built assets, and passes every other request to Start. In development the same server runs Vite in middleware mode, so `pnpm dev` is one process. Only the shell, login, and settings are server-rendered. Chat routes render in the browser, since their data lives in the browser's local copy.
+
+Hono is the only API. The web app calls it through Hono's typed client, in process during server rendering and over HTTP in the browser, with TanStack Query on top. See [ADR 0001](adr/0001-tanstack-start-inside-hono.md) and [specs/web-ui.md](../specs/web-ui.md).
+
 ## Chat history storage
 
 The goal is to keep users in control of their own chat data. The server should not keep a copy of the chat records. The records are stored in the browser in a wasm sqlite db to allow easy listing and search without having to perform intensive operations on the PDS.
@@ -49,6 +55,14 @@ The storage type is chosen on first login and currently cannot be changed. So if
 - **Migration:** Moving chats between local storage and spaces is a future feature. Local records keep the same structure that a PDS would give them, so moving them to spaces should be a replay.
 
 See [specs/auth.md](../specs/auth.md).
+
+## Decisions
+
+The [ADRs](adr/) record the choices a reader might otherwise undo:
+
+- [0001](adr/0001-tanstack-start-inside-hono.md): TanStack Start runs inside the Hono server.
+- [0002](adr/0002-no-third-party-code-in-the-browser.md): No third-party code runs in the browser at runtime. Themes are design tokens only.
+- [0003](adr/0003-no-chat-library-owns-messages.md): No AI chat library owns message state in the browser.
 
 ## Plugins
 
