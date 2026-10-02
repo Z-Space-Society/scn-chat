@@ -1,13 +1,9 @@
-import { useEffect, useState } from 'react'
-import { api, read } from '../api.ts'
+import { useQuery } from '@tanstack/react-query'
 import { MessageView } from '../components/MessageView.tsx'
 import { useBranch } from '../components/useBranch.ts'
 import { blobUrlFor } from '../lib/blob-url.ts'
-
-type Shared = Awaited<ReturnType<typeof load>>
-
-const load = (ownerDid: string, skey: string) =>
-  read(api.sharing.shared[':ownerDid'][':skey'].$get({ param: { ownerDid, skey } }))
+import { messageOf } from '../lib/errors.ts'
+import { sharedQuery } from '../queries.ts'
 
 /** A shared conversation, read-only. */
 export function SharedPage({
@@ -19,20 +15,12 @@ export function SharedPage({
   skey: string
   signedIn: boolean
 }) {
-  const [shared, setShared] = useState<Shared | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { data: shared, error } = useQuery({ ...sharedQuery(ownerDid, skey), enabled: signedIn })
   const messages = (shared?.messages ?? []).map((m) => ({
     rkey: m.rkey,
     record: m.value as Record<string, unknown>,
   }))
   const { branch, pick } = useBranch(messages)
-
-  useEffect(() => {
-    if (!signedIn) return
-    load(ownerDid, skey)
-      .then(setShared)
-      .catch((err: Error) => setError(err.message))
-  }, [ownerDid, skey, signedIn])
 
   if (!signedIn) {
     return (
@@ -42,7 +30,7 @@ export function SharedPage({
       </main>
     )
   }
-  if (error) return <main role="alert">{error}</main>
+  if (error) return <main role="alert">{messageOf(error)}</main>
   if (!shared) return <main>Loading...</main>
 
   const blobUrl = blobUrlFor(`/api/shared/${ownerDid}/${skey}`)

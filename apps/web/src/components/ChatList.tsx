@@ -1,9 +1,10 @@
+import { useMutation } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { api, read } from '../api.ts'
+import { lastError } from '../lib/errors.ts'
 import { useConversations, useSearch } from '../store/react.tsx'
 import { SearchResults } from './SearchResults.tsx'
-import { useAction } from './useAction.ts'
 import { useDebounced } from './useDebounced.ts'
 import { useSignOut } from './useSignOut.ts'
 
@@ -14,16 +15,18 @@ export function ChatList() {
   // Searching only begins after 2 characters are types.
   const searching = typed.trim().length >= 2
   const found = useSearch(searching ? typed : '')
-  const { error, run } = useAction()
-  const signOut = useSignOut()
   const navigate = useNavigate()
-  const create = async () => {
-    const created = await read(api.chats.conversations.$post())
-    await navigate({ to: '/chat/$skey', params: { skey: created.skey } })
-  }
+  const create = useMutation({
+    mutationFn: async () => {
+      const created = await read(api.chats.conversations.$post())
+      await navigate({ to: '/chat/$skey', params: { skey: created.skey } })
+    },
+  })
+  const signOut = useMutation({ mutationFn: useSignOut() })
+  const error = lastError(create, signOut)
   return (
     <nav className="sidebar chat-list">
-      <button type="button" onClick={() => run(create)}>
+      <button type="button" onClick={() => create.mutate()}>
         New chat
       </button>
       <input
@@ -50,7 +53,7 @@ export function ChatList() {
         </ul>
       )}
       <Link to="/settings">Settings</Link>
-      <button type="button" onClick={() => run(signOut)}>
+      <button type="button" onClick={() => signOut.mutate()}>
         Sign out
       </button>
     </nav>

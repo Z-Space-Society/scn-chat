@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Navigate, Outlet } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { onUnauthorized } from '../api.ts'
@@ -17,6 +18,7 @@ function SignedInLayout() {
 
 function SignedIn({ me }: { me: Me }) {
   const store = openStore(me.did)
+  const queryClient = useQueryClient()
   useEffect(() => {
     const ended = () =>
       // Use a full page load, since the signed-in routes redirect /login to /.
@@ -24,14 +26,16 @@ function SignedIn({ me }: { me: Me }) {
         .deleteLocalCopy()
         .catch((err: unknown) => console.error('Could not delete the local copy', err))
         .finally(() => location.assign('/login'))
-    syncTimeZone().catch((err: unknown) => console.warn('Could not save the time zone', err))
+    syncTimeZone(queryClient).catch((err: unknown) =>
+      console.warn('Could not save the time zone', err),
+    )
     const stopApi = onUnauthorized(ended)
     const stopStore = store.onChange((change) => change.type === 'unauthorized' && ended())
     return () => {
       stopApi()
       stopStore()
     }
-  }, [store])
+  }, [store, queryClient])
   return (
     <MeContext.Provider value={me}>
       <StoreProvider store={store}>

@@ -1,7 +1,9 @@
 import { nsid } from '@scn-chat/lexicons/nsid'
-import { useEffect, useState } from 'react'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { api, json, read } from '../api.ts'
-import { messageOf, useAction } from './useAction.ts'
+import { lastError, messageOf } from '../lib/errors.ts'
+import { attachmentTypesQuery } from '../queries.ts'
 
 export type ModelOption = {
   provider: string
@@ -41,14 +43,10 @@ export function Composer({
   const [effort, setEffort] = useState('')
   const [attachments, setAttachments] = useState<Record<string, unknown>[]>([])
   const [uploading, setUploading] = useState(0)
-  const { error, run, fail } = useAction()
+  // A file this composer refused before uploading it.
+  const [refused, setRefused] = useState<string | null>(null)
   const model = models.find((m) => modelKey(m) === modelId)
-  const [types, setTypes] = useState<{ images: string[]; files: string[] } | null>(null)
-  useEffect(() => {
-    read(api.blobs.attachments.types.$get()).then(setTypes, (err: unknown) =>
-      fail(`Could not load the attachment types: ${messageOf(err)}`),
-    )
-  }, [fail])
+  const { data: types, error: typesError } = useQuery(attachmentTypesQuery)
   // With the default model chosen, the server checks vision when the turn starts.
   const images = !model || model.capabilities.vision
   const accept = types && [...(images ? types.images : []), ...types.files].join(',')
@@ -76,11 +74,13 @@ export function Composer({
     }
   }
 
+  const uploadingFile = useMutation({ mutationFn: upload })
   const attach = (files: FileList | null) => {
+    setRefused(null)
     for (const file of Array.from(files ?? [])) {
       if (file.type.startsWith('image/') && model && !model.capabilities.vision)
-        fail('This model cannot read images.')
-      else run(() => upload(file))
+        setRefused('This model cannot read images.')
+      else uploadingFile.mutate(file)
     }
   }
 
@@ -104,13 +104,22 @@ export function Composer({
     setAttachments([])
     onSent({ rkey: sent.rkey, replyRkey: sent.replyRkey })
   }
+  const sending = useMutation({ mutationFn: send })
+  const submit = () => {
+    setRefused(null)
+    sending.mutate()
+  }
+  const error =
+    refused ??
+    lastError(uploadingFile, sending) ??
+    (typesError && `Could not load the attachment types: ${messageOf(typesError)}`)
 
   return (
     <form
       className="composer"
       onSubmit={(event) => {
         event.preventDefault()
-        run(send)
+        submit()
       }}
     >
       <textarea
@@ -120,7 +129,7 @@ export function Composer({
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
-            run(send)
+            submit()
           }
         }}
       />

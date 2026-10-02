@@ -1,41 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import { api, json, read } from '../api.ts'
-import { useAction } from './useAction.ts'
+import { messageOf } from '../lib/errors.ts'
+import { sharingQuery } from '../queries.ts'
 
 type Mode = 'private' | 'people' | 'public'
+type Settings = { mode: Mode; members: { did: string; handle: string | null }[] }
 
 /** Who can read this conversation, and its link. */
 export function ShareControl({ skey, ownerDid }: { skey: string; ownerDid: string }) {
   const [open, setOpen] = useState(false)
-  const [mode, setMode] = useState<Mode>('private')
-  const [members, setMembers] = useState('')
-  const { error, run } = useAction()
-  const link = `${location.origin}/shared/${ownerDid}/${skey}`
-
-  useEffect(() => {
-    if (!open) return
-    run(async () => {
-      const settings = await read(
-        api.sharing.conversations[':skey'].sharing.$get({ param: { skey } }),
-      )
-      setMode(settings.mode)
-      setMembers(settings.members.map((m) => m.handle ?? m.did).join(', '))
-    })
-  }, [open, skey, run])
-
-  const save = async () => {
-    const list = members
-      .split(',')
-      .map((m) => m.trim())
-      .filter(Boolean)
-    await read(
-      api.sharing.conversations[':skey'].sharing.$put(
-        { param: { skey } },
-        json({ mode, members: list }),
-      ),
-    )
-  }
-
+  const settings = useQuery({ ...sharingQuery(skey), enabled: open })
   if (!open) {
     return (
       <button type="button" onClick={() => setOpen(true)}>
@@ -43,6 +18,53 @@ export function ShareControl({ skey, ownerDid }: { skey: string; ownerDid: strin
       </button>
     )
   }
+  return (
+    <SharingForm
+      // Start over from the stored settings whenever they load or change.
+      key={settings.dataUpdatedAt}
+      skey={skey}
+      link={`${location.origin}/shared/${ownerDid}/${skey}`}
+      settings={settings.data}
+      loadError={settings.error ? messageOf(settings.error) : null}
+      onClose={() => setOpen(false)}
+    />
+  )
+}
+
+function SharingForm({
+  skey,
+  link,
+  settings,
+  loadError,
+  onClose,
+}: {
+  skey: string
+  link: string
+  settings: Settings | undefined
+  loadError: string | null
+  onClose: () => void
+}) {
+  const [mode, setMode] = useState<Mode>(settings?.mode ?? 'private')
+  const [members, setMembers] = useState(
+    settings?.members.map((m) => m.handle ?? m.did).join(', ') ?? '',
+  )
+  const queryClient = useQueryClient()
+  const save = useMutation({
+    mutationFn: () => {
+      const list = members
+        .split(',')
+        .map((m) => m.trim())
+        .filter(Boolean)
+      return read(
+        api.sharing.conversations[':skey'].sharing.$put(
+          { param: { skey } },
+          json({ mode, members: list }),
+        ),
+      )
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: sharingQuery(skey).queryKey }),
+  })
+  const error = save.error ? messageOf(save.error) : loadError
   return (
     <fieldset>
       <legend>Sharing</legend>
@@ -63,11 +85,11 @@ export function ShareControl({ skey, ownerDid }: { skey: string; ownerDid: strin
           onChange={(e) => setMembers(e.target.value)}
         />
       )}
-      <button type="button" onClick={() => run(save)}>
+      <button type="button" onClick={() => save.mutate()}>
         Save
       </button>
       {mode !== 'private' && <input aria-label="Link" readOnly value={link} />}
-      <button type="button" onClick={() => setOpen(false)}>
+      <button type="button" onClick={onClose}>
         Close
       </button>
       {error && <p role="alert">{error}</p>}

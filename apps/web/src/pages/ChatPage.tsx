@@ -1,20 +1,17 @@
-import { useEffect, useState } from 'react'
-import { api, read } from '../api.ts'
+import { useQuery } from '@tanstack/react-query'
 import { BusyBanner } from '../components/BusyBanner.tsx'
 import { ChatList } from '../components/ChatList.tsx'
 import type { ModelOption } from '../components/Composer.tsx'
 import { ConversationView } from '../components/ConversationView.tsx'
-import { messageOf } from '../components/useAction.ts'
+import { messageOf } from '../lib/errors.ts'
+import { modelsQuery } from '../queries.ts'
 
 export function useModels(): { models: ModelOption[]; error: string | null } {
-  const [models, setModels] = useState<ModelOption[]>([])
-  const [error, setError] = useState<string | null>(null)
-  useEffect(() => {
-    read(api.providers.models.$get())
-      .then((body) => setModels(body.models))
-      .catch((err: unknown) => setError(`Could not load models: ${messageOf(err)}`))
-  }, [])
-  return { models, error }
+  const { data, error } = useQuery(modelsQuery)
+  return {
+    models: data?.models ?? [],
+    error: error ? `Could not load models: ${messageOf(error)}` : null,
+  }
 }
 
 export function ChatPage({ skey }: { skey?: string }) {

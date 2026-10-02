@@ -1,42 +1,50 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { type ReactNode, useCallback, useEffect, useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import { api, json, read } from '../api.ts'
 import { type ModelOption, modelKey } from '../components/Composer.tsx'
 import { SchemaFields } from '../components/SchemaFields.tsx'
-import { useAction } from '../components/useAction.ts'
 import { useSignOut } from '../components/useSignOut.ts'
+import { lastError, messageOf } from '../lib/errors.ts'
 import { browserTimeZone } from '../lib/time-zone.ts'
+import {
+  accountQuery,
+  credentialsQuery,
+  modelsQuery,
+  pluginSettingsQuery,
+  preferencesQuery,
+  providersQuery,
+} from '../queries.ts'
 import { useStore } from '../store/react.tsx'
 import { useModels } from './ChatPage.tsx'
 
 type Json = Record<string, unknown>
 
 function Preferences({ models }: { models: ModelOption[] }) {
-  // Null until the stored preferences load, and the form only renders after that.
-  const [prefs, setPrefs] = useState<Json | null>(null)
-  const [saved, setSaved] = useState(false)
-  const { error, run } = useAction()
-  useEffect(() => {
-    run(async () => {
-      const body = await read(api.chats.preferences.$get())
-      setPrefs((body.preferences as Json | null) ?? {})
-    })
-  }, [run])
-  if (!prefs) return error ? <p role="alert">Could not load preferences: {error}</p> : null
+  const { data, error } = useQuery(preferencesQuery)
+  // The form only renders once the stored preferences load, and starts from them.
+  if (data === undefined)
+    return error ? <p role="alert">Could not load preferences: {messageOf(error)}</p> : null
+  return <PreferencesForm initial={data ?? {}} models={models} />
+}
+
+function PreferencesForm({ initial, models }: { initial: Json; models: ModelOption[] }) {
+  const [prefs, setPrefs] = useState(initial)
+  const queryClient = useQueryClient()
+  const save = useMutation({
+    mutationFn: () => {
+      const { $type: _type, updatedAt: _updated, ...record } = prefs
+      return read(api.chats.preferences.$put({}, json({ ...record, timezone: browserTimeZone() })))
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: preferencesQuery.queryKey }),
+  })
   const set = (key: string, value: unknown) => setPrefs((p) => ({ ...p, [key]: value }))
   const model = prefs.defaultModel as { provider: string; id: string } | undefined
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault()
-        const { $type: _type, updatedAt: _updated, ...record } = prefs
-        setSaved(false)
-        run(async () => {
-          await read(
-            api.chats.preferences.$put({}, json({ ...record, timezone: browserTimeZone() })),
-          )
-          setSaved(true)
-        })
+        save.mutate()
       }}
     >
       <h2>Preferences</h2>
@@ -85,83 +93,83 @@ function Preferences({ models }: { models: ModelOption[] }) {
         Generate titles
       </label>
       <button type="submit">Save</button>
-      {saved && <span>Saved.</span>}
-      {error && <p role="alert">{error}</p>}
+      {save.isSuccess && <span>Saved.</span>}
+      {save.error && <p role="alert">{messageOf(save.error)}</p>}
     </form>
   )
 }
 
+const emptyDraft = { providerId: '', apiKey: '', name: '', slug: '', baseUrl: '', models: '' }
+
 export function ApiKeys() {
-  const [providers, setProviders] = useState<
-    { id: string; name: string; userEndpoints: boolean; listsModels: boolean }[]
-  >([])
-  const [credentials, setCredentials] = useState<
-    { id: string; providerId: string; name: string | null; slug: string | null; keyHint: string }[]
-  >([])
-  const [draft, setDraft] = useState({
-    providerId: '',
-    apiKey: '',
-    name: '',
-    slug: '',
-    baseUrl: '',
-    models: '',
-  })
+  const providers = useQuery(providersQuery)
+  const credentials = useQuery(credentialsQuery)
+  const [draft, setDraft] = useState(emptyDraft)
   const [listed, setListed] = useState<
     { id: string; name: string; capabilities: ModelOption['capabilities'] }[]
   >([])
-  const { error, run } = useAction()
-  const reload = useCallback(
-    () =>
-      run(async () => setCredentials((await read(api.providers.credentials.$get())).credentials)),
-    [run],
-  )
-  useEffect(() => {
-    run(async () => setProviders((await read(api.providers.providers.$get())).providers))
-    reload()
-  }, [run, reload])
-  const provider = providers.find((p) => p.id === draft.providerId)
+  const queryClient = useQueryClient()
+  // Keys decide which of the user's own models are offered.
+  const keysChanged = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: credentialsQuery.queryKey }),
+      queryClient.invalidateQueries({ queryKey: modelsQuery.queryKey }),
+    ])
+  const provider = providers.data?.find((p) => p.id === draft.providerId)
   const none = { vision: false, reasoning: false, tools: false }
 
-  const add = async () => {
-    const typed = draft.models
-      .split(',')
-      .map((id) => id.trim())
-      .filter(Boolean)
-      .map((id) => ({ id, name: id, capabilities: none }))
-    await read(
-      api.providers.credentials.$post(
-        {},
-        json({
-          providerId: draft.providerId,
-          apiKey: draft.apiKey,
-          name: draft.name || undefined,
-          slug: draft.slug || undefined,
-          baseUrl: draft.baseUrl || undefined,
-          models: [...listed, ...typed],
-        }),
+  const add = useMutation({
+    mutationFn: () => {
+      const typed = draft.models
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean)
+        .map((id) => ({ id, name: id, capabilities: none }))
+      return read(
+        api.providers.credentials.$post(
+          {},
+          json({
+            providerId: draft.providerId,
+            apiKey: draft.apiKey,
+            name: draft.name || undefined,
+            slug: draft.slug || undefined,
+            baseUrl: draft.baseUrl || undefined,
+            models: [...listed, ...typed],
+          }),
+        ),
+      )
+    },
+    onSuccess: () => {
+      setDraft(emptyDraft)
+      setListed([])
+      return keysChanged()
+    },
+  })
+  const remove = useMutation({
+    mutationFn: (id: string) => read(api.providers.credentials[':id'].$delete({ param: { id } })),
+    onSuccess: keysChanged,
+  })
+  const listModels = useMutation({
+    mutationFn: () =>
+      read(
+        api.providers.providers[':id']['list-models'].$post(
+          { param: { id: draft.providerId } },
+          json({ apiKey: draft.apiKey, baseUrl: draft.baseUrl || undefined }),
+        ),
       ),
-    )
-    setDraft({ providerId: '', apiKey: '', name: '', slug: '', baseUrl: '', models: '' })
-    setListed([])
-    reload()
-  }
+    onSuccess: (body) => setListed(body.models),
+  })
+  const loadError = providers.error ?? credentials.error
+  const error = lastError(add, remove, listModels) ?? (loadError && messageOf(loadError))
 
   return (
     <section>
       <h2>API keys</h2>
       <ul>
-        {credentials.map((c) => (
+        {(credentials.data ?? []).map((c) => (
           <li key={c.id}>
             {c.name ?? c.slug ?? c.providerId} ending {c.keyHint}{' '}
-            <button
-              type="button"
-              onClick={() =>
-                run(async () => {
-                  await read(api.providers.credentials[':id'].$delete({ param: { id: c.id } }))
-                  reload()
-                })
-              }
-            >
+            <button type="button" onClick={() => remove.mutate(c.id)}>
               Delete
             </button>
           </li>
@@ -170,7 +178,7 @@ export function ApiKeys() {
       <form
         onSubmit={(e) => {
           e.preventDefault()
-          run(add)
+          add.mutate()
         }}
       >
         <select
@@ -180,7 +188,7 @@ export function ApiKeys() {
           required
         >
           <option value="">Choose a provider</option>
-          {providers.map((p) => (
+          {(providers.data ?? []).map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
             </option>
@@ -217,20 +225,7 @@ export function ApiKeys() {
           </>
         )}
         {provider?.listsModels && (
-          <button
-            type="button"
-            onClick={() =>
-              run(async () => {
-                const body = await read(
-                  api.providers.providers[':id']['list-models'].$post(
-                    { param: { id: draft.providerId } },
-                    json({ apiKey: draft.apiKey, baseUrl: draft.baseUrl || undefined }),
-                  ),
-                )
-                setListed(body.models)
-              })
-            }
-          >
+          <button type="button" onClick={() => listModels.mutate()}>
             Load models
           </button>
         )}
@@ -248,42 +243,27 @@ export function ApiKeys() {
   )
 }
 
+type PluginEntry = {
+  id: string
+  name: string
+  tools: { name: string; description: string; enabled: boolean; userToggle: boolean }[]
+  schema: object | null
+  values: Json
+  secretFields: string[]
+  secretsSet: string[]
+  error: string | null
+}
+
+type PluginChanges = { drafts: Record<string, Json>; switches: Record<string, boolean> }
+
 export function PluginSettings() {
-  type Entry = {
-    id: string
-    name: string
-    tools: { name: string; description: string; enabled: boolean; userToggle: boolean }[]
-    schema: object | null
-    values: Json
-    secretFields: string[]
-    secretsSet: string[]
-    error: string | null
-  }
-  const [plugins, setPlugins] = useState<Entry[]>([])
-  const [drafts, setDrafts] = useState<Record<string, Json>>({})
-  const [switches, setSwitches] = useState<Record<string, boolean>>({})
-  const [saved, setSaved] = useState(false)
-  const { error, run } = useAction()
-  const reload = useCallback(
-    () =>
-      run(async () => {
-        const loaded = (await read(api.plugins.settings.$get())).plugins as Entry[]
-        setPlugins(loaded)
-        setDrafts(Object.fromEntries(loaded.map((plugin) => [plugin.id, plugin.values])))
-        setSwitches(
-          Object.fromEntries(
-            loaded.flatMap((plugin) => plugin.tools.map((tool) => [tool.name, tool.enabled])),
-          ),
-        )
-      }),
-    [run],
-  )
-  useEffect(reload, [reload])
-  if (plugins.length === 0) return error ? <p role="alert">{error}</p> : null
-  const save = () =>
-    run(async () => {
-      setSaved(false)
-      for (const plugin of plugins) {
+  const query = useQuery(pluginSettingsQuery)
+  const queryClient = useQueryClient()
+  const reload = () => queryClient.invalidateQueries({ queryKey: pluginSettingsQuery.queryKey })
+  const plugins = query.data as PluginEntry[] | undefined
+  const save = useMutation({
+    mutationFn: async ({ drafts, switches }: PluginChanges) => {
+      for (const plugin of plugins ?? []) {
         if (plugin.schema && !plugin.error) {
           const values = drafts[plugin.id] ?? plugin.values
           await read(api.plugins[':id'].settings.$put({ param: { id: plugin.id } }, json(values)))
@@ -299,120 +279,143 @@ export function PluginSettings() {
           )
         }
       }
-      reload()
-      setSaved(true)
-    })
+    },
+    onSuccess: reload,
+  })
+  const reset = useMutation({
+    mutationFn: (id: string) => read(api.plugins[':id'].settings.$delete({ param: { id } })),
+    onSuccess: reload,
+  })
+  const error = lastError(save, reset) ?? (query.error && messageOf(query.error))
+  if (!plugins?.length) return error ? <p role="alert">{error}</p> : null
   return (
     <section>
       <h2>Plugins</h2>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          save()
-        }}
-      >
-        {plugins.map((plugin) => {
-          const switchable = plugin.tools.filter((tool) => tool.userToggle)
-          const values = drafts[plugin.id] ?? plugin.values
-          return (
-            <fieldset key={plugin.id}>
-              <legend>{plugin.name}</legend>
-              {switchable.map((tool) => (
-                <label key={tool.name} title={tool.description}>
-                  <input
-                    type="checkbox"
-                    checked={switches[tool.name] ?? tool.enabled}
-                    onChange={(e) => {
-                      const enabled = e.target.checked
-                      setSwitches((current) => ({ ...current, [tool.name]: enabled }))
-                    }}
-                  />
-                  {switchable.length === 1 ? 'Enabled' : tool.name}
-                </label>
-              ))}
-              {plugin.error ? (
-                <p role="alert">
-                  {plugin.error}{' '}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      run(async () => {
-                        await read(
-                          api.plugins[':id'].settings.$delete({ param: { id: plugin.id } }),
-                        )
-                        reload()
-                      })
-                    }
-                  >
-                    Reset
-                  </button>
-                </p>
-              ) : (
-                plugin.schema && (
-                  <SchemaFields
-                    schema={plugin.schema}
-                    values={values}
-                    secretFields={plugin.secretFields}
-                    secretsSet={plugin.secretsSet}
-                    onChange={(key, value) =>
-                      setDrafts((current) => ({
-                        ...current,
-                        [plugin.id]: { ...values, [key]: value },
-                      }))
-                    }
-                  />
-                )
-              )}
-            </fieldset>
-          )
-        })}
-        <button type="submit">Save</button>
-        {saved && <span>Saved.</span>}
-      </form>
+      <PluginForm
+        // Start over from the stored values whenever they load or change.
+        key={query.dataUpdatedAt}
+        plugins={plugins}
+        saved={save.isSuccess}
+        onSave={save.mutate}
+        onReset={reset.mutate}
+      />
       {error && <p role="alert">{error}</p>}
     </section>
   )
 }
 
+function PluginForm({
+  plugins,
+  saved,
+  onSave,
+  onReset,
+}: {
+  plugins: PluginEntry[]
+  saved: boolean
+  onSave: (changes: PluginChanges) => void
+  onReset: (id: string) => void
+}) {
+  const [drafts, setDrafts] = useState<Record<string, Json>>(() =>
+    Object.fromEntries(plugins.map((plugin) => [plugin.id, plugin.values])),
+  )
+  const [switches, setSwitches] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(
+      plugins.flatMap((plugin) => plugin.tools.map((tool) => [tool.name, tool.enabled])),
+    ),
+  )
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        onSave({ drafts, switches })
+      }}
+    >
+      {plugins.map((plugin) => {
+        const switchable = plugin.tools.filter((tool) => tool.userToggle)
+        const values = drafts[plugin.id] ?? plugin.values
+        return (
+          <fieldset key={plugin.id}>
+            <legend>{plugin.name}</legend>
+            {switchable.map((tool) => (
+              <label key={tool.name} title={tool.description}>
+                <input
+                  type="checkbox"
+                  checked={switches[tool.name] ?? tool.enabled}
+                  onChange={(e) => {
+                    const enabled = e.target.checked
+                    setSwitches((current) => ({ ...current, [tool.name]: enabled }))
+                  }}
+                />
+                {switchable.length === 1 ? 'Enabled' : tool.name}
+              </label>
+            ))}
+            {plugin.error ? (
+              <p role="alert">
+                {plugin.error}{' '}
+                <button type="button" onClick={() => onReset(plugin.id)}>
+                  Reset
+                </button>
+              </p>
+            ) : (
+              plugin.schema && (
+                <SchemaFields
+                  schema={plugin.schema}
+                  values={values}
+                  secretFields={plugin.secretFields}
+                  secretsSet={plugin.secretsSet}
+                  onChange={(key, value) =>
+                    setDrafts((current) => ({
+                      ...current,
+                      [plugin.id]: { ...values, [key]: value },
+                    }))
+                  }
+                />
+              )
+            )}
+          </fieldset>
+        )
+      })}
+      <button type="submit">Save</button>
+      {saved && <span>Saved.</span>}
+    </form>
+  )
+}
+
 export function Device() {
   const store = useStore()
-  const [account, setAccount] = useState<{
-    backgroundSync: boolean
-    allowUserOptOut: boolean
-  } | null>(null)
-  const { error, run } = useAction()
-  useEffect(() => {
-    run(async () => setAccount(await read(api.chats.account.$get())))
-  }, [run])
+  const account = useQuery(accountQuery)
+  const queryClient = useQueryClient()
+  const setBackgroundSync = useMutation({
+    mutationFn: (backgroundSync: boolean) =>
+      read(api.chats.account.$put({}, json({ backgroundSync }))),
+    onSuccess: (_result, backgroundSync) =>
+      queryClient.setQueryData(
+        accountQuery.queryKey,
+        (current) => current && { ...current, backgroundSync },
+      ),
+  })
+  const rebuild = useMutation({
+    mutationFn: async () => {
+      await store.deleteLocalCopy()
+      // Reload to open a fresh copy and sync it from the server.
+      location.reload()
+    },
+  })
+  const error = lastError(setBackgroundSync, rebuild) ?? (account.error && messageOf(account.error))
   return (
     <section>
       <h2>Sync</h2>
-      {account?.allowUserOptOut && (
+      {account.data?.allowUserOptOut && (
         <label>
           <input
             type="checkbox"
-            checked={account.backgroundSync}
-            onChange={(e) => {
-              const backgroundSync = e.target.checked
-              run(async () => {
-                await read(api.chats.account.$put({}, json({ backgroundSync })))
-                setAccount({ ...account, backgroundSync })
-              })
-            }}
+            checked={account.data.backgroundSync}
+            onChange={(e) => setBackgroundSync.mutate(e.target.checked)}
           />{' '}
           Keep my chats in sync in the background
         </label>
       )}
-      <button
-        type="button"
-        onClick={() =>
-          run(async () => {
-            await store.deleteLocalCopy()
-            // Reload to open a fresh copy and sync it from the server.
-            location.reload()
-          })
-        }
-      >
+      <button type="button" onClick={() => rebuild.mutate()}>
         Rebuild this device's copy
       </button>
       {error && <p role="alert">{error}</p>}
@@ -439,8 +442,7 @@ export function PreferencesSettings() {
 
 /** The settings sidebar around the current section. */
 export function SettingsLayout({ children }: { children: ReactNode }) {
-  const signOut = useSignOut()
-  const { error, run } = useAction()
+  const signOut = useMutation({ mutationFn: useSignOut() })
   return (
     <div className="layout settings">
       <nav className="sidebar">
@@ -456,10 +458,10 @@ export function SettingsLayout({ children }: { children: ReactNode }) {
             </li>
           ))}
         </ul>
-        <button type="button" onClick={() => run(signOut)}>
+        <button type="button" onClick={() => signOut.mutate()}>
           Sign out
         </button>
-        {error && <p role="alert">{error}</p>}
+        {signOut.error && <p role="alert">{messageOf(signOut.error)}</p>}
       </nav>
       <main>{children}</main>
     </div>

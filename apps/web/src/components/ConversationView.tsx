@@ -1,14 +1,15 @@
+import { useMutation } from '@tanstack/react-query'
 import { useSearch } from '@tanstack/react-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, json, read } from '../api.ts'
 import { blobUrlFor } from '../lib/blob-url.ts'
+import { lastError } from '../lib/errors.ts'
 import { useMe } from '../session.tsx'
 import { messageText } from '../store/core.ts'
 import { useConversation, useStore } from '../store/react.tsx'
 import { Composer, type ModelOption, modelKey } from './Composer.tsx'
 import { MessageView } from './MessageView.tsx'
 import { ShareControl } from './ShareControl.tsx'
-import { useAction } from './useAction.ts'
 import { useBranch } from './useBranch.ts'
 import { useReplyStream } from './useReplyStream.ts'
 import { useStickToBottom } from './useStickToBottom.ts'
@@ -17,7 +18,6 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
   const me = useMe()
   const store = useStore()
   const { conversation, error: loadError } = useConversation(skey)
-  const { error, run } = useAction()
   const [editing, setEditing] = useState<{ parent?: string; text: string } | null>(null)
   const [regenModel, setRegenModel] = useState('')
   const [renaming, setRenaming] = useState<string | null>(null)
@@ -86,6 +86,19 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
     await refresh()
   }
 
+  const renamingTitle = useMutation({ mutationFn: rename })
+  const syncing = useMutation({ mutationFn: sync })
+  const stopping = useMutation({ mutationFn: stop })
+  const regenerating = useMutation({
+    mutationFn: (parent: string | null) => {
+      if (!parent) throw new Error('This reply has no user message to regenerate')
+      return regenerate(parent)
+    },
+  })
+  // Refreshing after a send picks up the sent message without waiting for the stream.
+  const refreshing = useMutation({ mutationFn: refresh })
+  const error = lastError(renamingTitle, syncing, stopping, regenerating, refreshing)
+
   return (
     <section className="conversation" ref={section}>
       <header>
@@ -100,7 +113,7 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
           <form
             onSubmit={(e) => {
               e.preventDefault()
-              run(() => rename(renaming))
+              renamingTitle.mutate(renaming)
             }}
           >
             <input
@@ -111,7 +124,7 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
             <button type="submit">Save</button>
           </form>
         )}
-        <button type="button" onClick={() => run(sync)}>
+        <button type="button" onClick={() => syncing.mutate()}>
           Sync
         </button>
         {me.storageMode === 'space' && <ShareControl skey={skey} ownerDid={me.did} />}
@@ -129,7 +142,7 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
               Edit
             </button>
           ) : record.status === 'pending' ? (
-            <button type="button" onClick={() => run(() => stop(message.rkey))}>
+            <button type="button" onClick={() => stopping.mutate(message.rkey)}>
               Stop
             </button>
           ) : (
@@ -146,15 +159,7 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
                   </option>
                 ))}
               </select>
-              <button
-                type="button"
-                onClick={() =>
-                  run(() => {
-                    if (!parent) throw new Error('This reply has no user message to regenerate')
-                    return regenerate(parent)
-                  })
-                }
-              >
+              <button type="button" onClick={() => regenerating.mutate(parent)}>
                 Regenerate
               </button>
             </>
@@ -187,7 +192,7 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
             setEditing(null)
             pick(editing.parent ?? null, sent.rkey)
             if (sent.replyRkey) follow(sent.replyRkey)
-            run(refresh)
+            refreshing.mutate()
           }}
           onCancel={() => setEditing(null)}
         />
@@ -200,7 +205,7 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
           onSent={(sent) => {
             pin()
             if (sent.replyRkey) follow(sent.replyRkey)
-            run(refresh)
+            refreshing.mutate()
           }}
         />
       )}
