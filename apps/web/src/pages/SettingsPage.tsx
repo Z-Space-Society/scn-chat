@@ -16,7 +16,7 @@ import {
   preferencesQuery,
   providersQuery,
 } from '../queries.ts'
-import { useStore } from '../store/react.tsx'
+import { useOpenStore } from '../store/react.tsx'
 import { useModels } from './ChatPage.tsx'
 
 type Json = Record<string, unknown>
@@ -463,7 +463,7 @@ function PluginForm({
 }
 
 export function Device() {
-  const store = useStore()
+  const openStore = useOpenStore()
   const account = useQuery(accountQuery)
   const queryClient = useQueryClient()
   const setBackgroundSync = useMutation({
@@ -477,7 +477,7 @@ export function Device() {
   })
   const rebuild = useMutation({
     mutationFn: async () => {
-      await store.deleteLocalCopy()
+      await openStore().deleteLocalCopy()
       // Reload to open a fresh copy and sync it from the server.
       location.reload()
     },

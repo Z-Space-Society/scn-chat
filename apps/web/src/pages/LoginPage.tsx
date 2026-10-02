@@ -1,7 +1,4 @@
-export function LoginPage() {
-  const params = new URLSearchParams(location.search)
-  const error = params.get('error')
-  const next = params.get('next')
+export function LoginPage({ error, next }: { error?: string; next?: string }) {
   return (
     <main className="login">
       <h1>Sign in</h1>

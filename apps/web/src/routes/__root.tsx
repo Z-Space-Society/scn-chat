@@ -1,21 +1,16 @@
 import type { QueryClient } from '@tanstack/react-query'
-import {
-  createRootRouteWithContext,
-  HeadContent,
-  Navigate,
-  Outlet,
-  Scripts,
-} from '@tanstack/react-router'
+import { createRootRouteWithContext, HeadContent, Navigate, Scripts } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { appName } from '../app-name.ts'
-import { SessionContext, useSessionCheck } from '../session.tsx'
+import { messageOf } from '../lib/errors.ts'
+import { checkSession } from '../session.tsx'
 import styles from '../styles.css?url'
 import theme from '../theme.css?url'
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  // The shell is server-rendered with the app name, which the server passes with each request.
-  ssr: true,
   staleTime: Number.POSITIVE_INFINITY,
+  beforeLoad: async ({ context }) => ({ session: await checkSession(context.queryClient) }),
+  // The app name comes with each server request, and from the rendered page in the browser.
   loader: ({ serverContext }) => ({ appName: serverContext?.appName ?? appName() }),
   head: ({ loaderData }) => ({
     meta: [
@@ -30,7 +25,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
   }),
   shellComponent: Shell,
-  component: Root,
+  errorComponent: ({ error }) => <p role="alert">{messageOf(error)}</p>,
   notFoundComponent: () => <Navigate to="/" replace />,
 })
 
@@ -45,17 +40,5 @@ function Shell({ children }: { children: ReactNode }) {
         <Scripts />
       </body>
     </html>
-  )
-}
-
-function Root() {
-  const session = useSessionCheck()
-  if (session.state === 'loading') return <p>Loading...</p>
-  if (session.state === 'error')
-    return <p role="alert">Could not reach the server: {session.message}</p>
-  return (
-    <SessionContext.Provider value={session}>
-      <Outlet />
-    </SessionContext.Provider>
   )
 }

@@ -1,7 +1,7 @@
 import { createStart } from '@tanstack/react-start'
 
 /** What the server passes with each request. See WebContext in apps/server/src/app.ts. */
-export type RequestContext = { appName: string }
+export type RequestContext = { appName: string; fetch: typeof fetch }
 
 declare module '@tanstack/react-start' {
   interface Register {
@@ -9,5 +9,6 @@ declare module '@tanstack/react-start' {
   }
 }
 
-// Chats live in the browser's local copy, so routes render on the client unless they opt in.
-export const startInstance = createStart(() => ({ defaultSsr: false }))
+// Routes render on the server unless they opt out. The chat routes do, since chats live in the
+// browser's local copy.
+export const startInstance = createStart(() => ({ defaultSsr: true }))

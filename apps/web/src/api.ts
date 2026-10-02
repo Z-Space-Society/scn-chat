@@ -7,19 +7,30 @@ import type {
   StorageApi,
   TurnsApi,
 } from '@scn-chat/server/api-types'
+import { getGlobalStartContext } from '@tanstack/react-start'
 import { type ClientResponse, hc } from 'hono/client'
 import type { SuccessStatusCode } from 'hono/utils/http-status'
 import { errorMessage } from './lib/response.ts'
 
+/**
+ * Call the server: in process while rendering on the server, with the page request's session,
+ * and over HTTP in the browser. The window check comes first, since outside Start's compiler, as
+ * in tests, the context lookup always takes its server branch.
+ */
+const apiFetch: typeof fetch = (input, init) => {
+  const server = typeof window === 'undefined' ? getGlobalStartContext() : undefined
+  return server ? server.fetch(input, init) : fetch(input, init)
+}
+
 /** Clients for calling the hono server's /api routes. **/
 export const api = {
-  auth: hc<AuthApi>('/api'),
-  chats: hc<StorageApi>('/api'),
-  turns: hc<TurnsApi>('/api'),
-  providers: hc<ProvidersApi>('/api'),
-  plugins: hc<PluginsApi>('/api/plugins'),
-  blobs: hc<BlobsApi>('/api'),
-  sharing: hc<SharingApi>('/api'),
+  auth: hc<AuthApi>('/api', { fetch: apiFetch }),
+  chats: hc<StorageApi>('/api', { fetch: apiFetch }),
+  turns: hc<TurnsApi>('/api', { fetch: apiFetch }),
+  providers: hc<ProvidersApi>('/api', { fetch: apiFetch }),
+  plugins: hc<PluginsApi>('/api/plugins', { fetch: apiFetch }),
+  blobs: hc<BlobsApi>('/api', { fetch: apiFetch }),
+  sharing: hc<SharingApi>('/api', { fetch: apiFetch }),
 }
 
 /** Build the request options for a JSON body with api calls. */

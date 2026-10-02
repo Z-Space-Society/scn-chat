@@ -1,7 +1,8 @@
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createContext, type ReactNode, useContext, useEffect, useState } from 'react'
 import { messageOf } from '../lib/errors.ts'
-import type { StoreClient } from './client.ts'
+import { MeContext } from '../session.tsx'
+import { openStore, type StoreClient } from './client.ts'
 import type { Conversation, ConversationSummary } from './core.ts'
 import { isStoreClosed } from './errors.ts'
 import type { HandoverState } from './handover.ts'
@@ -28,6 +29,21 @@ export function StoreProvider({ store, children }: { store: StoreClient; childre
     [store, queryClient],
   )
   return <StoreContext.Provider value={store}>{children}</StoreContext.Provider>
+}
+
+/**
+ * The user's store for an action outside the chat routes, like signing out: the provided one, or
+ * opened when the action runs, so a page like settings does not take the store from another tab
+ * just by being open.
+ */
+export function useOpenStore(): () => StoreClient {
+  const provided = useContext(StoreContext)
+  const me = useContext(MeContext)
+  return () => {
+    if (provided) return provided
+    if (!me) throw new Error('Opening the store needs a signed-in user')
+    return openStore(me.did)
+  }
 }
 
 export function useStore(): StoreClient {

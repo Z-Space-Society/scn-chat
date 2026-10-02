@@ -1,5 +1,6 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient } from '@tanstack/react-query'
 import { createRouter, type RouterHistory } from '@tanstack/react-router'
+import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query'
 import { routeTree } from './routeTree.gen.ts'
 
 export function createQueryClient() {
@@ -9,18 +10,20 @@ export function createQueryClient() {
   })
 }
 
-/** The router, with a query client of its own, so each server request gets a fresh cache. */
+/**
+ * The router, with a query client of its own, so each server request gets a fresh cache. Queries
+ * that loaders fill while rendering on the server reach the browser with the page.
+ */
 export function getRouter({ history }: { history?: RouterHistory } = {}) {
   const queryClient = createQueryClient()
-  return createRouter({
+  const router = createRouter({
     routeTree,
     history,
     context: { queryClient },
     scrollRestoration: true,
-    Wrap: ({ children }) => (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    ),
   })
+  setupRouterSsrQueryIntegration({ router, queryClient })
+  return router
 }
 
 declare module '@tanstack/react-router' {

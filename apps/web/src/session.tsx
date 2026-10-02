@@ -1,8 +1,9 @@
-import { useQuery } from '@tanstack/react-query'
+import type { QueryClient } from '@tanstack/react-query'
 import { createContext, useContext } from 'react'
 import { ApiError } from './api.ts'
 import { messageOf } from './lib/errors.ts'
 import { meQuery } from './queries.ts'
+import { openStore } from './store/client.ts'
 
 export type Me = {
   did: string
@@ -20,24 +21,26 @@ export function useMe(): Me {
   return me
 }
 
-export type Session =
-  | { state: 'loading' }
-  | { state: 'signed-out' }
-  | { state: 'signed-in'; me: Me }
-  | { state: 'error'; message: string }
+export type Session = { state: 'signed-out' } | { state: 'signed-in'; me: Me }
 
-/** Ask the server who is signed in. */
-export function useSessionCheck(): Session {
-  const { data, error } = useQuery(meQuery)
-  if (data) return { state: 'signed-in', me: data as Me }
-  if (error instanceof ApiError && error.status === 401) return { state: 'signed-out' }
-  if (error) return { state: 'error', message: messageOf(error) }
-  return { state: 'loading' }
+/**
+ * Ask the server who is signed in, through the query cache, so the answer reaches the browser with
+ * a server-rendered page. A 401 means signed out, and any other failure throws.
+ */
+export async function checkSession(queryClient: QueryClient): Promise<Session> {
+  try {
+    return { state: 'signed-in', me: (await queryClient.ensureQueryData(meQuery)) as Me }
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) return { state: 'signed-out' }
+    throw new Error(`Could not reach the server: ${messageOf(err)}`, { cause: err })
+  }
 }
 
-/** The checked session, once it is known. */
-export const SessionContext = createContext<Exclude<Session, { state: 'loading' | 'error' }>>({
-  state: 'signed-out',
-})
-
-export const useSession = () => useContext(SessionContext)
+/** Sign this device out after the session ended: delete its copy of the chats, then go to login. */
+export function endSession(did: string) {
+  openStore(did)
+    .deleteLocalCopy()
+    .catch((err: unknown) => console.error('Could not delete the local copy', err))
+    // A full page load, so nothing from the ended session stays in memory.
+    .finally(() => location.assign('/login'))
+}

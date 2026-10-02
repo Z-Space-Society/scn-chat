@@ -11,14 +11,15 @@
 import { Route as rootRouteImport } from './routes/__root.tsx'
 import { Route as AppRouteImport } from './routes/_app.tsx'
 import { Route as LoginRouteImport } from './routes/login.tsx'
-import { Route as AppIndexRouteImport } from './routes/_app/index.tsx'
+import { Route as AppChatsRouteImport } from './routes/_app/_chats.tsx'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings.tsx'
-import { Route as AppChatSkeyRouteImport } from './routes/_app/chat/$skey.tsx'
+import { Route as AppChatsIndexRouteImport } from './routes/_app/_chats/index.tsx'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index.tsx'
 import { Route as AppSettingsApiKeysRouteImport } from './routes/_app/settings/api-keys.tsx'
 import { Route as AppSettingsPluginsRouteImport } from './routes/_app/settings/plugins.tsx'
 import { Route as AppSettingsSyncRouteImport } from './routes/_app/settings/sync.tsx'
 import { Route as SharedOwnerDidSkeyRouteImport } from './routes/shared/$ownerDid/$skey.tsx'
+import { Route as AppChatsChatSkeyRouteImport } from './routes/_app/_chats/chat/$skey.tsx'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -29,9 +30,8 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppIndexRoute = AppIndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AppChatsRoute = AppChatsRouteImport.update({
+  id: '/_chats',
   getParentRoute: () => AppRoute,
 } as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
@@ -39,10 +39,10 @@ const AppSettingsRoute = AppSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AppRoute,
 } as any)
-const AppChatSkeyRoute = AppChatSkeyRouteImport.update({
-  id: '/chat/$skey',
-  path: '/chat/$skey',
-  getParentRoute: () => AppRoute,
+const AppChatsIndexRoute = AppChatsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppChatsRoute,
 } as any)
 const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
   id: '/',
@@ -69,40 +69,46 @@ const SharedOwnerDidSkeyRoute = SharedOwnerDidSkeyRouteImport.update({
   path: '/shared/$ownerDid/$skey',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppChatsChatSkeyRoute = AppChatsChatSkeyRouteImport.update({
+  id: '/chat/$skey',
+  path: '/chat/$skey',
+  getParentRoute: () => AppChatsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof AppIndexRoute
+  '/': typeof AppChatsIndexRoute
   '/login': typeof LoginRoute
   '/settings': typeof AppSettingsRouteWithChildren
-  '/chat/$skey': typeof AppChatSkeyRoute
   '/settings/api-keys': typeof AppSettingsApiKeysRoute
   '/settings/plugins': typeof AppSettingsPluginsRoute
   '/settings/sync': typeof AppSettingsSyncRoute
   '/shared/$ownerDid/$skey': typeof SharedOwnerDidSkeyRoute
   '/settings/': typeof AppSettingsIndexRoute
+  '/chat/$skey': typeof AppChatsChatSkeyRoute
 }
 export interface FileRoutesByTo {
+  '/': typeof AppChatsIndexRoute
   '/login': typeof LoginRoute
-  '/': typeof AppIndexRoute
-  '/chat/$skey': typeof AppChatSkeyRoute
   '/settings/api-keys': typeof AppSettingsApiKeysRoute
   '/settings/plugins': typeof AppSettingsPluginsRoute
   '/settings/sync': typeof AppSettingsSyncRoute
   '/shared/$ownerDid/$skey': typeof SharedOwnerDidSkeyRoute
   '/settings': typeof AppSettingsIndexRoute
+  '/chat/$skey': typeof AppChatsChatSkeyRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/_app/_chats': typeof AppChatsRouteWithChildren
   '/_app/settings': typeof AppSettingsRouteWithChildren
-  '/_app/': typeof AppIndexRoute
-  '/_app/chat/$skey': typeof AppChatSkeyRoute
   '/_app/settings/api-keys': typeof AppSettingsApiKeysRoute
   '/_app/settings/plugins': typeof AppSettingsPluginsRoute
   '/_app/settings/sync': typeof AppSettingsSyncRoute
   '/shared/$ownerDid/$skey': typeof SharedOwnerDidSkeyRoute
+  '/_app/_chats/': typeof AppChatsIndexRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
+  '/_app/_chats/chat/$skey': typeof AppChatsChatSkeyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -110,34 +116,35 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/settings'
-    | '/chat/$skey'
     | '/settings/api-keys'
     | '/settings/plugins'
     | '/settings/sync'
     | '/shared/$ownerDid/$skey'
     | '/settings/'
+    | '/chat/$skey'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/login'
     | '/'
-    | '/chat/$skey'
+    | '/login'
     | '/settings/api-keys'
     | '/settings/plugins'
     | '/settings/sync'
     | '/shared/$ownerDid/$skey'
     | '/settings'
+    | '/chat/$skey'
   id:
     | '__root__'
     | '/_app'
     | '/login'
+    | '/_app/_chats'
     | '/_app/settings'
-    | '/_app/'
-    | '/_app/chat/$skey'
     | '/_app/settings/api-keys'
     | '/_app/settings/plugins'
     | '/_app/settings/sync'
     | '/shared/$ownerDid/$skey'
+    | '/_app/_chats/'
     | '/_app/settings/'
+    | '/_app/_chats/chat/$skey'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -162,11 +169,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_app/': {
-      id: '/_app/'
-      path: '/'
+    '/_app/_chats': {
+      id: '/_app/_chats'
+      path: ''
       fullPath: '/'
-      preLoaderRoute: typeof AppIndexRouteImport
+      preLoaderRoute: typeof AppChatsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/settings': {
@@ -176,12 +183,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/chat/$skey': {
-      id: '/_app/chat/$skey'
-      path: '/chat/$skey'
-      fullPath: '/chat/$skey'
-      preLoaderRoute: typeof AppChatSkeyRouteImport
-      parentRoute: typeof AppRoute
+    '/_app/_chats/': {
+      id: '/_app/_chats/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof AppChatsIndexRouteImport
+      parentRoute: typeof AppChatsRoute
     }
     '/_app/settings/': {
       id: '/_app/settings/'
@@ -218,8 +225,29 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SharedOwnerDidSkeyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/_chats/chat/$skey': {
+      id: '/_app/_chats/chat/$skey'
+      path: '/chat/$skey'
+      fullPath: '/chat/$skey'
+      preLoaderRoute: typeof AppChatsChatSkeyRouteImport
+      parentRoute: typeof AppChatsRoute
+    }
   }
 }
+
+interface AppChatsRouteChildren {
+  AppChatsIndexRoute: typeof AppChatsIndexRoute
+  AppChatsChatSkeyRoute: typeof AppChatsChatSkeyRoute
+}
+
+const AppChatsRouteChildren: AppChatsRouteChildren = {
+  AppChatsIndexRoute: AppChatsIndexRoute,
+  AppChatsChatSkeyRoute: AppChatsChatSkeyRoute,
+}
+
+const AppChatsRouteWithChildren = AppChatsRoute._addFileChildren(
+  AppChatsRouteChildren,
+)
 
 interface AppSettingsRouteChildren {
   AppSettingsApiKeysRoute: typeof AppSettingsApiKeysRoute
@@ -240,15 +268,13 @@ const AppSettingsRouteWithChildren = AppSettingsRoute._addFileChildren(
 )
 
 interface AppRouteChildren {
+  AppChatsRoute: typeof AppChatsRouteWithChildren
   AppSettingsRoute: typeof AppSettingsRouteWithChildren
-  AppIndexRoute: typeof AppIndexRoute
-  AppChatSkeyRoute: typeof AppChatSkeyRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppChatsRoute: AppChatsRouteWithChildren,
   AppSettingsRoute: AppSettingsRouteWithChildren,
-  AppIndexRoute: AppIndexRoute,
-  AppChatSkeyRoute: AppChatSkeyRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

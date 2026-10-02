@@ -1,46 +1,31 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, Navigate, Outlet } from '@tanstack/react-router'
+import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { onUnauthorized } from '../api.ts'
 import { syncTimeZone } from '../lib/time-zone.ts'
-import { type Me, MeContext, useSession } from '../session.tsx'
-import { openStore } from '../store/client.ts'
-import { StoreProvider } from '../store/react.tsx'
+import { endSession, MeContext } from '../session.tsx'
 
-/** The signed-in routes, with the user's local copy of their chats. */
-export const Route = createFileRoute('/_app')({ component: SignedInLayout })
+/** The signed-in routes. Signed-out requests are sent to the login page, from the server too. */
+export const Route = createFileRoute('/_app')({
+  beforeLoad: ({ context }) => {
+    if (context.session.state !== 'signed-in') throw redirect({ to: '/login' })
+    return { me: context.session.me }
+  },
+  component: SignedIn,
+})
 
-function SignedInLayout() {
-  const session = useSession()
-  if (session.state !== 'signed-in') return <Navigate to="/login" replace />
-  return <SignedIn me={session.me} />
-}
-
-function SignedIn({ me }: { me: Me }) {
-  const store = openStore(me.did)
+function SignedIn() {
+  const { me } = Route.useRouteContext()
   const queryClient = useQueryClient()
   useEffect(() => {
-    const ended = () =>
-      // Use a full page load, since the signed-in routes redirect /login to /.
-      store
-        .deleteLocalCopy()
-        .catch((err: unknown) => console.error('Could not delete the local copy', err))
-        .finally(() => location.assign('/login'))
     syncTimeZone(queryClient).catch((err: unknown) =>
       console.warn('Could not save the time zone', err),
     )
-    const stopApi = onUnauthorized(ended)
-    const stopStore = store.onChange((change) => change.type === 'unauthorized' && ended())
-    return () => {
-      stopApi()
-      stopStore()
-    }
-  }, [store, queryClient])
+    return onUnauthorized(() => endSession(me.did))
+  }, [me.did, queryClient])
   return (
     <MeContext.Provider value={me}>
-      <StoreProvider store={store}>
-        <Outlet />
-      </StoreProvider>
+      <Outlet />
     </MeContext.Provider>
   )
 }

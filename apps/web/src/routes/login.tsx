@@ -1,10 +1,16 @@
-import { createFileRoute, Navigate } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
+import { validateLoginSearch } from '../lib/search-params.ts'
 import { LoginPage } from '../pages/LoginPage.tsx'
-import { useSession } from '../session.tsx'
 
-export const Route = createFileRoute('/login')({ component: Login })
+export const Route = createFileRoute('/login')({
+  validateSearch: validateLoginSearch,
+  beforeLoad: ({ context }) => {
+    if (context.session.state === 'signed-in') throw redirect({ to: '/' })
+  },
+  component: Login,
+})
 
 function Login() {
-  if (useSession().state === 'signed-in') return <Navigate to="/" replace />
-  return <LoginPage />
+  const { error, next } = Route.useSearch()
+  return <LoginPage error={error} next={next} />
 }
