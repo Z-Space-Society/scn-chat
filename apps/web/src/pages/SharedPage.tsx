@@ -38,7 +38,7 @@ export function SharedPage({
     <main className="conversation">
       <h2>{shared.title ?? 'Shared chat'}</h2>
       <p>Shared by {shared.owner.handle ?? shared.owner.did}</p>
-      {branch.map(({ message, siblings, index, parent }) => {
+      {branch.map(({ message, siblings, index }) => {
         return (
           <MessageView
             key={message.rkey}
@@ -47,7 +47,7 @@ export function SharedPage({
             siblings={{
               index,
               count: siblings.length,
-              onPick: (i) => pick(parent, (siblings[i] as { rkey: string }).rkey),
+              onPick: (i) => pick((siblings[i] as { rkey: string }).rkey),
             }}
           />
         )

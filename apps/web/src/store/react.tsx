@@ -86,7 +86,7 @@ export function useConversation(skey: string): {
 }
 
 /** Search the local copy, rerunning as the download and live changes add to it. */
-export function useSearch(query: string): {
+export function useChatSearch(query: string): {
   results: SearchResult[]
   remaining: number
   error: string | null

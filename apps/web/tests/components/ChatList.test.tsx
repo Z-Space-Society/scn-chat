@@ -67,6 +67,29 @@ describe('ChatList', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 
+  it('keeps the settled search in the URL', async () => {
+    const store = fakeStore()
+    const { router } = await renderAt(
+      <StoreProvider store={store as unknown as StoreClient}>
+        <ChatList />
+      </StoreProvider>,
+    )
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search chats' }), 'blue')
+    await vi.waitFor(() => expect(router.state.location.search).toEqual({ q: 'blue' }))
+  })
+
+  it('starts from the search in the URL', async () => {
+    const store = fakeStore()
+    await renderAt(
+      <StoreProvider store={store as unknown as StoreClient}>
+        <ChatList />
+      </StoreProvider>,
+      '/?q=blue',
+    )
+    expect(screen.getByRole('searchbox', { name: 'Search chats' })).toHaveValue('blue')
+    expect(await screen.findByText('Paint')).toBeInTheDocument()
+  })
+
   it('waits for two characters before searching', async () => {
     const store = fakeStore()
     await renderAt(

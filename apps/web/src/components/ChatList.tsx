@@ -1,21 +1,31 @@
 import { useMutation } from '@tanstack/react-query'
-import { Link, useNavigate } from '@tanstack/react-router'
-import { useState } from 'react'
+import { Link, useNavigate, useSearch } from '@tanstack/react-router'
+import { useEffect, useState } from 'react'
 import { api, read } from '../api.ts'
 import { lastError } from '../lib/errors.ts'
-import { useConversations, useSearch } from '../store/react.tsx'
+import { useChatSearch, useConversations } from '../store/react.tsx'
 import { SearchResults } from './SearchResults.tsx'
 import { useDebounced } from './useDebounced.ts'
 import { useSignOut } from './useSignOut.ts'
 
 export function ChatList() {
   const { conversations, error: loadError } = useConversations()
-  const [query, setQuery] = useState('')
+  const navigate = useNavigate()
+  // The box starts from the URL's `q`, and the settled search goes back into it.
+  const { q } = useSearch({ strict: false })
+  const [query, setQuery] = useState(q ?? '')
   const typed = useDebounced(query, 150)
+  useEffect(() => {
+    if ((typed || undefined) === q) return
+    void navigate({
+      to: '.',
+      search: (prev) => ({ ...prev, q: typed || undefined }),
+      replace: true,
+    })
+  }, [typed, q, navigate])
   // Searching only begins after 2 characters are types.
   const searching = typed.trim().length >= 2
-  const found = useSearch(searching ? typed : '')
-  const navigate = useNavigate()
+  const found = useChatSearch(searching ? typed : '')
   const create = useMutation({
     mutationFn: async () => {
       const created = await read(api.chats.conversations.$post())

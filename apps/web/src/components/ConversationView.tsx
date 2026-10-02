@@ -1,5 +1,4 @@
 import { useMutation } from '@tanstack/react-query'
-import { useSearch } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
 import { api, json, read } from '../api.ts'
 import { blobUrlFor } from '../lib/blob-url.ts'
@@ -27,12 +26,16 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
   const pending = messages.filter((m) => m.record.status === 'pending').map((m) => m.rkey)
   const { streams, follow } = useReplyStream(skey, pending)
 
-  const focus = useSearch({ strict: false }).m
+  const { focus, branch, pick } = useBranch(messages)
   const section = useRef<HTMLElement>(null)
-  // A link to a message scrolls to that message instead.
+  // Opening the conversation on a message scrolls to that message instead.
   const { pin } = useStickToBottom(section, !focus)
-  const { branch, pick } = useBranch(messages, focus)
   const scrolledTo = useRef<string | null>(null)
+  /** Focus a message without scrolling to it, as when switching siblings. */
+  const choose = (rkey: string) => {
+    scrolledTo.current = rkey
+    pick(rkey)
+  }
   const focusShown = branch.some((step) => step.message.rkey === focus)
   useEffect(() => {
     if (!focus || !focusShown || scrolledTo.current === focus) return
@@ -53,7 +56,7 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
       ),
     )
     if (!result.replyRkey) throw new Error(`Regenerating was ${result.status}`)
-    pick(userRkey, result.replyRkey)
+    choose(result.replyRkey)
     follow(result.replyRkey)
     await refresh()
   }
@@ -123,7 +126,7 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
         {me.storageMode === 'space' && <ShareControl skey={skey} ownerDid={me.did} />}
       </header>
       {(error ?? loadError) && <p role="alert">{error ?? loadError}</p>}
-      {branch.map(({ message, siblings, index, parent: group }) => {
+      {branch.map(({ message, siblings, index }) => {
         const record = message.record
         const parent = (record.parent as string | undefined) ?? null
         const actions =
@@ -167,7 +170,7 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
             siblings={{
               index,
               count: siblings.length,
-              onPick: (i) => pick(group, (siblings[i] as { rkey: string }).rkey),
+              onPick: (i) => choose((siblings[i] as { rkey: string }).rkey),
             }}
             actions={actions}
           />
@@ -183,7 +186,7 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
           onSent={(sent) => {
             pin()
             setEditing(null)
-            pick(editing.parent ?? null, sent.rkey)
+            choose(sent.rkey)
             if (sent.replyRkey) follow(sent.replyRkey)
             refreshing.mutate()
           }}

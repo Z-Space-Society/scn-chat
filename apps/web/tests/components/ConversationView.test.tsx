@@ -148,6 +148,23 @@ describe('ConversationView', () => {
     expect(screen.queryByText('second answer')).toBeNull()
   })
 
+  it('names the chosen branch in the URL without scrolling to it', async () => {
+    const scrolled = vi.fn()
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled(this.id)
+    }
+    const store = fakeStore([
+      user('u', 'question'),
+      reply('u.r0', 'first answer', 'u'),
+      reply('u.r1', 'second answer', 'u'),
+    ])
+    const { router } = await renderWith(store, <ConversationView skey="s1" models={[]} />)
+    expect(await screen.findByText('second answer')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '‹' }))
+    expect(router.state.location.search).toEqual({ m: 'u.r0' })
+    expect(scrolled).not.toHaveBeenCalled()
+  })
+
   it('regenerates and selects the new reply, even when it is not the newest sibling', async () => {
     stubFetch(vi.fn(async () => Response.json({ replyRkey: 'u.r1', status: 'claimed' })))
     const store = fakeStore([
