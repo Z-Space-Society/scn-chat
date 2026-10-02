@@ -1,3 +1,4 @@
+import { useForm, useStore as useFormStore } from '@tanstack/react-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, json, read } from '../api.ts'
@@ -44,13 +45,9 @@ function SharingForm({
   loadError: string | null
   onClose: () => void
 }) {
-  const [mode, setMode] = useState<Mode>(settings?.mode ?? 'private')
-  const [members, setMembers] = useState(
-    settings?.members.map((m) => m.handle ?? m.did).join(', ') ?? '',
-  )
   const queryClient = useQueryClient()
   const save = useMutation({
-    mutationFn: () => {
+    mutationFn: ({ mode, members }: { mode: Mode; members: string }) => {
       const list = members
         .split(',')
         .map((m) => m.trim())
@@ -64,28 +61,44 @@ function SharingForm({
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: sharingQuery(skey).queryKey }),
   })
+  const form = useForm({
+    defaultValues: {
+      mode: settings?.mode ?? ('private' as Mode),
+      members: settings?.members.map((m) => m.handle ?? m.did).join(', ') ?? '',
+    },
+    onSubmit: ({ value }) => save.mutate(value),
+  })
+  const mode = useFormStore(form.store, (state) => state.values.mode)
   const error = save.error ? messageOf(save.error) : loadError
   return (
     <fieldset>
       <legend>Sharing</legend>
-      <select
-        aria-label="Sharing mode"
-        value={mode}
-        onChange={(e) => setMode(e.target.value as Mode)}
-      >
-        <option value="private">Private</option>
-        <option value="people">Specific people</option>
-        <option value="public">Anyone with an atproto account</option>
-      </select>
+      <form.Field name="mode">
+        {(field) => (
+          <select
+            aria-label="Sharing mode"
+            value={field.state.value}
+            onChange={(e) => field.handleChange(e.target.value as Mode)}
+          >
+            <option value="private">Private</option>
+            <option value="people">Specific people</option>
+            <option value="public">Anyone with an atproto account</option>
+          </select>
+        )}
+      </form.Field>
       {mode === 'people' && (
-        <input
-          aria-label="People"
-          placeholder="Handles, separated by commas"
-          value={members}
-          onChange={(e) => setMembers(e.target.value)}
-        />
+        <form.Field name="members">
+          {(field) => (
+            <input
+              aria-label="People"
+              placeholder="Handles, separated by commas"
+              value={field.state.value}
+              onChange={(e) => field.handleChange(e.target.value)}
+            />
+          )}
+        </form.Field>
       )}
-      <button type="button" onClick={() => save.mutate()}>
+      <button type="button" onClick={() => void form.handleSubmit()}>
         Save
       </button>
       {mode !== 'private' && <input aria-label="Link" readOnly value={link} />}

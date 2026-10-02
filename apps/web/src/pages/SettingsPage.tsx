@@ -1,3 +1,4 @@
+import { useForm, useStore as useFormStore } from '@tanstack/react-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { type ReactNode, useState } from 'react'
@@ -29,69 +30,93 @@ function Preferences({ models }: { models: ModelOption[] }) {
 }
 
 function PreferencesForm({ initial, models }: { initial: Json; models: ModelOption[] }) {
-  const [prefs, setPrefs] = useState(initial)
   const queryClient = useQueryClient()
   const save = useMutation({
-    mutationFn: () => {
-      const { $type: _type, updatedAt: _updated, ...record } = prefs
-      return read(api.chats.preferences.$put({}, json({ ...record, timezone: browserTimeZone() })))
-    },
+    mutationFn: (record: Json) =>
+      read(api.chats.preferences.$put({}, json({ ...record, timezone: browserTimeZone() }))),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: preferencesQuery.queryKey }),
   })
-  const set = (key: string, value: unknown) => setPrefs((p) => ({ ...p, [key]: value }))
-  const model = prefs.defaultModel as { provider: string; id: string } | undefined
+  const stored = initial.defaultModel as { provider: string; id: string } | undefined
+  const form = useForm({
+    defaultValues: {
+      defaultModel: stored ? modelKey(stored) : '',
+      defaultEffort: String(initial.defaultEffort ?? ''),
+      customInstructions: String(initial.customInstructions ?? ''),
+      generateTitles: initial.generateTitles !== false,
+    },
+    onSubmit: ({ value }) => {
+      // Fields this form does not edit, like the time zone, keep their stored values.
+      const { $type: _type, updatedAt: _updated, ...record } = initial
+      const picked = models.find((m) => modelKey(m) === value.defaultModel)
+      // The mutation holds any error for display, so submitting never rejects.
+      save.mutate({
+        ...record,
+        defaultModel: picked ? { provider: picked.provider, id: picked.id } : undefined,
+        defaultEffort: value.defaultEffort || undefined,
+        customInstructions: value.customInstructions || undefined,
+        generateTitles: value.generateTitles,
+      })
+    },
+  })
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault()
-        save.mutate()
+        void form.handleSubmit()
       }}
     >
       <h2>Preferences</h2>
-      <label>
-        Default model
-        <select
-          value={model ? modelKey(model) : ''}
-          onChange={(e) => {
-            const picked = models.find((m) => modelKey(m) === e.target.value)
-            set('defaultModel', picked ? { provider: picked.provider, id: picked.id } : undefined)
-          }}
-        >
-          <option value="">App default</option>
-          {models.map((m) => (
-            <option key={modelKey(m)} value={modelKey(m)}>
-              {m.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Default effort
-        <select
-          value={String(prefs.defaultEffort ?? '')}
-          onChange={(e) => set('defaultEffort', e.target.value || undefined)}
-        >
-          <option value="">Provider default</option>
-          {['none', 'low', 'medium', 'high', 'max'].map((level) => (
-            <option key={level}>{level}</option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Custom instructions
-        <textarea
-          value={String(prefs.customInstructions ?? '')}
-          onChange={(e) => set('customInstructions', e.target.value)}
-        />
-      </label>
-      <label>
-        <input
-          type="checkbox"
-          checked={prefs.generateTitles !== false}
-          onChange={(e) => set('generateTitles', e.target.checked)}
-        />{' '}
-        Generate titles
-      </label>
+      <form.Field name="defaultModel">
+        {(field) => (
+          <label>
+            Default model
+            <select value={field.state.value} onChange={(e) => field.handleChange(e.target.value)}>
+              <option value="">App default</option>
+              {models.map((m) => (
+                <option key={modelKey(m)} value={modelKey(m)}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      </form.Field>
+      <form.Field name="defaultEffort">
+        {(field) => (
+          <label>
+            Default effort
+            <select value={field.state.value} onChange={(e) => field.handleChange(e.target.value)}>
+              <option value="">Provider default</option>
+              {['none', 'low', 'medium', 'high', 'max'].map((level) => (
+                <option key={level}>{level}</option>
+              ))}
+            </select>
+          </label>
+        )}
+      </form.Field>
+      <form.Field name="customInstructions">
+        {(field) => (
+          <label>
+            Custom instructions
+            <textarea
+              value={field.state.value}
+              onChange={(e) => field.handleChange(e.target.value)}
+            />
+          </label>
+        )}
+      </form.Field>
+      <form.Field name="generateTitles">
+        {(field) => (
+          <label>
+            <input
+              type="checkbox"
+              checked={field.state.value}
+              onChange={(e) => field.handleChange(e.target.checked)}
+            />{' '}
+            Generate titles
+          </label>
+        )}
+      </form.Field>
       <button type="submit">Save</button>
       {save.isSuccess && <span>Saved.</span>}
       {save.error && <p role="alert">{messageOf(save.error)}</p>}
@@ -99,12 +124,28 @@ function PreferencesForm({ initial, models }: { initial: Json; models: ModelOpti
   )
 }
 
-const emptyDraft = { providerId: '', apiKey: '', name: '', slug: '', baseUrl: '', models: '' }
+type KeyDraft = {
+  providerId: string
+  apiKey: string
+  name: string
+  slug: string
+  baseUrl: string
+  models: string
+}
+
+const emptyDraft: KeyDraft = {
+  providerId: '',
+  apiKey: '',
+  name: '',
+  slug: '',
+  baseUrl: '',
+  models: '',
+}
 
 export function ApiKeys() {
   const providers = useQuery(providersQuery)
   const credentials = useQuery(credentialsQuery)
-  const [draft, setDraft] = useState(emptyDraft)
+  // Models listed by the provider for the key being added.
   const [listed, setListed] = useState<
     { id: string; name: string; capabilities: ModelOption['capabilities'] }[]
   >([])
@@ -115,11 +156,10 @@ export function ApiKeys() {
       queryClient.invalidateQueries({ queryKey: credentialsQuery.queryKey }),
       queryClient.invalidateQueries({ queryKey: modelsQuery.queryKey }),
     ])
-  const provider = providers.data?.find((p) => p.id === draft.providerId)
   const none = { vision: false, reasoning: false, tools: false }
 
   const add = useMutation({
-    mutationFn: () => {
+    mutationFn: (draft: KeyDraft) => {
       const typed = draft.models
         .split(',')
         .map((id) => id.trim())
@@ -140,25 +180,33 @@ export function ApiKeys() {
       )
     },
     onSuccess: () => {
-      setDraft(emptyDraft)
+      form.reset()
       setListed([])
       return keysChanged()
     },
+  })
+  const form = useForm({
+    defaultValues: emptyDraft,
+    onSubmit: ({ value }) => add.mutate(value),
   })
   const remove = useMutation({
     mutationFn: (id: string) => read(api.providers.credentials[':id'].$delete({ param: { id } })),
     onSuccess: keysChanged,
   })
   const listModels = useMutation({
-    mutationFn: () =>
-      read(
+    mutationFn: () => {
+      const { providerId, apiKey, baseUrl } = form.state.values
+      return read(
         api.providers.providers[':id']['list-models'].$post(
-          { param: { id: draft.providerId } },
-          json({ apiKey: draft.apiKey, baseUrl: draft.baseUrl || undefined }),
+          { param: { id: providerId } },
+          json({ apiKey, baseUrl: baseUrl || undefined }),
         ),
-      ),
+      )
+    },
     onSuccess: (body) => setListed(body.models),
   })
+  const providerId = useFormStore(form.store, (state) => state.values.providerId)
+  const provider = providers.data?.find((p) => p.id === providerId)
   const loadError = providers.error ?? credentials.error
   const error = lastError(add, remove, listModels) ?? (loadError && messageOf(loadError))
 
@@ -178,50 +226,70 @@ export function ApiKeys() {
       <form
         onSubmit={(e) => {
           e.preventDefault()
-          add.mutate()
+          void form.handleSubmit()
         }}
       >
-        <select
-          aria-label="Provider"
-          value={draft.providerId}
-          onChange={(e) => setDraft({ ...draft, providerId: e.target.value })}
-          required
-        >
-          <option value="">Choose a provider</option>
-          {(providers.data ?? []).map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-        <input
-          aria-label="API key"
-          type="password"
-          placeholder="API key"
-          value={draft.apiKey}
-          onChange={(e) => setDraft({ ...draft, apiKey: e.target.value })}
-          required
-        />
-        <input
-          aria-label="Name"
-          placeholder="Name (optional)"
-          value={draft.name}
-          onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-        />
+        <form.Field name="providerId">
+          {(field) => (
+            <select
+              aria-label="Provider"
+              value={field.state.value}
+              onChange={(e) => field.handleChange(e.target.value)}
+              required
+            >
+              <option value="">Choose a provider</option>
+              {(providers.data ?? []).map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </form.Field>
+        <form.Field name="apiKey">
+          {(field) => (
+            <input
+              aria-label="API key"
+              type="password"
+              placeholder="API key"
+              value={field.state.value}
+              onChange={(e) => field.handleChange(e.target.value)}
+              required
+            />
+          )}
+        </form.Field>
+        <form.Field name="name">
+          {(field) => (
+            <input
+              aria-label="Name"
+              placeholder="Name (optional)"
+              value={field.state.value}
+              onChange={(e) => field.handleChange(e.target.value)}
+            />
+          )}
+        </form.Field>
         {provider?.userEndpoints && (
           <>
-            <input
-              aria-label="Base URL"
-              placeholder="https://host/v1"
-              value={draft.baseUrl}
-              onChange={(e) => setDraft({ ...draft, baseUrl: e.target.value })}
-            />
-            <input
-              aria-label="Slug"
-              placeholder="my-endpoint"
-              value={draft.slug}
-              onChange={(e) => setDraft({ ...draft, slug: e.target.value })}
-            />
+            <form.Field name="baseUrl">
+              {(field) => (
+                <input
+                  aria-label="Base URL"
+                  placeholder="https://host/v1"
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+              )}
+            </form.Field>
+            <form.Field name="slug">
+              {(field) => (
+                <input
+                  aria-label="Slug"
+                  placeholder="my-endpoint"
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+              )}
+            </form.Field>
           </>
         )}
         {provider?.listsModels && (
@@ -230,12 +298,16 @@ export function ApiKeys() {
           </button>
         )}
         {listed.length > 0 && <span>{listed.length} models loaded</span>}
-        <input
-          aria-label="Model IDs"
-          placeholder="Model IDs, separated by commas"
-          value={draft.models}
-          onChange={(e) => setDraft({ ...draft, models: e.target.value })}
-        />
+        <form.Field name="models">
+          {(field) => (
+            <input
+              aria-label="Model IDs"
+              placeholder="Model IDs, separated by commas"
+              value={field.state.value}
+              onChange={(e) => field.handleChange(e.target.value)}
+            />
+          )}
+        </form.Field>
         <button type="submit">Add key</button>
       </form>
       {error && <p role="alert">{error}</p>}
@@ -254,7 +326,8 @@ type PluginEntry = {
   error: string | null
 }
 
-type PluginChanges = { drafts: Record<string, Json>; switches: Record<string, boolean> }
+/** The plugin form's values: each plugin's settings and tool switches, by position. */
+type PluginValues = { plugins: { values: Json; tools: boolean[] }[] }
 
 export function PluginSettings() {
   const query = useQuery(pluginSettingsQuery)
@@ -262,14 +335,19 @@ export function PluginSettings() {
   const reload = () => queryClient.invalidateQueries({ queryKey: pluginSettingsQuery.queryKey })
   const plugins = query.data as PluginEntry[] | undefined
   const save = useMutation({
-    mutationFn: async ({ drafts, switches }: PluginChanges) => {
-      for (const plugin of plugins ?? []) {
+    mutationFn: async ({ plugins: edited }: PluginValues) => {
+      for (const [i, plugin] of (plugins ?? []).entries()) {
+        const draft = edited[i]
         if (plugin.schema && !plugin.error) {
-          const values = drafts[plugin.id] ?? plugin.values
-          await read(api.plugins[':id'].settings.$put({ param: { id: plugin.id } }, json(values)))
+          await read(
+            api.plugins[':id'].settings.$put(
+              { param: { id: plugin.id } },
+              json(draft?.values ?? plugin.values),
+            ),
+          )
         }
-        for (const tool of plugin.tools) {
-          const enabled = switches[tool.name] ?? tool.enabled
+        for (const [j, tool] of plugin.tools.entries()) {
+          const enabled = draft?.tools[j] ?? tool.enabled
           if (!tool.userToggle || enabled === tool.enabled) continue
           await read(
             api.plugins[':id'].tools[':name'].$put(
@@ -312,42 +390,44 @@ function PluginForm({
 }: {
   plugins: PluginEntry[]
   saved: boolean
-  onSave: (changes: PluginChanges) => void
+  onSave: (values: PluginValues) => void
   onReset: (id: string) => void
 }) {
-  const [drafts, setDrafts] = useState<Record<string, Json>>(() =>
-    Object.fromEntries(plugins.map((plugin) => [plugin.id, plugin.values])),
-  )
-  const [switches, setSwitches] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(
-      plugins.flatMap((plugin) => plugin.tools.map((tool) => [tool.name, tool.enabled])),
-    ),
-  )
+  // Fields are addressed by position, since tool names and setting keys may contain dots.
+  const form = useForm({
+    defaultValues: {
+      plugins: plugins.map((plugin) => ({
+        values: plugin.values,
+        tools: plugin.tools.map((tool) => tool.enabled),
+      })),
+    } as PluginValues,
+    onSubmit: ({ value }) => onSave(value),
+  })
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault()
-        onSave({ drafts, switches })
+        void form.handleSubmit()
       }}
     >
-      {plugins.map((plugin) => {
-        const switchable = plugin.tools.filter((tool) => tool.userToggle)
-        const values = drafts[plugin.id] ?? plugin.values
+      {plugins.map((plugin, i) => {
+        const switchable = plugin.tools.flatMap((tool, j) => (tool.userToggle ? [{ tool, j }] : []))
         return (
           <fieldset key={plugin.id}>
             <legend>{plugin.name}</legend>
-            {switchable.map((tool) => (
-              <label key={tool.name} title={tool.description}>
-                <input
-                  type="checkbox"
-                  checked={switches[tool.name] ?? tool.enabled}
-                  onChange={(e) => {
-                    const enabled = e.target.checked
-                    setSwitches((current) => ({ ...current, [tool.name]: enabled }))
-                  }}
-                />
-                {switchable.length === 1 ? 'Enabled' : tool.name}
-              </label>
+            {switchable.map(({ tool, j }) => (
+              <form.Field key={tool.name} name={`plugins[${i}].tools[${j}]`}>
+                {(field) => (
+                  <label title={tool.description}>
+                    <input
+                      type="checkbox"
+                      checked={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.checked)}
+                    />
+                    {switchable.length === 1 ? 'Enabled' : tool.name}
+                  </label>
+                )}
+              </form.Field>
             ))}
             {plugin.error ? (
               <p role="alert">
@@ -358,18 +438,19 @@ function PluginForm({
               </p>
             ) : (
               plugin.schema && (
-                <SchemaFields
-                  schema={plugin.schema}
-                  values={values}
-                  secretFields={plugin.secretFields}
-                  secretsSet={plugin.secretsSet}
-                  onChange={(key, value) =>
-                    setDrafts((current) => ({
-                      ...current,
-                      [plugin.id]: { ...values, [key]: value },
-                    }))
-                  }
-                />
+                <form.Field name={`plugins[${i}].values`}>
+                  {(field) => (
+                    <SchemaFields
+                      schema={plugin.schema as object}
+                      values={field.state.value}
+                      secretFields={plugin.secretFields}
+                      secretsSet={plugin.secretsSet}
+                      onChange={(key, value) =>
+                        field.handleChange((current) => ({ ...current, [key]: value }))
+                      }
+                    />
+                  )}
+                </form.Field>
               )
             )}
           </fieldset>

@@ -10,6 +10,7 @@
   "dependencies": {
     "@scn-chat/lexicons": "workspace:*",
     "@sqlite.org/sqlite-wasm": "3.53.4-build1",
+    "@tanstack/react-form": "1.33.5",
     "@tanstack/react-query": "5.104.1",
     "@tanstack/react-router": "1.170.41",
     "@tanstack/react-start": "1.168.60",
