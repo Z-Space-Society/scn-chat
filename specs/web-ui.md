@@ -19,7 +19,7 @@ The first build used Vite and React with `wouter` and hand-written data hooks. I
 - `hono/client`'s `hc` with the server's exported route types, for a typed API client with no hand-written API types. There are no Start server functions: Hono is the only API.
 - TanStack Query for all data, both server calls and chats read from the browser store through its worker API.
 - TanStack Form for the settings forms and schema forms.
-- `EventSource` for reply streams, read through Query's `streamedQuery`.
+- `EventSource` for reply streams, read through Query's `streamedQuery`, which Query still exports as `experimental_streamedQuery`.
 - One small stylesheet carried over from the first build, for layout and a stand-in look. No component library or CSS framework yet. The styling stack is the themes spec's decision.
 
 ### Serving
@@ -75,7 +75,9 @@ The signed-in routes share a layout route that is server-rendered and checks `/a
 
 ### Streaming
 
-After sending, the conversation opens a stream query, `['reply-stream', skey, rkey]`, over the reply's stream endpoint. It appends deltas to the pending reply's streamed text and reasoning. On the `status` event the stream ends and the conversation query is invalidated, which fetches the final record through the browser store. If the stream fails, or the status says another server runs the reply, the conversation query refetches with a backoff from two seconds to thirty until the reply leaves `pending`.
+Each pending reply in the open conversation has a stream query, `['reply-stream', skey, rkey]`, over the reply's stream endpoint. A reply just sent or regenerated is followed at once, before its pending record reaches the browser store. The query reduces the stream's events into the reply's streamed text and reasoning, and ends after the `status` event. A finished status (`complete`, `error`, or `cancelled`) refreshes the conversation from the PDS, which brings the final record into the browser store. A stream runs once while the conversation is open. Leaving the conversation drops it, and coming back follows the reply again.
+
+If a reply is still pending after its stream ends, because the stream dropped or the status says another server runs it, a poll query refreshes the conversation from the PDS with a backoff from two seconds to thirty until the reply leaves `pending`. The first poll comes one interval after the stream ends, and polling continues while the tab is in the background.
 
 While the reader is at the bottom of the conversation, it stays scrolled to the bottom as replies stream and messages arrive. Once they scroll up it stops following, until they scroll back down or send a message, which always scrolls to the bottom. A conversation opened on a linked message scrolls to that message instead. Switching siblings does not scroll.
 
@@ -106,6 +108,8 @@ While the reader is at the bottom of the conversation, it stays scrolled to the 
 - Where a screen shows one error for several actions, it shows the error of the action that ran last, so a later success clears an earlier failure.
 - Invalidating a conversation is exact, so its own refresh query, which causes those invalidations, does not rerun in a loop.
 - Adding or deleting an API key also invalidates the model list, since a user's keys add their own models.
+- A pending reply keeps showing its streamed text after its stream drops, until the final record arrives, instead of going back to "Thinking...".
+- Each wait on the same replies is its own poll query, keyed by the replies waited on, so the backoff starts over for each new wait.
 - Shared links show a sign-in prompt when signed out, and every other route sends signed-out users to `/login`.
 
 ## Acceptance Criteria
