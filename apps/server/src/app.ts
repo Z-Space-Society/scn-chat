@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
 import { sql } from 'kysely'
@@ -32,14 +30,21 @@ import { InvalidSpaceUri } from './storage/records.ts'
 import { type StorageRoutesDeps, storageRoutes } from './storage/routes.ts'
 import { type SyncRoutesDeps, syncRoutes } from './sync/routes.ts'
 import { type TurnRoutesDeps, turnRoutes } from './turns/routes.ts'
-import { renderIndexHtml } from './web-html.ts'
+
+/** What the web app's server-side routes receive with each request. */
+export type WebContext = { appName: string }
+
+/** The web app: its built client assets, if any, and a handler that renders every other page. */
+export type Web = {
+  assets?: string
+  fetch: (request: Request, context: WebContext) => Promise<Response>
+}
 
 export type AppDeps = {
   config: Config
   db: Db
   logger: Logger
-  /** Built web app to serve, in production. */
-  webDist?: string
+  web?: Web
   auth?: AuthDeps
   plugins?: PluginRoutesDeps
   storage?: StorageRoutesDeps
@@ -118,15 +123,10 @@ export function createApp(deps: AppDeps) {
   })
   app.all('/api/*', (c) => c.json({ error: 'NotFound' }, 404))
 
-  if (deps.webDist) {
-    const index = renderIndexHtml(
-      readFileSync(join(deps.webDist, 'index.html'), 'utf8'),
-      config.appName,
-    )
-    app.get('/', (c) => c.html(index))
-    app.get('/index.html', (c) => c.html(index))
-    app.use('*', serveStatic({ root: deps.webDist }))
-    app.get('*', (c) => c.html(index))
+  const web = deps.web
+  if (web) {
+    if (web.assets) app.use('*', serveStatic({ root: web.assets }))
+    app.get('*', (c) => web.fetch(c.req.raw, { appName: config.appName }))
   }
 
   return app

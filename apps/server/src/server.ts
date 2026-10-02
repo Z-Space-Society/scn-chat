@@ -1,5 +1,5 @@
 import type { Plugin } from '@scn-chat/plugin-api'
-import { createApp } from './app.ts'
+import { createApp, type Web } from './app.ts'
 import { type Account, getAccount } from './auth/accounts.ts'
 import { createIdentityResolver, type IdentityResolver } from './auth/identity.ts'
 import { createOAuthClient, type OAuthClientLike } from './auth/oauth-client.ts'
@@ -42,7 +42,7 @@ export type ServerDeps = {
   appConfig: AppConfig
   db: Db
   logger: Logger
-  webDist?: string
+  web?: Web
   /** Replacements for network-facing pieces, for tests. */
   oauth?: OAuthClientLike
   identity?: IdentityResolver
@@ -158,7 +158,7 @@ export async function createServer(deps: ServerDeps) {
     config,
     db,
     logger,
-    webDist: deps.webDist,
+    web: deps.web,
     auth: { config, db, logger, oauth, identity, roles, scope, onLogin },
     plugins: { db, box, host },
     storage: { db, services, events, engine, hooks: host.hooks, syncConfig, logger },

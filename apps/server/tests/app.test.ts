@@ -5,7 +5,7 @@ import SqliteDatabase from 'better-sqlite3'
 import { Kysely, SqliteDialect } from 'kysely'
 import pino from 'pino'
 import { afterAll, describe, expect, it } from 'vitest'
-import { createApp } from '../src/app.ts'
+import { createApp, type WebContext } from '../src/app.ts'
 import type { Db } from '../src/db/index.ts'
 import type { Database } from '../src/db/schema.ts'
 import { testConfig } from './helpers/config.ts'
@@ -35,41 +35,36 @@ describe('GET /api/health', () => {
   })
 })
 
-describe('production static serving', () => {
-  const webDist = mkdtempSync(join(tmpdir(), 'scn-web-'))
-  writeFileSync(join(webDist, 'index.html'), '<!doctype html><title>index</title>')
-  writeFileSync(join(webDist, 'app.js'), 'console.log(1)')
-  afterAll(() => rmSync(webDist, { recursive: true, force: true }))
+describe('web app serving', () => {
+  const assets = mkdtempSync(join(tmpdir(), 'scn-web-'))
+  writeFileSync(join(assets, 'app.js'), 'console.log(1)')
+  afterAll(() => rmSync(assets, { recursive: true, force: true }))
   const db = createSqliteDb()
-  const app = createApp({ config, db, logger, webDist })
+  const rendered: { path: string; context: WebContext }[] = []
+  const app = createApp({
+    config,
+    db,
+    logger,
+    web: {
+      assets,
+      fetch: async (request, context) => {
+        rendered.push({ path: new URL(request.url).pathname, context })
+        return new Response('<title>page</title>', { headers: { 'content-type': 'text/html' } })
+      },
+    },
+  })
 
-  it('serves built files', async () => {
+  it('serves built assets', async () => {
     const res = await app.request('/app.js')
     expect(res.status).toBe(200)
     expect(await res.text()).toBe('console.log(1)')
   })
 
-  it('falls back to index.html for unknown non-API paths', async () => {
+  it('hands other paths to the web app with the app name', async () => {
     const res = await app.request('/c/some-chat')
     expect(res.status).toBe(200)
-    expect(await res.text()).toContain('<title>index</title>')
-  })
-
-  it('fills the app name into index.html, escaped', async () => {
-    const dist = mkdtempSync(join(tmpdir(), 'scn-web-'))
-    writeFileSync(join(dist, 'index.html'), '<title>__APP_NAME__</title>')
-    const named = createApp({
-      config: { ...config, appName: 'Chat & <Co>' },
-      db,
-      logger,
-      webDist: dist,
-    })
-    for (const path of ['/', '/index.html', '/c/some-chat']) {
-      expect(await (await named.request(path)).text()).toBe(
-        '<title>Chat &#38; &#60;Co&#62;</title>',
-      )
-    }
-    rmSync(dist, { recursive: true, force: true })
+    expect(await res.text()).toBe('<title>page</title>')
+    expect(rendered.at(-1)).toEqual({ path: '/c/some-chat', context: { appName: 'Test Chat' } })
   })
 
   it('returns 404 for unknown API paths', async () => {

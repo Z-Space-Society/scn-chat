@@ -2,7 +2,7 @@
 
 app:
   name: SCN Chat Server
-  publicUrl: http://127.0.0.1:5173
+  publicUrl: http://127.0.0.1:3000
   port: 3000
   dataDir: ./data
   logLevel: info

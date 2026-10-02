@@ -60,7 +60,7 @@ Phase 1:
 ### Start the app
 
  1. Run `pnpm dev`
- 2. Open http://127.0.0.1:5173 and sign in with your ATProto handle.
+ 2. Open http://127.0.0.1:3000 and sign in with your ATProto handle.
 
 ## Deploying
 
