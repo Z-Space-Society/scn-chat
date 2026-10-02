@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { useSearch } from '@tanstack/react-router'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api, json, read } from '../api.ts'
 import { blobUrlFor } from '../lib/blob-url.ts'
 import { lastError } from '../lib/errors.ts'
@@ -23,16 +23,9 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
   const [renaming, setRenaming] = useState<string | null>(null)
 
   const messages = conversation?.messages ?? []
-  const refresh = useCallback(() => store.worker.refreshConversation(skey), [store, skey])
-  const isPending = useCallback(
-    (rkey: string) => messages.find((m) => m.rkey === rkey)?.record.status === 'pending',
-    [messages],
-  )
-  const { streams, follow } = useReplyStream(skey, refresh, isPending)
-
-  useEffect(() => {
-    for (const message of messages) if (message.record.status === 'pending') follow(message.rkey)
-  }, [messages, follow])
+  const refresh = () => store.worker.refreshConversation(skey)
+  const pending = messages.filter((m) => m.record.status === 'pending').map((m) => m.rkey)
+  const { streams, follow } = useReplyStream(skey, pending)
 
   const focus = useSearch({ strict: false }).m
   const section = useRef<HTMLElement>(null)

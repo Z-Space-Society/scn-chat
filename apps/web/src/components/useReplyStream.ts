@@ -1,101 +1,88 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  experimental_streamedQuery as streamedQuery,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
+import { useCallback, useState } from 'react'
+import {
+  addEvent,
+  FINISHED,
+  noParts,
+  replyEvents,
+  type StreamedReply,
+  streamedReply,
+} from '../lib/reply-stream.ts'
+import { conversationRefreshKey, useStore } from '../store/react.tsx'
 
-export type StreamedReply = { text: string; reasoning: string }
-
-const FINISHED = new Set(['complete', 'error', 'cancelled'])
 const POLL_START_MS = 2_000
 const POLL_MAX_MS = 30_000
 
-/** Follow a reply's stream, then refresh it from the store when it ends, polling if the stream drops. */
-export function useReplyStream(
-  skey: string,
-  refresh: () => Promise<void>,
-  isPending: (rkey: string) => boolean,
-) {
-  const [streams, setStreams] = useState<Record<string, StreamedReply>>({})
-  const sources = useRef(new Map<string, EventSource>())
-  const ended = useRef(new Set<string>())
-  const timers = useRef(new Set<ReturnType<typeof setTimeout>>())
-  // Keep the latest isPending in a ref for the polling timers to read.
-  const pending = useRef(isPending)
-  pending.current = isPending
-
-  /** Refresh until the reply is no longer pending, backing off between tries. */
-  const poll = useCallback(
-    (replyRkey: string, delay = POLL_START_MS) => {
-      const timer = setTimeout(() => {
-        timers.current.delete(timer)
-        refresh().then(
-          () => pending.current(replyRkey) && poll(replyRkey, Math.min(delay * 2, POLL_MAX_MS)),
-          (err: unknown) => {
-            console.warn('Polling a reply failed', err)
-            poll(replyRkey, Math.min(delay * 2, POLL_MAX_MS))
-          },
-        )
-      }, delay)
-      timers.current.add(timer)
-    },
-    [refresh],
-  )
-
+/**
+ * Follow each pending reply's stream, and refresh the conversation when one finishes. A reply
+ * still pending after its stream ends, because the stream dropped or another server runs it, is
+ * polled for with a backoff until it leaves pending.
+ */
+export function useReplyStream(skey: string, pending: string[]) {
+  const store = useStore()
+  const queryClient = useQueryClient()
+  // Replies followed as soon as they are sent, before their pending record reaches the local copy.
+  const [followed, setFollowed] = useState<string[]>([])
   const follow = useCallback(
-    (replyRkey: string) => {
-      if (sources.current.has(replyRkey) || ended.current.has(replyRkey)) return
-      const source = new EventSource(`/api/conversations/${skey}/messages/${replyRkey}/stream`)
-      sources.current.set(replyRkey, source)
-      const kinds: string[] = []
-      const parts: string[] = []
-      const finish = () => {
-        source.close()
-        sources.current.delete(replyRkey)
-        ended.current.add(replyRkey)
-        setStreams(({ [replyRkey]: _done, ...rest }) => rest)
-      }
-      const collect = (reasoning: boolean) =>
-        parts.filter((text, i) => text && (kinds[i] === 'reasoningPart') === reasoning).join('\n\n')
-      source.addEventListener('part-start', (event) => {
-        const { index, partType } = JSON.parse((event as MessageEvent).data) as {
-          index: number
-          partType: string
-        }
-        kinds[index] = partType
-      })
-      source.addEventListener('delta', (event) => {
-        const { index, text } = JSON.parse((event as MessageEvent).data) as {
-          index: number
-          text: string
-        }
-        parts[index] = (parts[index] ?? '') + text
-        setStreams((current) => ({
-          ...current,
-          [replyRkey]: {
-            text: collect(false),
-            reasoning: collect(true),
-          },
-        }))
-      })
-      source.addEventListener('status', (event) => {
-        finish()
-        const { status } = JSON.parse((event as MessageEvent).data) as { status: string }
-        // Other statuses mean this server isn't running the reply, so wait for it elsewhere.
-        if (!FINISHED.has(status)) return poll(replyRkey)
-        refresh().catch((err: unknown) => console.warn('Refreshing a finished reply failed', err))
-      })
-      source.onerror = () => {
-        finish()
-        poll(replyRkey)
-      }
-    },
-    [skey, refresh, poll],
-  )
-
-  useEffect(
-    () => () => {
-      for (const source of sources.current.values()) source.close()
-      for (const timer of timers.current) clearTimeout(timer)
-    },
+    (rkey: string) =>
+      setFollowed((current) => (current.includes(rkey) ? current : [...current, rkey])),
     [],
   )
+  const rkeys = [...new Set([...pending, ...followed])]
+  const results = useQueries({
+    queries: rkeys.map((rkey) => ({
+      queryKey: ['reply-stream', skey, rkey],
+      queryFn: streamedQuery({
+        streamFn: async function* ({ signal }) {
+          const url = `/api/conversations/${skey}/messages/${rkey}/stream`
+          for await (const event of replyEvents(url, signal)) {
+            yield event
+            if (event.type === 'status' && FINISHED.has(event.status))
+              void queryClient.invalidateQueries({ queryKey: conversationRefreshKey(skey) })
+          }
+        },
+        reducer: addEvent,
+        initialValue: noParts,
+      }),
+      // A stream runs once. Leaving the conversation drops it, and coming back follows again.
+      staleTime: Number.POSITIVE_INFINITY,
+      gcTime: 0,
+    })),
+  })
+
+  const streams: Record<string, StreamedReply> = {}
+  const ended: string[] = []
+  rkeys.forEach((rkey, i) => {
+    const result = results[i]
+    if (result?.data) streams[rkey] = streamedReply(result.data)
+    if (result?.isError || (result?.isSuccess && result.fetchStatus === 'idle')) ended.push(rkey)
+  })
+  const waiting = pending.filter((rkey) => ended.includes(rkey))
+
+  useQuery({
+    // A new key for each set of replies waited on, so each wait starts its backoff over.
+    queryKey: ['conversation', skey, 'poll', ...waiting],
+    queryFn: async () => {
+      await store.worker.refreshConversation(skey)
+      return true
+    },
+    enabled: waiting.length > 0,
+    // Fresh data from the start, so only the interval polls, beginning one interval after the wait.
+    initialData: true,
+    staleTime: Number.POSITIVE_INFINITY,
+    refetchInterval: (query) =>
+      Math.min(
+        POLL_START_MS * 2 ** (query.state.dataUpdateCount + query.state.errorUpdateCount),
+        POLL_MAX_MS,
+      ),
+    refetchIntervalInBackground: true,
+    gcTime: 0,
+  })
 
   return { streams, follow }
 }

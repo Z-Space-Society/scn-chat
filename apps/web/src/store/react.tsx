@@ -57,6 +57,9 @@ export function useConversations(): { conversations: ConversationSummary[]; erro
   return { conversations: data ?? [], error: storeError(error) }
 }
 
+/** The query that refreshes a conversation from the PDS. Invalidating it refreshes again. */
+export const conversationRefreshKey = (skey: string) => ['conversation', skey, 'refresh']
+
 /** A conversation from the local copy, shown at once and refreshed from the PDS when opened. */
 export function useConversation(skey: string): {
   conversation: Conversation | null
@@ -71,7 +74,7 @@ export function useConversation(skey: string): {
   })
   // The refresh's changes arrive as store events, which update the local query.
   const refreshed = useQuery({
-    queryKey: ['conversation', skey, 'refresh'],
+    queryKey: conversationRefreshKey(skey),
     queryFn: async () => {
       await store.worker.refreshConversation(skey)
       await store.worker.reconcileConversation(skey)

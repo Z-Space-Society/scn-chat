@@ -209,10 +209,10 @@ describe('ConversationView', () => {
       source.emit('delta', { index: 1, text: 'Hel' })
       source.emit('delta', { index: 1, text: 'lo' })
     })
-    expect(screen.getByText('Hello')).toBeInTheDocument()
+    expect(await screen.findByText('Hello')).toBeInTheDocument()
     expect(screen.getByText('pondering').closest('details')).not.toBeNull()
     act(() => source.emit('status', { status: 'complete' }))
-    expect(source.closed).toBe(true)
+    await vi.waitFor(() => expect(source.closed).toBe(true))
     await vi.waitFor(() => expect(store.worker.refreshConversation).toHaveBeenCalled())
   })
 

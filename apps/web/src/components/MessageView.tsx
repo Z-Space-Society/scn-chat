@@ -1,7 +1,7 @@
 import { type ReactNode, useState } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import type { StreamedReply } from './useReplyStream.ts'
+import type { StreamedReply } from '../lib/reply-stream.ts'
 
 type Part = Record<string, unknown> & { $type: string }
 type Blob = { ref: { $link: string }; mimeType: string }
