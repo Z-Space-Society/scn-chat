@@ -1,7 +1,7 @@
 import type { Plugin } from '@scn-chat/plugin-api'
-import type { z } from 'zod'
 import type { Db } from '../db/index.ts'
 import type { SecretBox } from '../secrets.ts'
+import { secretKeys } from './installed.ts'
 
 export class InvalidPluginSettingsError extends Error {
   readonly pluginId: string
@@ -13,14 +13,7 @@ export class InvalidPluginSettingsError extends Error {
   }
 }
 
-type SettingsSchema = z.ZodObject<z.ZodRawShape>
-
-/** Top-level fields marked with .meta({ secret: true }). */
-export function secretKeys(schema: SettingsSchema): string[] {
-  return Object.entries(schema.shape)
-    .filter(([, field]) => (field as z.ZodType).meta()?.secret === true)
-    .map(([key]) => key)
-}
+export { secretKeys }
 
 async function readRaw(db: Db, box: SecretBox, did: string, pluginId: string) {
   const row = await db

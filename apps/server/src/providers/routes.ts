@@ -19,8 +19,9 @@ import {
 export type ProviderRoutesDeps = {
   db: Db
   box: SecretBox
-  catalog: ModelCatalog
-  providers: Registry<ModelProvider>
+  /** The current plugin runtime's catalog and providers. */
+  catalog: () => ModelCatalog
+  providers: () => Registry<ModelProvider>
   guardedFetch: typeof fetch
   logger: Logger
 }
@@ -46,7 +47,7 @@ const listModelsRequest = z.object({
 /** Models, providers that accept user keys, and the user's own credentials. */
 export function providerRoutes(deps: ProviderRoutesDeps) {
   const userProvider = (id: string) => {
-    const provider = deps.providers.get(id)
+    const provider = deps.providers().get(id)
     return provider?.userKeys ? provider : undefined
   }
 
@@ -55,13 +56,14 @@ export function providerRoutes(deps: ProviderRoutesDeps) {
     .get('/models', async (c) => {
       const { did } = signedInUser(c)
       return c.json({
-        models: await deps.catalog.listForUser(did),
-        defaultModel: deps.catalog.defaultModel() ?? null,
+        models: await deps.catalog().listForUser(did),
+        defaultModel: (await deps.catalog().defaultModel()) ?? null,
       })
     })
     .get('/providers', (c) =>
       c.json({
-        providers: deps.providers
+        providers: deps
+          .providers()
           .list()
           .filter((provider) => provider.userKeys)
           .map((provider) => ({

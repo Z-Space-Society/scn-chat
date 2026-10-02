@@ -108,14 +108,7 @@ A user's first index sync, with no `last_rev`, does not sync every conversation.
 
 ### Sync configuration
 
-The admin configures sync in `config.yml`:
-
-```yaml
-sync:
-  safetyNet: { enabled: true, intervalMinutes: 15, activeWithinHours: 24 }
-  discovery: { intervalMinutes: 60, activeWithinDays: 30 }
-  allowUserOptOut: true
-```
+The admin configures sync in the admin area, through the `sync` setting from the admin-settings spec. The defaults are a safety net every 15 minutes for users active within 24 hours, discovery every 60 minutes for users active within 30 days, and users allowed to opt out. The scheduler restarts its timers when the setting changes. Background work skips users without access, as the admin spec describes.
 
 - The safety net syncs the index of every user active within `activeWithinHours`, every `intervalMinutes`. That is one PDS call per user per interval, plus one per changed conversation.
 - Discovery runs every `intervalMinutes` for users active within `activeWithinDays`.

@@ -28,7 +28,11 @@ export const userMessage = (text: string, extra: Record<string, unknown> = {}) =
 
 /** A spaces account on a fake PDS, with the services and sync engine the server would build. */
 export async function spacesHarness(
-  options: { backfillWindowMs?: number; storageMode?: 'space' | 'local' } = {},
+  options: {
+    backfillWindowMs?: number
+    storageMode?: 'space' | 'local'
+    hasAccess?: (did: string) => Promise<boolean>
+  } = {},
 ) {
   const db = createSqliteDb()
   await migrateToLatest(db)
@@ -68,7 +72,8 @@ export async function spacesHarness(
     resolveSigningKey: async () => pds.keypair.did(),
     publicUrl: 'https://chat.example.com',
     logger,
-    backfillWindowMs: options.backfillWindowMs ?? 60 * 60_000,
+    backfillWindowMs: () => options.backfillWindowMs ?? 60 * 60_000,
+    hasAccess: options.hasAccess ?? (async () => true),
   })
   /** Write as another client would, straight to the PDS, bypassing the server's services. */
   const external = services.storeFor(account)

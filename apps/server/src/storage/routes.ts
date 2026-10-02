@@ -9,9 +9,9 @@ import type { AppEnv } from '../env.ts'
 import type { Logger } from '../logger.ts'
 import type { HookRunner } from '../plugins/hooks.ts'
 import { jsonObject } from '../schemas.ts'
+import type { Settings } from '../settings/schemas.ts'
 import type { SyncEngine } from '../sync/engine.ts'
 import type { SyncEventBus, SyncEvents } from '../sync/events.ts'
-import type { ResolvedSyncConfig } from '../sync/scheduler.ts'
 import type { ChatServices } from './services.ts'
 
 export type StorageRoutesDeps = {
@@ -19,8 +19,10 @@ export type StorageRoutesDeps = {
   services: ChatServices
   events: SyncEventBus
   engine?: SyncEngine
-  hooks?: HookRunner
-  syncConfig: ResolvedSyncConfig
+  /** The current plugin runtime's hooks. */
+  hooks?: () => HookRunner
+  /** The current sync settings. */
+  sync: () => Settings['sync']
   logger: Logger
 }
 
@@ -59,11 +61,9 @@ export function storageRoutes(deps: StorageRoutesDeps) {
         systemPrompt: body.systemPrompt,
         tags: body.tags,
       })
-      await deps.hooks?.action(
-        'conversation:created',
-        { user: chats.did, conversation: created.uri },
-        deps.logger,
-      )
+      await deps
+        .hooks?.()
+        .action('conversation:created', { user: chats.did, conversation: created.uri }, deps.logger)
       return c.json(created, 201)
     })
     .get('/conversations/keys', async (c) => c.json({ keys: await chatsFor(c).listKeys() }))
@@ -95,11 +95,13 @@ export function storageRoutes(deps: StorageRoutesDeps) {
       const chats = chatsFor(c)
       const skey = c.req.param('skey')
       await chats.deleteConversation(skey)
-      await deps.hooks?.action(
-        'conversation:deleted',
-        { user: chats.did, conversation: chats.conversationUri(skey) },
-        deps.logger,
-      )
+      await deps
+        .hooks?.()
+        .action(
+          'conversation:deleted',
+          { user: chats.did, conversation: chats.conversationUri(skey) },
+          deps.logger,
+        )
       return c.json({ ok: true })
     })
     .post('/conversations/:skey/sync', async (c) => {
@@ -117,13 +119,13 @@ export function storageRoutes(deps: StorageRoutesDeps) {
       const { account } = signedInUser(c)
       return c.json({
         backgroundSync: account.backgroundSync,
-        allowUserOptOut: deps.syncConfig.allowUserOptOut,
+        allowUserOptOut: deps.sync().allowUserOptOut,
       })
     })
     .put('/account', async (c) => {
       const body = await jsonBody(c, accountSettings)
       if (body.backgroundSync !== undefined) {
-        if (!deps.syncConfig.allowUserOptOut) {
+        if (!deps.sync().allowUserOptOut) {
           return c.json(
             { error: 'Forbidden', message: 'This app does not allow turning off background sync' },
             403,

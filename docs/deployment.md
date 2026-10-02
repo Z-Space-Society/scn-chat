@@ -10,11 +10,12 @@
 ## Setup
 
 1. Clone the repository on the server.
-2. Copy `config.example.yml` to `config.yml` and set at least:
-   - `app.publicUrl` to the HTTPS URL, such as `https://chat.example.com`.
-   - `auth.scopeMode` to `permission-set`. Production refuses `raw`.
-   - Your models and plugins.
-3. Copy `.env.example` to `.env`. Both files must exist before compose runs, or Docker creates directories in their place. Generate the secrets with `docker compose run --rm scn-chat pnpm keys`, and put `SECRET_KEY`, `OAUTH_PRIVATE_KEYS`, and any provider keys in `.env`.
-4. Start it with `docker compose up -d --build`.
-5. Point the reverse proxy at `http://127.0.0.1:3000`.
-6. Run `docker compose up -d --build` again.
+2. Copy `.env.example` to `.env`. Generate the secrets with `docker compose run --rm scn-chat pnpm keys`, and set at least:
+   - `SECRET_KEY` and `OAUTH_PRIVATE_KEYS`, from `pnpm keys`.
+   - `PUBLIC_URL` to the HTTPS URL, such as `https://chat.example.com`.
+   - `OAUTH_SCOPE_MODE` to `permission-set`. Use `raw` for local dev.
+   - `ADMIN_DIDS` to your admin DID(s), comma separated.
+   - `NODE_ENV` to `production` or `development`.
+3. Start it with `docker compose up -d --build` (For dev, `pnpm dev`).
+4. Point the reverse proxy at `http://127.0.0.1:3000`, if applicable.
+5. Sign in as an admin and open the admin area, from Settings > Admin. Add your plugins and models.

@@ -59,6 +59,7 @@ export async function createOAuthClient(
   config: Config,
   db: Db,
   scope: string,
+  appName: string,
 ): Promise<NodeOAuthClient> {
   const redirectUri = `${config.publicUrl}/oauth/callback` as const
   const loopback = isLoopbackUrl(config.publicUrl)
@@ -71,7 +72,7 @@ export async function createOAuthClient(
     ? buildAtprotoLoopbackClientMetadata({ redirect_uris: [redirectUri], scope })
     : {
         client_id: `${config.publicUrl}/oauth-client-metadata.json`,
-        client_name: config.appName,
+        client_name: appName,
         client_uri: config.publicUrl,
         redirect_uris: [redirectUri] as [string, ...string[]],
         scope,

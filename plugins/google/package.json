@@ -1,6 +1,10 @@
 {
   "name": "@scn-chat/plugin-google",
   "version": "0.0.0",
+  "description": "Google Gemini models as a model provider.",
+  "keywords": [
+    "scn-chat-plugin"
+  ],
   "private": true,
   "type": "module",
   "exports": "./src/index.ts",

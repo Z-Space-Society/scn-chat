@@ -1,6 +1,10 @@
 {
   "name": "@scn-chat/plugin-web-search",
   "version": "0.0.0",
+  "description": "A web_search tool for the model, on the search engine you choose.",
+  "keywords": [
+    "scn-chat-plugin"
+  ],
   "private": true,
   "type": "module",
   "exports": "./src/index.ts",

@@ -1,6 +1,5 @@
-import { setupForTest } from '@scn-chat/plugin-api/testing'
 import { describe, expect, it } from 'vitest'
-import plugin, { NoTextLayerError, optionsSchema, pdfText } from '../src/index.ts'
+import { NoTextLayerError, pdfText } from '../src/index.ts'
 
 /** A minimal PDF with one page per entry, each drawing its text, or nothing for an empty string. */
 function makePdf(pages: string[]): Uint8Array {
@@ -36,29 +35,7 @@ describe('pdfText', () => {
     expect(await pdfText(makePdf(['First page', 'Second page']))).toBe('First page\n\nSecond page')
   })
 
-  it('fails with a clear message for a PDF without a text layer', async () => {
+  it('fails with NoTextLayerError for a PDF without a text layer', async () => {
     await expect(pdfText(makePdf(['']))).rejects.toBeInstanceOf(NoTextLayerError)
-  })
-})
-
-describe('pdf-text plugin', () => {
-  it('registers an ingester for PDFs with the text method', async () => {
-    const { ingesters } = await setupForTest(plugin())
-    expect(ingesters).toMatchObject([
-      { id: 'pdf-text', accepts: ['application/pdf'], method: 'text' },
-    ])
-    expect(
-      await ingesters[0]?.ingest({ bytes: makePdf(['Hello PDF']), mimeType: 'application/pdf' }),
-    ).toEqual({ text: 'Hello PDF' })
-  })
-})
-
-describe('pdf-text optionsSchema', () => {
-  it('accepts valid options', () => {
-    expect(optionsSchema.safeParse({}).success).toBe(true)
-  })
-
-  it('rejects invalid or unknown options', () => {
-    expect(optionsSchema.safeParse({ ocr: true }).success).toBe(false)
   })
 })

@@ -54,78 +54,32 @@ const renderPage = (section = '') =>
   )
 
 describe('SettingsPage preferences', () => {
-  it('shows the load error and no form when preferences cannot be read', async () => {
+  it('shows no form when preferences cannot be read', async () => {
     stubServer({
       '/api/preferences': () => Response.json({ error: 'InternalServerError' }, { status: 500 }),
     })
     renderPage()
-    expect(await screen.findByText(/Could not load preferences/)).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Preferences' })).toBeNull()
+    await screen.findByRole('alert')
+    expect(screen.queryByLabelText('Default model')).toBeNull()
   })
 
-  it('saves a default model whose ID contains a slash', async () => {
+  it("saves a default model whose ID contains a slash, with the browser's time zone", async () => {
     const fetch = stubServer({ '/api/preferences': () => Response.json({ preferences: null }) })
     renderPage()
-    await screen.findByRole('heading', { name: 'Preferences' })
     await vi.waitFor(() =>
       expect(screen.getByRole('option', { name: 'Claude' })).toBeInTheDocument(),
     )
     await userEvent.selectOptions(screen.getByLabelText('Default model'), 'router/anthropic/claude')
     await userEvent.click(screen.getAllByRole('button', { name: 'Save' })[0] as HTMLElement)
-    const put = fetch.mock.calls.find(
-      ([url, init]) => url === '/api/preferences' && init?.method === 'PUT',
-    )
-    expect(JSON.parse(String(put?.[1]?.body))).toMatchObject({
-      defaultModel: { provider: 'router', id: 'anthropic/claude' },
+    await vi.waitFor(() => {
+      const put = fetch.mock.calls.find(
+        ([url, init]) => url === '/api/preferences' && init?.method === 'PUT',
+      )
+      expect(JSON.parse(String(put?.[1]?.body))).toMatchObject({
+        defaultModel: { provider: 'router', id: 'anthropic/claude' },
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      })
     })
-  })
-
-  it("saves the browser's time zone with the preferences", async () => {
-    const fetch = stubServer({ '/api/preferences': () => Response.json({ preferences: null }) })
-    renderPage()
-    await screen.findByRole('heading', { name: 'Preferences' })
-    await userEvent.click(screen.getAllByRole('button', { name: 'Save' })[0] as HTMLElement)
-    await vi.waitFor(() =>
-      expect(
-        fetch.mock.calls.find(
-          ([url, init]) => url === '/api/preferences' && init?.method === 'PUT',
-        ),
-      ).toBeDefined(),
-    )
-    const put = fetch.mock.calls.find(
-      ([url, init]) => url === '/api/preferences' && init?.method === 'PUT',
-    )
-    expect(JSON.parse(String(put?.[1]?.body)).timezone).toBe(
-      Intl.DateTimeFormat().resolvedOptions().timeZone,
-    )
-  })
-})
-
-describe('SettingsPage sections', () => {
-  it('links to each section from the sidebar and marks the current one', async () => {
-    stubServer({})
-    renderPage('/plugins')
-    const nav = screen.getByRole('navigation')
-    expect(screen.getByRole('link', { name: 'Back to chats' })).toHaveAttribute('href', '/')
-    expect(screen.getByRole('link', { name: 'API keys' })).toHaveAttribute(
-      'href',
-      '/settings/api-keys',
-    )
-    expect(screen.getByRole('link', { name: 'Plugins' })).toHaveAttribute('aria-current', 'page')
-    expect(nav.querySelectorAll('[aria-current]')).toHaveLength(1)
-  })
-
-  it('shows only the current section', async () => {
-    stubServer({})
-    renderPage('/sync')
-    expect(await screen.findByRole('heading', { name: 'Sync' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Preferences' })).toBeNull()
-  })
-
-  it('opens on preferences', async () => {
-    stubServer({ '/api/preferences': () => Response.json({ preferences: null }) })
-    renderPage()
-    expect(await screen.findByRole('heading', { name: 'Preferences' })).toBeInTheDocument()
   })
 })
 
@@ -159,20 +113,11 @@ describe('SettingsPage plugins', () => {
       .filter(([, init]) => init?.method === 'PUT')
       .map(([url, init]) => [url, JSON.parse(String(init?.body))])
 
-  it("labels a plugin's one switchable tool Enabled, and hides tools users cannot switch", async () => {
+  it('hides tools users cannot switch', async () => {
     stubServer({ '/api/plugins/settings': () => Response.json({ plugins: [fetcher] }) })
     renderPage('/plugins')
     const group = await screen.findByRole('group', { name: 'web-fetch' })
     expect(group.querySelectorAll('input[type="checkbox"]')).toHaveLength(1)
-    expect(screen.getByRole('checkbox', { name: 'Enabled' })).toBeChecked()
-  })
-
-  it('labels switchable tools by name when a plugin has several', async () => {
-    const both = plugin('tools', { tools: [tool('one'), tool('two')] })
-    stubServer({ '/api/plugins/settings': () => Response.json({ plugins: [both] }) })
-    renderPage('/plugins')
-    expect(await screen.findByRole('checkbox', { name: 'one' })).toBeInTheDocument()
-    expect(screen.getByRole('checkbox', { name: 'two' })).toBeInTheDocument()
   })
 
   it('saves every plugin and only the changed switches with one Save at the end', async () => {

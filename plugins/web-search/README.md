@@ -4,22 +4,14 @@ Adds a `web_search` tool. Returns a title, URL, and snippet for each result. Eve
 
 ## Configuration
 
-Add the plugin to `config.yml`, with any keys in `.env`:
-
-```yaml
-plugins:
-  - package: '@scn-chat/plugin-web-search'
-    options:
-      engine: tavily
-      apiKey: ${TAVILY_API_KEY}
-      enabledByDefault: true
-```
+Add the plugin under **Admin > Plugins** and fill in its options. The API key is stored encrypted.
 
 | Option | Default | Meaning |
 |---|---|---|
 | `engine` | Required | The site-wide engine. See [Engines](#engines). |
 | `apiKey` | | The site-wide engine's key. Required for engines that need one. |
 | `baseURL` | | The site-wide SearXNG instance. Required for SearXNG. |
+| `adminEngineRoles` | `[user]` | List of roles allowed to use the admin-configured search engine. |
 | `enabledByDefault` | `false` | Whether search is on for users who haven't switched it themselves. |
 | `userToggle` | `true` | Whether users can switch search on and off in their settings. |
 | `userEngines` | `true` | Whether users can pick their own engine and key. Set to `false` to use the site-wide engine for everyone. |

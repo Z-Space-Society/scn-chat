@@ -1,9 +1,10 @@
 import type { LanguageModelV4, ModelProvider } from '@scn-chat/plugin-api'
 import { MockLanguageModelV4, simulateReadableStream } from 'ai/test'
-import { createRoles } from '../../src/auth/roles.ts'
-import type { ModelConfig } from '../../src/config.ts'
-import type { PluginHost } from '../../src/plugins/host.ts'
+import pino from 'pino'
+import { loadPlugins, type PluginHost } from '../../src/plugins/host.ts'
 import { Registry } from '../../src/plugins/registry.ts'
+import { RuntimeHolder } from '../../src/plugins/runtime.ts'
+import { type AdminModel, saveAdminModel } from '../../src/providers/admin-models.ts'
 import { ModelCatalog } from '../../src/providers/catalog.ts'
 import { SecretBox } from '../../src/secrets.ts'
 import { type TurnBlobs, TurnRunner } from '../../src/turns/runner.ts'
@@ -73,8 +74,11 @@ export async function turnsHarness(
   options: {
     storageMode?: 'space' | 'local'
     model?: () => LanguageModelV4
-    adminModels?: Partial<ModelConfig>[]
+    adminModels?: Partial<AdminModel>[]
     host?: PluginHost
+    hasAccess?: (did: string) => Promise<boolean>
+    appName?: () => string
+    rolesOf?: (did: string) => Promise<string[]>
     ratePerMinute?: number
     timeoutMs?: number
     systemPrompt?: string
@@ -98,25 +102,44 @@ export async function turnsHarness(
   const providers = new Registry<ModelProvider>('provider', (p) => p.id)
   providers.register(provider, 'test')
   const caps = { vision: true, reasoning: true, tools: true }
-  const adminModels = (options.adminModels ?? [{ id: 'default-model', default: true }]).map(
-    (m) => ({
-      provider: 'fake',
-      id: 'm',
-      name: 'M',
-      capabilities: caps,
-      roles: ['user'],
-      ...m,
-    }),
-  ) as ModelConfig[]
+  for (const m of options.adminModels ?? [{ id: 'default-model', default: true }]) {
+    await saveAdminModel(
+      h.db,
+      {
+        provider: 'fake',
+        id: 'm',
+        name: 'M',
+        capabilities: caps,
+        roles: ['user'],
+        default: false,
+        ...m,
+      },
+      'did:plc:admin',
+    )
+  }
   const catalog = new ModelCatalog({
     db: h.db,
     box: new SecretBox(Buffer.alloc(32, 8)),
     providers,
-    adminModels,
-    roles: createRoles(),
+    rolesOf: async () => ['user'],
     guardedFetch: fetch,
     logger: h.logger,
   })
+  const host =
+    options.host ??
+    (await loadPlugins([], {
+      services: {} as never,
+      logger: pino({ level: 'silent' }),
+      app: { name: 'Test Chat', publicUrl: 'http://x' },
+    }))
+  const plugins = new RuntimeHolder({ host, catalog, statuses: new Map() }, h.logger)
+  const settings = {
+    ratePerMinute: options.ratePerMinute ?? 100,
+    maxSteps: 4,
+    timeoutMs: options.timeoutMs ?? 10_000,
+    backfillWindowMs: 60 * 60_000,
+    systemPrompt: options.systemPrompt ?? '',
+  }
   const stored = new Map<string, Uint8Array>()
   const blobs: TurnBlobs = {
     reader: () => async (cid) => ({
@@ -138,18 +161,13 @@ export async function turnsHarness(
   const runner = new TurnRunner({
     db: h.db,
     services: h.services,
-    catalog,
-    host: options.host,
+    plugins,
     hub,
     blobs,
-    config: {
-      ratePerMinute: options.ratePerMinute ?? 100,
-      maxSteps: 4,
-      timeoutMs: options.timeoutMs ?? 10_000,
-      backfillWindowMs: 60 * 60_000,
-      systemPrompt: options.systemPrompt ?? '',
-    },
-    appName: 'Test Chat',
+    settings: () => settings,
+    appName: options.appName ?? (() => 'Test Chat'),
+    hasAccess: options.hasAccess ?? (async () => true),
+    rolesOf: options.rolesOf ?? (async () => ['user']),
     toolFetch: fetch,
     logger: h.logger,
     ...(options.now ? { now: options.now } : {}),
@@ -161,5 +179,17 @@ export async function turnsHarness(
     const { messages } = await h.chats.getConversation(skey)
     return new Map(messages.map((m) => [m.rkey, m.value]))
   }
-  return { ...h, runner, hub, catalog, created, setModel, messages, blobs, stored }
+  return {
+    ...h,
+    runner,
+    hub,
+    catalog,
+    plugins,
+    settings,
+    created,
+    setModel,
+    messages,
+    blobs,
+    stored,
+  }
 }

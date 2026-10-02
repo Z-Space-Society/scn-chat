@@ -2,7 +2,7 @@
 
 ## Summary
 
-A provider connects SCN Chat to a model API. Providers are plugins that register with the provider registry from the plugins spec. Each provider turns a model ID and an API key into a Vercel AI SDK language model, and the chat-turns spec drives that model. Admins configure providers and a list of models everyone can use in `config.yml`. Users can add their own API keys for any provider that allows it, and, when the admin permits, their own OpenAI-compatible endpoints. User keys are encrypted in the app database. Phase 1 ships four provider plugins: Anthropic, OpenAI, Google, and OpenAI-compatible, which covers OpenRouter, co/core, llama.cpp, vLLM, and Ollama.
+A provider connects SCN Chat to a model API. Providers are plugins that register with the provider registry from the plugins spec. Each provider turns a model ID and an API key into a Vercel AI SDK language model, and the chat-turns spec drives that model. Admins configure providers and a list of models everyone can use in the admin area. Users can add their own API keys for any provider that allows it, and, when the admin permits, their own OpenAI-compatible endpoints. User keys are encrypted in the app database. Phase 1 ships four provider plugins: Anthropic, OpenAI, Google, and OpenAI-compatible, which covers OpenRouter, co/core, llama.cpp, vLLM, and Ollama.
 
 ## Motivation
 
@@ -45,26 +45,16 @@ interface ModelInfo {
 | `@scn-chat/plugin-google` | `@ai-sdk/google` | `createGoogle({ apiKey })` |
 | `@scn-chat/plugin-openai-compatible` | `@ai-sdk/openai-compatible` | Takes `id`, `name`, `baseURL`, and optional `apiKey`. Can be listed several times with different IDs. Sets `includeUsage: true` |
 
-Each plugin takes an optional admin `apiKey` and `userKeys` (default `true`) as options, and exports a zod `optionsSchema` for them. The OpenAI-compatible plugin also takes `userEndpoints` (default `false`) and `allowPrivateNetworks` (default `false`).
+Each plugin takes an optional admin `apiKey`, marked secret, and `userKeys` (default `true`) as options, and exports a zod `optionsSchema` for them. The Anthropic, OpenAI, and Google plugins list their models from each API's model list endpoint, with every capability off for the admin to set. The OpenAI-compatible plugin also takes `userEndpoints` (default `false`) and `allowPrivateNetworks` (default `false`).
 
 ### Models
 
-The `models` list in `config.yml` names the models every signed-in user can use with the admin's keys:
+Admin models are the models users can use with the admin's keys. They live in the database and are managed in the admin area, as the admin-plugins spec describes, with a provider, model ID, name, capabilities, roles, and whether it is the default.
 
-```yaml
-models:
-  - provider: anthropic
-    id: claude-sonnet-5
-    name: Claude Sonnet 5
-    capabilities: { vision: true, reasoning: true, tools: true }
-    roles: [user]
-    default: true
-```
+- A model can only be saved for a loaded provider with an admin key. A model whose provider isn't loaded, or has lost its admin key, is hidden from users.
+- At most one model is the default. It is the fallback when a request names no model, the conversation has no earlier reply, and the user's preferences set no default.
 
-- Startup fails if a model names a provider that is not registered, or a provider without an admin key.
-- Exactly zero or one model has `default: true`. It is the fallback when a request names no model, the conversation has no earlier reply, and the user's preferences set no default.
-
-Each admin model's `roles` lists the roles allowed to use it, using the roles from the auth spec. `roles: ['user']` opens a model to every signed-in user. `roles` is required, so who can use a model is always a deliberate choice, and a model without it fails startup. A model naming an undefined role also fails startup. Roles never restrict a user's own keys.
+Each admin model's `roles` lists the roles allowed to use it, using the roles from the admin spec. `roles: ['user']` opens a model to everyone with access. `roles` can't be empty, so who can use a model is always a deliberate choice, and every role must exist. Roles never restrict a user's own keys.
 
 ### User credentials
 
@@ -122,7 +112,6 @@ The provider data is stored in the `providerData` field of reasoning, text, and 
 
 ## Scope Boundaries
 
-- No admin UI. Providers and admin models are configured in the config file.
 - No usage limits, quotas, or billing for admin models beyond role checks.
 - No automatic model discovery for admin models. They are listed explicitly.
 - No image generation, speech, or embedding models.
@@ -140,18 +129,19 @@ The provider data is stored in the `providerData` field of reasoning, text, and 
 ## Acceptance Criteria
 
 - [ ] Each phase 1 provider plugin creates a working AI SDK model from a model ID and API key.
-- [ ] Startup fails when an admin model names an unregistered provider or a provider without an admin key.
-- [ ] Startup fails when more than one admin model is marked default.
+- [ ] Saving an admin model for an unregistered provider or a provider without an admin key is refused.
+- [ ] Marking an admin model default clears the flag on the others.
 - [ ] A user credential's API key is stored encrypted and never returned by the API.
 - [ ] Startup fails without a valid `SECRET_KEY`.
 - [ ] Resolution uses the user's key when the user has one for the model.
 - [ ] Resolution falls back to the admin key for an admin model when one of the user's roles allows it.
 - [ ] Resolution fails with `ModelUnavailable` for a model the user cannot use.
 - [ ] A model with `roles: ['user']` is available to every signed-in user.
-- [ ] An admin model without `roles` fails startup.
+- [ ] Saving an admin model without roles is refused.
 - [ ] A user endpoint whose host is a private IP literal, such as `127.0.0.1` or an IPv4-mapped IPv6 address, is refused.
 - [ ] A user without an allowed role cannot use an admin model but can use their own keys for it.
-- [ ] An admin model naming an undefined role fails startup.
+- [ ] Saving an admin model naming an undefined role is refused.
+- [ ] An admin model whose provider isn't loaded is hidden from users.
 - [ ] A user endpoint resolving to a private address is refused unless the provider allows private networks.
 - [ ] A hostname that resolves to a public address when checked and a private one when connecting is still refused.
 - [ ] Redirects from a user endpoint are not followed.

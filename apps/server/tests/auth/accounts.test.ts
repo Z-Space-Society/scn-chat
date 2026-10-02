@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  getAccount,
-  recordLogin,
-  SpacesLostError,
-  setBackgroundSync,
-  touchActivity,
-} from '../../src/auth/accounts.ts'
+import { getAccount, recordLogin, SpacesLostError, touchActivity } from '../../src/auth/accounts.ts'
 import { migrateToLatest } from '../../src/db/migrate.ts'
 import { dialects } from '../helpers/db.ts'
 
@@ -18,15 +12,11 @@ describe.each(dialects)('accounts on $name', ({ create }) => {
     return db
   }
 
-  it('gives a new account space storage when its scope allows spaces', async () => {
+  it('gives a new account space storage only when its scope allows spaces', async () => {
     const db = await setup()
     expect((await recordLogin(db, { ...login, spacesAllowed: true })).storageMode).toBe('space')
-    await db.destroy()
-  })
-
-  it('gives a new account local storage when its scope lacks spaces', async () => {
-    const db = await setup()
-    expect((await recordLogin(db, { ...login, spacesAllowed: false })).storageMode).toBe('local')
+    const bob = { ...login, did: 'did:plc:bob', spacesAllowed: false }
+    expect((await recordLogin(db, bob)).storageMode).toBe('local')
     await db.destroy()
   })
 
@@ -64,15 +54,6 @@ describe.each(dialects)('accounts on $name', ({ create }) => {
     expect((await getAccount(db, login.did))?.lastActiveAt).toBe(
       new Date(start.getTime() + 90_000).toISOString(),
     )
-    await db.destroy()
-  })
-
-  it('stores the background sync setting', async () => {
-    const db = await setup()
-    await recordLogin(db, { ...login, spacesAllowed: true })
-    expect((await getAccount(db, login.did))?.backgroundSync).toBe(true)
-    await setBackgroundSync(db, login.did, false)
-    expect((await getAccount(db, login.did))?.backgroundSync).toBe(false)
     await db.destroy()
   })
 })

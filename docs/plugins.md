@@ -11,20 +11,41 @@ Plugins are stored in [`plugins/`](../plugins). The core providers and chat titl
 
 See [specs/plugins.md](../specs/plugins.md).
 
-## Loading plugins
+## Installing and configuring plugins
 
-Plugins are configured in [config.yml](../config.example.yml). They're loaded in the same order they're listed in.
+To install a plugin it first needs to be a dependency of the root `package.json` and it's own `package.json` needs to have the `scn-chat-plugin` keyword. Use `pnpm add` to add one or `workspace:` or `file:` dependency for local plugins.
 
-```yaml
-plugins:
-  - package: '@scn-chat/plugin-openai-compatible'
-    options:
-      id: cocore
-      name: co/core
-      baseURL: https://cocore.dev/v1
-      apiKey: ${COCORE_API_KEY}
-  - package: '@scn-chat/plugin-titles'
+Root `package.json`:
 ```
+{
+  "dependencies": {
+    "@scn-chat/plugin-web-search": "workspace:*",
+    "@acme/plugin-happyview": "workspace:*",
+    "my-local-plugin": "file:../my-local-plugin",
+    "scn-chat-plugin-kagi-extras": "1.2.0"
+  }
+}
+```
+
+The plugins `package.json`:
+```
+{
+  "name": "@acme/plugin-happyview",
+  "version": "0.1.0",
+  "description": "Grants roles from approved HappyView applications.",
+  "keywords": ["scn-chat-plugin"],
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@scn-chat/plugin-api": "workspace:*",
+    "zod": "4.6.5"
+  }
+}
+```
+
+Plugins can then be enabled **Settings** > **Admin > Plugins**. The plugin form is generated from it's `optionsSchema`.
+
+Set `multipleInstances = true` if the plugin should be able to be added multiple times (generic openai model config, for example).
 
 ## Anatomy of a plugin
 
@@ -32,6 +53,7 @@ A plugin package exports two things:
 
 - **A default export:** Gets the options list and returns the plugin.
 - **optionsSchema:** a zod schema for the options. Optional but recommended.
+- **multipleInstances:** when set to `true` the plugin can be added multiple times each with it's own configuration. Optional.
 
 The following snippet is an example of a plugin that passes today's date to the model:
 
@@ -78,7 +100,7 @@ Plugin object fields:
 | `name` | User-facing name of the plugin, where applicable. |
 | `apiVersion` | The server currently supports only `1`. |
 | `userSettings` | Optional. A zod object schema for per-user settings. See [Per-user settings](#per-user-settings). |
-| `setup(ctx)` | Runs once at startup and may be async. Startup waits for every plugin's setup, in config order. |
+| `setup(ctx)` | Runs when the plugin loads, at startup and again whenever an admin changes the plugins. |
 
 ## The plugin context
 
@@ -89,6 +111,9 @@ Context passed to the plugins `setup` handler can include the following data. Pl
 | `ctx.providers.register(provider)` | Add a model provider. |
 | `ctx.tools.register(tool)` | Add a tool the model can call. |
 | `ctx.toolSources.register(source)` | Add a set of tools. |
+| `ctx.roleSources.register(source)` | See [Role sources](#role-sources). |
+| `ctx.accounts.suspend(did, { reason })` | Suspend an account. |
+| `ctx.accounts.restore(did)` | Restore a suspended account. |
 | `ctx.ingesters.register(ingester)` | Add a file ingester. |
 | `ctx.ingesters.accepts(mimeType)` | Check if a file type is handled by an available ingester. |
 | `ctx.ingesters.ingest(file)` | Extract a file's text. |
@@ -98,7 +123,7 @@ Context passed to the plugins `setup` handler can include the following data. Pl
 | `ctx.userSettings(user)` | Read this plugin's settings for a user. |
 | `ctx.logger` | A logger object. Logs are tagged with the plugin's ID. |
 | `ctx.app` | Read the app's name and public URL. |
-| `ctx.onClose(fn)` | Clean up at shutdown. |
+| `ctx.onClose(fn)` | Clean up when the plugin unloads, at shutdown or when an admin changes plugins. |
 
 ## Model providers
 
@@ -131,12 +156,24 @@ A tool supports:
 `context` includes:
  - `user` - the user's DID.
  - `conversation` - the conversation URI.
+ - `roles` - the user's roles when the turn started.
  - `signal` - aborts when the turn is cancelled or times out.
  - `fetch` - use instead of the global fetch for URLs a user or the model chose.
  - `cite({ url, title })` - adds a source link to the reply.
  - `turnCache` - a map for keeping data between calls to the tool during one turn, such as a page read in parts.
 
 The model gets tools listed in `generation.tools`. Defaults to tools the user has switched on.
+
+## Role sources
+
+A role source allows plugins to set role membership on login.
+
+```ts
+ctx.roleSources.register({
+  id: 'members',
+  rolesFor: async ({ did, handle, pdsUrl }) => ((await isMember(did)) ? [options.role] : []),
+})
+```
 
 ## File ingesters
 

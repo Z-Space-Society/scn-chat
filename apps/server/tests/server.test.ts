@@ -1,6 +1,9 @@
 import { definePlugin } from '@scn-chat/plugin-api'
 import pino from 'pino'
 import { describe, expect, it, vi } from 'vitest'
+import { migrateToLatest } from '../src/db/migrate.ts'
+import { writeInstances } from '../src/plugins/instances.ts'
+import { SecretBox } from '../src/secrets.ts'
 import { createServer } from '../src/server.ts'
 import {
   fakeIdentity,
@@ -8,41 +11,45 @@ import {
   fakeSession,
   LOGIN_STATE,
   loginCookie,
-  ORIGIN,
   sessionCookie,
 } from './helpers/auth.ts'
-import { testConfig } from './helpers/config.ts'
+import { TEST_SECRET_KEY, testConfig } from './helpers/config.ts'
 import { createSqliteDb } from './helpers/db.ts'
+import { installedFrom } from './helpers/plugins.ts'
 import { fakeProvider } from './helpers/providers.ts'
 
-const caps = { vision: false, reasoning: false, tools: false }
-
-async function build() {
+async function build(packages: string[]) {
   const { provider } = fakeProvider()
+  const db = createSqliteDb()
+  await migrateToLatest(db)
+  const box = new SecretBox(Buffer.from(TEST_SECRET_KEY, 'base64'))
+  await writeInstances(
+    db,
+    box,
+    packages.map((pkg, index) => ({
+      id: `instance-${index}`,
+      package: pkg,
+      enabled: true,
+      options: {},
+      secrets: {},
+    })),
+    'did:plc:admin',
+  )
   const server = await createServer({
-    config: testConfig(),
-    appConfig: {
-      plugins: [
-        definePlugin({
-          id: 'fake',
-          name: 'Fake',
-          apiVersion: 1,
-          setup: (ctx) => ctx.providers.register(provider),
-        }),
-      ],
-      models: [
-        {
-          provider: 'fake',
-          id: 'm',
-          name: 'M',
-          capabilities: caps,
-          roles: ['user'],
-          default: true,
-        },
-      ],
-    },
-    db: createSqliteDb(),
+    config: testConfig({ ADMIN_DIDS: 'did:plc:alice' }),
+    db,
     logger: pino({ level: 'silent' }),
+    installed: installedFrom({
+      'fake-plugin': {
+        factory: () =>
+          definePlugin({
+            id: 'fake',
+            name: 'Fake',
+            apiVersion: 1,
+            setup: (ctx) => ctx.providers.register(provider),
+          }),
+      },
+    }),
     oauth: fakeOAuth({
       callback: vi.fn(async () => ({
         session: fakeSession('did:plc:alice', 'atproto'),
@@ -56,38 +63,19 @@ async function build() {
 }
 
 describe('createServer', () => {
-  it('wires every route: health, identity, OAuth, and the signed-in API', async () => {
-    const { app, close } = await build()
-    expect((await app.request('/api/health')).status).toBe(200)
-    expect((await app.request('/.well-known/did.json')).status).toBe(200)
-    expect((await app.request('/oauth-client-metadata.json')).status).toBe(200)
+  it('starts when a stored plugin is no longer installed, and reports it', async () => {
+    const { app, close } = await build(['gone-plugin', 'fake-plugin'])
     const cookie = sessionCookie(await app.request('/oauth/callback?code=a&state=b', loginCookie))
-    const models = (await (await app.request('/api/models', { headers: { cookie } })).json()) as {
-      models: { id: string }[]
+    const body = (await (
+      await app.request('/api/admin/plugins', { headers: { cookie } })
+    ).json()) as {
+      instances: { package: string; status: string; error: string | null }[]
     }
-    expect(models.models.map((m) => m.id)).toEqual(['m'])
-    const created = await app.request('/api/conversations', {
-      method: 'POST',
-      headers: { cookie, origin: ORIGIN },
-    })
-    expect(created.status).toBe(201)
+    expect(body.instances.map((i) => [i.package, i.status])).toEqual([
+      ['gone-plugin', 'failed'],
+      ['fake-plugin', 'loaded'],
+    ])
+    expect(body.instances[0]?.error).toContain('gone-plugin')
     await close()
-  })
-
-  it('fails to start when an admin model names an unregistered provider', async () => {
-    await expect(
-      createServer({
-        config: testConfig(),
-        appConfig: {
-          plugins: [],
-          models: [{ provider: 'ghost', id: 'm', name: 'M', capabilities: caps, roles: ['user'] }],
-        },
-        db: createSqliteDb(),
-        logger: pino({ level: 'silent' }),
-        oauth: fakeOAuth(),
-        identity: fakeIdentity(),
-        startBackgroundJobs: false,
-      }),
-    ).rejects.toThrow(/ghost/)
   })
 })

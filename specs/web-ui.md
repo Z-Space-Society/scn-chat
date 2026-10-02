@@ -29,8 +29,9 @@ A separate designer will build the production interface. The phase 1 UI exists t
 | `/s/:ownerDid/:skey` | A shared conversation, read-only |
 | `/settings` | Preferences, with a sidebar linking to each settings section |
 | `/settings/api-keys`, `/settings/plugins`, `/settings/sync` | The other settings sections |
+| `/admin` and its sections | The admin area, for admins, from the admin specs |
 
-Any route except `/login` and a shared route redirects to `/login` when `/api/me` returns 401. A shared route shows a sign-in prompt instead.
+Any route except `/login` and a shared route redirects to `/login` when `/api/me` returns 401. A shared route shows a sign-in prompt instead. A viewer, signed in only to view shared chats, sees the access message with sign-in and sign-out on every route except shared chats.
 
 ### Components
 
@@ -45,7 +46,7 @@ Any route except `/login` and a shared route redirects to `/login` when `/api/me
   - A pending reply shows streamed text as it arrives. An errored reply shows its error, and a cancelled reply is labeled as stopped.
 - **Message actions.** On user messages, edit, which opens the composer prefilled and sends a sibling. On assistant replies, regenerate, with an optional model change. While generating, stop.
 - **Composer.** A textarea, a model select from `/api/models`, an effort select for models with the reasoning capability, and an attach button. The attach button accepts images only for models with vision, plus any type an ingester supports. Attachments upload when chosen and show a progress state. Enter sends, and Shift+Enter adds a newline.
-- **Settings.** A sidebar links back to the chats and to each section, marks the current one, and holds sign out. Only the current section is shown.
+- **Settings.** A sidebar links back to the chats, to the admin area for admins, and to each section, marks the current one, and holds sign out. Only the current section is shown.
   - Preferences: default model, default effort, custom instructions, and generate titles. Saving also stores the browser's time zone, which the app saves on sign-in as well when it differs from the stored one.
   - API keys: add, list with the last four characters, and delete. For providers with user endpoints, a base URL field.
   - Plugins: one form with a group per plugin and a single Save at the end, which saves every plugin's settings and any tool switches that changed. A group has a checkbox for each tool the user may switch, labeled "Enabled" when it is the plugin's only one and by tool name otherwise, then the fields generated from the plugin's JSON schema.
@@ -68,7 +69,6 @@ While the reader is at the bottom of the conversation, it stays scrolled to the 
 - No PWA, offline support, or notifications.
 - No mobile-specific layout beyond what the browser does.
 - No search box. That is the search spec.
-- No admin screens.
 
 ## Edge Cases and Decisions
 

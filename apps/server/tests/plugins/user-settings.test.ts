@@ -7,7 +7,6 @@ import {
   clearUserSettings,
   InvalidPluginSettingsError,
   readUserSettings,
-  secretKeys,
   writeUserSettings,
 } from '../../src/plugins/user-settings.ts'
 import { SecretBox } from '../../src/secrets.ts'
@@ -27,27 +26,12 @@ const plugin = definePlugin({
   setup: () => {},
 })
 
-describe('secretKeys', () => {
-  it('finds fields marked secret', () => {
-    expect(secretKeys(schema)).toEqual(['apiKey'])
-  })
-})
-
 describe.each(dialects)('plugin user settings on $name', ({ create }) => {
   const setup = async () => {
     const db = create()
     await migrateToLatest(db)
     return db
   }
-
-  it('returns schema defaults when nothing is stored', async () => {
-    const db = await setup()
-    expect(await readUserSettings(db, box, did, plugin)).toEqual({
-      engine: 'duckduckgo',
-      apiKey: '',
-    })
-    await db.destroy()
-  })
 
   it('round-trips settings, storing secret fields encrypted', async () => {
     const db = await setup()

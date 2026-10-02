@@ -4,19 +4,29 @@ import { z } from 'zod'
 
 export const optionsSchema = z
   .object({
-    /** Provider ID used in model references, such as 'scn' or 'ollama'. */
-    id: z.string().regex(/^[a-z0-9-]+$/),
-    name: z.string().min(1),
-    baseURL: z.url().optional(),
-    apiKey: z.string().min(1).optional(),
-    userKeys: z.boolean().optional(),
-    userEndpoints: z.boolean().optional(),
-    /** Let user endpoints reach private network addresses, for self-hosted local models. */
-    allowPrivateNetworks: z.boolean().optional(),
+    id: z
+      .string()
+      .regex(/^[a-z0-9-]+$/)
+      .meta({
+        title: 'Provider ID',
+        description: "Used in model references, such as 'scn' or 'llama'. Fixed once added.",
+      }),
+    name: z.string().min(1).meta({ title: 'Name' }),
+    baseURL: z.url().optional().meta({ title: 'Base URL', description: 'The admin endpoint.' }),
+    apiKey: z.string().min(1).optional().meta({ title: 'API key', secret: true }),
+    userKeys: z.boolean().optional().meta({ title: 'Allow users to add their own keys' }),
+    userEndpoints: z.boolean().optional().meta({ title: 'Allow users to set their own endpoints' }),
+    allowPrivateNetworks: z.boolean().optional().meta({
+      title: 'User endpoints can reach private networks',
+      description: 'For self-hosted local models.',
+    }),
   })
   .strict()
 
 export type OpenAICompatibleOptions = z.infer<typeof optionsSchema>
+
+/** Each endpoint is its own instance, with its own provider ID. */
+export const multipleInstances = true
 
 const modelList = z.object({ data: z.array(z.object({ id: z.string().min(1) })) })
 

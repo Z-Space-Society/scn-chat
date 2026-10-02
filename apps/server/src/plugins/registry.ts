@@ -27,6 +27,19 @@ export class Registry<T> {
     this.items.set(key, { item, pluginId })
   }
 
+  /** Throw if these items would clash with each other or with ones already registered. */
+  assertFree(items: T[], pluginId: string): void {
+    const seen = new Set<string>()
+    for (const item of items) {
+      const key = this.keyOf(item)
+      const existing = this.items.get(key)
+      if (existing)
+        throw new DuplicateRegistrationError(this.kind, key, pluginId, existing.pluginId)
+      if (seen.has(key)) throw new DuplicateRegistrationError(this.kind, key, pluginId, pluginId)
+      seen.add(key)
+    }
+  }
+
   get(key: string): T | undefined {
     return this.items.get(key)?.item
   }

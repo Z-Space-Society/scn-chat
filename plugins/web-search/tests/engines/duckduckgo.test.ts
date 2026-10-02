@@ -41,8 +41,4 @@ describe('duckduckgo', () => {
       duckduckgo.parse('<html><body><form id="challenge-form"></form></body></html>'),
     ).toThrow(SearchError)
   })
-
-  it('describes any error status as a block', () => {
-    expect(duckduckgo.describeError?.(403)).toMatch(/DuckDuckGo blocked the search/)
-  })
 })

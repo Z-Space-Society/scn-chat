@@ -21,7 +21,7 @@ describe('createOAuthClient', () => {
   it('uses loopback client metadata for a loopback public URL', async () => {
     const db = createSqliteDb()
     await migrateToLatest(db)
-    const client = await createOAuthClient(testConfig(), db, buildScope('raw'))
+    const client = await createOAuthClient(testConfig(), db, buildScope('raw'), 'Test Chat')
     expect(String(client.clientMetadata.client_id)).toMatch(/^http:\/\/localhost/)
     expect(client.clientMetadata.token_endpoint_auth_method).toBe('none')
   })
@@ -34,9 +34,10 @@ describe('createOAuthClient', () => {
       PUBLIC_URL: 'https://chat.example.com',
       OAUTH_PRIVATE_KEYS: JSON.stringify([key.privateJwk]),
     })
-    const client = await createOAuthClient(config, db, buildScope('permission-set'))
+    const client = await createOAuthClient(config, db, buildScope('permission-set'), 'Test Chat')
     expect(client.clientMetadata).toMatchObject({
       client_id: 'https://chat.example.com/oauth-client-metadata.json',
+      client_name: 'Test Chat',
       token_endpoint_auth_method: 'private_key_jwt',
       jwks_uri: 'https://chat.example.com/oauth/jwks.json',
       dpop_bound_access_tokens: true,

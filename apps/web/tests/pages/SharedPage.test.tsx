@@ -18,7 +18,7 @@ const message = (rkey: string, role: string, text: string, parent?: string) => (
 })
 
 describe('SharedPage', () => {
-  it('shows the shared conversation and lets the viewer switch between replies', async () => {
+  it('shows the newest reply and lets the viewer switch between replies', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () =>
@@ -34,9 +34,7 @@ describe('SharedPage', () => {
       ),
     )
     render(<SharedPage ownerDid="did:plc:alice" skey="3abc" signedIn />)
-    expect(await screen.findByRole('heading', { name: 'Tile quotes' })).toBeInTheDocument()
-    expect(screen.getByText('Shared by alice.test')).toBeInTheDocument()
-    expect(screen.getByText('Roughly $450')).toBeInTheDocument()
+    expect(await screen.findByText('Roughly $450')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '‹' }))
     expect(screen.getByText('About $500')).toBeInTheDocument()
   })

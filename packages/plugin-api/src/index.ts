@@ -70,6 +70,8 @@ export type Citation = { url: string; title?: string }
 export type ToolContext = {
   user: string
   conversation: string
+  /** The user's roles when the turn started. */
+  roles: string[]
   signal: AbortSignal
   /** Fetch function for retrieving URLs. */
   fetch: typeof globalThis.fetch
@@ -125,6 +127,18 @@ export function matchIngester(ingesters: Ingester[], mimeType: string): Ingester
     if (!best || (ingester.priority ?? 0) > (best.priority ?? 0)) best = ingester
   }
   return best
+}
+
+// Role sources
+
+/** Who is asking about roles: their DID, verified handle, and PDS. */
+export type RoleIdentity = { did: string; handle?: string | null; pdsUrl: string }
+
+/** Decides role membership outside the app database, such as from an external member list. */
+export interface RoleSource {
+  id: string
+  /** The role names the user holds. Asked on every check, so cache slow lookups in the plugin. */
+  rolesFor(identity: RoleIdentity): Promise<string[]>
 }
 
 // Hooks
@@ -203,6 +217,12 @@ export interface PluginContext<UserSettings = unknown> {
   providers: { register(provider: ModelProvider): void }
   tools: { register<Input>(tool: Tool<Input>): void }
   toolSources: { register(source: ToolSource): void }
+  roleSources: { register(source: RoleSource): void }
+  /** Suspend or restore an account. Each returns whether an account changed. Admins can't be suspended. */
+  accounts: {
+    suspend(did: string, options?: { reason?: string }): Promise<boolean>
+    restore(did: string): Promise<boolean>
+  }
   ingesters: {
     register(ingester: Ingester): void
     /** True if a registered ingester accepts the MIME type. */
@@ -261,10 +281,42 @@ export function definePlugin<UserSettings = unknown>(
 
 /** Options for a provider plugin that only needs an API key. */
 export const keyedProviderOptions = z
-  .object({ apiKey: z.string().min(1).optional(), userKeys: z.boolean().optional() })
+  .object({
+    apiKey: z.string().min(1).optional().meta({
+      title: 'API key',
+      description:
+        'The admin key, used for admin models. Leave empty and all users will need to use their own keys.',
+      secret: true,
+    }),
+    userKeys: z.boolean().optional().meta({ title: 'Allow users to their own API keys' }),
+  })
   .strict()
 
 export type KeyedProviderOptions = z.infer<typeof keyedProviderOptions>
+
+/**
+ * Fetch a provider's model list and turn it into model info. The lists don't say what a model
+ * can do, so every capability starts off for the admin to set.
+ */
+export async function fetchModelList<S extends z.ZodType>(request: {
+  fetch: typeof globalThis.fetch
+  url: string
+  headers: Record<string, string>
+  schema: S
+  models: (body: z.infer<S>) => { id: string; name: string }[]
+}): Promise<ModelInfo[]> {
+  const host = new URL(request.url).host
+  const response = await request.fetch(request.url, {
+    headers: request.headers,
+    redirect: 'error',
+  })
+  if (!response.ok) throw new Error(`Listing models at ${host} returned ${response.status}`)
+  const body = request.schema.safeParse(await response.json())
+  if (!body.success) throw new Error(`${host} did not return a model list`)
+  return request
+    .models(body.data)
+    .map((model) => ({ ...model, capabilities: { vision: false, reasoning: false, tools: false } }))
+}
 
 /** Build the factory for a provider plugin only needs an API key. */
 export function keyedProvider(provider: {
@@ -273,6 +325,8 @@ export function keyedProvider(provider: {
   replay: ReplayPolicy
   providerOptions?: ModelProvider['providerOptions']
   create: (apiKey: string | undefined) => (modelId: string) => LanguageModelV4
+  /** List the models a key can use. */
+  list?: (apiKey: string, fetch: typeof globalThis.fetch) => Promise<ModelInfo[]>
 }) {
   return (options: KeyedProviderOptions = {}) =>
     definePlugin({
@@ -288,6 +342,15 @@ export function keyedProvider(provider: {
           replay: provider.replay,
           ...(provider.providerOptions ? { providerOptions: provider.providerOptions } : {}),
           createModel: ({ modelId, apiKey }) => provider.create(apiKey ?? options.apiKey)(modelId),
+          ...(provider.list
+            ? {
+                listModels: async ({ apiKey, fetch = globalThis.fetch }) => {
+                  const key = apiKey ?? options.apiKey
+                  if (!key) throw new Error(`Add an API key to list ${provider.name} models`)
+                  return (provider.list as NonNullable<typeof provider.list>)(key, fetch)
+                },
+              }
+            : {}),
         })
       },
     })

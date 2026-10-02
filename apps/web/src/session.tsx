@@ -6,6 +6,10 @@ export type Me = {
   storageMode: 'space' | 'local'
   backgroundSync: boolean
   roles: string[]
+  admin: boolean
+  /** Viewers can only open chats shared with them. */
+  access: 'full' | 'viewer'
+  accessMessage: string | null
 }
 
 export const MeContext = createContext<Me | null>(null)

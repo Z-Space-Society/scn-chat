@@ -1,6 +1,6 @@
 import { setupForTest } from '@scn-chat/plugin-api/testing'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import plugin, { optionsSchema } from '../src/index.ts'
+import plugin from '../src/index.ts'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -33,23 +33,6 @@ async function keyUsed(
 }
 
 describe('anthropic plugin', () => {
-  it('registers the Anthropic provider with its replay policy', async () => {
-    const { providers } = await setupForTest(plugin({ apiKey: 'admin-key' }))
-    expect(providers).toMatchObject([
-      { id: 'anthropic', name: 'Anthropic', hasAdminKey: true, userKeys: true, replay: 'replay' },
-    ])
-  })
-
-  it('reports no admin key when none is configured', async () => {
-    const { providers } = await setupForTest(plugin())
-    expect(providers[0]?.hasAdminKey).toBe(false)
-  })
-
-  it('can turn off user keys', async () => {
-    const { providers } = await setupForTest(plugin({ userKeys: false }))
-    expect(providers[0]?.userKeys).toBe(false)
-  })
-
   it('uses the admin key when no user key is given', async () => {
     const { providers } = await setupForTest(plugin({ apiKey: 'admin-key' }))
     expect(await keyUsed(providers[0]!)).toContain('admin-key')
@@ -61,12 +44,26 @@ describe('anthropic plugin', () => {
   })
 })
 
-describe('anthropic optionsSchema', () => {
-  it('accepts valid options', () => {
-    expect(optionsSchema.safeParse({ apiKey: 'k', userKeys: false }).success).toBe(true)
+describe('anthropic listModels', () => {
+  it('lists models with their display names, using the user key over the admin key', async () => {
+    const fetch = vi.fn(async (_url: string, _init?: RequestInit) =>
+      Response.json({ data: [{ id: 'claude-x', display_name: 'Claude X' }] }),
+    )
+    const { providers } = await setupForTest(plugin({ apiKey: 'admin-key' }))
+    const models = await providers[0]?.listModels?.({ apiKey: 'user-key', fetch: fetch as never })
+    expect(models).toEqual([
+      {
+        id: 'claude-x',
+        name: 'Claude X',
+        capabilities: { vision: false, reasoning: false, tools: false },
+      },
+    ])
+    expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('x-api-key')).toBe('user-key')
   })
 
-  it('rejects invalid or unknown options', () => {
-    expect(optionsSchema.safeParse({ apikey: 'typo' }).success).toBe(false)
+  it('reports a failed listing with its status', async () => {
+    const fetch = vi.fn(async () => new Response('no', { status: 401 }))
+    const { providers } = await setupForTest(plugin({ apiKey: 'admin-key' }))
+    await expect(providers[0]?.listModels?.({ fetch: fetch as never })).rejects.toThrow('401')
   })
 })

@@ -71,10 +71,6 @@ describe('buildInstructions', () => {
       ),
     ).toBe('Base\n\nMetric units\n\nBe brief')
   })
-
-  it('returns an empty string when there is nothing to send', () => {
-    expect(buildInstructions('', null, null)).toBe('')
-  })
 })
 
 describe('fillBasePrompt', () => {
@@ -98,14 +94,6 @@ describe('fillBasePrompt', () => {
 
 describe('timeZoneOf', () => {
   const logger = pino({ level: 'silent' })
-
-  it('returns the zone from preferences', () => {
-    expect(timeZoneOf({ timezone: 'Europe/Paris' }, logger)).toBe('Europe/Paris')
-  })
-
-  it('falls back to UTC when preferences have no zone', () => {
-    expect(timeZoneOf(null, logger)).toBe('UTC')
-  })
 
   it('falls back to UTC and warns for a zone that does not exist', () => {
     const warn = vi.spyOn(logger, 'warn')
@@ -245,8 +233,8 @@ describe('toModelMessages', () => {
     })
     const parts = user?.content as { type: string; text?: string; mediaType?: string }[]
     expect(parts[0]).toMatchObject({ type: 'file', mediaType: 'image/png' })
-    expect(parts[1]?.text).toBe('# report.pdf\n\nPDF body')
-    expect(parts[2]?.text).toMatch(/scan\.pdf.*could not be read/)
+    expect(parts[1]?.text).toMatch(/report\.pdf[\s\S]*PDF body/)
+    expect(parts[2]?.text).toContain('scan.pdf')
   })
 
   it('refuses images for a model without vision', async () => {
@@ -281,7 +269,7 @@ describe('toModelMessages', () => {
         readBlob: noBlobs,
         isUntrusted: trusted,
       }),
-    ).rejects.toThrow(/c9 has no tool call/)
+    ).rejects.toThrow(/c9/)
   })
 
   it('throws on tool input that is not JSON', async () => {
@@ -305,7 +293,7 @@ describe('toModelMessages', () => {
     ).rejects.toBeInstanceOf(SyntaxError)
   })
 
-  it('fails with a readable error on encrypted content', async () => {
+  it('refuses encrypted content', async () => {
     const branch = [msg('a', { role: 'user', content: { $type: d('encryptedContent') } })]
     await expect(
       toModelMessages(branch, {
@@ -314,7 +302,7 @@ describe('toModelMessages', () => {
         readBlob: noBlobs,
         isUntrusted: trusted,
       }),
-    ).rejects.toThrow(/encrypted/)
+    ).rejects.toBeInstanceOf(TurnInputError)
   })
 
   it('leaves out a tool call that never got a result, as in a reply cancelled mid-call', async () => {

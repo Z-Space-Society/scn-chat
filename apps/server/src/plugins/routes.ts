@@ -17,19 +17,27 @@ import {
 } from './user-settings.ts'
 import { isToolEnabled, readToolChoices, writeToolChoice } from './user-tools.ts'
 
-export type PluginRoutesDeps = { db: Db; box: SecretBox; host: PluginHost }
+export type PluginRoutesDeps = {
+  db: Db
+  box: SecretBox
+  /** The current plugin runtime's host. */
+  host: () => PluginHost
+}
 
 /** Per-user plugin settings and tool switches: forms, saving, and resetting. */
 export function pluginRoutes(deps: PluginRoutesDeps) {
-  const { tools } = deps.host
-  const toolsOf = (plugin: Plugin) =>
-    tools.list().filter((tool) => tools.owner(tool.name) === plugin.id)
+  const toolsOf = (plugin: Plugin) => {
+    const { tools } = deps.host()
+    return tools.list().filter((tool) => tools.owner(tool.name) === plugin.id)
+  }
   const listed = () =>
-    deps.host.plugins.filter(
-      (plugin) => plugin.userSettings || toolsOf(plugin).some((tool) => tool.userToggle),
-    )
+    deps
+      .host()
+      .plugins.filter(
+        (plugin) => plugin.userSettings || toolsOf(plugin).some((tool) => tool.userToggle),
+      )
   const find = (id: string) =>
-    deps.host.plugins.find((plugin) => plugin.id === id && plugin.userSettings)
+    deps.host().plugins.find((plugin) => plugin.id === id && plugin.userSettings)
 
   /** The plugin's settings form and the user's values, with secrets blanked. */
   const settingsOf = async (plugin: Plugin, did: string) => {
@@ -74,6 +82,7 @@ export function pluginRoutes(deps: PluginRoutesDeps) {
     })
     .put('/:id/tools/:name', async (c) => {
       const name = c.req.param('name')
+      const { tools } = deps.host()
       const tool = tools.get(name)
       if (!tool || tools.owner(name) !== c.req.param('id'))
         return c.json({ error: 'NotFound' }, 404)

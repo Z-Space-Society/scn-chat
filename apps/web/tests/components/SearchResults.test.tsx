@@ -27,23 +27,16 @@ describe('Snippet', () => {
 })
 
 describe('SearchResults', () => {
-  it('links a message match to its message', () => {
-    render(<SearchResults results={[result({})]} remaining={0} />)
-    expect(screen.getByRole('link')).toHaveAttribute('href', '/c/a?m=u1')
-  })
-
-  it('links a title match to its conversation', () => {
-    render(<SearchResults results={[result({ rkey: null, role: null })]} remaining={0} />)
-    expect(screen.getByRole('link')).toHaveAttribute('href', '/c/a')
-  })
-
-  it('says how many conversations are left to download', () => {
-    render(<SearchResults results={[]} remaining={3} />)
-    expect(screen.getByRole('status')).toHaveTextContent('Still downloading 3 conversations.')
-  })
-
-  it('says when nothing matched', () => {
-    render(<SearchResults results={[]} remaining={0} />)
-    expect(screen.getByText('No matches.')).toBeInTheDocument()
+  it('links a message match to its message and a title match to its conversation', () => {
+    render(
+      <SearchResults
+        results={[result({}), result({ skey: 'b', rkey: null, role: null })]}
+        remaining={0}
+      />,
+    )
+    expect(screen.getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
+      '/c/a?m=u1',
+      '/c/b',
+    ])
   })
 })

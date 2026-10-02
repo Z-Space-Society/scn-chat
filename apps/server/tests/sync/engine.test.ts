@@ -24,6 +24,24 @@ async function writeAsClient(
 }
 
 describe('SyncEngine', () => {
+  it('does not sync a user without access', async () => {
+    let allowed = false
+    const h = await spacesHarness({ hasAccess: async () => allowed })
+    const { skey } = await h.chats.createConversation()
+    await h.external.createRecord(
+      h.chats.conversationUri(skey),
+      nsid.message,
+      '3mmmmmmmmmmm1',
+      userMessage('hi') as never,
+    )
+    const changed = collect(h.events, 'message:changed')
+    await h.engine.syncConversation(ALICE, skey)
+    expect(changed).toEqual([])
+    allowed = true
+    await h.engine.syncConversation(ALICE, skey)
+    expect(changed).toHaveLength(1)
+  })
+
   it('turns a direct write noticed through the index into a live message event', async () => {
     const h = await spacesHarness()
     const { skey } = await h.chats.createConversation()

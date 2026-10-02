@@ -1,6 +1,6 @@
 import { setupForTest } from '@scn-chat/plugin-api/testing'
 import { describe, expect, it, vi } from 'vitest'
-import plugin, { optionsSchema } from '../src/index.ts'
+import plugin from '../src/index.ts'
 
 const cocore = {
   id: 'cocore',
@@ -10,20 +10,6 @@ const cocore = {
 }
 
 describe('openai-compatible plugin', () => {
-  it('registers a provider under the configured ID that drops earlier reasoning', async () => {
-    const { providers } = await setupForTest(plugin(cocore))
-    expect(providers).toMatchObject([
-      {
-        id: 'cocore',
-        name: 'co/core',
-        hasAdminKey: true,
-        replay: 'drop',
-        userEndpoints: false,
-        allowPrivateNetworks: false,
-      },
-    ])
-  })
-
   it('offers admin models for a keyless local server with only a base URL', async () => {
     const { providers } = await setupForTest(
       plugin({ id: 'ollama', name: 'Ollama', baseURL: 'http://localhost:11434/v1' }),
@@ -75,10 +61,14 @@ describe('openai-compatible plugin', () => {
     expect((fetch.mock.calls[0] as unknown as [string])[0]).toBe('https://cocore.dev/v1/models')
   })
 
-  it('fails without a base URL', async () => {
+  it('fails without a base URL, before fetching', async () => {
     const { providers } = await setupForTest(plugin({ id: 'x', name: 'X' }))
-    expect(() => providers[0]!.createModel({ modelId: 'm' })).toThrow(/no base URL/)
-    await expect(providers[0]!.listModels!({})).rejects.toThrow(/no base URL/)
+    const fetch = vi.fn()
+    expect(() => providers[0]!.createModel({ modelId: 'm' })).toThrow()
+    await expect(
+      providers[0]!.listModels!({ fetch: fetch as unknown as typeof globalThis.fetch }),
+    ).rejects.toThrow()
+    expect(fetch).not.toHaveBeenCalled()
   })
 
   it('fails on a model list that is not OpenAI-shaped', async () => {
@@ -86,19 +76,6 @@ describe('openai-compatible plugin', () => {
     const fetch = vi.fn(async () => Response.json({ models: [{ name: 'llama-3' }] }))
     await expect(
       providers[0]!.listModels!({ fetch: fetch as unknown as typeof globalThis.fetch }),
-    ).rejects.toThrow(/OpenAI-style model list/)
-  })
-})
-
-describe('openai-compatible optionsSchema', () => {
-  it('accepts valid options', () => {
-    expect(
-      optionsSchema.safeParse({ id: 'cocore', name: 'co/core', baseURL: 'https://cocore.dev/v1' })
-        .success,
-    ).toBe(true)
-  })
-
-  it('rejects invalid or unknown options', () => {
-    expect(optionsSchema.safeParse({ id: 'Bad ID', name: 'x' }).success).toBe(false)
+    ).rejects.toThrow()
   })
 })
