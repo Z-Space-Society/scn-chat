@@ -1,11 +1,18 @@
-import { createRootRoute, HeadContent, Navigate, Outlet, Scripts } from '@tanstack/react-router'
+import type { QueryClient } from '@tanstack/react-query'
+import {
+  createRootRouteWithContext,
+  HeadContent,
+  Navigate,
+  Outlet,
+  Scripts,
+} from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { appName } from '../app-name.ts'
 import { SessionContext, useSessionCheck } from '../session.tsx'
 import styles from '../styles.css?url'
 import theme from '../theme.css?url'
 
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   // The shell is server-rendered with the app name, which the server passes with each request.
   ssr: true,
   staleTime: Number.POSITIVE_INFINITY,

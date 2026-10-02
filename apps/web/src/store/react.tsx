@@ -1,5 +1,6 @@
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createContext, type ReactNode, useContext, useEffect, useState } from 'react'
-import { messageOf } from '../components/useAction.ts'
+import { messageOf } from '../lib/errors.ts'
 import type { StoreClient } from './client.ts'
 import type { Conversation, ConversationSummary } from './core.ts'
 import { isStoreClosed } from './errors.ts'
@@ -8,7 +9,24 @@ import type { SearchResult } from './search.ts'
 
 const StoreContext = createContext<StoreClient | null>(null)
 
+/** Provide the store, and turn its change events into stale queries. */
 export function StoreProvider({ store, children }: { store: StoreClient; children: ReactNode }) {
+  const queryClient = useQueryClient()
+  useEffect(
+    () =>
+      store.onChange((change) => {
+        if (change.type === 'index')
+          void queryClient.invalidateQueries({ queryKey: ['conversations'] })
+        if (change.type === 'conversation')
+          void queryClient.invalidateQueries({
+            queryKey: ['conversation', change.skey],
+            exact: true,
+          })
+        // Any change can add results or finish a download.
+        void queryClient.invalidateQueries({ queryKey: ['search'] })
+      }),
+    [store, queryClient],
+  )
   return <StoreContext.Provider value={store}>{children}</StoreContext.Provider>
 }
 
@@ -25,28 +43,18 @@ export function useStoreState(): HandoverState {
   return state
 }
 
-/** Report store failures, except for the store moving to another tab. */
-function reportUnless(setError: (message: string) => void) {
-  return (err: unknown) => {
-    if (isStoreClosed(err)) return
-    console.error(err)
-    setError(messageOf(err))
-  }
-}
+/** A store failure's message, except for the store moving to another tab. */
+const storeError = (err: unknown) => (!err || isStoreClosed(err) ? null : messageOf(err))
 
 export function useConversations(): { conversations: ConversationSummary[]; error: string | null } {
   const store = useStore()
-  const state = useStoreState()
-  const [conversations, setConversations] = useState<ConversationSummary[]>([])
-  const [error, setError] = useState<string | null>(null)
-  useEffect(() => {
-    if (state !== 'active') return
-    const load = () =>
-      void store.worker.listConversations().then(setConversations, reportUnless(setError))
-    load()
-    return store.onChange((change) => change.type === 'index' && load())
-  }, [store, state])
-  return { conversations, error }
+  const active = useStoreState() === 'active'
+  const { data, error } = useQuery({
+    queryKey: ['conversations'],
+    queryFn: () => store.worker.listConversations(),
+    enabled: active,
+  })
+  return { conversations: data ?? [], error: storeError(error) }
 }
 
 /** A conversation from the local copy, shown at once and refreshed from the PDS when opened. */
@@ -55,23 +63,23 @@ export function useConversation(skey: string): {
   error: string | null
 } {
   const store = useStore()
-  const state = useStoreState()
-  const [conversation, setConversation] = useState<Conversation | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  useEffect(() => {
-    if (state !== 'active') return
-    const report = reportUnless(setError)
-    const load = () => void store.worker.getConversation(skey).then(setConversation, report)
-    load()
-    store.worker
-      .refreshConversation(skey)
-      .then(() => store.worker.reconcileConversation(skey))
-      .catch(report)
-    return store.onChange(
-      (change) => change.type === 'conversation' && change.skey === skey && load(),
-    )
-  }, [store, state, skey])
-  return { conversation, error }
+  const active = useStoreState() === 'active'
+  const local = useQuery({
+    queryKey: ['conversation', skey],
+    queryFn: () => store.worker.getConversation(skey),
+    enabled: active,
+  })
+  // The refresh's changes arrive as store events, which update the local query.
+  const refreshed = useQuery({
+    queryKey: ['conversation', skey, 'refresh'],
+    queryFn: async () => {
+      await store.worker.refreshConversation(skey)
+      await store.worker.reconcileConversation(skey)
+      return true
+    },
+    enabled: active,
+  })
+  return { conversation: local.data ?? null, error: storeError(local.error ?? refreshed.error) }
 }
 
 /** Search the local copy, rerunning as the download and live changes add to it. */
@@ -81,29 +89,18 @@ export function useSearch(query: string): {
   error: string | null
 } {
   const store = useStore()
-  const state = useStoreState()
-  const [found, setFound] = useState<{ results: SearchResult[]; remaining: number }>({
-    results: [],
-    remaining: 0,
+  const active = useStoreState() === 'active'
+  const { data, error } = useQuery({
+    queryKey: ['search', query],
+    queryFn: async () => {
+      const [results, remaining] = await Promise.all([
+        store.worker.search(query),
+        store.worker.remainingDownloads(),
+      ])
+      return { results, remaining }
+    },
+    enabled: active && query.trim() !== '',
+    placeholderData: keepPreviousData,
   })
-  const [error, setError] = useState<string | null>(null)
-  useEffect(() => {
-    if (state !== 'active' || !query.trim()) return
-    let current = true
-    const report = reportUnless(setError)
-    const load = () =>
-      void Promise.all([store.worker.search(query), store.worker.remainingDownloads()]).then(
-        ([results, remaining]) => {
-          if (current) setFound({ results, remaining })
-        },
-        report,
-      )
-    load()
-    const stop = store.onChange(load)
-    return () => {
-      current = false
-      stop()
-    }
-  }, [store, state, query])
-  return { ...found, error }
+  return { results: data?.results ?? [], remaining: data?.remaining ?? 0, error: storeError(error) }
 }

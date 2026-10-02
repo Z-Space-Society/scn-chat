@@ -1,6 +1,8 @@
-import { createContext, useContext, useEffect, useState } from 'react'
-import { ApiError, api, read } from './api.ts'
-import { messageOf } from './components/useAction.ts'
+import { useQuery } from '@tanstack/react-query'
+import { createContext, useContext } from 'react'
+import { ApiError } from './api.ts'
+import { messageOf } from './lib/errors.ts'
+import { meQuery } from './queries.ts'
 
 export type Me = {
   did: string
@@ -26,19 +28,11 @@ export type Session =
 
 /** Ask the server who is signed in. */
 export function useSessionCheck(): Session {
-  const [session, setSession] = useState<Session>({ state: 'loading' })
-  useEffect(() => {
-    read(api.auth.me.$get())
-      .then((me) => setSession({ state: 'signed-in', me: me as Me }))
-      .catch((err: unknown) =>
-        setSession(
-          err instanceof ApiError && err.status === 401
-            ? { state: 'signed-out' }
-            : { state: 'error', message: messageOf(err) },
-        ),
-      )
-  }, [])
-  return session
+  const { data, error } = useQuery(meQuery)
+  if (data) return { state: 'signed-in', me: data as Me }
+  if (error instanceof ApiError && error.status === 401) return { state: 'signed-out' }
+  if (error) return { state: 'error', message: messageOf(error) }
+  return { state: 'loading' }
 }
 
 /** The checked session, once it is known. */
