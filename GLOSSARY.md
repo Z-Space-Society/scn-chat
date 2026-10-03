@@ -17,8 +17,24 @@ A capability a plugin offers that the model can call during a turn.
 _Avoid_: Function, action
 
 **Part view**:
-The component that shows one kind of message part, chosen by the part's type or, for a tool call, by the tool's name.
-_Avoid_: Renderer, widget, tool UI
+The component that shows one kind of message part, chosen by the part's type.
+_Avoid_: Renderer, widget
+
+**Tool view**:
+The component that shows one tool's call and result together, chosen by the tool's name.
+_Avoid_: Tool UI, tool renderer
+
+**Tool status**:
+Where a tool call stands: running, done, error, or incomplete. Derived from the call, its result, and the message.
+_Avoid_: Tool state, phase
+
+**Steps**:
+A run of consecutive reasoning parts and tool calls in one reply, shown folded together.
+_Avoid_: Tool group, chain of thought
+
+**Message action**:
+A control under a message, like copy, edit, regenerate, or stop.
+_Avoid_: Message button, hover action
 
 ## Look
 
