@@ -29,7 +29,10 @@ export type Session = { state: 'signed-out' } | { state: 'signed-in'; me: Me }
  */
 export async function checkSession(queryClient: QueryClient): Promise<Session> {
   try {
-    return { state: 'signed-in', me: (await queryClient.ensureQueryData(meQuery)) as Me }
+    return {
+      state: 'signed-in',
+      me: (await queryClient.query({ ...meQuery, staleTime: 'static' })) as Me,
+    }
   } catch (err) {
     if (err instanceof ApiError && err.status === 401) return { state: 'signed-out' }
     throw new Error(`Could not reach the server: ${messageOf(err)}`, { cause: err })
