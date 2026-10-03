@@ -17,6 +17,8 @@ export type ComposerProps = {
   skey: string
   parent?: string
   models: ModelOption[]
+  /** Whether the server picks a model when none is chosen. Without one, sending waits for a choice. */
+  hasDefault: boolean
   initialModel?: { provider: string; id: string } | null
   initialText?: string
   onSent: (sent: { rkey: string; replyRkey: string | null }) => void
@@ -29,11 +31,62 @@ const blobCid = (part: Record<string, unknown>) =>
 
 export const modelKey = (m: { provider: string; id: string }) => `${m.provider}/${m.id}`
 
+/** What the attach button takes: any type an ingester reads, and images when the model sees them. */
+function acceptedTypes(types: { images: string[]; files: string[] }, model?: ModelOption): string {
+  // With the default model chosen, the server checks vision when the turn starts.
+  const images = !model || model.capabilities.vision
+  return [...(images ? types.images : []), ...types.files].join(',')
+}
+
+/** The model choice. "Default model" is offered only when the server has one to fall back to. */
+function ModelSelect({
+  models,
+  hasDefault,
+  value,
+  onChange,
+}: {
+  models: ModelOption[]
+  hasDefault: boolean
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <select aria-label="Model" value={value} onChange={(e) => onChange(e.target.value)}>
+      {hasDefault ? (
+        <option value="">Default model</option>
+      ) : (
+        <option value="" disabled>
+          Choose a model
+        </option>
+      )}
+      {models.map((m) => (
+        <option key={modelKey(m)} value={modelKey(m)}>
+          {m.name}
+        </option>
+      ))}
+    </select>
+  )
+}
+
+function EffortSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <select aria-label="Effort" value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">Default effort</option>
+      {['none', 'low', 'medium', 'high', 'max'].map((level) => (
+        <option key={level} value={level}>
+          {level}
+        </option>
+      ))}
+    </select>
+  )
+}
+
 /** The message box, with model and effort choice and attachments. */
 export function Composer({
   skey,
   parent,
   models,
+  hasDefault,
   initialModel,
   initialText = '',
   onSent,
@@ -47,11 +100,10 @@ export function Composer({
   // A file this composer refused before uploading it.
   const [refused, setRefused] = useState<string | null>(null)
   const model = models.find((m) => modelKey(m) === modelId)
+  const needsModel = !model && !hasDefault
   const { data: types, error: typesError } = useQuery(attachmentTypesQuery)
   const queryClient = useQueryClient()
-  // With the default model chosen, the server checks vision when the turn starts.
-  const images = !model || model.capabilities.vision
-  const accept = types && [...(images ? types.images : []), ...types.files].join(',')
+  const accept = types && acceptedTypes(types, model)
 
   const upload = async (file: File) => {
     setUploading((n) => n + 1)
@@ -87,7 +139,7 @@ export function Composer({
   }
 
   const send = async () => {
-    if (uploading > 0 || (!text.trim() && attachments.length === 0)) return
+    if (needsModel || uploading > 0 || (!text.trim() && attachments.length === 0)) return
     const parts = [
       ...attachments,
       ...(text.trim() ? [{ $type: `${nsid.defs}#textPart`, text }] : []),
@@ -141,24 +193,13 @@ export function Composer({
         }}
       />
       <div>
-        <select aria-label="Model" value={modelId} onChange={(e) => setModelId(e.target.value)}>
-          <option value="">Default model</option>
-          {models.map((m) => (
-            <option key={modelKey(m)} value={modelKey(m)}>
-              {m.name}
-            </option>
-          ))}
-        </select>
-        {model?.capabilities.reasoning && (
-          <select aria-label="Effort" value={effort} onChange={(e) => setEffort(e.target.value)}>
-            <option value="">Default effort</option>
-            {['none', 'low', 'medium', 'high', 'max'].map((level) => (
-              <option key={level} value={level}>
-                {level}
-              </option>
-            ))}
-          </select>
-        )}
+        <ModelSelect
+          models={models}
+          hasDefault={hasDefault}
+          value={modelId}
+          onChange={setModelId}
+        />
+        {model?.capabilities.reasoning && <EffortSelect value={effort} onChange={setEffort} />}
         <input
           aria-label="Attach"
           type="file"
@@ -170,7 +211,7 @@ export function Composer({
         {attachments.map((part) => (
           <span key={blobCid(part)}>{(part.name as string | undefined) ?? 'Image'}</span>
         ))}
-        <button type="submit" disabled={uploading > 0}>
+        <button type="submit" disabled={needsModel || uploading > 0}>
           Send
         </button>
         {onCancel && (
@@ -179,6 +220,7 @@ export function Composer({
           </button>
         )}
       </div>
+      {needsModel && <p>Choose a model, or set a default model in Settings.</p>}
       {error && <p role="alert">{error}</p>}
     </form>
   )

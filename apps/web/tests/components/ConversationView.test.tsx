@@ -129,7 +129,11 @@ describe('ConversationView', () => {
       reply('u.r0', 'first answer', 'u'),
       reply('u.r1', 'second answer', 'u'),
     ])
-    await renderWith(store, <ConversationView skey="s1" models={[]} />, '/chat/s1?m=u.r0')
+    await renderWith(
+      store,
+      <ConversationView skey="s1" models={[]} hasDefaultModel />,
+      '/chat/s1?m=u.r0',
+    )
     expect(await screen.findByText('first answer')).toBeInTheDocument()
     expect(screen.queryByText('second answer')).toBeNull()
     expect(scrolled).toHaveBeenCalledWith('m-u.r0')
@@ -141,7 +145,7 @@ describe('ConversationView', () => {
       reply('u.r0', 'first answer', 'u'),
       reply('u.r1', 'second answer', 'u'),
     ])
-    await renderWith(store, <ConversationView skey="s1" models={[]} />)
+    await renderWith(store, <ConversationView skey="s1" models={[]} hasDefaultModel />)
     expect(await screen.findByText('second answer')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '‹' }))
     expect(screen.getByText('first answer')).toBeInTheDocument()
@@ -158,7 +162,10 @@ describe('ConversationView', () => {
       reply('u.r0', 'first answer', 'u'),
       reply('u.r1', 'second answer', 'u'),
     ])
-    const { router } = await renderWith(store, <ConversationView skey="s1" models={[]} />)
+    const { router } = await renderWith(
+      store,
+      <ConversationView skey="s1" models={[]} hasDefaultModel />,
+    )
     expect(await screen.findByText('second answer')).toBeInTheDocument()
     const scrollTo = vi.spyOn(window, 'scrollTo')
     await userEvent.click(screen.getByRole('button', { name: '‹' }))
@@ -175,7 +182,7 @@ describe('ConversationView', () => {
       reply('u.r0', 'first answer', 'u'),
       reply('u.r2', 'third answer', 'u'),
     ])
-    await renderWith(store, <ConversationView skey="s1" models={[]} />)
+    await renderWith(store, <ConversationView skey="s1" models={[]} hasDefaultModel />)
     await userEvent.click(await screen.findByRole('button', { name: 'Regenerate' }))
     act(() => store.update([...store.data.messages, reply('u.r1', 'regenerated', 'u')]))
     expect(await screen.findByText('regenerated')).toBeInTheDocument()
@@ -188,7 +195,7 @@ describe('ConversationView', () => {
     )
     stubFetch(fetch)
     const store = fakeStore([user('u', 'original'), reply('u.r0', 'answer', 'u')])
-    await renderWith(store, <ConversationView skey="s1" models={[]} />)
+    await renderWith(store, <ConversationView skey="s1" models={[]} hasDefaultModel />)
     await userEvent.click(await screen.findByRole('button', { name: 'Edit' }))
     const boxes = screen.getAllByPlaceholderText('Message')
     expect(boxes[0]).toHaveValue('original')
@@ -209,7 +216,7 @@ describe('ConversationView', () => {
     const fetch = vi.fn(async () => Response.json({ cancelled: true }))
     stubFetch(fetch)
     const store = fakeStore([user('u', 'q'), reply('u.r0', '', 'u', 'pending')])
-    await renderWith(store, <ConversationView skey="s1" models={[]} />)
+    await renderWith(store, <ConversationView skey="s1" models={[]} hasDefaultModel />)
     await userEvent.click(await screen.findByRole('button', { name: 'Stop' }))
     expect(String((requests(fetch)[0] as [string])[0])).toBe(
       '/api/conversations/s1/messages/u.r0/cancel',
@@ -218,7 +225,7 @@ describe('ConversationView', () => {
 
   it('shows streamed text for a pending reply and refreshes when the stream ends', async () => {
     const store = fakeStore([user('u', 'q'), reply('u.r0', '', 'u', 'pending')])
-    await renderWith(store, <ConversationView skey="s1" models={[]} />)
+    await renderWith(store, <ConversationView skey="s1" models={[]} hasDefaultModel />)
     await vi.waitFor(() => expect(FakeEventSource.instances).toHaveLength(1))
     const source = FakeEventSource.instances[0] as FakeEventSource
     expect(source.url).toBe('/api/conversations/s1/messages/u.r0/stream')
@@ -240,7 +247,7 @@ describe('ConversationView', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     try {
       const store = fakeStore([user('u', 'q'), reply('u.r0', '', 'u', 'pending')])
-      await renderWith(store, <ConversationView skey="s1" models={[]} />)
+      await renderWith(store, <ConversationView skey="s1" models={[]} hasDefaultModel />)
       await vi.waitFor(() => expect(FakeEventSource.instances).toHaveLength(1))
       store.worker.refreshConversation.mockClear()
       act(() => (FakeEventSource.instances[0] as FakeEventSource).onerror?.())
@@ -249,6 +256,24 @@ describe('ConversationView', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe('ConversationView default model', () => {
+  it('asks for a model when nothing on the branch or in settings names one', async () => {
+    stubFetch()
+    const store = fakeStore([user('u', 'question'), reply('u.r0', 'answer', 'u')])
+    await renderWith(store, <ConversationView skey="s1" models={[]} hasDefaultModel={false} />)
+    expect(await screen.findByRole('button', { name: 'Send' })).toBeDisabled()
+  })
+
+  it('falls back to the model of an earlier reply on the branch', async () => {
+    stubFetch()
+    const answered = reply('u.r0', 'answer', 'u')
+    answered.record.model = { provider: 'p', id: 'smart' }
+    const store = fakeStore([user('u', 'question'), answered])
+    await renderWith(store, <ConversationView skey="s1" models={[]} hasDefaultModel={false} />)
+    expect(await screen.findByRole('button', { name: 'Send' })).toBeEnabled()
   })
 })
 
@@ -262,7 +287,7 @@ describe('ConversationView errors', () => {
       { provider: 'router', id: 'anthropic/claude', name: 'Claude', capabilities: caps },
     ]
     const store = fakeStore([user('u', 'question'), reply('u.r0', 'answer', 'u')])
-    await renderWith(store, <ConversationView skey="s1" models={models} />)
+    await renderWith(store, <ConversationView skey="s1" models={models} hasDefaultModel />)
     await userEvent.selectOptions(
       await screen.findByRole('combobox', { name: 'Regenerate with' }),
       'router/anthropic/claude',
@@ -284,7 +309,7 @@ describe('ConversationView errors', () => {
       ),
     )
     const store = fakeStore([user('u', 'question')])
-    await renderWith(store, <ConversationView skey="s1" models={[]} />)
+    await renderWith(store, <ConversationView skey="s1" models={[]} hasDefaultModel />)
     await userEvent.click(await screen.findByRole('button', { name: 'Rename' }))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('The title is too long')
@@ -293,7 +318,7 @@ describe('ConversationView errors', () => {
   it('says so when Stop has nothing to stop', async () => {
     stubFetch(vi.fn(async () => Response.json({ cancelled: false })))
     const store = fakeStore([user('u', 'q'), reply('u.r0', '', 'u', 'pending')])
-    await renderWith(store, <ConversationView skey="s1" models={[]} />)
+    await renderWith(store, <ConversationView skey="s1" models={[]} hasDefaultModel />)
     await userEvent.click(await screen.findByRole('button', { name: 'Stop' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('cannot be stopped')
   })
@@ -303,7 +328,7 @@ describe('ConversationView errors', () => {
     store.worker.refreshConversation.mockRejectedValue(
       new Error('GET returned 404: Space not found'),
     )
-    await renderWith(store, <ConversationView skey="s1" models={[]} />)
+    await renderWith(store, <ConversationView skey="s1" models={[]} hasDefaultModel />)
     expect(await screen.findByRole('alert')).toHaveTextContent('Space not found')
   })
 
@@ -311,7 +336,7 @@ describe('ConversationView errors', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     try {
       const store = fakeStore([user('u', 'q'), reply('u.r0', '', 'u', 'pending')])
-      await renderWith(store, <ConversationView skey="s1" models={[]} />)
+      await renderWith(store, <ConversationView skey="s1" models={[]} hasDefaultModel />)
       await vi.waitFor(() => expect(FakeEventSource.instances).toHaveLength(1))
       act(() => (FakeEventSource.instances[0] as FakeEventSource).onerror?.())
       await act(async () => store.update([user('u', 'q'), reply('u.r0', 'done', 'u')]))
@@ -330,7 +355,7 @@ describe('ConversationView streams', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     try {
       const store = fakeStore([user('u', 'q'), reply('u.r0', '', 'u', 'pending')])
-      await renderWith(store, <ConversationView skey="s1" models={[]} />)
+      await renderWith(store, <ConversationView skey="s1" models={[]} hasDefaultModel />)
       await vi.waitFor(() => expect(FakeEventSource.instances).toHaveLength(1))
       await act(async () =>
         (FakeEventSource.instances[0] as FakeEventSource).emit('status', { status: 'unknown' }),

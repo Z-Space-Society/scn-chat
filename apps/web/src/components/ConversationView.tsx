@@ -13,7 +13,16 @@ import { useBranch } from './useBranch.ts'
 import { useReplyStream } from './useReplyStream.ts'
 import { useStickToBottom } from './useStickToBottom.ts'
 
-export function ConversationView({ skey, models }: { skey: string; models: ModelOption[] }) {
+export function ConversationView({
+  skey,
+  models,
+  hasDefaultModel,
+}: {
+  skey: string
+  models: ModelOption[]
+  /** Whether the user's preferences or the admin set a default model. */
+  hasDefaultModel: boolean
+}) {
   const me = useMe()
   const queryClient = useQueryClient()
   const { conversation, error: loadError } = useConversation(skey)
@@ -44,6 +53,17 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
     document.getElementById(`m-${focus}`)?.scrollIntoView({ block: 'center' })
   }, [focus, focusShown])
   const leaf = branch.at(-1)?.message
+  /** Whether the server has a model for a message under `parent` that names none, as in chat-turns. */
+  const hasDefaultUnder = (parent: string | undefined) => {
+    if (hasDefaultModel) return true
+    const end = branch.findIndex((step) => step.message.rkey === parent)
+    return branch
+      .slice(0, end + 1)
+      .some(
+        ({ message: { record } }) =>
+          record.role === 'assistant' && record.status === 'complete' && record.model,
+      )
+  }
   const blobUrl = blobUrlFor(`/api/conversations/${skey}`)
   const title = (conversation?.info?.title as string | undefined) ?? 'New chat'
 
@@ -179,6 +199,7 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
           skey={skey}
           parent={editing.parent}
           models={models}
+          hasDefault={hasDefaultUnder(editing.parent)}
           initialText={editing.text}
           onSent={(sent) => {
             pin()
@@ -194,6 +215,7 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
           skey={skey}
           parent={leaf?.rkey}
           models={models}
+          hasDefault={hasDefaultUnder(leaf?.rkey)}
           onSent={(sent) => {
             pin()
             if (sent.replyRkey) follow(sent.replyRkey)

@@ -25,7 +25,7 @@ const models: ModelOption[] = [
 
 describe('Composer', () => {
   it('shows the effort select only for reasoning models', async () => {
-    await renderAt(<Composer skey="s" models={models} onSent={() => {}} />)
+    await renderAt(<Composer skey="s" models={models} hasDefault onSent={() => {}} />)
     expect(screen.queryByLabelText('Effort')).toBeNull()
     await userEvent.selectOptions(screen.getByLabelText('Model'), 'p/smart')
     expect(screen.getByLabelText('Effort')).toBeInTheDocument()
@@ -34,7 +34,7 @@ describe('Composer', () => {
   })
 
   it('stops offering images for models without vision', async () => {
-    await renderAt(<Composer skey="s" models={models} onSent={() => {}} />)
+    await renderAt(<Composer skey="s" models={models} hasDefault onSent={() => {}} />)
     await vi.waitFor(() =>
       expect(screen.getByLabelText('Attach')).toHaveAttribute(
         'accept',
@@ -50,7 +50,7 @@ describe('Composer', () => {
       Response.json({ rkey: 'u1', replyRkey: 'u1.r0', status: 'claimed' }, { status: 201 }),
     )
     const onSent = vi.fn()
-    await renderAt(<Composer skey="s1" parent="p0" models={models} onSent={onSent} />)
+    await renderAt(<Composer skey="s1" parent="p0" models={models} hasDefault onSent={onSent} />)
     await userEvent.selectOptions(screen.getByLabelText('Model'), 'p/smart')
     await userEvent.selectOptions(screen.getByLabelText('Effort'), 'high')
     await userEvent.type(screen.getByPlaceholderText('Message'), 'Hello{Enter}')
@@ -70,7 +70,7 @@ describe('Composer', () => {
         ? new Promise<Response>(() => {})
         : Promise.resolve(Response.json({ rkey: 'u1', replyRkey: null, status: null })),
     )
-    await renderAt(<Composer skey="s1" models={models} onSent={() => {}} />)
+    await renderAt(<Composer skey="s1" models={models} hasDefault onSent={() => {}} />)
     const file = new File(['%PDF'], 'report.pdf', { type: 'application/pdf' })
     await userEvent.upload(screen.getByLabelText('Attach'), file)
     await userEvent.type(screen.getByPlaceholderText('Message'), 'Read this{Enter}')
@@ -79,9 +79,28 @@ describe('Composer', () => {
 
   it('adds a newline on Shift+Enter instead of sending', async () => {
     const fetch = stubFetch()
-    await renderAt(<Composer skey="s" models={models} onSent={() => {}} />)
+    await renderAt(<Composer skey="s" models={models} hasDefault onSent={() => {}} />)
     await userEvent.type(screen.getByPlaceholderText('Message'), 'a{Shift>}{Enter}{/Shift}b')
     expect(screen.getByPlaceholderText('Message')).toHaveValue('a\nb')
     expect(requests(fetch)).toEqual([])
+  })
+
+  it('asks for a model before sending when there is no default', async () => {
+    const fetch = stubFetch(async () =>
+      Response.json({ rkey: 'u1', replyRkey: 'u1.r0', status: 'claimed' }, { status: 201 }),
+    )
+    await renderAt(<Composer skey="s1" models={models} hasDefault={false} onSent={() => {}} />)
+    expect(screen.queryByRole('option', { name: 'Default model' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
+    await userEvent.type(screen.getByPlaceholderText('Message'), 'Hello{Enter}')
+    expect(requests(fetch)).toEqual([])
+    await userEvent.selectOptions(screen.getByLabelText('Model'), 'p/basic')
+    expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled()
+    await userEvent.type(screen.getByPlaceholderText('Message'), '{Enter}')
+    await vi.waitFor(() => expect(requests(fetch)).toHaveLength(1))
+    const init = (requests(fetch)[0] as [string, RequestInit])[1]
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      generation: { model: { provider: 'p', id: 'basic' } },
+    })
   })
 })
