@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createContext, type ReactNode, useContext, useEffect, useState } from 'react'
+import { createContext, type ReactNode, useContext, useEffect, useSyncExternalStore } from 'react'
 import { messageOf } from '../lib/errors.ts'
 import { MeContext } from '../session.tsx'
 import { openStore, type StoreClient } from './client.ts'
@@ -54,9 +54,7 @@ export function useStore(): StoreClient {
 
 export function useStoreState(): HandoverState {
   const store = useStore()
-  const [state, setState] = useState(store.state())
-  useEffect(() => store.onState(setState), [store])
-  return state
+  return useSyncExternalStore(store.onState, store.state)
 }
 
 /** A store failure's message, except for the store moving to another tab. */
