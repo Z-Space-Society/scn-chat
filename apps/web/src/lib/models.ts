@@ -13,6 +13,8 @@ export const effortLevels = ['none', 'low', 'medium', 'high', 'max'] satisfies E
 /** A model's reference, without the catalog's name and capabilities. */
 export const modelRef = ({ provider, id }: ModelRef): ModelRef => ({ provider, id })
 
+export const sameModel = (a: ModelRef, b: ModelRef) => a.provider === b.provider && a.id === b.id
+
 /** The model of the nearest completed reply on the branch, at or above `parent`. */
 export function inheritedModel(
   branch: { message: BranchMessage }[],

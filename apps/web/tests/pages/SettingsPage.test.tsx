@@ -115,6 +115,27 @@ describe('SettingsPage preferences', () => {
 })
 
 describe('SettingsPage preferences fields', () => {
+  it('shows and keeps a default model the list no longer offers', async () => {
+    const fetch = stubServer({
+      '/api/preferences': () =>
+        Response.json({ preferences: { defaultModel: { provider: 'gone', id: 'old' } } }),
+    })
+    await renderPage()
+    expect(await screen.findByLabelText('Default model')).toHaveDisplayValue(
+      'Unavailable: gone/old',
+    )
+    await userEvent.type(screen.getByLabelText('Custom instructions'), 'Metric units')
+    await userEvent.click(screen.getAllByRole('button', { name: 'Save' })[0] as HTMLElement)
+    await vi.waitFor(() => expect(screen.getByText('Saved.')).toBeInTheDocument())
+    const put = fetch.mock.calls.find(
+      ([url, init]) => url === '/api/preferences' && init?.method === 'PUT',
+    )
+    expect(JSON.parse(String(put?.[1]?.body))).toMatchObject({
+      defaultModel: { provider: 'gone', id: 'old' },
+      customInstructions: 'Metric units',
+    })
+  })
+
   it('starts from the stored preferences and keeps the ones the form does not show', async () => {
     const fetch = stubServer({
       '/api/preferences': () =>

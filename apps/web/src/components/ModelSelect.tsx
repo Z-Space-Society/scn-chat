@@ -1,6 +1,6 @@
 import type { ModelRef } from '@scn-chat/lexicons'
 import type { ComponentProps } from 'react'
-import { effortLevels, type ModelOption } from '../lib/models.ts'
+import { effortLevels, type ModelOption, sameModel } from '../lib/models.ts'
 
 type SelectProps = Omit<ComponentProps<'select'>, 'value' | 'onChange'>
 
@@ -8,7 +8,7 @@ const keyOf = (m: ModelRef) => `${m.provider}/${m.id}`
 
 /**
  * A choice among the models on offer, or none. The children are the option for no model, with
- * value "".
+ * value "". A chosen model that is not on offer shows as unavailable.
  */
 export function ModelSelect({
   models,
@@ -21,6 +21,7 @@ export function ModelSelect({
   value: ModelRef | null
   onChange: (model: ModelOption | null) => void
 }) {
+  const offered = !value || models.some((m) => sameModel(m, value))
   return (
     <select
       {...props}
@@ -28,6 +29,11 @@ export function ModelSelect({
       onChange={(e) => onChange(models.find((m) => keyOf(m) === e.target.value) ?? null)}
     >
       {children}
+      {!offered && (
+        <option value={keyOf(value)} disabled>
+          Unavailable: {keyOf(value)}
+        </option>
+      )}
       {models.map((m) => (
         <option key={keyOf(m)} value={keyOf(m)}>
           {m.name}
