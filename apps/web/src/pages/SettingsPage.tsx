@@ -1,12 +1,15 @@
+import type { ModelRef } from '@scn-chat/lexicons'
 import { useForm, useStore as useFormStore } from '@tanstack/react-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { type ReactNode, useState } from 'react'
 import { api, json, read } from '../api.ts'
-import { type ModelOption, modelKey } from '../components/Composer.tsx'
+import { EffortSelect, ModelSelect } from '../components/ModelSelect.tsx'
 import { SchemaFields } from '../components/SchemaFields.tsx'
+import { useModels } from '../components/useModels.ts'
 import { useSignOut } from '../components/useSignOut.ts'
 import { lastError, messageOf } from '../lib/errors.ts'
+import { type ModelOption, modelRef } from '../lib/models.ts'
 import { browserTimeZone } from '../lib/time-zone.ts'
 import {
   accountQuery,
@@ -17,7 +20,6 @@ import {
   providersQuery,
 } from '../queries.ts'
 import { useOpenStore } from '../store/react.tsx'
-import { useModels } from './ChatPage.tsx'
 
 type Json = Record<string, unknown>
 
@@ -36,10 +38,9 @@ function PreferencesForm({ initial, models }: { initial: Json; models: ModelOpti
       read(api.chats.preferences.$put({}, json({ ...record, timezone: browserTimeZone() }))),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: preferencesQuery.queryKey }),
   })
-  const stored = initial.defaultModel as { provider: string; id: string } | undefined
   const form = useForm({
     defaultValues: {
-      defaultModel: stored ? modelKey(stored) : '',
+      defaultModel: (initial.defaultModel as ModelRef | undefined) ?? null,
       defaultEffort: String(initial.defaultEffort ?? ''),
       customInstructions: String(initial.customInstructions ?? ''),
       generateTitles: initial.generateTitles !== false,
@@ -47,11 +48,10 @@ function PreferencesForm({ initial, models }: { initial: Json; models: ModelOpti
     onSubmit: ({ value }) => {
       // Fields this form does not edit, like the time zone, keep their stored values.
       const { $type: _type, updatedAt: _updated, ...record } = initial
-      const picked = models.find((m) => modelKey(m) === value.defaultModel)
       // The mutation holds any error for display, so submitting never rejects.
       save.mutate({
         ...record,
-        defaultModel: picked ? { provider: picked.provider, id: picked.id } : undefined,
+        defaultModel: value.defaultModel ? modelRef(value.defaultModel) : undefined,
         defaultEffort: value.defaultEffort || undefined,
         customInstructions: value.customInstructions || undefined,
         generateTitles: value.generateTitles,
@@ -68,29 +68,26 @@ function PreferencesForm({ initial, models }: { initial: Json; models: ModelOpti
       <h2>Preferences</h2>
       <form.Field name="defaultModel">
         {(field) => (
-          <label>
+          <label htmlFor={field.name}>
             Default model
-            <select value={field.state.value} onChange={(e) => field.handleChange(e.target.value)}>
+            <ModelSelect
+              id={field.name}
+              models={models}
+              value={field.state.value}
+              onChange={field.handleChange}
+            >
               <option value="">App default</option>
-              {models.map((m) => (
-                <option key={modelKey(m)} value={modelKey(m)}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
+            </ModelSelect>
           </label>
         )}
       </form.Field>
       <form.Field name="defaultEffort">
         {(field) => (
-          <label>
+          <label htmlFor={field.name}>
             Default effort
-            <select value={field.state.value} onChange={(e) => field.handleChange(e.target.value)}>
+            <EffortSelect id={field.name} value={field.state.value} onChange={field.handleChange}>
               <option value="">Provider default</option>
-              {['none', 'low', 'medium', 'high', 'max'].map((level) => (
-                <option key={level}>{level}</option>
-              ))}
-            </select>
+            </EffortSelect>
           </label>
         )}
       </form.Field>

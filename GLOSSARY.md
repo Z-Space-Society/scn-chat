@@ -36,6 +36,12 @@ _Avoid_: Tool group, chain of thought
 A control under a message, like copy, edit, regenerate, or stop.
 _Avoid_: Message button, hover action
 
+## Turns
+
+**Fallback model**:
+The model a turn runs with when it names none: the model of the nearest completed reply up the branch, else the user's default model, else the admin's.
+_Avoid_: Default model (that is the user's preference), inherited model
+
 ## Look
 
 **Theme**:

@@ -3,31 +3,26 @@ import { useEffect, useRef, useState } from 'react'
 import { api, json, read } from '../api.ts'
 import { blobUrlFor } from '../lib/blob-url.ts'
 import { lastError } from '../lib/errors.ts'
+import { inheritedModel, type ModelOption, modelRef } from '../lib/models.ts'
 import { useMe } from '../session.tsx'
 import { messageText } from '../store/core.ts'
 import { conversationRefreshKey, useConversation } from '../store/react.tsx'
-import { Composer, type ModelOption, modelKey } from './Composer.tsx'
+import { Composer } from './Composer.tsx'
 import { MessageView } from './MessageView.tsx'
+import { ModelSelect } from './ModelSelect.tsx'
 import { ShareControl } from './ShareControl.tsx'
 import { useBranch } from './useBranch.ts'
+import { useModels } from './useModels.ts'
 import { useReplyStream } from './useReplyStream.ts'
 import { useStickToBottom } from './useStickToBottom.ts'
 
-export function ConversationView({
-  skey,
-  models,
-  hasDefaultModel,
-}: {
-  skey: string
-  models: ModelOption[]
-  /** Whether the user's preferences or the admin set a default model. */
-  hasDefaultModel: boolean
-}) {
+export function ConversationView({ skey }: { skey: string }) {
   const me = useMe()
   const queryClient = useQueryClient()
   const { conversation, error: loadError } = useConversation(skey)
   const [editing, setEditing] = useState<{ parent?: string; text: string } | null>(null)
-  const [regenModel, setRegenModel] = useState('')
+  const { models } = useModels()
+  const [regenModel, setRegenModel] = useState<ModelOption | null>(null)
   const [renaming, setRenaming] = useState<string | null>(null)
 
   const messages = conversation?.messages ?? []
@@ -53,23 +48,11 @@ export function ConversationView({
     document.getElementById(`m-${focus}`)?.scrollIntoView({ block: 'center' })
   }, [focus, focusShown])
   const leaf = branch.at(-1)?.message
-  /** Whether the server has a model for a message under `parent` that names none, as in chat-turns. */
-  const hasDefaultUnder = (parent: string | undefined) => {
-    if (hasDefaultModel) return true
-    const end = branch.findIndex((step) => step.message.rkey === parent)
-    return branch
-      .slice(0, end + 1)
-      .some(
-        ({ message: { record } }) =>
-          record.role === 'assistant' && record.status === 'complete' && record.model,
-      )
-  }
   const blobUrl = blobUrlFor(`/api/conversations/${skey}`)
   const title = (conversation?.info?.title as string | undefined) ?? 'New chat'
 
   const regenerate = async (userRkey: string) => {
-    const model = models.find((m) => modelKey(m) === regenModel)
-    const body = model ? { model: { provider: model.provider, id: model.id } } : {}
+    const body = regenModel ? { model: modelRef(regenModel) } : {}
     const result = await read(
       api.turns.conversations[':skey'].messages[':rkey'].regenerate.$post(
         { param: { skey, rkey: userRkey } },
@@ -160,18 +143,14 @@ export function ConversationView({
             </button>
           ) : (
             <>
-              <select
+              <ModelSelect
                 aria-label="Regenerate with"
+                models={models}
                 value={regenModel}
-                onChange={(e) => setRegenModel(e.target.value)}
+                onChange={setRegenModel}
               >
                 <option value="">Same model</option>
-                {models.map((m) => (
-                  <option key={modelKey(m)} value={modelKey(m)}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
+              </ModelSelect>
               <button type="button" onClick={() => regenerating.mutate(parent)}>
                 Regenerate
               </button>
@@ -198,8 +177,7 @@ export function ConversationView({
           key="edit"
           skey={skey}
           parent={editing.parent}
-          models={models}
-          hasDefault={hasDefaultUnder(editing.parent)}
+          inherited={inheritedModel(branch, editing.parent)}
           initialText={editing.text}
           onSent={(sent) => {
             pin()
@@ -214,8 +192,7 @@ export function ConversationView({
           key="reply"
           skey={skey}
           parent={leaf?.rkey}
-          models={models}
-          hasDefault={hasDefaultUnder(leaf?.rkey)}
+          inherited={inheritedModel(branch, leaf?.rkey)}
           onSent={(sent) => {
             pin()
             if (sent.replyRkey) follow(sent.replyRkey)

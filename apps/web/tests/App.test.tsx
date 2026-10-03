@@ -50,14 +50,15 @@ afterEach(() => {
 function signedIn() {
   const me = { did: 'did:plc:alice', handle: 'alice', storageMode: 'local', roles: ['user'] }
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
-  stubFetch(async (url: string) => {
-    if (url === '/api/me') return Response.json({ ...me, backgroundSync: true })
-    if (url === '/api/models') return Response.json({ models: [], defaultModel: null })
-    if (url === '/api/preferences') return Response.json({ preferences: { timezone } })
-    if (url === '/api/account')
-      return Response.json({ backgroundSync: true, allowUserOptOut: false })
-    return Response.json({})
-  })
+  stubFetch(
+    async (url: string) => {
+      if (url === '/api/me') return Response.json({ ...me, backgroundSync: true })
+      if (url === '/api/account')
+        return Response.json({ backgroundSync: true, allowUserOptOut: false })
+      return Response.json({})
+    },
+    { '/api/preferences': { preferences: { timezone } } },
+  )
 }
 
 /** Render the whole app at a path. */

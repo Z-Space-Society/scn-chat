@@ -1,24 +1,20 @@
+import type { ModelRef } from '@scn-chat/lexicons'
 import { nsid } from '@scn-chat/lexicons/nsid'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, json, read } from '../api.ts'
 import { lastError, messageOf } from '../lib/errors.ts'
+import { type ModelOption, modelRef } from '../lib/models.ts'
 import { attachmentTypesQuery } from '../queries.ts'
 import { conversationRefreshKey } from '../store/react.tsx'
-
-export type ModelOption = {
-  provider: string
-  id: string
-  name: string
-  capabilities: { vision: boolean; reasoning: boolean; tools: boolean }
-}
+import { EffortSelect, ModelSelect } from './ModelSelect.tsx'
+import { useModels } from './useModels.ts'
 
 export type ComposerProps = {
   skey: string
   parent?: string
-  models: ModelOption[]
-  /** Whether the server picks a model when none is chosen. Without one, sending waits for a choice. */
-  hasDefault: boolean
+  /** The model of the nearest completed reply above `parent`, which the server falls back to. */
+  inherited?: ModelRef | null
   initialText?: string
   onSent: (sent: { rkey: string; replyRkey: string | null }) => void
   onCancel?: () => void
@@ -28,77 +24,32 @@ export type ComposerProps = {
 const blobCid = (part: Record<string, unknown>) =>
   ((part.image ?? part.file) as { ref: { $link: string } }).ref.$link
 
-export const modelKey = (m: { provider: string; id: string }) => `${m.provider}/${m.id}`
-
 /** What the attach button takes: any type an ingester reads, and images when the model sees them. */
-function acceptedTypes(types: { images: string[]; files: string[] }, model?: ModelOption): string {
-  // With the default model chosen, the server checks vision when the turn starts.
+function acceptedTypes(types: { images: string[]; files: string[] }, model: ModelOption | null) {
+  // With the fallback model, the server checks vision when the turn starts.
   const images = !model || model.capabilities.vision
   return [...(images ? types.images : []), ...types.files].join(',')
-}
-
-/** The model choice. "Default model" is offered only when the server has one to fall back to. */
-function ModelSelect({
-  models,
-  hasDefault,
-  value,
-  onChange,
-}: {
-  models: ModelOption[]
-  hasDefault: boolean
-  value: string
-  onChange: (value: string) => void
-}) {
-  return (
-    <select aria-label="Model" value={value} onChange={(e) => onChange(e.target.value)}>
-      {hasDefault ? (
-        <option value="">Default model</option>
-      ) : (
-        <option value="" disabled>
-          Choose a model
-        </option>
-      )}
-      {models.map((m) => (
-        <option key={modelKey(m)} value={modelKey(m)}>
-          {m.name}
-        </option>
-      ))}
-    </select>
-  )
-}
-
-function EffortSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  return (
-    <select aria-label="Effort" value={value} onChange={(e) => onChange(e.target.value)}>
-      <option value="">Default effort</option>
-      {['none', 'low', 'medium', 'high', 'max'].map((level) => (
-        <option key={level} value={level}>
-          {level}
-        </option>
-      ))}
-    </select>
-  )
 }
 
 /** The message box, with model and effort choice and attachments. */
 export function Composer({
   skey,
   parent,
-  models,
-  hasDefault,
+  inherited = null,
   initialText = '',
   onSent,
   onCancel,
 }: ComposerProps) {
   const [text, setText] = useState(initialText)
-  const [modelId, setModelId] = useState('')
+  const { models, fallback } = useModels(inherited)
+  const [model, setModel] = useState<ModelOption | null>(null)
   const [effort, setEffort] = useState('')
   const [attachments, setAttachments] = useState<Record<string, unknown>[]>([])
   const [uploading, setUploading] = useState(0)
   // A file this composer refused before uploading it.
   const [refused, setRefused] = useState<string | null>(null)
-  const model = models.find((m) => modelKey(m) === modelId)
-  const needsModel = !model && !hasDefault
+  // Without a fallback model, the server has nothing to run the turn with.
+  const needsModel = !model && fallback === null
   const { data: types, error: typesError } = useQuery(attachmentTypesQuery)
   const queryClient = useQueryClient()
   const accept = types && acceptedTypes(types, model)
@@ -143,7 +94,7 @@ export function Composer({
       ...(text.trim() ? [{ $type: `${nsid.defs}#textPart`, text }] : []),
     ]
     const generation = {
-      ...(model ? { model: { provider: model.provider, id: model.id } } : {}),
+      ...(model ? { model: modelRef(model) } : {}),
       ...(effort ? { effort } : {}),
     }
     const sent = await read(
@@ -191,13 +142,20 @@ export function Composer({
         }}
       />
       <div>
-        <ModelSelect
-          models={models}
-          hasDefault={hasDefault}
-          value={modelId}
-          onChange={setModelId}
-        />
-        {model?.capabilities.reasoning && <EffortSelect value={effort} onChange={setEffort} />}
+        <ModelSelect aria-label="Model" models={models} value={model} onChange={setModel}>
+          {fallback === null ? (
+            <option value="" disabled>
+              Choose a model
+            </option>
+          ) : (
+            <option value="">Default model</option>
+          )}
+        </ModelSelect>
+        {model?.capabilities.reasoning && (
+          <EffortSelect aria-label="Effort" value={effort} onChange={setEffort}>
+            <option value="">Default effort</option>
+          </EffortSelect>
+        )}
         <input
           aria-label="Attach"
           type="file"
