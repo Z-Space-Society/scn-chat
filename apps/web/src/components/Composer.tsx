@@ -19,7 +19,6 @@ export type ComposerProps = {
   models: ModelOption[]
   /** Whether the server picks a model when none is chosen. Without one, sending waits for a choice. */
   hasDefault: boolean
-  initialModel?: { provider: string; id: string } | null
   initialText?: string
   onSent: (sent: { rkey: string; replyRkey: string | null }) => void
   onCancel?: () => void
@@ -87,13 +86,12 @@ export function Composer({
   parent,
   models,
   hasDefault,
-  initialModel,
   initialText = '',
   onSent,
   onCancel,
 }: ComposerProps) {
   const [text, setText] = useState(initialText)
-  const [modelId, setModelId] = useState(initialModel ? modelKey(initialModel) : '')
+  const [modelId, setModelId] = useState('')
   const [effort, setEffort] = useState('')
   const [attachments, setAttachments] = useState<Record<string, unknown>[]>([])
   const [uploading, setUploading] = useState(0)
