@@ -31,7 +31,7 @@ These are settled. Raise a concern before working against any of them.
 - The browser keeps its own local copy of the user's chats in SQLite compiled to WebAssembly, for the chat list, the open conversation, and search. That copy lives on the user's device, not on the server.
 - BYO API keys are stored encrypted in the app database, never in records.
 - Providers, tools, file ingesters, and turn hooks are plugins. Web search, fetch, and image generation are plugins, not core.
-- The browser runs only code built into the fork. A plugin's web half is registered in the fork's source, and what end users can add is a theme, which is design tokens only.
+- The web app has no plugin system. Programmers extend it by changing the code in their fork, and nothing third-party loads in the browser at runtime.
 - Messages in the browser come from the local copy. No chat client library holds them, and the stream is an overlay until the record arrives.
 - The project is meant to be forked. Code refers to lexicon NSIDs only through one generated module, and app name, URLs, OAuth metadata, and admin models come from `config.yml`.
 
@@ -43,7 +43,7 @@ Prefer existing libraries over writing our own, especially the official `@atprot
 
 Admins configure plugins, global models, roles, and every other public setting in `config.yml`, with secrets in `.env`. Roles gate which admin models a user may use. There is no admin UI yet.
 
-The web UI stays plain, with minimal code and styling. Its look will come from a theme, which a designer will build, so core components carry as few visual decisions as possible.
+The web UI stays plain, with minimal code and styling, and easy for a forker to change. Its look will come from a theme of design tokens, which a designer will build, so core components carry as few visual decisions as possible.
 
 ## Lexicons
 

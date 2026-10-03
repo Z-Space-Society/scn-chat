@@ -6,7 +6,7 @@ The web UI is a deliberately plain React app built on TanStack Start. It exposes
 
 ## Motivation
 
-The project is meant to be forked and customized, and a designer will build the production look. Both go through themes and the extension seams in later phases, not through this spec. This UI exists to prove the features work end to end, and to give forkers and the designer working components and data flow to restyle, extend, or override. Every visual choice made here is one a theme might have to undo, so this UI makes as few as possible.
+The project is meant to be forked and changed in code, and a designer will build the production look. Making the code easy to extend and the styling are later phases, not this spec. This UI exists to prove the features work end to end, and to give forkers and the designer working components and data flow to restyle, extend, or override. Every visual choice made here is one a theme might have to undo, so this UI makes as few as possible.
 
 The first build used Vite and React with `wouter` and hand-written data hooks. It was rebuilt on TanStack Start, Router, Query, and Form to give forkers a conventional, type-safe base, with the same behavior and acceptance criteria. See ADR 0001 for how Start sits inside Hono, and ADR 0003 for why no chat client library holds messages.
 
@@ -20,7 +20,7 @@ The first build used Vite and React with `wouter` and hand-written data hooks. I
 - TanStack Query for all data, both server calls and chats read from the browser store through its worker API.
 - TanStack Form for the settings and sharing forms, including the plugin form built from schemas.
 - `EventSource` for reply streams, read through Query's `streamedQuery`, which Query still exports as `experimental_streamedQuery`.
-- One small stylesheet carried over from the first build, for layout and a stand-in look. No component library or CSS framework yet. The styling stack is the themes spec's decision.
+- One small stylesheet carried over from the first build, for layout and a stand-in look. No component library or CSS framework yet. The styling stack is the styling spec's decision.
 
 ### Serving
 
@@ -83,8 +83,8 @@ While the reader is at the bottom of the conversation, it stays scrolled to the 
 
 ## Scope Boundaries
 
-- No visual design, theming, dark mode beyond the stand-in stylesheet, icons, or animations. Those belong to the themes spec.
-- No Renderers, Slots, or plugin settings panels. Those belong to the web plugins spec.
+- No visual design, theming, dark mode beyond the stand-in stylesheet, icons, or animations. Those belong to the styling spec.
+- No table of part views or forker guide. Those belong to the extending spec.
 - No server rendering of chat or shared routes.
 - No code highlighting.
 - No PWA, offline support, or notifications.

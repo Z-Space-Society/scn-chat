@@ -28,8 +28,8 @@ The overview at the end of this file lists every spec and whether it is active, 
 
 The later phases of the web rebuild, each spec written before its phase starts:
 
-- web-plugins: Renderers, Slots, and settings panels from plugins' web halves, registered in a fork. Lifts the plugins spec's "no UI" boundary.
-- themes: the styling stack, the design token contract, a default theme, and Overrides, then themes users pick or import, saved in their settings.
+- extending: the web app made easy to change in a fork, with small components, a table of part views keyed by part type and tool name, and a guide in `docs/extending.md`.
+- styling: the styling stack, a theme of design tokens for light and dark, and the designer's default look.
 
 ### Completed
 
