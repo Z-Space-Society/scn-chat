@@ -129,6 +129,7 @@ export function Composer({
       }}
     >
       <textarea
+        aria-label="Message"
         value={text}
         placeholder="Message"
         onChange={(e) => setText(e.target.value)}
