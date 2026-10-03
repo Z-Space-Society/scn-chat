@@ -148,7 +148,7 @@ describe('ConversationView', () => {
     expect(screen.queryByText('second answer')).toBeNull()
   })
 
-  it('names the chosen branch in the URL without scrolling to it', async () => {
+  it('names the chosen branch in the URL without scrolling', async () => {
     const scrolled = vi.fn()
     Element.prototype.scrollIntoView = function (this: Element) {
       scrolled(this.id)
@@ -160,9 +160,12 @@ describe('ConversationView', () => {
     ])
     const { router } = await renderWith(store, <ConversationView skey="s1" models={[]} />)
     expect(await screen.findByText('second answer')).toBeInTheDocument()
+    const scrollTo = vi.spyOn(window, 'scrollTo')
     await userEvent.click(screen.getByRole('button', { name: '‹' }))
     expect(router.state.location.search).toEqual({ m: 'u.r0' })
     expect(scrolled).not.toHaveBeenCalled()
+    // Nor does the router reset the page to the top.
+    expect(scrollTo).not.toHaveBeenCalled()
   })
 
   it('regenerates and selects the new reply, even when it is not the newest sibling', async () => {

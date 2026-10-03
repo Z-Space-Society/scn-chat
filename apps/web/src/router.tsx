@@ -20,7 +20,9 @@ export function getRouter({ history }: { history?: RouterHistory } = {}) {
     routeTree,
     history,
     context: { queryClient },
-    scrollRestoration: true,
+    // A conversation places its own scroll, at the bottom or on the message in `m`. The router's
+    // reset to the top would run after it and undo it, so the router leaves conversations alone.
+    scrollRestoration: ({ location }) => !location.pathname.startsWith('/chat/'),
   })
   setupRouterSsrQueryIntegration({ router, queryClient })
   return router

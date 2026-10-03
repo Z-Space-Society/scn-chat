@@ -3,10 +3,33 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { getRouter } from '../src/router.tsx'
+import { stubFetch } from './helpers/fetch.ts'
 
 const { openStore, store } = vi.hoisted(() => {
+  const question = {
+    rkey: 'u',
+    author: 'did:plc:alice',
+    cid: 'c-u',
+    record: {
+      role: 'user',
+      content: {
+        $type: 'network.sharedcomputer.chat.defs#plainContent',
+        parts: [{ $type: 'network.sharedcomputer.chat.defs#textPart', text: 'Which tiles?' }],
+      },
+      createdAt: '2026-09-26T00:00:00Z',
+    },
+  }
   const store = {
-    worker: { listConversations: async () => [] },
+    worker: {
+      listConversations: async () => [],
+      getConversation: async (skey: string) => ({ skey, info: {}, messages: [question] }),
+      refreshConversation: async () => {},
+      reconcileConversation: async () => {},
+      search: async () => [
+        { skey: 's1', title: 'Tiles', rkey: 'u', role: 'user', snippet: 'tiles', time: '' },
+      ],
+      remainingDownloads: async () => 0,
+    },
     state: () => 'active',
     onState: () => () => {},
     onChange: () => () => {},
@@ -27,17 +50,14 @@ afterEach(() => {
 function signedIn() {
   const me = { did: 'did:plc:alice', handle: 'alice', storageMode: 'local', roles: ['user'] }
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async (url: string) => {
-      if (url === '/api/me') return Response.json({ ...me, backgroundSync: true })
-      if (url === '/api/models') return Response.json({ models: [], defaultModel: null })
-      if (url === '/api/preferences') return Response.json({ preferences: { timezone } })
-      if (url === '/api/account')
-        return Response.json({ backgroundSync: true, allowUserOptOut: false })
-      return Response.json({})
-    }),
-  )
+  stubFetch(async (url: string) => {
+    if (url === '/api/me') return Response.json({ ...me, backgroundSync: true })
+    if (url === '/api/models') return Response.json({ models: [], defaultModel: null })
+    if (url === '/api/preferences') return Response.json({ preferences: { timezone } })
+    if (url === '/api/account')
+      return Response.json({ backgroundSync: true, allowUserOptOut: false })
+    return Response.json({})
+  })
 }
 
 /** Render the whole app at a path. */
@@ -96,5 +116,21 @@ describe('App', () => {
     await userEvent.click(rebuild)
     await vi.waitFor(() => expect(store.deleteLocalCopy).toHaveBeenCalled())
     expect(openStore).toHaveBeenCalledWith('did:plc:alice')
+  })
+
+  it('keeps a conversation opened from a search result on the matching message', async () => {
+    signedIn()
+    const scrolled = vi.fn()
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled(this.id)
+    }
+    const router = renderApp('/chat/s1?q=tiles')
+    expect(await screen.findByText('Which tiles?')).toBeInTheDocument()
+    const scrollTo = vi.spyOn(window, 'scrollTo')
+    await userEvent.click(await screen.findByRole('link', { name: /Tiles/ }))
+    expect(router.state.location.search).toMatchObject({ m: 'u' })
+    await vi.waitFor(() => expect(scrolled).toHaveBeenCalledWith('m-u'))
+    // The router's reset to the top would otherwise run after it.
+    expect(scrollTo).not.toHaveBeenCalled()
   })
 })
