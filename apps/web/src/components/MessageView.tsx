@@ -131,6 +131,58 @@ function PartView({
   }
 }
 
+/** Arrows to step between alternative versions of a message. */
+function SiblingPicker({ siblings }: { siblings: NonNullable<MessageViewProps['siblings']> }) {
+  return (
+    <span className="siblings">
+      <button
+        type="button"
+        disabled={siblings.index === 0}
+        onClick={() => siblings.onPick(siblings.index - 1)}
+      >
+        ‹
+      </button>
+      {siblings.index + 1} / {siblings.count}
+      <button
+        type="button"
+        disabled={siblings.index === siblings.count - 1}
+        onClick={() => siblings.onPick(siblings.index + 1)}
+      >
+        ›
+      </button>
+    </span>
+  )
+}
+
+/** The reasoning and text streamed so far, shown until the reply's record arrives. */
+function StreamingReply({ streaming }: { streaming: StreamedReply }) {
+  return (
+    <>
+      {streaming.reasoning && (
+        <details>
+          <summary>Reasoning</summary>
+          <p className="text">{streaming.reasoning}</p>
+        </details>
+      )}
+      {streaming.text && <Markdown text={streaming.text} />}
+    </>
+  )
+}
+
+/** A line for a message that is still thinking, failed, or was stopped. */
+function Status({ record, streaming }: Pick<MessageViewProps, 'record' | 'streaming'>) {
+  switch (record.status) {
+    case 'pending':
+      return streaming === undefined ? <p>Thinking...</p> : null
+    case 'error':
+      return <p role="alert">Error{record.error ? `: ${record.error as string}` : ''}</p>
+    case 'cancelled':
+      return <p>Stopped.</p>
+    default:
+      return null
+  }
+}
+
 /** One message: its parts, its state, sibling controls, and actions. */
 export function MessageView({
   id,
@@ -149,39 +201,13 @@ export function MessageView({
     <article id={id} className={`message ${record.role as string}`}>
       <header>
         <strong>{record.role === 'user' ? 'You' : 'Assistant'}</strong>
-        {siblings && siblings.count > 1 && (
-          <span className="siblings">
-            <button
-              type="button"
-              disabled={siblings.index === 0}
-              onClick={() => siblings.onPick(siblings.index - 1)}
-            >
-              ‹
-            </button>
-            {siblings.index + 1} / {siblings.count}
-            <button
-              type="button"
-              disabled={siblings.index === siblings.count - 1}
-              onClick={() => siblings.onPick(siblings.index + 1)}
-            >
-              ›
-            </button>
-          </span>
-        )}
+        {siblings && siblings.count > 1 && <SiblingPicker siblings={siblings} />}
       </header>
       {shown.map(({ part, key }) => (
         <PartView key={key} part={part} role={record.role} blobUrl={blobUrl} />
       ))}
       {streaming !== undefined && record.status === 'pending' && (
-        <>
-          {streaming.reasoning && (
-            <details>
-              <summary>Reasoning</summary>
-              <p className="text">{streaming.reasoning}</p>
-            </details>
-          )}
-          {streaming.text && <Markdown text={streaming.text} />}
-        </>
+        <StreamingReply streaming={streaming} />
       )}
       {sources.length > 0 && (
         <ul>
@@ -193,11 +219,7 @@ export function MessageView({
         </ul>
       )}
       {encrypted && <p>This message is encrypted.</p>}
-      {record.status === 'pending' && streaming === undefined && <p>Thinking...</p>}
-      {record.status === 'error' && (
-        <p role="alert">Error{record.error ? `: ${record.error as string}` : ''}</p>
-      )}
-      {record.status === 'cancelled' && <p>Stopped.</p>}
+      <Status record={record} streaming={streaming} />
       {actions && <footer>{actions}</footer>}
     </article>
   )
