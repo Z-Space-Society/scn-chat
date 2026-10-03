@@ -28,7 +28,7 @@ The overview at the end of this file lists every spec and whether it is active, 
 
 The later phases of the web rebuild, each spec written before its phase starts:
 
-- extending: the web app made easy to change in a fork, with small components, a table of part views keyed by part type and tool name, and a guide in `docs/extending.md`.
+- [[extending]]: the web app made easy to change in a fork, with tables of part and tool views, tool status and steps, message actions as a list with Copy, a Markdown seam with code block copy, smaller components, and a guide in `docs/extending.md`.
 - styling: the styling stack, a theme of design tokens for light and dark, and the designer's default look.
 
 ### Completed
