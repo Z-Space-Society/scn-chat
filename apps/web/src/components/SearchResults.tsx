@@ -4,16 +4,15 @@ import { MATCH_END, MATCH_START, type SearchResult } from '../store/search.ts'
 /** A snippet with its marked matches as highlight elements. */
 export function Snippet({ text }: { text: string }) {
   const pieces = text.split(new RegExp(`(${MATCH_START}[^${MATCH_END}]*${MATCH_END})`))
+  // Each piece is keyed by where it starts in the text, which no other piece shares.
+  let start = 0
   return (
     <>
-      {pieces.map((piece, i) =>
-        piece.startsWith(MATCH_START) ? (
-          // biome-ignore lint/suspicious/noArrayIndexKey: pieces keep their order
-          <mark key={i}>{piece.slice(1, -1)}</mark>
-        ) : (
-          piece
-        ),
-      )}
+      {pieces.map((piece) => {
+        const at = start
+        start += piece.length
+        return piece.startsWith(MATCH_START) ? <mark key={at}>{piece.slice(1, -1)}</mark> : piece
+      })}
     </>
   )
 }

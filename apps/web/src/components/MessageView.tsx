@@ -18,6 +18,23 @@ export type MessageViewProps = {
 
 const kind = (part: Part) => part.$type.split('#')[1]
 
+/** What tells a part apart within its message, since only tool parts carry an id. */
+function partIdentity(part: Part): string {
+  const blob = (part.image ?? part.file) as Blob | undefined
+  return `${part.$type}:${(part.callId ?? blob?.ref.$link ?? part.text ?? '') as string}`
+}
+
+/** A message's parts with stable keys, counting repeats of the same identity. */
+function withKeys(parts: Part[]): { part: Part; key: string }[] {
+  const seen = new Map<string, number>()
+  return parts.map((part) => {
+    const identity = partIdentity(part)
+    const count = seen.get(identity) ?? 0
+    seen.set(identity, count + 1)
+    return { part, key: `${identity}#${count}` }
+  })
+}
+
 /** An image from model output, loaded only on click, since loading it could leak the chat through its URL. */
 function MarkdownImage({ src, alt }: { src: string; alt?: string }) {
   const [shown, setShown] = useState(false)
@@ -127,6 +144,7 @@ export function MessageView({
   const encrypted = content.$type.endsWith('#encryptedContent')
   const parts = content.parts ?? []
   const sources = parts.filter((part) => kind(part) === 'sourcePart')
+  const shown = withKeys(parts.filter((part) => kind(part) !== 'sourcePart'))
   return (
     <article id={id} className={`message ${record.role as string}`}>
       <header>
@@ -151,12 +169,9 @@ export function MessageView({
           </span>
         )}
       </header>
-      {parts
-        .filter((part) => kind(part) !== 'sourcePart')
-        .map((part, i) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: a record's parts keep their order
-          <PartView key={i} part={part} role={record.role} blobUrl={blobUrl} />
-        ))}
+      {shown.map(({ part, key }) => (
+        <PartView key={key} part={part} role={record.role} blobUrl={blobUrl} />
+      ))}
       {streaming !== undefined && record.status === 'pending' && (
         <>
           {streaming.reasoning && (
