@@ -1,9 +1,10 @@
 import { nsid } from '@scn-chat/lexicons/nsid'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, json, read } from '../api.ts'
 import { lastError, messageOf } from '../lib/errors.ts'
 import { attachmentTypesQuery } from '../queries.ts'
+import { conversationRefreshKey } from '../store/react.tsx'
 
 export type ModelOption = {
   provider: string
@@ -47,6 +48,7 @@ export function Composer({
   const [refused, setRefused] = useState<string | null>(null)
   const model = models.find((m) => modelKey(m) === modelId)
   const { data: types, error: typesError } = useQuery(attachmentTypesQuery)
+  const queryClient = useQueryClient()
   // With the default model chosen, the server checks vision when the turn starts.
   const images = !model || model.capabilities.vision
   const accept = types && [...(images ? types.images : []), ...types.files].join(',')
@@ -104,7 +106,11 @@ export function Composer({
     setAttachments([])
     onSent({ rkey: sent.rkey, replyRkey: sent.replyRkey })
   }
-  const sending = useMutation({ mutationFn: send })
+  const sending = useMutation({
+    mutationFn: send,
+    // Refreshing picks up the sent message without waiting for the stream.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: conversationRefreshKey(skey) }),
+  })
   const submit = () => {
     setRefused(null)
     sending.mutate()

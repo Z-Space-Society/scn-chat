@@ -1,11 +1,11 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { api, json, read } from '../api.ts'
 import { blobUrlFor } from '../lib/blob-url.ts'
 import { lastError } from '../lib/errors.ts'
 import { useMe } from '../session.tsx'
 import { messageText } from '../store/core.ts'
-import { useConversation, useStore } from '../store/react.tsx'
+import { conversationRefreshKey, useConversation } from '../store/react.tsx'
 import { Composer, type ModelOption, modelKey } from './Composer.tsx'
 import { MessageView } from './MessageView.tsx'
 import { ShareControl } from './ShareControl.tsx'
@@ -15,14 +15,15 @@ import { useStickToBottom } from './useStickToBottom.ts'
 
 export function ConversationView({ skey, models }: { skey: string; models: ModelOption[] }) {
   const me = useMe()
-  const store = useStore()
+  const queryClient = useQueryClient()
   const { conversation, error: loadError } = useConversation(skey)
   const [editing, setEditing] = useState<{ parent?: string; text: string } | null>(null)
   const [regenModel, setRegenModel] = useState('')
   const [renaming, setRenaming] = useState<string | null>(null)
 
   const messages = conversation?.messages ?? []
-  const refresh = () => store.worker.refreshConversation(skey)
+  /** Refresh the conversation from the PDS after a change to it. */
+  const refresh = () => queryClient.invalidateQueries({ queryKey: conversationRefreshKey(skey) })
   const pending = messages.filter((m) => m.record.status === 'pending').map((m) => m.rkey)
   const { streams, follow } = useReplyStream(skey, pending)
 
@@ -58,7 +59,6 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
     if (!result.replyRkey) throw new Error(`Regenerating was ${result.status}`)
     choose(result.replyRkey)
     follow(result.replyRkey)
-    await refresh()
   }
 
   const stop = async (replyRkey: string) => {
@@ -73,27 +73,24 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
 
   const sync = async () => {
     await read(api.chats.conversations[':skey'].sync.$post({ param: { skey } }))
-    await refresh()
   }
 
   const rename = async (value: string) => {
     await read(api.chats.conversations[':skey'].$patch({ param: { skey } }, json({ title: value })))
     setRenaming(null)
-    await refresh()
   }
 
-  const renamingTitle = useMutation({ mutationFn: rename })
-  const syncing = useMutation({ mutationFn: sync })
-  const stopping = useMutation({ mutationFn: stop })
+  const renamingTitle = useMutation({ mutationFn: rename, onSuccess: refresh })
+  const syncing = useMutation({ mutationFn: sync, onSuccess: refresh })
+  const stopping = useMutation({ mutationFn: stop, onSuccess: refresh })
   const regenerating = useMutation({
     mutationFn: (parent: string | null) => {
       if (!parent) throw new Error('This reply has no user message to regenerate')
       return regenerate(parent)
     },
+    onSuccess: refresh,
   })
-  // Refreshing after a send picks up the sent message without waiting for the stream.
-  const refreshing = useMutation({ mutationFn: refresh })
-  const error = lastError(renamingTitle, syncing, stopping, regenerating, refreshing)
+  const error = lastError(renamingTitle, syncing, stopping, regenerating)
 
   return (
     <section className="conversation" ref={section}>
@@ -188,7 +185,6 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
             setEditing(null)
             choose(sent.rkey)
             if (sent.replyRkey) follow(sent.replyRkey)
-            refreshing.mutate()
           }}
           onCancel={() => setEditing(null)}
         />
@@ -201,7 +197,6 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
           onSent={(sent) => {
             pin()
             if (sent.replyRkey) follow(sent.replyRkey)
-            refreshing.mutate()
           }}
         />
       )}
