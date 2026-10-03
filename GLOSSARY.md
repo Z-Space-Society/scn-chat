@@ -4,28 +4,24 @@ An AI assistant chat app where each conversation lives in a permissioned space o
 
 ## Extension
 
+**Fork**:
+A copy of this project that a programmer changes and runs as their own app. The web app is extended by changing a fork's code.
+_Avoid_: Web plugin, extension, customization
+
 **Plugin**:
-A package that extends the server, the web app, or both, with one ID across both halves. Admins enable server halves in the config; forkers build web halves into their fork.
-_Avoid_: Extension, add-on, UI plugin, web extension
+A package an admin installs and lists in the config to add to the server, such as a model provider, a tool, or a turn hook.
+_Avoid_: Extension, add-on
 
 **Tool**:
 A capability a plugin offers that the model can call during a turn.
 _Avoid_: Function, action
 
-**Renderer**:
-A component from a plugin's web half that shows one kind of message part, such as a particular tool's call and result, in place of the default display.
-_Avoid_: Tool UI, widget
-
-**Slot**:
-A fixed place in the web app, such as the composer or a message's actions, where plugins' web halves add controls.
-_Avoid_: Extension point, hook (hooks are server-side)
-
-**Override**:
-A forker's replacement for one of the web app's core components. Overrides are code in a fork, never part of a theme.
-_Avoid_: Custom component, theme component
+**Part view**:
+The component that shows one kind of message part, chosen by the part's type or, for a tool call, by the tool's name.
+_Avoid_: Renderer, widget, tool UI
 
 ## Look
 
 **Theme**:
-A set of design tokens that sets the look of the web app. A fork ships themes, and users can import their own. A theme is data, never code.
+The design tokens, for light and dark, that set the web app's look. Forkers and the designer edit it, and users only get the system's light or dark mode.
 _Avoid_: Skin, style, appearance

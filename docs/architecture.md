@@ -61,7 +61,7 @@ See [specs/auth.md](../specs/auth.md).
 The [ADRs](adr/) record the choices a reader might otherwise undo:
 
 - [0001](adr/0001-tanstack-start-inside-hono.md): TanStack Start runs inside the Hono server.
-- [0002](adr/0002-no-third-party-code-in-the-browser.md): No third-party code runs in the browser at runtime. Themes are design tokens only.
+- [0002](adr/0002-web-app-extended-in-code.md): The web app is extended in code, not through plugins.
 - [0003](adr/0003-no-chat-library-owns-messages.md): No AI chat library owns message state in the browser.
 
 ## Plugins
