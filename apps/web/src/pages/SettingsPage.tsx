@@ -332,28 +332,35 @@ export function PluginSettings() {
   const reload = () => queryClient.invalidateQueries({ queryKey: pluginSettingsQuery.queryKey })
   const plugins = query.data as PluginEntry[] | undefined
   const save = useMutation({
+    // Each write is its own row on the server, so they all go at once.
     mutationFn: async ({ plugins: edited }: PluginValues) => {
+      const writes: Promise<unknown>[] = []
       for (const [i, plugin] of (plugins ?? []).entries()) {
         const draft = edited[i]
         if (plugin.schema && !plugin.error) {
-          await read(
-            api.plugins[':id'].settings.$put(
-              { param: { id: plugin.id } },
-              json(draft?.values ?? plugin.values),
+          writes.push(
+            read(
+              api.plugins[':id'].settings.$put(
+                { param: { id: plugin.id } },
+                json(draft?.values ?? plugin.values),
+              ),
             ),
           )
         }
         for (const [j, tool] of plugin.tools.entries()) {
           const enabled = draft?.tools[j] ?? tool.enabled
           if (!tool.userToggle || enabled === tool.enabled) continue
-          await read(
-            api.plugins[':id'].tools[':name'].$put(
-              { param: { id: plugin.id, name: tool.name } },
-              json({ enabled }),
+          writes.push(
+            read(
+              api.plugins[':id'].tools[':name'].$put(
+                { param: { id: plugin.id, name: tool.name } },
+                json({ enabled }),
+              ),
             ),
           )
         }
       }
+      await Promise.all(writes)
     },
     onSuccess: reload,
   })

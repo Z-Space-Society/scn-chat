@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from 'react'
+import { memo, type ReactNode, useState } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { StreamedReply } from '../lib/reply-stream.ts'
@@ -56,16 +56,21 @@ const markdownComponents: Components = {
     typeof src === 'string' && src ? <MarkdownImage src={src} alt={alt} /> : null,
 }
 
-/** Assistant text as Markdown. Raw HTML in it is not rendered. */
-function Markdown({ text }: { text: string }) {
+const remarkPlugins = [remarkGfm]
+
+/**
+ * Assistant text as Markdown. Raw HTML in it is not rendered. Memoized, since a streaming reply
+ * rerenders the whole conversation on every delta, and parsing is the costly part.
+ */
+const Markdown = memo(function Markdown({ text }: { text: string }) {
   return (
     <div className="markdown">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+      <ReactMarkdown remarkPlugins={remarkPlugins} components={markdownComponents}>
         {text}
       </ReactMarkdown>
     </div>
   )
-}
+})
 
 function Text({ text, role }: { text: string; role: unknown }) {
   return role === 'assistant' ? <Markdown text={text} /> : <p className="text">{text}</p>

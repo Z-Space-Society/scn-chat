@@ -8,7 +8,8 @@ import { type BranchMessage, choicesFor, currentBranch } from '../lib/branch.ts'
  * or sharing the URL keeps the branch. Picking leaves the scroll where it is.
  */
 export function useBranch(messages: BranchMessage[]) {
-  const focus = useSearch({ strict: false }).m
+  // Only `m`, so typing a search, which changes `q`, doesn't rerender the conversation.
+  const focus = useSearch({ strict: false, select: (search) => search.m })
   const navigate = useNavigate()
   const pick = useCallback(
     (rkey: string) =>

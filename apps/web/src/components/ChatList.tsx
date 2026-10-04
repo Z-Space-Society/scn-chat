@@ -12,7 +12,7 @@ export function ChatList() {
   const { conversations, error: loadError } = useConversations()
   const navigate = useNavigate()
   // The box starts from the URL's `q`, and the settled search goes back into it.
-  const { q } = useSearch({ strict: false })
+  const q = useSearch({ strict: false, select: (search) => search.q })
   const [query, setQuery] = useState(q ?? '')
   const typed = useDebounced(query, 150)
   useEffect(() => {

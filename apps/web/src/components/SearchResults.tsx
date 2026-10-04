@@ -1,9 +1,11 @@
 import { Link } from '@tanstack/react-router'
 import { MATCH_END, MATCH_START, type SearchResult } from '../store/search.ts'
 
+const MATCH = new RegExp(`(${MATCH_START}[^${MATCH_END}]*${MATCH_END})`)
+
 /** A snippet with its marked matches as highlight elements. */
 export function Snippet({ text }: { text: string }) {
-  const pieces = text.split(new RegExp(`(${MATCH_START}[^${MATCH_END}]*${MATCH_END})`))
+  const pieces = text.split(MATCH)
   // Each piece is keyed by where it starts in the text, which no other piece shares.
   let start = 0
   return (
