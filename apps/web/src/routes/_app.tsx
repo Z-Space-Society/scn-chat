@@ -21,8 +21,8 @@ function SignedIn() {
     syncTimeZone(queryClient).catch((err: unknown) =>
       console.warn('Could not save the time zone', err),
     )
-    return onUnauthorized(() => endSession(me.did))
-  }, [me.did, queryClient])
+  }, [queryClient])
+  useEffect(() => onUnauthorized(() => endSession(me.did)), [me.did])
   return (
     <MeContext.Provider value={me}>
       <Outlet />
