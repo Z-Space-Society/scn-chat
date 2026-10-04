@@ -23,6 +23,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: 'stylesheet', href: styles },
       { rel: 'stylesheet', href: theme },
     ],
+    // In development, React Scan outlines components as they render. It hooks into React through
+    // the devtools global before React loads, so it runs as a plain script ahead of the app.
+    scripts: import.meta.env.DEV ? [{ src: '/node_modules/react-scan/dist/auto.global.js' }] : [],
   }),
   shellComponent: Shell,
   errorComponent: ({ error }) => <p role="alert">{messageOf(error)}</p>,
