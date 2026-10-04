@@ -142,6 +142,7 @@ function SiblingPicker({ siblings }: { siblings: NonNullable<MessageViewProps['s
     <span className="siblings">
       <button
         type="button"
+        aria-label="Previous version"
         disabled={siblings.index === 0}
         onClick={() => siblings.onPick(siblings.index - 1)}
       >
@@ -150,6 +151,7 @@ function SiblingPicker({ siblings }: { siblings: NonNullable<MessageViewProps['s
       {siblings.index + 1} / {siblings.count}
       <button
         type="button"
+        aria-label="Next version"
         disabled={siblings.index === siblings.count - 1}
         onClick={() => siblings.onPick(siblings.index + 1)}
       >
