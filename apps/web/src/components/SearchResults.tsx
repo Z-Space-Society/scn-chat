@@ -5,16 +5,18 @@ const MATCH = new RegExp(`(${MATCH_START}[^${MATCH_END}]*${MATCH_END})`)
 
 /** A snippet with its marked matches as highlight elements. */
 export function Snippet({ text }: { text: string }) {
-  const pieces = text.split(MATCH)
   // Each piece is keyed by where it starts in the text, which no other piece shares.
+  const pieces: { piece: string; start: number }[] = []
   let start = 0
+  for (const piece of text.split(MATCH)) {
+    pieces.push({ piece, start })
+    start += piece.length
+  }
   return (
     <>
-      {pieces.map((piece) => {
-        const at = start
-        start += piece.length
-        return piece.startsWith(MATCH_START) ? <mark key={at}>{piece.slice(1, -1)}</mark> : piece
-      })}
+      {pieces.map(({ piece, start }) =>
+        piece.startsWith(MATCH_START) ? <mark key={start}>{piece.slice(1, -1)}</mark> : piece,
+      )}
     </>
   )
 }

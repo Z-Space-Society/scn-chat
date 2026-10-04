@@ -31,6 +31,23 @@ function acceptedTypes(types: { images: string[]; files: string[] }, model: Mode
   return [...(images ? types.images : []), ...types.files].join(',')
 }
 
+/** Upload a file the composer will attach, returning its attachment part. */
+const uploadAttachment = (file: File) =>
+  read(
+    api.blobs.attachments.$post(
+      {},
+      {
+        init: {
+          body: file,
+          headers: {
+            'content-type': file.type || 'application/octet-stream',
+            'x-filename': encodeURIComponent(file.name),
+          },
+        },
+      },
+    ),
+  )
+
 /** The message box, with model and effort choice and attachments. */
 export function Composer({
   skey,
@@ -56,30 +73,13 @@ export function Composer({
   const queryClient = useQueryClient()
   const accept = types && acceptedTypes(types, model)
 
-  const upload = async (file: File) => {
-    setUploading((n) => n + 1)
-    try {
-      const { part } = await read(
-        api.blobs.attachments.$post(
-          {},
-          {
-            init: {
-              body: file,
-              headers: {
-                'content-type': file.type || 'application/octet-stream',
-                'x-filename': encodeURIComponent(file.name),
-              },
-            },
-          },
-        ),
-      )
-      setAttachments((current) => [...current, part])
-    } finally {
-      setUploading((n) => n - 1)
-    }
-  }
-
-  const uploadingFile = useMutation({ mutationFn: upload })
+  // Several uploads can run at once, so each one counts while it runs.
+  const uploadingFile = useMutation({
+    mutationFn: uploadAttachment,
+    onMutate: () => setUploading((n) => n + 1),
+    onSuccess: ({ part }) => setAttachments((current) => [...current, part]),
+    onSettled: () => setUploading((n) => n - 1),
+  })
   const attach = (files: FileList | null) => {
     setRefused(null)
     for (const file of Array.from(files ?? [])) {
