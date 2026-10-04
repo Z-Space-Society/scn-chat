@@ -80,6 +80,8 @@ Each pending reply in the open conversation has a stream query, `['reply-stream'
 
 The conversation starts each stream but follows it only to learn when it ends. A pending message shows its stream through `ReplyStream`, which `ConversationView` puts in `MessageView`'s `pending` slot. `ReplyStream` reads the stream query with fetching disabled, so it never starts a stream itself, and each delta re-renders that reply alone rather than the conversation. A message with nothing in the slot, as on the shared page, shows "Thinking..." while pending.
 
+Each message on the branch is a `ConversationMessage`, memoized, since React Compiler doesn't memoize the items of a list. Its props stay equal across renders unless the message changed: the message object, which the query's structural sharing keeps for an unchanged message, its sibling position as numbers and the neighbors' rkeys, and one `Operations` object for its actions. So sending a message, a stream ending, and a final record arriving re-render only the messages they add or change.
+
 If a reply is still pending after its stream ends, because the stream dropped or the status says another server runs it, a poll query refreshes the conversation from the PDS with a backoff from two seconds to thirty until the reply leaves `pending`. The first poll comes one interval after the stream ends, and polling continues while the tab is in the background.
 
 While the reader is at the bottom of the conversation, it stays scrolled to the bottom as replies stream and messages arrive. Once they scroll up it stops following, until they scroll back down or send a message, which always scrolls to the bottom. A conversation opened on a linked message scrolls to that message instead. Switching siblings does not scroll.
