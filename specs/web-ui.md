@@ -15,6 +15,7 @@ The first build used Vite and React with `wouter` and hand-written data hooks. I
 ### Stack
 
 - TanStack Start with React. Routes render on the server unless they opt out, and the chat and shared routes do.
+- React Compiler, through `@rolldown/plugin-babel` and plugin-react's `reactCompilerPreset`, memoizes components and hooks in the browser build and in tests. Server rendering runs uncompiled, since it renders once.
 - TanStack Router with file-based routes in `src/routes/`. Each route validates its search params.
 - `hono/client`'s `hc` with the server's exported route types, for a typed API client with no hand-written API types. There are no Start server functions: Hono is the only API.
 - TanStack Query for all data, both server calls and chats read from the browser store through its worker API.
