@@ -20,7 +20,9 @@ export function ConversationView({ skey }: { skey: string }) {
   const me = useMe()
   const queryClient = useQueryClient()
   const { conversation, error: loadError } = useConversation(skey)
-  const [editing, setEditing] = useState<{ parent?: string; text: string } | null>(null)
+  const [editing, setEditing] = useState<{ rkey: string; parent?: string; text: string } | null>(
+    null,
+  )
   const { models } = useModels()
   const [regenModel, setRegenModel] = useState<ModelOption | null>(null)
   const [renaming, setRenaming] = useState<string | null>(null)
@@ -133,7 +135,13 @@ export function ConversationView({ skey }: { skey: string }) {
           record.role === 'user' ? (
             <button
               type="button"
-              onClick={() => setEditing({ parent: parent ?? undefined, text: messageText(record) })}
+              onClick={() =>
+                setEditing({
+                  rkey: message.rkey,
+                  parent: parent ?? undefined,
+                  text: messageText(record),
+                })
+              }
             >
               Edit
             </button>
@@ -174,7 +182,8 @@ export function ConversationView({ skey }: { skey: string }) {
       })}
       {editing ? (
         <Composer
-          key="edit"
+          // Editing another message starts the composer over from that message.
+          key={`edit-${editing.rkey}`}
           skey={skey}
           parent={editing.parent}
           inherited={inheritedModel(branch, editing.parent)}

@@ -205,6 +205,33 @@ describe('ConversationView', () => {
     expect(await screen.findByText('new answer')).toBeInTheDocument()
   })
 
+  it('starts the edit over when Edit is clicked on another message', async () => {
+    const fetch = vi.fn(async () =>
+      Response.json({ rkey: 'v2', replyRkey: 'v2.r0', status: 'claimed' }, { status: 201 }),
+    )
+    stubFetch(fetch)
+    const store = fakeStore([
+      user('u', 'first'),
+      reply('u.r0', 'answer', 'u'),
+      user('v', 'second', 'u.r0'),
+      reply('v.r0', 'another answer', 'v'),
+    ])
+    await renderWith(store, <ConversationView skey="s1" />)
+    await screen.findByText('another answer')
+    const [editFirst, editSecond] = screen.getAllByRole('button', { name: 'Edit' })
+    await userEvent.click(editFirst as HTMLElement)
+    expect(screen.getByPlaceholderText('Message')).toHaveValue('first')
+    await userEvent.click(editSecond as HTMLElement)
+    expect(screen.getByPlaceholderText('Message')).toHaveValue('second')
+    await userEvent.type(screen.getByPlaceholderText('Message'), '!{Enter}')
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalled())
+    const init = (writes(fetch)[0] as [string, RequestInit])[1]
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      parent: 'u.r0',
+      parts: [{ text: 'second!' }],
+    })
+  })
+
   it('stops a generating reply', async () => {
     const fetch = vi.fn(async () => Response.json({ cancelled: true }))
     stubFetch(fetch)
