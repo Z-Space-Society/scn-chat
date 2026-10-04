@@ -10,6 +10,7 @@ import { conversationRefreshKey, useConversation } from '../store/react.tsx'
 import { Composer } from './Composer.tsx'
 import { MessageView } from './MessageView.tsx'
 import { ModelSelect } from './ModelSelect.tsx'
+import { ReplyStream } from './ReplyStream.tsx'
 import { ShareControl } from './ShareControl.tsx'
 import { useBranch } from './useBranch.ts'
 import { useModels } from './useModels.ts'
@@ -31,7 +32,7 @@ export function ConversationView({ skey }: { skey: string }) {
   /** Refresh the conversation from the PDS after a change to it. */
   const refresh = () => queryClient.invalidateQueries({ queryKey: conversationRefreshKey(skey) })
   const pending = messages.filter((m) => m.record.status === 'pending').map((m) => m.rkey)
-  const { streams, follow } = useReplyStream(skey, pending)
+  const { follow } = useReplyStream(skey, pending)
 
   const { focus, branch, pick } = useBranch(messages)
   const section = useRef<HTMLElement>(null)
@@ -169,7 +170,7 @@ export function ConversationView({ skey }: { skey: string }) {
             key={message.rkey}
             id={`m-${message.rkey}`}
             record={record}
-            streaming={streams[message.rkey]}
+            pending={<ReplyStream skey={skey} rkey={message.rkey} />}
             blobUrl={blobUrl}
             siblings={{
               index,

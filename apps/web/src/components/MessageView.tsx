@@ -1,4 +1,4 @@
-import { memo, type ReactNode, useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { StreamedReply } from '../lib/reply-stream.ts'
@@ -9,8 +9,8 @@ type Blob = { ref: { $link: string }; mimeType: string }
 export type MessageViewProps = {
   id?: string
   record: Record<string, unknown>
-  /** Text and reasoning streamed so far for a pending reply. */
-  streaming?: StreamedReply
+  /** What a pending reply shows in place of "Thinking...", such as its stream. */
+  pending?: ReactNode
   blobUrl: (cid: string, mimeType?: string) => string
   siblings?: { index: number; count: number; onPick: (index: number) => void }
   actions?: ReactNode
@@ -58,11 +58,8 @@ const markdownComponents: Components = {
 
 const remarkPlugins = [remarkGfm]
 
-/**
- * Assistant text as Markdown. Raw HTML in it is not rendered. Memoized, since a streaming reply
- * rerenders the whole conversation on every delta, and parsing is the costly part.
- */
-const Markdown = memo(function Markdown({ text }: { text: string }) {
+/** Assistant text as Markdown. Raw HTML in it is not rendered. */
+function Markdown({ text }: { text: string }) {
   return (
     <div className="markdown">
       <ReactMarkdown remarkPlugins={remarkPlugins} components={markdownComponents}>
@@ -70,7 +67,7 @@ const Markdown = memo(function Markdown({ text }: { text: string }) {
       </ReactMarkdown>
     </div>
   )
-})
+}
 
 function Text({ text, role }: { text: string; role: unknown }) {
   return role === 'assistant' ? <Markdown text={text} /> : <p className="text">{text}</p>
@@ -162,7 +159,7 @@ function SiblingPicker({ siblings }: { siblings: NonNullable<MessageViewProps['s
 }
 
 /** The reasoning and text streamed so far, shown until the reply's record arrives. */
-function StreamingReply({ streaming }: { streaming: StreamedReply }) {
+export function StreamingReply({ streaming }: { streaming: StreamedReply }) {
   return (
     <>
       {streaming.reasoning && (
@@ -177,10 +174,10 @@ function StreamingReply({ streaming }: { streaming: StreamedReply }) {
 }
 
 /** A line for a message that is still thinking, failed, or was stopped. */
-function Status({ record, streaming }: Pick<MessageViewProps, 'record' | 'streaming'>) {
+function Status({ record, pending }: Pick<MessageViewProps, 'record' | 'pending'>) {
   switch (record.status) {
     case 'pending':
-      return streaming === undefined ? <p>Thinking...</p> : null
+      return pending === undefined ? <p>Thinking...</p> : null
     case 'error':
       return <p role="alert">Error{record.error ? `: ${record.error as string}` : ''}</p>
     case 'cancelled':
@@ -191,14 +188,7 @@ function Status({ record, streaming }: Pick<MessageViewProps, 'record' | 'stream
 }
 
 /** One message: its parts, its state, sibling controls, and actions. */
-export function MessageView({
-  id,
-  record,
-  streaming,
-  blobUrl,
-  siblings,
-  actions,
-}: MessageViewProps) {
+export function MessageView({ id, record, pending, blobUrl, siblings, actions }: MessageViewProps) {
   const content = record.content as { $type: string; parts?: Part[] }
   const encrypted = content.$type.endsWith('#encryptedContent')
   const parts = content.parts ?? []
@@ -213,9 +203,7 @@ export function MessageView({
       {shown.map(({ part, key }) => (
         <PartView key={key} part={part} role={record.role} blobUrl={blobUrl} />
       ))}
-      {streaming !== undefined && record.status === 'pending' && (
-        <StreamingReply streaming={streaming} />
-      )}
+      {record.status === 'pending' && pending}
       {sources.length > 0 && (
         <ul>
           {sources.map((part) => (
@@ -226,7 +214,7 @@ export function MessageView({
         </ul>
       )}
       {encrypted && <p>This message is encrypted.</p>}
-      <Status record={record} streaming={streaming} />
+      <Status record={record} pending={pending} />
       {actions && <footer>{actions}</footer>}
     </article>
   )

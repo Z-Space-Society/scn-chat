@@ -62,7 +62,7 @@ export const StepsView: StepsView = Steps
 - **Tool views** get `{ call, result, status, record, blobUrl }`: a tool call part, its result or `undefined`, and the call's status. `MessageView` pairs each `toolCallPart` with the `toolResultPart` that has the same `callId` in the same message, and shows the pair once, where the call is. A result with no matching call is shown alone with the default tool view.
 - **The default tool view** is today's display: a collapsed `<details>` with the tool's name, its status, its input, then the output, or the error when `isError` is set.
 - **Unknown kinds.** A part kind with no view is skipped, as now, so records written by newer clients still show what this one understands.
-- **What stays in `MessageView`.** It keeps the message's layout: the header and sibling controls, the streamed text of a pending reply, the list of source links at the end, the status lines, and the actions. Only drawing parts moves into the tables.
+- **What stays in `MessageView`.** It keeps the message's layout: the header and sibling controls, the `pending` slot for a pending reply's stream, the list of source links at the end, the status lines, and the actions. Only drawing parts moves into the tables.
 
 ### Tool status
 

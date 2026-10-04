@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { MessageView } from '../../src/components/MessageView.tsx'
+import { MessageView, StreamingReply } from '../../src/components/MessageView.tsx'
 
 const d = (name: string) => `network.sharedcomputer.chat.defs#${name}`
 const blobUrl = (cid: string) => `/blob/${cid}`
@@ -119,7 +119,7 @@ describe('MessageView', () => {
     render(
       <MessageView
         blobUrl={blobUrl}
-        streaming={{ text: '*Hel*', reasoning: '' }}
+        pending={<StreamingReply streaming={{ text: '*Hel*', reasoning: '' }} />}
         record={{
           role: 'assistant',
           status: 'pending',
@@ -128,6 +128,21 @@ describe('MessageView', () => {
       />,
     )
     expect(screen.getByText('Hel').tagName).toBe('EM')
+    expect(screen.queryByText('Thinking...')).toBeNull()
+  })
+
+  it('shows a pending reply with nothing in its place as thinking', () => {
+    render(
+      <MessageView
+        blobUrl={blobUrl}
+        record={{
+          role: 'assistant',
+          status: 'pending',
+          content: { $type: d('plainContent'), parts: [] },
+        }}
+      />,
+    )
+    expect(screen.getByText('Thinking...')).toBeInTheDocument()
   })
 
   it('shows an error and a stopped label', () => {
