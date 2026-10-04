@@ -190,7 +190,7 @@ describe('MessageView', () => {
       />,
     )
     expect(screen.getByText(/2 \/ 3/)).toBeInTheDocument()
-    screen.getByRole('button', { name: '›' }).click()
+    screen.getByRole('button', { name: 'Next version' }).click()
     expect(onPick).toHaveBeenCalledWith(2)
   })
 

@@ -143,7 +143,7 @@ describe('ConversationView', () => {
     ])
     await renderWith(store, <ConversationView skey="s1" />)
     expect(await screen.findByText('second answer')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: '‹' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Previous version' }))
     expect(screen.getByText('first answer')).toBeInTheDocument()
     expect(screen.queryByText('second answer')).toBeNull()
   })
@@ -161,7 +161,7 @@ describe('ConversationView', () => {
     const { router } = await renderWith(store, <ConversationView skey="s1" />)
     expect(await screen.findByText('second answer')).toBeInTheDocument()
     const scrollTo = vi.spyOn(window, 'scrollTo')
-    await userEvent.click(screen.getByRole('button', { name: '‹' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Previous version' }))
     expect(router.state.location.search).toEqual({ m: 'u.r0' })
     expect(scrolled).not.toHaveBeenCalled()
     // Nor does the router reset the page to the top.
