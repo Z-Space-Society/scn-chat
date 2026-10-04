@@ -83,6 +83,22 @@ describe('Composer', () => {
     })
   })
 
+  it('does not send an effort hidden by switching to a model without reasoning', async () => {
+    const fetch = serve(async () =>
+      Response.json({ rkey: 'u1', replyRkey: 'u1.r0', status: 'claimed' }, { status: 201 }),
+    )
+    await renderComposer(<Composer skey="s1" onSent={() => {}} />)
+    await userEvent.selectOptions(screen.getByLabelText('Model'), 'p/smart')
+    await userEvent.selectOptions(screen.getByLabelText('Effort'), 'max')
+    await userEvent.selectOptions(screen.getByLabelText('Model'), 'p/basic')
+    await userEvent.type(screen.getByPlaceholderText('Message'), 'Hello{Enter}')
+    await vi.waitFor(() => expect(writes(fetch)).toHaveLength(1))
+    const init = (writes(fetch)[0] as [string, RequestInit])[1]
+    expect(JSON.parse(String(init.body)).generation).toEqual({
+      model: { provider: 'p', id: 'basic' },
+    })
+  })
+
   it('does not send on Enter while an attachment is still uploading', async () => {
     const fetch = serve((url) =>
       url === '/api/attachments'

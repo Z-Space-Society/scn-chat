@@ -62,7 +62,7 @@ The root route's `beforeLoad` asks `/api/me` who is signed in, through the query
   - Images are shown inline, and files as their names.
   - A pending reply shows streamed text as it arrives. An errored reply shows its error, and a cancelled reply is labeled as stopped.
 - **Message actions.** On user messages, edit, which opens the composer prefilled and sends a sibling. Editing another message starts the composer over from that message. On assistant replies, regenerate, with an optional model change. While generating, stop.
-- **Composer.** A textarea, a model select from `/api/models`, an effort select for models with the reasoning capability, and an attach button. The attach button accepts images only for models with vision, plus any type an ingester supports. Attachments upload when chosen and show a progress state. Enter sends, and Shift+Enter adds a newline. The model select offers "Default model" only when the server can choose a model without one, following chat-turns: an earlier completed reply on the branch names a model, or the user's preferences or the admin set a default. Otherwise the composer asks for a model, and sending waits until one is chosen.
+- **Composer.** A textarea, a model select from `/api/models`, an effort select for models with the reasoning capability, and an attach button. The effort is sent only while its select is shown. The attach button accepts images only for models with vision, plus any type an ingester supports. Attachments upload when chosen and show a progress state. Enter sends, and Shift+Enter adds a newline. The model select offers "Default model" only when the server can choose a model without one, following chat-turns: an earlier completed reply on the branch names a model, or the user's preferences or the admin set a default. Otherwise the composer asks for a model, and sending waits until one is chosen.
 - **Settings.** A sidebar links back to the chats and to each section, marks the current one, and holds sign out. Only the current section is shown.
   - Preferences: default model, default effort, custom instructions, and generate titles. Saving also stores the browser's time zone, which the app saves on sign-in as well when it differs from the stored one. A stored default model the model list no longer offers, as after its key is deleted, shows as unavailable and is kept on save until the user picks another.
   - API keys: add, list with the last four characters, and delete. For providers with user endpoints, a base URL field.
@@ -134,7 +134,7 @@ While the reader is at the bottom of the conversation, it stays scrolled to the 
 - [ ] Regenerating adds a sibling reply and selects it.
 - [ ] Editing a message adds a sibling user message with its own reply, and switching the edit to another message starts over from its text.
 - [ ] Stop cancels a generating reply, which then shows as stopped.
-- [ ] The effort select appears only for reasoning models.
+- [ ] The effort select appears only for reasoning models, and a hidden effort is not sent.
 - [ ] With no default model anywhere, a new chat asks for a model instead of failing with "No model selected".
 - [ ] Image attachment is disabled for models without vision.
 - [ ] A PDF attachment uploads, shows its name, and reaches the model as text.

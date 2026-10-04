@@ -50,6 +50,8 @@ export function Composer({
   const [refused, setRefused] = useState<string | null>(null)
   // Without a fallback model, the server has nothing to run the turn with.
   const needsModel = !model && fallback === null
+  // Effort is sent only while its select is shown, so switching models back keeps the choice.
+  const chosenEffort = model?.capabilities.reasoning ? effort : ''
   const { data: types, error: typesError } = useQuery(attachmentTypesQuery)
   const queryClient = useQueryClient()
   const accept = types && acceptedTypes(types, model)
@@ -95,7 +97,7 @@ export function Composer({
     ]
     const generation = {
       ...(model ? { model: modelRef(model) } : {}),
-      ...(effort ? { effort } : {}),
+      ...(chosenEffort ? { effort: chosenEffort } : {}),
     }
     const sent = await read(
       api.turns.conversations[':skey'].messages.$post(
