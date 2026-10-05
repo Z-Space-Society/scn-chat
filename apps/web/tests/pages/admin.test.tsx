@@ -260,6 +260,24 @@ describe('Admin users', () => {
       ),
     )
   })
+  it('keeps the search box focused after a search', async () => {
+    stubServer()
+    const { router } = await renderPage(<Users />, '/admin/users')
+    await userEvent.type(await screen.findByLabelText('Search users'), ' bo {Enter}')
+    await waitFor(() => expect(router.state.location.search).toEqual({ q: 'bo' }))
+    expect(screen.getByLabelText('Search users')).toHaveFocus()
+    expect(screen.getByLabelText('Search users')).toHaveValue('bo')
+  })
+
+  it('empties the search box when the sidebar link clears the search', async () => {
+    stubServer()
+    await renderPage(<Users />, '/admin/users?q=bo')
+    expect(await screen.findByLabelText('Search users')).toHaveValue('bo')
+    await userEvent.click(
+      within(screen.getByRole('navigation')).getByRole('link', { name: 'Users' }),
+    )
+    await waitFor(() => expect(screen.getByLabelText('Search users')).toHaveValue(''))
+  })
 })
 
 describe('Admin roles', () => {

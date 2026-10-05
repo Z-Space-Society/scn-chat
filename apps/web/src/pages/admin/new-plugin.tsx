@@ -67,6 +67,8 @@ export function NewPluginAdmin() {
           <form.Field name="options">
             {(field) => (
               <SchemaFields
+                // Another package's fields start over, as its options do.
+                key={plugin.package}
                 schema={plugin.schema}
                 values={field.state.value}
                 secretFields={plugin.secretFields}

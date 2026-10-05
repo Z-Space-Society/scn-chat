@@ -12,8 +12,6 @@ export function UsersAdmin({ q }: { q: string }) {
   const users = useInfiniteQuery(adminUsersQuery(q))
   const roles = useQuery(adminRolesQuery)
   const queryClient = useQueryClient()
-  const navigate = useNavigate()
-  const [search, setSearch] = useState(q)
   const usersChanged = () => queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
   // Explicit members are listed on the roles page too.
   const membersChanged = () =>
@@ -60,25 +58,7 @@ export function UsersAdmin({ q }: { q: string }) {
       <h2>Users</h2>
       <Invites />
       <h3>Accounts</h3>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          const trimmed = search.trim()
-          void navigate({
-            to: '/admin/users',
-            search: trimmed ? { q: trimmed } : {},
-            replace: true,
-          })
-        }}
-      >
-        <input
-          aria-label="Search users"
-          placeholder="Handle or DID"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <button type="submit">Search</button>
-      </form>
+      <UserSearch q={q} />
       <table>
         <thead>
           <tr>
@@ -149,6 +129,39 @@ export function UsersAdmin({ q }: { q: string }) {
       )}
       {error && <p role="alert">{error}</p>}
     </section>
+  )
+}
+
+/** The search box, which follows the URL's `q` when it changes, as when the sidebar link clears it. */
+function UserSearch({ q }: { q: string }) {
+  const navigate = useNavigate()
+  const [search, setSearch] = useState(q)
+  // Updated while rendering rather than by remounting, so the box keeps focus after a search.
+  const [shownQ, setShownQ] = useState(q)
+  if (q !== shownQ) {
+    setShownQ(q)
+    setSearch(q)
+  }
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        const trimmed = search.trim()
+        void navigate({
+          to: '/admin/users',
+          search: trimmed ? { q: trimmed } : {},
+          replace: true,
+        })
+      }}
+    >
+      <input
+        aria-label="Search users"
+        placeholder="Handle or DID"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
+      <button type="submit">Search</button>
+    </form>
   )
 }
 

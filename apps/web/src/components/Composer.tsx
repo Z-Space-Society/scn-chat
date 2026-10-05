@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, json, read } from '../api.ts'
 import { lastError, messageOf } from '../lib/errors.ts'
-import { type ModelOption, modelRef } from '../lib/models.ts'
+import { sameModel } from '../lib/models.ts'
 import { attachmentTypesQuery } from '../queries.ts'
 import { conversationRefreshKey } from '../store/react.tsx'
 import { EffortSelect, ModelSelect } from './ModelSelect.tsx'
@@ -25,11 +25,8 @@ const blobCid = (part: Record<string, unknown>) =>
   ((part.image ?? part.file) as { ref: { $link: string } }).ref.$link
 
 /** What the attach button takes: any type an ingester reads, and images when the model sees them. */
-function acceptedTypes(types: { images: string[]; files: string[] }, model: ModelOption | null) {
-  // With the fallback model, the server checks vision when the turn starts.
-  const images = !model || model.capabilities.vision
-  return [...(images ? types.images : []), ...types.files].join(',')
-}
+const acceptedTypes = (types: { images: string[]; files: string[] }, images: boolean) =>
+  [...(images ? types.images : []), ...types.files].join(',')
 
 /** Upload a file the composer will attach, returning its attachment part. */
 const uploadAttachment = (file: File) =>
@@ -59,19 +56,24 @@ export function Composer({
 }: ComposerProps) {
   const [text, setText] = useState(initialText)
   const { models, fallback } = useModels(inherited)
-  const [model, setModel] = useState<ModelOption | null>(null)
+  // The chosen model by reference, so its capabilities come from the current catalog.
+  const [chosenModel, setChosenModel] = useState<ModelRef | null>(null)
+  const model = chosenModel && models.find((m) => sameModel(m, chosenModel))
+  // With the fallback model, the server checks vision when the turn starts. A chosen model no
+  // longer on offer takes no images, as nothing says it can read them.
+  const seesImages = chosenModel ? Boolean(model?.capabilities.vision) : true
   const [effort, setEffort] = useState('')
   const [attachments, setAttachments] = useState<Record<string, unknown>[]>([])
   const [uploading, setUploading] = useState(0)
   // A file this composer refused before uploading it.
   const [refused, setRefused] = useState<string | null>(null)
   // Without a fallback model, the server has nothing to run the turn with.
-  const needsModel = !model && fallback === null
+  const needsModel = !chosenModel && fallback === null
   // Effort is sent only while its select is shown, so switching models back keeps the choice.
   const chosenEffort = model?.capabilities.reasoning ? effort : ''
   const { data: types, error: typesError } = useQuery(attachmentTypesQuery)
   const queryClient = useQueryClient()
-  const accept = types && acceptedTypes(types, model)
+  const accept = types && acceptedTypes(types, seesImages)
 
   // Several uploads can run at once, so each one counts while it runs.
   const uploadingFile = useMutation({
@@ -83,7 +85,7 @@ export function Composer({
   const attach = (files: FileList | null) => {
     setRefused(null)
     for (const file of Array.from(files ?? [])) {
-      if (file.type.startsWith('image/') && model && !model.capabilities.vision)
+      if (file.type.startsWith('image/') && !seesImages)
         setRefused('This model cannot read images.')
       else uploadingFile.mutate(file)
     }
@@ -96,7 +98,7 @@ export function Composer({
       ...(text.trim() ? [{ $type: `${nsid.defs}#textPart`, text }] : []),
     ]
     const generation = {
-      ...(model ? { model: modelRef(model) } : {}),
+      ...(chosenModel ? { model: chosenModel } : {}),
       ...(chosenEffort ? { effort: chosenEffort } : {}),
     }
     const sent = await read(
@@ -144,7 +146,12 @@ export function Composer({
         }}
       />
       <div>
-        <ModelSelect aria-label="Model" models={models} value={model} onChange={setModel}>
+        <ModelSelect
+          aria-label="Model"
+          models={models}
+          value={chosenModel}
+          onChange={setChosenModel}
+        >
           {fallback === null ? (
             <option value="" disabled>
               Choose a model

@@ -1,9 +1,7 @@
 import { useForm, useStore as useFormStore } from '@tanstack/react-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
 import { api, json, read } from '../../api.ts'
 import { lastError, messageOf } from '../../lib/errors.ts'
-import type { ModelOption } from '../../lib/models.ts'
 import { credentialsQuery, modelsQuery, providersQuery } from '../../queries.ts'
 
 type KeyDraft = {
@@ -27,10 +25,6 @@ const emptyDraft: KeyDraft = {
 export function ApiKeySettings() {
   const providers = useQuery(providersQuery)
   const credentials = useQuery(credentialsQuery)
-  // Models listed by the provider for the key being added.
-  const [listed, setListed] = useState<
-    { id: string; name: string; capabilities: ModelOption['capabilities'] }[]
-  >([])
   const queryClient = useQueryClient()
   // Keys decide which of the user's own models are offered.
   const keysChanged = () =>
@@ -63,7 +57,7 @@ export function ApiKeySettings() {
     },
     onSuccess: () => {
       form.reset()
-      setListed([])
+      listModels.reset()
       return keysChanged()
     },
   })
@@ -85,8 +79,10 @@ export function ApiKeySettings() {
         ),
       )
     },
-    onSuccess: (body) => setListed(body.models),
   })
+  // Models listed by the provider for the key being added, until what they were listed with changes.
+  const listed = listModels.data?.models ?? []
+  const clearsListed = { onChange: () => listModels.reset() }
   const providerId = useFormStore(form.store, (state) => state.values.providerId)
   const provider = providers.data?.find((p) => p.id === providerId)
   const loadError = providers.error ?? credentials.error
@@ -111,7 +107,7 @@ export function ApiKeySettings() {
           void form.handleSubmit()
         }}
       >
-        <form.Field name="providerId">
+        <form.Field name="providerId" listeners={clearsListed}>
           {(field) => (
             <select
               aria-label="Provider"
@@ -128,7 +124,7 @@ export function ApiKeySettings() {
             </select>
           )}
         </form.Field>
-        <form.Field name="apiKey">
+        <form.Field name="apiKey" listeners={clearsListed}>
           {(field) => (
             <input
               aria-label="API key"
@@ -152,7 +148,7 @@ export function ApiKeySettings() {
         </form.Field>
         {provider?.userEndpoints && (
           <>
-            <form.Field name="baseUrl">
+            <form.Field name="baseUrl" listeners={clearsListed}>
               {(field) => (
                 <input
                   aria-label="Base URL"

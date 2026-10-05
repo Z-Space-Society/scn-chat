@@ -197,7 +197,6 @@ function ProviderModels({
   models: AdminModel[]
   roleNames: string[]
 }) {
-  const [listed, setListed] = useState<Omit<AdminModel, 'roles' | 'default'>[]>([])
   const [typed, setTyped] = useState('')
   const modelsChanged = useModelsChanged()
   const add = useMutation({
@@ -221,8 +220,8 @@ function ProviderModels({
           json({ package: instance.package, instanceId: instance.id, options }),
         ),
       ),
-    onSuccess: (body) => setListed(body.models.filter((m) => m.provider === provider.id)),
   })
+  const listed = (list.data?.models ?? []).filter((model) => model.provider === provider.id)
   // A model a provider lists starts with the user role and the capabilities the list reports.
   const offer = (id: string, name: string, capabilities: Capabilities) =>
     add.mutate({ provider: provider.id, id, name, capabilities, roles: ['user'], default: false })

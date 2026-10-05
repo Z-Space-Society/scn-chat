@@ -198,6 +198,33 @@ describe('Settings API keys', () => {
     })
     expect(screen.getByLabelText('Provider')).toHaveValue('')
   })
+  it('drops the models loaded for one provider when another is chosen', async () => {
+    const fetch = stubServer({
+      '/api/providers': () =>
+        Response.json({
+          providers: [
+            { id: 'openai', name: 'OpenAI', userEndpoints: false, listsModels: true },
+            { id: 'mistral', name: 'Mistral', userEndpoints: false, listsModels: true },
+          ],
+        }),
+      '/api/providers/openai/list-models': () =>
+        Response.json({ models: [{ id: 'gpt', name: 'GPT', capabilities: caps }] }),
+    })
+    await renderPage('/api-keys')
+    await screen.findByRole('option', { name: 'OpenAI' })
+    await userEvent.selectOptions(screen.getByLabelText('Provider'), 'openai')
+    await userEvent.type(screen.getByLabelText('API key'), 'sk-test')
+    await userEvent.click(screen.getByRole('button', { name: 'Load models' }))
+    expect(await screen.findByText('1 models loaded')).toBeInTheDocument()
+    await userEvent.selectOptions(screen.getByLabelText('Provider'), 'mistral')
+    expect(screen.queryByText('1 models loaded')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Add key' }))
+    await vi.waitFor(() => expect(screen.getByLabelText('API key')).toHaveValue(''))
+    const post = fetch.mock.calls.find(
+      ([url, init]) => url === '/api/credentials' && init?.method === 'POST',
+    )
+    expect(JSON.parse(String(post?.[1]?.body))).toMatchObject({ providerId: 'mistral', models: [] })
+  })
 })
 
 describe('Settings sections', () => {

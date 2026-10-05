@@ -1,9 +1,10 @@
+import type { ModelRef } from '@scn-chat/lexicons'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { api, json, read } from '../api.ts'
 import { blobUrlFor } from '../lib/blob-url.ts'
 import { lastError } from '../lib/errors.ts'
-import { inheritedModel, type ModelOption, modelRef } from '../lib/models.ts'
+import { inheritedModel, type ModelOption } from '../lib/models.ts'
 import { messageText } from '../store/core.ts'
 import { conversationRefreshKey, useConversation } from '../store/react.tsx'
 import { Composer } from './Composer.tsx'
@@ -51,8 +52,8 @@ export function ConversationView({ skey }: { skey: string }) {
   const blobUrl = blobUrlFor(`/api/conversations/${skey}`)
   const title = (conversation?.info?.title as string | undefined) ?? 'New chat'
 
-  const regenerate = async (userRkey: string, model: ModelOption | null) => {
-    const body = model ? { model: modelRef(model) } : {}
+  const regenerate = async (userRkey: string, model: ModelRef | null) => {
+    const body = model ? { model } : {}
     const result = await read(
       api.turns.conversations[':skey'].messages[':rkey'].regenerate.$post(
         { param: { skey, rkey: userRkey } },
@@ -86,7 +87,7 @@ export function ConversationView({ skey }: { skey: string }) {
   const syncing = useMutation({ mutationFn: sync, onSuccess: refresh })
   const stopping = useMutation({ mutationFn: stop, onSuccess: refresh })
   const regenerating = useMutation({
-    mutationFn: ({ parent, model }: { parent: string | null; model: ModelOption | null }) => {
+    mutationFn: ({ parent, model }: { parent: string | null; model: ModelRef | null }) => {
       if (!parent) throw new Error('This reply has no user message to regenerate')
       return regenerate(parent, model)
     },
@@ -175,9 +176,9 @@ function RegenerateAction({
   onRegenerate,
 }: {
   models: ModelOption[]
-  onRegenerate: (model: ModelOption | null) => void
+  onRegenerate: (model: ModelRef | null) => void
 }) {
-  const [model, setModel] = useState<ModelOption | null>(null)
+  const [model, setModel] = useState<ModelRef | null>(null)
   return (
     <>
       <ModelSelect aria-label="Regenerate with" models={models} value={model} onChange={setModel}>

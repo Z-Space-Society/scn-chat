@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Composer } from '../../src/components/Composer.tsx'
 import type { ModelOption } from '../../src/lib/models.ts'
+import { modelsQuery } from '../../src/queries.ts'
 import { stubFetch, writes } from '../helpers/fetch.ts'
 import { renderAt } from '../helpers/router.tsx'
 
@@ -61,6 +62,15 @@ describe('Composer', () => {
       ),
     )
     await userEvent.selectOptions(screen.getByLabelText('Model'), 'p/basic')
+    expect(screen.getByLabelText('Attach')).toHaveAttribute('accept', 'application/pdf')
+  })
+
+  it('stops offering images once the chosen model is no longer offered', async () => {
+    const { queryClient } = await renderAt(<Composer skey="s" onSent={() => {}} />)
+    await screen.findByRole('option', { name: 'Smart' })
+    await userEvent.selectOptions(screen.getByLabelText('Model'), 'p/smart')
+    queryClient.setQueryData(modelsQuery.queryKey, { models: models.slice(1), defaultModel: null })
+    expect(await screen.findByRole('option', { name: 'Unavailable: p/smart' })).toBeInTheDocument()
     expect(screen.getByLabelText('Attach')).toHaveAttribute('accept', 'application/pdf')
   })
 
