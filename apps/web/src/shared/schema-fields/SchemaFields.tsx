@@ -15,14 +15,19 @@ export type Property = {
 }
 export type Schema = { properties?: Record<string, Property> }
 
+/** The string fields that hold secrets, which show as password inputs. */
+export interface Secrets {
+  fields: string[]
+  /** The secret fields with a value already saved, which a blank input keeps. */
+  stored?: string[]
+  /** Offer to clear stored secrets, for forms that support it. */
+  clearing?: { cleared: string[]; onClear: (key: string, clear: boolean) => void }
+}
+
 export interface SchemaFieldsProps {
   schema: Schema
   values: Record<string, unknown>
-  secretFields?: string[]
-  secretsSet?: string[]
-  /** Offer to clear stored secrets, for forms that support it. */
-  cleared?: string[]
-  onClear?: (key: string, clear: boolean) => void
+  secrets?: Secrets
   /** Problems the server found, by field path. */
   issues?: Issue[]
   onChange: (key: string, value: unknown) => void
@@ -56,7 +61,8 @@ function LinesInput(props: LinesInputProps) {
 
 /** Inputs for a settings form, generated from its JSON schema. */
 export function SchemaFields(props: SchemaFieldsProps) {
-  const cleared = props.cleared ?? []
+  const clearing = props.secrets?.clearing
+  const cleared = clearing?.cleared ?? []
   return Object.entries(props.schema.properties ?? {}).map(([key, property]) => {
     const { visible, enabled } = applyRule(property.rule, props.values)
     if (!visible) return null
@@ -140,8 +146,8 @@ export function SchemaFields(props: SchemaFieldsProps) {
         />
       )
     } else if (property.type === 'string') {
-      const secret = (props.secretFields ?? []).includes(key)
-      const stored = secret && (props.secretsSet ?? []).includes(key)
+      const secret = (props.secrets?.fields ?? []).includes(key)
+      const stored = secret && (props.secrets?.stored ?? []).includes(key)
       input = (
         <>
           <input
@@ -151,12 +157,12 @@ export function SchemaFields(props: SchemaFieldsProps) {
             placeholder={stored ? 'Saved. Leave blank to keep.' : ''}
             onChange={(e) => props.onChange(key, e.target.value)}
           />
-          {stored && props.onClear && (
+          {stored && clearing && (
             <label>
               <input
                 type="checkbox"
                 checked={cleared.includes(key)}
-                onChange={(e) => props.onClear?.(key, e.target.checked)}
+                onChange={(e) => clearing.onClear(key, e.target.checked)}
               />{' '}
               Clear
             </label>

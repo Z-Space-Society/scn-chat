@@ -144,8 +144,7 @@ function PluginForm(props: Props) {
                     <SchemaFields
                       schema={plugin.schema as object}
                       values={field.state.value}
-                      secretFields={plugin.secretFields}
-                      secretsSet={plugin.secretsSet}
+                      secrets={{ fields: plugin.secretFields, stored: plugin.secretsSet }}
                       onChange={(key, value) =>
                         field.handleChange((current) => ({ ...current, [key]: value }))
                       }

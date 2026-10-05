@@ -2,6 +2,7 @@ import { useMutation } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { messageOf } from '../../../shared/errors.ts'
+import { SidebarLayout } from '../../../shared/SidebarLayout.tsx'
 import { useSignOut } from '../../auth/hooks/useSignOut.ts'
 import { useMe } from '../../auth/session.tsx'
 
@@ -21,27 +22,30 @@ export function SettingsLayout(props: Props) {
   const signOut = useMutation({ mutationFn: useSignOut() })
   const { admin } = useMe()
   return (
-    <div className="layout settings">
-      <nav className="sidebar">
-        <Link to="/" activeOptions={{ exact: true }}>
-          Back to chats
-        </Link>
-        {admin && <Link to="/admin">Admin</Link>}
-        <ul>
-          {sections.map((section) => (
-            <li key={section.to}>
-              <Link to={section.to} activeOptions={{ exact: true }}>
-                {section.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-        <button type="button" onClick={() => signOut.mutate()}>
-          Sign out
-        </button>
-        {signOut.error && <p role="alert">{messageOf(signOut.error)}</p>}
-      </nav>
-      <main>{props.children}</main>
-    </div>
+    <SidebarLayout
+      nav={
+        <>
+          <Link to="/" activeOptions={{ exact: true }}>
+            Back to chats
+          </Link>
+          {admin && <Link to="/admin">Admin</Link>}
+          <ul>
+            {sections.map((section) => (
+              <li key={section.to}>
+                <Link to={section.to} activeOptions={{ exact: true }}>
+                  {section.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <button type="button" onClick={() => signOut.mutate()}>
+            Sign out
+          </button>
+          {signOut.error && <p role="alert">{messageOf(signOut.error)}</p>}
+        </>
+      }
+    >
+      {props.children}
+    </SidebarLayout>
   )
 }

@@ -143,14 +143,17 @@ function PluginForm(props: PluginFormProps) {
                   <SchemaFields
                     schema={props.instance.schema as Schema}
                     values={field.state.value}
-                    secretFields={props.instance.secretFields}
-                    secretsSet={props.instance.secretsSet}
-                    cleared={cleared.state.value}
-                    onClear={(key, clear) =>
-                      cleared.handleChange((current) =>
-                        clear ? [...current, key] : current.filter((name) => name !== key),
-                      )
-                    }
+                    secrets={{
+                      fields: props.instance.secretFields,
+                      stored: props.instance.secretsSet,
+                      clearing: {
+                        cleared: cleared.state.value,
+                        onClear: (key, clear) =>
+                          cleared.handleChange((current) =>
+                            clear ? [...current, key] : current.filter((name) => name !== key),
+                          ),
+                      },
+                    }}
                     issues={props.issues}
                     onChange={(key, value) =>
                       field.handleChange((current) => ({ ...current, [key]: value }))

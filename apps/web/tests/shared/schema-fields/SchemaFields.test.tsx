@@ -23,8 +23,7 @@ describe('SchemaFields', () => {
           },
         }}
         values={{ engine: 'kagi' }}
-        secretFields={['apiKey']}
-        secretsSet={['apiKey']}
+        secrets={{ fields: ['apiKey'], stored: ['apiKey'] }}
         onChange={() => {}}
       />,
     )
@@ -40,15 +39,7 @@ describe('SchemaFields', () => {
 
   it('reports each change with its field name', async () => {
     const onChange = vi.fn()
-    render(
-      <SchemaFields
-        schema={schema}
-        values={{}}
-        secretFields={[]}
-        secretsSet={[]}
-        onChange={onChange}
-      />,
-    )
+    render(<SchemaFields schema={schema} values={{}} onChange={onChange} />)
     await userEvent.selectOptions(screen.getByRole('combobox'), 'duckduckgo')
     await userEvent.click(screen.getByRole('checkbox'))
     expect(onChange.mock.calls).toEqual([
@@ -77,7 +68,7 @@ describe('SchemaFields', () => {
         },
       },
     }
-    const props = { schema: conditional, secretFields: [], secretsSet: [], onChange: () => {} }
+    const props = { schema: conditional, onChange: () => {} }
     const { rerender } = render(<SchemaFields {...props} values={{ engine: 'default' }} />)
     expect(screen.queryByLabelText('apiKey')).toBeNull()
     expect(screen.getByLabelText('region')).toBeDisabled()
@@ -130,10 +121,11 @@ describe('SchemaFields', () => {
       <SchemaFields
         schema={{ properties: { apiKey: { type: 'string' } } }}
         values={{}}
-        secretFields={['apiKey']}
-        secretsSet={['apiKey']}
-        cleared={['apiKey']}
-        onClear={onClear}
+        secrets={{
+          fields: ['apiKey'],
+          stored: ['apiKey'],
+          clearing: { cleared: ['apiKey'], onClear },
+        }}
         onChange={() => {}}
       />,
     )

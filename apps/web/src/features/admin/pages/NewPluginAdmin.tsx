@@ -71,7 +71,7 @@ export function NewPluginAdmin() {
                 key={plugin.package}
                 schema={plugin.schema}
                 values={field.state.value}
-                secretFields={plugin.secretFields}
+                secrets={{ fields: plugin.secretFields }}
                 issues={issuesOf(add.error)}
                 onChange={(key, value) =>
                   field.handleChange((current) => ({ ...current, [key]: value }))

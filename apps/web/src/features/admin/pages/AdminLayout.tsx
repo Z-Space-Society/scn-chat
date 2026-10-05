@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
+import { SidebarLayout } from '../../../shared/SidebarLayout.tsx'
 
 const sections = [
   { to: '/admin/users', label: 'Users' },
@@ -18,26 +19,29 @@ interface Props {
 
 export function AdminLayout(props: Props) {
   return (
-    <div className="layout settings">
-      <nav className="sidebar">
-        <Link to="/" activeOptions={{ exact: true }}>
-          Back to chats
-        </Link>
-        <Link to="/settings" activeOptions={{ exact: true }}>
-          Account settings
-        </Link>
-        <ul>
-          {sections.map((section) => (
-            <li key={section.to}>
-              {/* A plugin's own page counts as the plugins section. */}
-              <Link to={section.to} activeOptions={{ includeSearch: false }}>
-                {section.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
-      <main>{props.children}</main>
-    </div>
+    <SidebarLayout
+      nav={
+        <>
+          <Link to="/" activeOptions={{ exact: true }}>
+            Back to chats
+          </Link>
+          <Link to="/settings" activeOptions={{ exact: true }}>
+            Account settings
+          </Link>
+          <ul>
+            {sections.map((section) => (
+              <li key={section.to}>
+                {/* A plugin's own page counts as the plugins section. */}
+                <Link to={section.to} activeOptions={{ includeSearch: false }}>
+                  {section.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </>
+      }
+    >
+      {props.children}
+    </SidebarLayout>
   )
 }
