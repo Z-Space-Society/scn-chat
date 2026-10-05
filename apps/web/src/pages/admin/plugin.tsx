@@ -291,7 +291,6 @@ function ProviderModels({
   )
 }
 
-/** One admin model's name, capabilities, and roles. */
 function ModelEditor({
   model,
   roleNames,

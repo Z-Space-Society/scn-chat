@@ -3,7 +3,6 @@ import { type RefObject, useCallback, useEffect, useRef } from 'react'
 /** How close to the bottom, in pixels, still counts as at the bottom. */
 const SLACK = 40
 
-/** The nearest ancestor that scrolls, or the page. */
 function scrollParent(element: HTMLElement): HTMLElement {
   for (let parent = element.parentElement; parent; parent = parent.parentElement) {
     const { overflowY } = getComputedStyle(parent)

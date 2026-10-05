@@ -152,7 +152,6 @@ export function UsersAdmin({ q }: { q: string }) {
   )
 }
 
-/** Suspend one account with a reason, or restore it. */
 function SuspendControl({
   name,
   suspension,

@@ -12,7 +12,6 @@ const sections = [
   { to: '/admin/sync', label: 'Sync' },
 ] as const
 
-/** The admin sidebar around the current section. */
 export function AdminLayout({ children }: { children: ReactNode }) {
   return (
     <div className="layout settings">
