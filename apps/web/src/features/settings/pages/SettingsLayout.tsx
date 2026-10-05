@@ -12,8 +12,12 @@ const sections = [
   { to: '/settings/sync', label: 'Sync' },
 ] as const
 
+interface Props {
+  children: ReactNode
+}
+
 /** The settings sidebar around the current section. */
-export function SettingsLayout({ children }: { children: ReactNode }) {
+export function SettingsLayout(props: Props) {
   const signOut = useMutation({ mutationFn: useSignOut() })
   const { admin } = useMe()
   return (
@@ -37,7 +41,7 @@ export function SettingsLayout({ children }: { children: ReactNode }) {
         </button>
         {signOut.error && <p role="alert">{messageOf(signOut.error)}</p>}
       </nav>
-      <main>{children}</main>
+      <main>{props.children}</main>
     </div>
   )
 }

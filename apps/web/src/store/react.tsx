@@ -10,12 +10,17 @@ import type { SearchResult } from './search.ts'
 
 const StoreContext = createContext<StoreClient | null>(null)
 
+interface Props {
+  store: StoreClient
+  children: ReactNode
+}
+
 /** Provide the store, and turn its change events into stale queries. */
-export function StoreProvider({ store, children }: { store: StoreClient; children: ReactNode }) {
+export function StoreProvider(props: Props) {
   const queryClient = useQueryClient()
   useEffect(
     () =>
-      store.onChange((change) => {
+      props.store.onChange((change) => {
         if (change.type === 'index')
           void queryClient.invalidateQueries({ queryKey: ['conversations'] })
         if (change.type === 'conversation')
@@ -26,9 +31,9 @@ export function StoreProvider({ store, children }: { store: StoreClient; childre
         // Any change can add results or finish a download.
         void queryClient.invalidateQueries({ queryKey: ['search'] })
       }),
-    [store, queryClient],
+    [props.store, queryClient],
   )
-  return <StoreContext.Provider value={store}>{children}</StoreContext.Provider>
+  return <StoreContext.Provider value={props.store}>{props.children}</StoreContext.Provider>
 }
 
 /**

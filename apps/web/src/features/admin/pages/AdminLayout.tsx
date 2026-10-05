@@ -12,7 +12,11 @@ const sections = [
   { to: '/admin/sync', label: 'Sync' },
 ] as const
 
-export function AdminLayout({ children }: { children: ReactNode }) {
+interface Props {
+  children: ReactNode
+}
+
+export function AdminLayout(props: Props) {
   return (
     <div className="layout settings">
       <nav className="sidebar">
@@ -33,7 +37,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           ))}
         </ul>
       </nav>
-      <main>{children}</main>
+      <main>{props.children}</main>
     </div>
   )
 }

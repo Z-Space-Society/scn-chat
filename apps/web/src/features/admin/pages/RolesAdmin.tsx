@@ -94,17 +94,15 @@ export function RolesAdmin() {
   )
 }
 
-/** One role's description, matching rules, and explicit members. */
-function RoleBlock({
-  role,
-  environmentAdmins,
-  onChange,
-}: {
+interface Props {
   role: Role
   environmentAdmins: string[]
   onChange: () => Promise<unknown>
-}) {
-  const { name } = role
+}
+
+/** One role's description, matching rules, and explicit members. */
+function RoleBlock(props: Props) {
+  const { name } = props.role
   const [identifier, setIdentifier] = useState('')
   const save = useMutation({
     mutationFn: (draft: { description: string; hosts: string; domains: string }) =>
@@ -118,30 +116,30 @@ function RoleBlock({
           }),
         ),
       ),
-    onSuccess: onChange,
+    onSuccess: props.onChange,
   })
   const addMember = useMutation({
     mutationFn: (identifier: string) =>
       read(api.admin.roles[':name'].members.$post({ param: { name } }, json({ identifier }))),
     onSuccess: () => {
       setIdentifier('')
-      return onChange()
+      return props.onChange()
     },
   })
   const removeMember = useMutation({
     mutationFn: (did: string) =>
       read(api.admin.roles[':name'].members[':did'].$delete({ param: { name, did } })),
-    onSuccess: onChange,
+    onSuccess: props.onChange,
   })
   const remove = useMutation({
     mutationFn: () => read(api.admin.roles[':name'].$delete({ param: { name } })),
-    onSuccess: onChange,
+    onSuccess: props.onChange,
   })
   const form = useForm({
     defaultValues: {
-      description: role.description,
-      hosts: role.pdsHosts.join('\n'),
-      domains: role.handleDomains.join('\n'),
+      description: props.role.description,
+      hosts: props.role.pdsHosts.join('\n'),
+      domains: props.role.handleDomains.join('\n'),
     },
     onSubmit: ({ value }) => save.mutate(value),
   })
@@ -185,8 +183,8 @@ function RoleBlock({
       <h4>Members</h4>
       <ul>
         {name === 'admin' &&
-          environmentAdmins.map((did) => <li key={did}>{did} (from ADMIN_DIDS)</li>)}
-        {role.members.map((member) => (
+          props.environmentAdmins.map((did) => <li key={did}>{did} (from ADMIN_DIDS)</li>)}
+        {props.role.members.map((member) => (
           <li key={member.did}>
             {member.handle ? `${member.handle} ` : ''}
             {member.did}{' '}
@@ -211,7 +209,7 @@ function RoleBlock({
         />
         <button type="submit">Add member</button>
       </form>
-      {!role.builtIn && (
+      {!props.role.builtIn && (
         <button type="button" onClick={() => remove.mutate()}>
           Delete role
         </button>

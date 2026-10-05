@@ -86,26 +86,23 @@ export function PluginSettings() {
   )
 }
 
-function PluginForm({
-  plugins,
-  saved,
-  onSave,
-  onReset,
-}: {
+interface Props {
   plugins: PluginEntry[]
   saved: boolean
   onSave: (values: PluginValues) => void
   onReset: (id: string) => void
-}) {
+}
+
+function PluginForm(props: Props) {
   // Fields are addressed by position, since tool names and setting keys may contain dots.
   const form = useForm({
     defaultValues: {
-      plugins: plugins.map((plugin) => ({
+      plugins: props.plugins.map((plugin) => ({
         values: plugin.values,
         tools: plugin.tools.map((tool) => tool.enabled),
       })),
     } as PluginValues,
-    onSubmit: ({ value }) => onSave(value),
+    onSubmit: ({ value }) => props.onSave(value),
   })
   return (
     <form
@@ -114,7 +111,7 @@ function PluginForm({
         void form.handleSubmit()
       }}
     >
-      {plugins.map((plugin, i) => {
+      {props.plugins.map((plugin, i) => {
         const switchable = plugin.tools.flatMap((tool, j) => (tool.userToggle ? [{ tool, j }] : []))
         return (
           <fieldset key={plugin.id}>
@@ -136,7 +133,7 @@ function PluginForm({
             {plugin.error ? (
               <p role="alert">
                 {plugin.error}{' '}
-                <button type="button" onClick={() => onReset(plugin.id)}>
+                <button type="button" onClick={() => props.onReset(plugin.id)}>
                   Reset
                 </button>
               </p>
@@ -161,7 +158,7 @@ function PluginForm({
         )
       })}
       <button type="submit">Save</button>
-      {saved && <span>Saved.</span>}
+      {props.saved && <span>Saved.</span>}
     </form>
   )
 }

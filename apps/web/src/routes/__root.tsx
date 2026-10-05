@@ -32,14 +32,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   notFoundComponent: () => <Navigate to="/" replace />,
 })
 
-function Shell({ children }: { children: ReactNode }) {
+interface Props {
+  children: ReactNode
+}
+
+function Shell(props: Props) {
   return (
     <html lang="en">
       <head>
         <HeadContent />
       </head>
       <body>
-        {children}
+        {props.children}
         <Scripts />
       </body>
     </html>

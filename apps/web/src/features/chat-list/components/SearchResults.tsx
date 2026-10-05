@@ -3,12 +3,16 @@ import { MATCH_END, MATCH_START, type SearchResult } from '../../../store/search
 
 const MATCH = new RegExp(`(${MATCH_START}[^${MATCH_END}]*${MATCH_END})`)
 
+interface SnippetProps {
+  text: string
+}
+
 /** A snippet with its marked matches as highlight elements. */
-export function Snippet({ text }: { text: string }) {
+export function Snippet(props: SnippetProps) {
   // Each piece is keyed by where it starts in the text, which no other piece shares.
   const pieces: { piece: string; start: number }[] = []
   let start = 0
-  for (const piece of text.split(MATCH)) {
+  for (const piece of props.text.split(MATCH)) {
     pieces.push({ piece, start })
     start += piece.length
   }
@@ -21,25 +25,25 @@ export function Snippet({ text }: { text: string }) {
   )
 }
 
-export function SearchResults({
-  results,
-  remaining,
-}: {
+interface SearchResultsProps {
   results: SearchResult[]
   remaining: number
-}) {
+}
+
+export function SearchResults(props: SearchResultsProps) {
   return (
     <div className="search-results">
-      {remaining > 0 && (
+      {props.remaining > 0 && (
         <p role="status">
-          Still downloading {remaining} {remaining === 1 ? 'conversation' : 'conversations'}.
+          Still downloading {props.remaining}{' '}
+          {props.remaining === 1 ? 'conversation' : 'conversations'}.
         </p>
       )}
-      {results.length === 0 ? (
+      {props.results.length === 0 ? (
         <p>No matches.</p>
       ) : (
         <ul>
-          {results.map((result) => (
+          {props.results.map((result) => (
             <li key={`${result.skey}/${result.rkey ?? ''}`}>
               <Link
                 to="/chat/$skey"

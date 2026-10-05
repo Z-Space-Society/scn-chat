@@ -9,21 +9,24 @@ import { type ModelOption, modelRef } from '../../models/models.ts'
 import { browserTimeZone } from '../lib/time-zone.ts'
 import { preferencesQuery } from '../queries.ts'
 
-function Preferences({ models }: { models: ModelOption[] }) {
+interface PreferencesProps {
+  models: ModelOption[]
+}
+
+function Preferences(props: PreferencesProps) {
   const { data, error } = useQuery(preferencesQuery)
   // The form only renders once the stored preferences load, and starts from them.
   if (data === undefined)
     return error ? <p role="alert">Could not load preferences: {messageOf(error)}</p> : null
-  return <PreferencesForm initial={data ?? {}} models={models} />
+  return <PreferencesForm initial={data ?? {}} models={props.models} />
 }
 
-function PreferencesForm({
-  initial,
-  models,
-}: {
+interface PreferencesFormProps {
   initial: Record<string, unknown>
   models: ModelOption[]
-}) {
+}
+
+function PreferencesForm(props: PreferencesFormProps) {
   const queryClient = useQueryClient()
   const save = useMutation({
     mutationFn: (record: Record<string, unknown>) =>
@@ -32,14 +35,14 @@ function PreferencesForm({
   })
   const form = useForm({
     defaultValues: {
-      defaultModel: (initial.defaultModel as ModelRef | undefined) ?? null,
-      defaultEffort: String(initial.defaultEffort ?? ''),
-      customInstructions: String(initial.customInstructions ?? ''),
-      generateTitles: initial.generateTitles !== false,
+      defaultModel: (props.initial.defaultModel as ModelRef | undefined) ?? null,
+      defaultEffort: String(props.initial.defaultEffort ?? ''),
+      customInstructions: String(props.initial.customInstructions ?? ''),
+      generateTitles: props.initial.generateTitles !== false,
     },
     onSubmit: ({ value }) => {
       // Fields this form does not edit, like the time zone, keep their stored values.
-      const { $type: _type, updatedAt: _updated, ...record } = initial
+      const { $type: _type, updatedAt: _updated, ...record } = props.initial
       // The mutation holds any error for display, so submitting never rejects.
       save.mutate({
         ...record,
@@ -64,7 +67,7 @@ function PreferencesForm({
             Default model
             <ModelSelect
               id={field.name}
-              models={models}
+              models={props.models}
               value={field.state.value}
               onChange={field.handleChange}
             >

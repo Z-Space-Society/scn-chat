@@ -3,7 +3,11 @@ import { useModels } from '../../models/hooks/useModels.ts'
 import { BusyBanner } from '../components/BusyBanner.tsx'
 import { ConversationView } from '../components/ConversationView.tsx'
 
-export function ChatPage({ skey }: { skey?: string }) {
+interface Props {
+  skey?: string
+}
+
+export function ChatPage(props: Props) {
   const { error } = useModels()
   return (
     <div className="layout">
@@ -11,8 +15,8 @@ export function ChatPage({ skey }: { skey?: string }) {
       <main>
         <BusyBanner />
         {error && <p role="alert">{error}</p>}
-        {skey ? (
-          <ConversationView key={skey} skey={skey} />
+        {props.skey ? (
+          <ConversationView key={props.skey} skey={props.skey} />
         ) : (
           <p>Start a new chat, or pick one from the list.</p>
         )}

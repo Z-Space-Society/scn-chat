@@ -5,24 +5,25 @@ import { useBranch } from '../../conversation/hooks/useBranch.ts'
 import { blobUrlFor } from '../../conversation/lib/blob-url.ts'
 import { sharedQuery } from '../queries.ts'
 
-/** A shared conversation, read-only. */
-export function SharedPage({
-  ownerDid,
-  skey,
-  signedIn,
-}: {
+interface Props {
   ownerDid: string
   skey: string
   signedIn: boolean
-}) {
-  const { data: shared, error } = useQuery({ ...sharedQuery(ownerDid, skey), enabled: signedIn })
+}
+
+/** A shared conversation, read-only. */
+export function SharedPage(props: Props) {
+  const { data: shared, error } = useQuery({
+    ...sharedQuery(props.ownerDid, props.skey),
+    enabled: props.signedIn,
+  })
   const messages = (shared?.messages ?? []).map((m) => ({
     rkey: m.rkey,
     record: m.value as Record<string, unknown>,
   }))
   const { branch, pick } = useBranch(messages)
 
-  if (!signedIn) {
+  if (!props.signedIn) {
     return (
       <main>
         <p>Sign in with your atproto account to view this shared chat.</p>
@@ -33,7 +34,7 @@ export function SharedPage({
   if (error) return <main role="alert">{messageOf(error)}</main>
   if (!shared) return <main>Loading...</main>
 
-  const blobUrl = blobUrlFor(`/api/shared/${ownerDid}/${skey}`)
+  const blobUrl = blobUrlFor(`/api/shared/${props.ownerDid}/${props.skey}`)
   return (
     <main className="conversation">
       <h2>{shared.title ?? 'Shared chat'}</h2>

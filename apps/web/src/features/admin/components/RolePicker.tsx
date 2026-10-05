@@ -1,20 +1,22 @@
-/** A checkbox for each role, for choosing several. */
-export function RolePicker({
-  names,
-  picked,
-  onChange,
-}: {
+interface Props {
   names: string[]
   picked: string[]
   onChange: (roles: string[]) => void
-}) {
-  return names.map((name) => (
+}
+
+/** A checkbox for each role, for choosing several. */
+export function RolePicker(props: Props) {
+  return props.names.map((name) => (
     <label key={name}>
       <input
         type="checkbox"
-        checked={picked.includes(name)}
+        checked={props.picked.includes(name)}
         onChange={(e) =>
-          onChange(e.target.checked ? [...picked, name] : picked.filter((role) => role !== name))
+          props.onChange(
+            e.target.checked
+              ? [...props.picked, name]
+              : props.picked.filter((role) => role !== name),
+          )
         }
       />{' '}
       {name}

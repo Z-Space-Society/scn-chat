@@ -18,18 +18,23 @@ import { ConversationHeader } from './ConversationHeader.tsx'
 import { MessageView } from './MessageView.tsx'
 import { ReplyStream } from './ReplyStream.tsx'
 
-export function ConversationView({ skey }: { skey: string }) {
+interface ConversationViewProps {
+  skey: string
+}
+
+export function ConversationView(props: ConversationViewProps) {
   const queryClient = useQueryClient()
-  const { conversation, error: loadError } = useConversation(skey)
+  const { conversation, error: loadError } = useConversation(props.skey)
   // The user message being edited, by rkey, so the composer reads it from the conversation.
   const [editingRkey, setEditingRkey] = useState<string | null>(null)
   const { models } = useModels()
 
   const messages = conversation?.messages ?? []
   /** Refresh the conversation from the PDS after a change to it. */
-  const refresh = () => queryClient.invalidateQueries({ queryKey: conversationRefreshKey(skey) })
+  const refresh = () =>
+    queryClient.invalidateQueries({ queryKey: conversationRefreshKey(props.skey) })
   const pending = messages.filter((m) => m.record.status === 'pending').map((m) => m.rkey)
-  const { follow } = useReplyStream(skey, pending)
+  const { follow } = useReplyStream(props.skey, pending)
 
   const { focus, branch, pick } = useBranch(messages)
   const section = useRef<HTMLElement>(null)
@@ -50,14 +55,14 @@ export function ConversationView({ skey }: { skey: string }) {
   const leaf = branch.at(-1)?.message
   const editing = messages.find((m) => m.rkey === editingRkey)
   const editingParent = editing?.record.parent as string | undefined
-  const blobUrl = blobUrlFor(`/api/conversations/${skey}`)
+  const blobUrl = blobUrlFor(`/api/conversations/${props.skey}`)
   const title = (conversation?.info?.title as string | undefined) ?? 'New chat'
 
   const regenerate = async (userRkey: string, model: ModelRef | null) => {
     const body = model ? { model } : {}
     const result = await read(
       api.turns.conversations[':skey'].messages[':rkey'].regenerate.$post(
-        { param: { skey, rkey: userRkey } },
+        { param: { skey: props.skey, rkey: userRkey } },
         json(body),
       ),
     )
@@ -69,7 +74,7 @@ export function ConversationView({ skey }: { skey: string }) {
   const stop = async (replyRkey: string) => {
     const { cancelled } = await read(
       api.turns.conversations[':skey'].messages[':rkey'].cancel.$post({
-        param: { skey, rkey: replyRkey },
+        param: { skey: props.skey, rkey: replyRkey },
       }),
     )
     if (!cancelled)
@@ -77,11 +82,13 @@ export function ConversationView({ skey }: { skey: string }) {
   }
 
   const sync = async () => {
-    await read(api.chats.conversations[':skey'].sync.$post({ param: { skey } }))
+    await read(api.chats.conversations[':skey'].sync.$post({ param: { skey: props.skey } }))
   }
 
   const rename = async (title: string) => {
-    await read(api.chats.conversations[':skey'].$patch({ param: { skey } }, json({ title })))
+    await read(
+      api.chats.conversations[':skey'].$patch({ param: { skey: props.skey } }, json({ title })),
+    )
   }
 
   const renamingTitle = useMutation({ mutationFn: rename, onSuccess: refresh })
@@ -99,7 +106,7 @@ export function ConversationView({ skey }: { skey: string }) {
   return (
     <section className="conversation" ref={section}>
       <ConversationHeader
-        skey={skey}
+        skey={props.skey}
         title={title}
         onRename={(title, onSaved) => renamingTitle.mutate(title, { onSuccess: onSaved })}
         onSync={() => syncing.mutate()}
@@ -128,7 +135,7 @@ export function ConversationView({ skey }: { skey: string }) {
             key={message.rkey}
             id={`m-${message.rkey}`}
             record={record}
-            pending={<ReplyStream skey={skey} rkey={message.rkey} />}
+            pending={<ReplyStream skey={props.skey} rkey={message.rkey} />}
             blobUrl={blobUrl}
             siblings={{
               index,
@@ -143,7 +150,7 @@ export function ConversationView({ skey }: { skey: string }) {
         <Composer
           // Editing another message starts the composer over from that message.
           key={`edit-${editing.rkey}`}
-          skey={skey}
+          skey={props.skey}
           parent={editingParent}
           inherited={inheritedModel(branch, editingParent)}
           initialText={messageText(editing.record)}
@@ -158,7 +165,7 @@ export function ConversationView({ skey }: { skey: string }) {
       ) : (
         <Composer
           key="reply"
-          skey={skey}
+          skey={props.skey}
           parent={leaf?.rkey}
           inherited={inheritedModel(branch, leaf?.rkey)}
           onSent={(sent) => {
@@ -171,21 +178,25 @@ export function ConversationView({ skey }: { skey: string }) {
   )
 }
 
-/** Regenerate a reply with the same model, or with a model chosen for this reply. */
-function RegenerateAction({
-  models,
-  onRegenerate,
-}: {
+interface RegenerateActionProps {
   models: ModelOption[]
   onRegenerate: (model: ModelRef | null) => void
-}) {
+}
+
+/** Regenerate a reply with the same model, or with a model chosen for this reply. */
+function RegenerateAction(props: RegenerateActionProps) {
   const [model, setModel] = useState<ModelRef | null>(null)
   return (
     <>
-      <ModelSelect aria-label="Regenerate with" models={models} value={model} onChange={setModel}>
+      <ModelSelect
+        aria-label="Regenerate with"
+        models={props.models}
+        value={model}
+        onChange={setModel}
+      >
         <option value="">Same model</option>
       </ModelSelect>
-      <button type="button" onClick={() => onRegenerate(model)}>
+      <button type="button" onClick={() => props.onRegenerate(model)}>
         Regenerate
       </button>
     </>

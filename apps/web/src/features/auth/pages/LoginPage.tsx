@@ -1,19 +1,16 @@
 import type { ReactNode } from 'react'
 
-export function LoginPage({
-  error,
-  next,
-  notice,
-  children,
-}: {
+interface Props {
   error?: string
   next?: string
   notice?: string | null
   children?: ReactNode
-}) {
+}
+
+export function LoginPage(props: Props) {
   return (
     <main className="login">
-      {notice && <p role="status">{notice}</p>}
+      {props.notice && <p role="status">{props.notice}</p>}
       <h1>Sign in</h1>
       <form method="get" action="/oauth/login">
         <label>
@@ -25,11 +22,11 @@ export function LoginPage({
             required
           />
         </label>
-        {next && <input type="hidden" name="next" value={next} />}
+        {props.next && <input type="hidden" name="next" value={props.next} />}
         <button type="submit">Sign in</button>
       </form>
-      {error && <p role="alert">{error}</p>}
-      {children}
+      {props.error && <p role="alert">{props.error}</p>}
+      {props.children}
     </main>
   )
 }

@@ -31,14 +31,19 @@ export function AccessAdmin() {
   )
 }
 
-function AccessForm({ initial, roleNames }: { initial: Access; roleNames: string[] }) {
+interface Props {
+  initial: Access
+  roleNames: string[]
+}
+
+function AccessForm(props: Props) {
   const queryClient = useQueryClient()
   const save = useMutation({
     mutationFn: (value: Access) => read(api.admin.access.$put({}, json(value))),
     onSuccess: (saved) => queryClient.setQueryData(adminAccessQuery.queryKey, saved),
   })
   const form = useForm({
-    defaultValues: initial,
+    defaultValues: props.initial,
     onSubmit: ({ value }) => save.mutate(value),
   })
   const registration = useFormStore(form.store, (state) => state.values.registration)
@@ -77,7 +82,7 @@ function AccessForm({ initial, roleNames }: { initial: Access; roleNames: string
             <form.Field name="inviteRoles">
               {(field) => (
                 <RolePicker
-                  names={roleNames}
+                  names={props.roleNames}
                   picked={field.state.value}
                   onChange={field.handleChange}
                 />

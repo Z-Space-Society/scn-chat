@@ -46,6 +46,8 @@ Admins configure plugins, global models, roles, access, and every other runtime 
 
 The web UI stays plain, with minimal code and styling, and easy for a forker to change. Its look will come from a theme of design tokens, which a designer will build, so core components carry as few visual decisions as possible.
 
+React components take `props: Props`, declared as an `interface`, and read `props.example`, rather than destructuring props in the signature. Destructure only the values the component builds other variables from.
+
 ## Lexicons
 
 - Lexicons live in `lexicons/network/sharedcomputer/chat/`. Once published, only add optional fields, new union members, or new record types. Never rename, remove, or tighten anything.

@@ -7,9 +7,13 @@ import { adminInvitesQuery, adminRolesQuery, adminUsersQuery } from '../queries.
 
 type Suspension = { at: string; by: string | null; reason: string | null }
 
+interface UsersAdminProps {
+  q: string
+}
+
 /** Accounts, with their roles and suspensions, and the people added who haven't signed in yet. */
-export function UsersAdmin({ q }: { q: string }) {
-  const users = useInfiniteQuery(adminUsersQuery(q))
+export function UsersAdmin(props: UsersAdminProps) {
+  const users = useInfiniteQuery(adminUsersQuery(props.q))
   const roles = useQuery(adminRolesQuery)
   const queryClient = useQueryClient()
   const usersChanged = () => queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
@@ -58,7 +62,7 @@ export function UsersAdmin({ q }: { q: string }) {
       <h2>Users</h2>
       <Invites />
       <h3>Accounts</h3>
-      <UserSearch q={q} />
+      <UserSearch q={props.q} />
       <table>
         <thead>
           <tr>
@@ -137,15 +141,19 @@ export function UsersAdmin({ q }: { q: string }) {
   )
 }
 
+interface UserSearchProps {
+  q: string
+}
+
 /** The search box, which follows the URL's `q` when it changes, as when the sidebar link clears it. */
-function UserSearch({ q }: { q: string }) {
+function UserSearch(props: UserSearchProps) {
   const navigate = useNavigate()
-  const [search, setSearch] = useState(q)
+  const [search, setSearch] = useState(props.q)
   // Updated while rendering rather than by remounting, so the box keeps focus after a search.
-  const [shownQ, setShownQ] = useState(q)
-  if (q !== shownQ) {
-    setShownQ(q)
-    setSearch(q)
+  const [shownQ, setShownQ] = useState(props.q)
+  if (props.q !== shownQ) {
+    setShownQ(props.q)
+    setSearch(props.q)
   }
   return (
     <form
@@ -170,24 +178,21 @@ function UserSearch({ q }: { q: string }) {
   )
 }
 
-function SuspendControl({
-  name,
-  suspension,
-  onSuspend,
-  onRestore,
-}: {
+interface SuspendControlProps {
   name: string
   suspension: Suspension | null
   onSuspend: (reason: string) => void
   onRestore: () => void
-}) {
+}
+
+function SuspendControl(props: SuspendControlProps) {
   const [reason, setReason] = useState('')
-  if (suspension)
+  if (props.suspension)
     return (
       <>
-        Suspended by {suspension.by}
-        {suspension.reason && `: ${suspension.reason}`}{' '}
-        <button type="button" onClick={onRestore}>
+        Suspended by {props.suspension.by}
+        {props.suspension.reason && `: ${props.suspension.reason}`}{' '}
+        <button type="button" onClick={props.onRestore}>
           Restore
         </button>
       </>
@@ -196,11 +201,11 @@ function SuspendControl({
     <form
       onSubmit={(e) => {
         e.preventDefault()
-        onSuspend(reason)
+        props.onSuspend(reason)
       }}
     >
       <input
-        aria-label={`Reason for suspending ${name}`}
+        aria-label={`Reason for suspending ${props.name}`}
         placeholder="Reason, seen only by admins"
         value={reason}
         onChange={(e) => setReason(e.target.value)}

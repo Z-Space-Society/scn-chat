@@ -10,7 +10,7 @@ import { useModels } from '../../models/hooks/useModels.ts'
 import { sameModel } from '../../models/models.ts'
 import { attachmentTypesQuery } from '../queries.ts'
 
-export type ComposerProps = {
+export interface ComposerProps {
   skey: string
   parent?: string
   /** The model of the nearest completed reply above `parent`, which the server falls back to. */
@@ -46,16 +46,9 @@ const uploadAttachment = (file: File) =>
   )
 
 /** The message box, with model and effort choice and attachments. */
-export function Composer({
-  skey,
-  parent,
-  inherited = null,
-  initialText = '',
-  onSent,
-  onCancel,
-}: ComposerProps) {
-  const [text, setText] = useState(initialText)
-  const { models, fallback } = useModels(inherited)
+export function Composer(props: ComposerProps) {
+  const [text, setText] = useState(props.initialText ?? '')
+  const { models, fallback } = useModels(props.inherited ?? null)
   // The chosen model by reference, so its capabilities come from the current catalog.
   const [chosenModel, setChosenModel] = useState<ModelRef | null>(null)
   const model = chosenModel && models.find((m) => sameModel(m, chosenModel))
@@ -103,18 +96,19 @@ export function Composer({
     }
     const sent = await read(
       api.turns.conversations[':skey'].messages.$post(
-        { param: { skey } },
-        json({ parent, parts, generation }),
+        { param: { skey: props.skey } },
+        json({ parent: props.parent, parts, generation }),
       ),
     )
     setText('')
     setAttachments([])
-    onSent({ rkey: sent.rkey, replyRkey: sent.replyRkey })
+    props.onSent({ rkey: sent.rkey, replyRkey: sent.replyRkey })
   }
   const sending = useMutation({
     mutationFn: send,
     // Refreshing picks up the sent message without waiting for the stream.
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: conversationRefreshKey(skey) }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: conversationRefreshKey(props.skey) }),
   })
   const submit = () => {
     setRefused(null)
@@ -179,8 +173,8 @@ export function Composer({
         <button type="submit" disabled={needsModel || uploading > 0}>
           Send
         </button>
-        {onCancel && (
-          <button type="button" onClick={onCancel}>
+        {props.onCancel && (
+          <button type="button" onClick={props.onCancel}>
             Cancel
           </button>
         )}

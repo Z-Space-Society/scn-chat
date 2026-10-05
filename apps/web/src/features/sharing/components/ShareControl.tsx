@@ -8,10 +8,15 @@ import { sharingQuery } from '../queries.ts'
 type Mode = 'private' | 'people' | 'public'
 type Settings = { mode: Mode; members: { did: string; handle: string | null }[] }
 
+interface ShareControlProps {
+  skey: string
+  ownerDid: string
+}
+
 /** Who can read this conversation, and its link. */
-export function ShareControl({ skey, ownerDid }: { skey: string; ownerDid: string }) {
+export function ShareControl(props: ShareControlProps) {
   const [open, setOpen] = useState(false)
-  const settings = useQuery({ ...sharingQuery(skey), enabled: open })
+  const settings = useQuery({ ...sharingQuery(props.skey), enabled: open })
   if (!open) {
     return (
       <button type="button" onClick={() => setOpen(true)}>
@@ -23,8 +28,8 @@ export function ShareControl({ skey, ownerDid }: { skey: string; ownerDid: strin
     <SharingForm
       // Start over from the stored settings whenever they load or change.
       key={settings.dataUpdatedAt}
-      skey={skey}
-      link={`${location.origin}/shared/${ownerDid}/${skey}`}
+      skey={props.skey}
+      link={`${location.origin}/shared/${props.ownerDid}/${props.skey}`}
       settings={settings.data}
       loadError={settings.error ? messageOf(settings.error) : null}
       onClose={() => setOpen(false)}
@@ -32,19 +37,15 @@ export function ShareControl({ skey, ownerDid }: { skey: string; ownerDid: strin
   )
 }
 
-function SharingForm({
-  skey,
-  link,
-  settings,
-  loadError,
-  onClose,
-}: {
+interface SharingFormProps {
   skey: string
   link: string
   settings: Settings | undefined
   loadError: string | null
   onClose: () => void
-}) {
+}
+
+function SharingForm(props: SharingFormProps) {
   const queryClient = useQueryClient()
   const save = useMutation({
     mutationFn: ({ mode, members }: { mode: Mode; members: string }) => {
@@ -54,22 +55,22 @@ function SharingForm({
         .filter(Boolean)
       return read(
         api.sharing.conversations[':skey'].sharing.$put(
-          { param: { skey } },
+          { param: { skey: props.skey } },
           json({ mode, members: list }),
         ),
       )
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: sharingQuery(skey).queryKey }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: sharingQuery(props.skey).queryKey }),
   })
   const form = useForm({
     defaultValues: {
-      mode: settings?.mode ?? ('private' as Mode),
-      members: settings?.members.map((m) => m.handle ?? m.did).join(', ') ?? '',
+      mode: props.settings?.mode ?? ('private' as Mode),
+      members: props.settings?.members.map((m) => m.handle ?? m.did).join(', ') ?? '',
     },
     onSubmit: ({ value }) => save.mutate(value),
   })
   const mode = useFormStore(form.store, (state) => state.values.mode)
-  const error = save.error ? messageOf(save.error) : loadError
+  const error = save.error ? messageOf(save.error) : props.loadError
   return (
     <fieldset>
       <legend>Sharing</legend>
@@ -101,8 +102,8 @@ function SharingForm({
       <button type="button" onClick={() => void form.handleSubmit()}>
         Save
       </button>
-      {mode !== 'private' && <input aria-label="Link" readOnly value={link} />}
-      <button type="button" onClick={onClose}>
+      {mode !== 'private' && <input aria-label="Link" readOnly value={props.link} />}
+      <button type="button" onClick={props.onClose}>
         Close
       </button>
       {error && <p role="alert">{error}</p>}

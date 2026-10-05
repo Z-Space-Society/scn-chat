@@ -38,8 +38,12 @@ type Change = { options: Record<string, unknown>; enabled: boolean; clearSecrets
 
 const noCapabilities: Capabilities = { vision: false, reasoning: false, tools: false }
 
+interface PluginAdminProps {
+  id: string
+}
+
 /** One plugin on its own page: its options, its provider models, and its removal. */
-export function PluginAdmin({ id }: { id: string }) {
+export function PluginAdmin(props: PluginAdminProps) {
   const plugins = useQuery(adminPluginsQuery)
   const models = useQuery(adminModelsQuery)
   const roles = useQuery(adminRolesQuery)
@@ -47,17 +51,17 @@ export function PluginAdmin({ id }: { id: string }) {
   const pluginsChanged = usePluginsChanged()
   const save = useMutation({
     mutationFn: (change: Change) =>
-      read(api.admin.plugins[':id'].$put({ param: { id } }, json(change))),
+      read(api.admin.plugins[':id'].$put({ param: { id: props.id } }, json(change))),
     onSuccess: pluginsChanged,
   })
   const remove = useMutation({
-    mutationFn: () => read(api.admin.plugins[':id'].$delete({ param: { id } })),
+    mutationFn: () => read(api.admin.plugins[':id'].$delete({ param: { id: props.id } })),
     onSuccess: async () => {
       await navigate({ to: '/admin/plugins' })
       await pluginsChanged()
     },
   })
-  const instance = plugins.data?.find((candidate) => candidate.id === id)
+  const instance = plugins.data?.find((candidate) => candidate.id === props.id)
   const loadError = plugins.error ?? models.error ?? roles.error
   const error = lastError(save, remove) ?? (loadError && messageOf(loadError))
   return (
@@ -90,15 +94,7 @@ export function PluginAdmin({ id }: { id: string }) {
   )
 }
 
-function PluginForm({
-  instance,
-  models,
-  roleNames,
-  issues,
-  saved,
-  onSave,
-  onRemove,
-}: {
+interface PluginFormProps {
   instance: Instance
   models: AdminModel[]
   roleNames: string[]
@@ -106,14 +102,16 @@ function PluginForm({
   saved: boolean
   onSave: (change: Change) => void
   onRemove: () => void
-}) {
+}
+
+function PluginForm(props: PluginFormProps) {
   const form = useForm({
     defaultValues: {
-      options: instance.options,
-      enabled: instance.enabled,
+      options: props.instance.options,
+      enabled: props.instance.enabled,
       clearSecrets: [],
     } as Change,
-    onSubmit: ({ value }) => onSave(value),
+    onSubmit: ({ value }) => props.onSave(value),
   })
   // The provider blocks list models with the options as they are in the form, saved or not.
   const options = useFormStore(form.store, (state) => state.values.options)
@@ -137,23 +135,23 @@ function PluginForm({
             </label>
           )}
         </form.Field>
-        {instance.schema && (
+        {props.instance.schema && (
           <form.Field name="clearSecrets">
             {(cleared) => (
               <form.Field name="options">
                 {(field) => (
                   <SchemaFields
-                    schema={instance.schema as Schema}
+                    schema={props.instance.schema as Schema}
                     values={field.state.value}
-                    secretFields={instance.secretFields}
-                    secretsSet={instance.secretsSet}
+                    secretFields={props.instance.secretFields}
+                    secretsSet={props.instance.secretsSet}
                     cleared={cleared.state.value}
                     onClear={(key, clear) =>
                       cleared.handleChange((current) =>
                         clear ? [...current, key] : current.filter((name) => name !== key),
                       )
                     }
-                    issues={issues}
+                    issues={props.issues}
                     onChange={(key, value) =>
                       field.handleChange((current) => ({ ...current, [key]: value }))
                     }
@@ -164,39 +162,35 @@ function PluginForm({
           </form.Field>
         )}
         <button type="submit">Save</button>{' '}
-        <button type="button" onClick={onRemove}>
+        <button type="button" onClick={props.onRemove}>
           Remove plugin
         </button>
-        {saved && <span>Saved.</span>}
+        {props.saved && <span>Saved.</span>}
       </form>
-      {instance.providers.map((provider) => (
+      {props.instance.providers.map((provider) => (
         <ProviderModels
           key={provider.id}
-          instance={instance}
+          instance={props.instance}
           options={options}
           provider={provider}
-          models={models.filter((model) => model.provider === provider.id)}
-          roleNames={roleNames}
+          models={props.models.filter((model) => model.provider === provider.id)}
+          roleNames={props.roleNames}
         />
       ))}
     </>
   )
 }
 
-/** A provider's admin models, with a model list fetched using the plugin form's current options. */
-function ProviderModels({
-  instance,
-  options,
-  provider,
-  models,
-  roleNames,
-}: {
+interface ProviderModelsProps {
   instance: Instance
   options: Record<string, unknown>
   provider: Provider
   models: AdminModel[]
   roleNames: string[]
-}) {
+}
+
+/** A provider's admin models, with a model list fetched using the plugin form's current options. */
+function ProviderModels(props: ProviderModelsProps) {
   const [typed, setTyped] = useState('')
   const modelsChanged = useModelsChanged()
   const add = useMutation({
@@ -217,35 +211,46 @@ function ProviderModels({
       read(
         api.admin.plugins['list-models'].$post(
           {},
-          json({ package: instance.package, instanceId: instance.id, options }),
+          json({
+            package: props.instance.package,
+            instanceId: props.instance.id,
+            options: props.options,
+          }),
         ),
       ),
   })
-  const listed = (list.data?.models ?? []).filter((model) => model.provider === provider.id)
+  const listed = (list.data?.models ?? []).filter((model) => model.provider === props.provider.id)
   // A model a provider lists starts with the user role and the capabilities the list reports.
   const offer = (id: string, name: string, capabilities: Capabilities) =>
-    add.mutate({ provider: provider.id, id, name, capabilities, roles: ['user'], default: false })
-  const offered = new Set(models.map((model) => model.id))
+    add.mutate({
+      provider: props.provider.id,
+      id,
+      name,
+      capabilities,
+      roles: ['user'],
+      default: false,
+    })
+  const offered = new Set(props.models.map((model) => model.id))
   const error = lastError(add, change, remove, list)
   return (
     <div>
-      <h4>Models for {provider.name}</h4>
-      {!provider.hasAdminKey && <p>Add an admin key to offer this provider's models.</p>}
+      <h4>Models for {props.provider.name}</h4>
+      {!props.provider.hasAdminKey && <p>Add an admin key to offer this provider's models.</p>}
       <ul>
-        {models.map((model) => (
+        {props.models.map((model) => (
           <li key={model.id}>
             <ModelEditor
               // Start over from the stored model whenever it changes.
               key={JSON.stringify(model)}
               model={model}
-              roleNames={roleNames}
+              roleNames={props.roleNames}
               onSave={change.mutate}
               onRemove={() => remove.mutate(model)}
             />
           </li>
         ))}
       </ul>
-      {provider.listsModels && (
+      {props.provider.listsModels && (
         <button type="button" onClick={() => list.mutate()}>
           Refresh model list
         </button>
@@ -258,7 +263,7 @@ function ProviderModels({
                 <input
                   type="checkbox"
                   checked={offered.has(model.id)}
-                  disabled={offered.has(model.id) || !provider.hasAdminKey}
+                  disabled={offered.has(model.id) || !props.provider.hasAdminKey}
                   onChange={() => offer(model.id, model.name, model.capabilities)}
                 />{' '}
                 {model.name} ({model.id})
@@ -275,13 +280,13 @@ function ProviderModels({
         }}
       >
         <input
-          aria-label={`Model ID for ${provider.name}`}
+          aria-label={`Model ID for ${props.provider.name}`}
           placeholder="Model ID"
           value={typed}
           onChange={(e) => setTyped(e.target.value)}
           required
         />
-        <button type="submit" disabled={!provider.hasAdminKey}>
+        <button type="submit" disabled={!props.provider.hasAdminKey}>
           Add model
         </button>
       </form>
@@ -290,21 +295,18 @@ function ProviderModels({
   )
 }
 
-function ModelEditor({
-  model,
-  roleNames,
-  onSave,
-  onRemove,
-}: {
+interface ModelEditorProps {
   model: AdminModel
   roleNames: string[]
   onSave: (model: AdminModel) => void
   onRemove: () => void
-}) {
-  const form = useForm({ defaultValues: model, onSubmit: ({ value }) => onSave(value) })
+}
+
+function ModelEditor(props: ModelEditorProps) {
+  const form = useForm({ defaultValues: props.model, onSubmit: ({ value }) => props.onSave(value) })
   return (
     <fieldset>
-      <legend>{model.id}</legend>
+      <legend>{props.model.id}</legend>
       <form.Field name="name">
         {(field) => (
           <label>
@@ -332,7 +334,7 @@ function ModelEditor({
         <form.Field name="roles">
           {(field) => (
             <RolePicker
-              names={roleNames}
+              names={props.roleNames}
               picked={field.state.value}
               onChange={field.handleChange}
             />
@@ -342,7 +344,7 @@ function ModelEditor({
       <button type="button" onClick={() => void form.handleSubmit()}>
         Save model
       </button>{' '}
-      <button type="button" onClick={onRemove}>
+      <button type="button" onClick={props.onRemove}>
         Remove
       </button>
     </fieldset>

@@ -6,7 +6,7 @@ import type { StreamedReply } from '../lib/reply-stream.ts'
 type Part = Record<string, unknown> & { $type: string }
 type Blob = { ref: { $link: string }; mimeType: string }
 
-export type MessageViewProps = {
+export interface MessageViewProps {
   id?: string
   record: Record<string, unknown>
   /** What a pending reply shows in place of "Thinking...", such as its stream. */
@@ -35,14 +35,19 @@ function withKeys(parts: Part[]): { part: Part; key: string }[] {
   })
 }
 
+interface MarkdownImageProps {
+  src: string
+  alt?: string
+}
+
 /** An image from model output, loaded only on click, since loading it could leak the chat through its URL. */
-function MarkdownImage({ src, alt }: { src: string; alt?: string }) {
+function MarkdownImage(props: MarkdownImageProps) {
   const [shown, setShown] = useState(false)
-  if (shown) return <img src={src} alt={alt ?? ''} referrerPolicy="no-referrer" />
+  if (shown) return <img src={props.src} alt={props.alt ?? ''} referrerPolicy="no-referrer" />
   return (
     <span className="image-placeholder">
-      {alt && <>{alt} </>}
-      <code>{src}</code>{' '}
+      {props.alt && <>{props.alt} </>}
+      <code>{props.src}</code>{' '}
       <button type="button" onClick={() => setShown(true)}>
         Load image
       </button>
@@ -58,73 +63,86 @@ const markdownComponents: Components = {
 
 const remarkPlugins = [remarkGfm]
 
+interface MarkdownProps {
+  text: string
+}
+
 /** Assistant text as Markdown. Raw HTML in it is not rendered. */
-function Markdown({ text }: { text: string }) {
+function Markdown(props: MarkdownProps) {
   return (
     <div className="markdown">
       <ReactMarkdown remarkPlugins={remarkPlugins} components={markdownComponents}>
-        {text}
+        {props.text}
       </ReactMarkdown>
     </div>
   )
 }
 
-function Text({ text, role }: { text: string; role: unknown }) {
-  return role === 'assistant' ? <Markdown text={text} /> : <p className="text">{text}</p>
+interface TextProps {
+  text: string
+  role: unknown
 }
 
-function PartView({
-  part,
-  role,
-  blobUrl,
-}: {
+function Text(props: TextProps) {
+  return props.role === 'assistant' ? (
+    <Markdown text={props.text} />
+  ) : (
+    <p className="text">{props.text}</p>
+  )
+}
+
+interface PartViewProps {
   part: Part
   role: unknown
   blobUrl: MessageViewProps['blobUrl']
-}) {
-  switch (kind(part)) {
+}
+
+function PartView(props: PartViewProps) {
+  switch (kind(props.part)) {
     case 'textPart':
-      return <Text text={part.text as string} role={role} />
+      return <Text text={props.part.text as string} role={props.role} />
     case 'reasoningPart':
       return (
         <details>
           <summary>Reasoning</summary>
-          <p className="text">{(part.text as string | undefined) ?? ''}</p>
+          <p className="text">{(props.part.text as string | undefined) ?? ''}</p>
         </details>
       )
     case 'toolCallPart':
       return (
         <details>
-          <summary>Tool call: {part.tool as string}</summary>
-          <pre>{part.input as string}</pre>
+          <summary>Tool call: {props.part.tool as string}</summary>
+          <pre>{props.part.input as string}</pre>
         </details>
       )
     case 'toolResultPart':
       return (
         <details>
-          <summary>{part.isError ? 'Tool error' : 'Tool result'}</summary>
-          <pre>{part.output as string}</pre>
+          <summary>{props.part.isError ? 'Tool error' : 'Tool result'}</summary>
+          <pre>{props.part.output as string}</pre>
         </details>
       )
     case 'sourcePart':
       return (
-        <a href={part.url as string} target="_blank" rel="noreferrer">
-          {(part.title as string | undefined) ?? (part.url as string)}
+        <a href={props.part.url as string} target="_blank" rel="noreferrer">
+          {(props.part.title as string | undefined) ?? (props.part.url as string)}
         </a>
       )
     case 'imagePart': {
-      const image = part.image as Blob
+      const image = props.part.image as Blob
       return (
         <img
-          src={blobUrl(image.ref.$link, image.mimeType)}
-          alt={(part.alt as string | undefined) ?? ''}
+          src={props.blobUrl(image.ref.$link, image.mimeType)}
+          alt={(props.part.alt as string | undefined) ?? ''}
         />
       )
     }
     case 'filePart': {
-      const file = part.file as Blob
+      const file = props.part.file as Blob
       return (
-        <a href={blobUrl(file.ref.$link)}>{(part.name as string | undefined) ?? 'Attached file'}</a>
+        <a href={props.blobUrl(file.ref.$link)}>
+          {(props.part.name as string | undefined) ?? 'Attached file'}
+        </a>
       )
     }
     default:
@@ -133,24 +151,28 @@ function PartView({
   }
 }
 
+interface SiblingPickerProps {
+  siblings: NonNullable<MessageViewProps['siblings']>
+}
+
 /** Arrows to step between alternative versions of a message. */
-function SiblingPicker({ siblings }: { siblings: NonNullable<MessageViewProps['siblings']> }) {
+function SiblingPicker(props: SiblingPickerProps) {
   return (
     <span className="siblings">
       <button
         type="button"
         aria-label="Previous version"
-        disabled={siblings.index === 0}
-        onClick={() => siblings.onPick(siblings.index - 1)}
+        disabled={props.siblings.index === 0}
+        onClick={() => props.siblings.onPick(props.siblings.index - 1)}
       >
         ‹
       </button>
-      {siblings.index + 1} / {siblings.count}
+      {props.siblings.index + 1} / {props.siblings.count}
       <button
         type="button"
         aria-label="Next version"
-        disabled={siblings.index === siblings.count - 1}
-        onClick={() => siblings.onPick(siblings.index + 1)}
+        disabled={props.siblings.index === props.siblings.count - 1}
+        onClick={() => props.siblings.onPick(props.siblings.index + 1)}
       >
         ›
       </button>
@@ -158,28 +180,36 @@ function SiblingPicker({ siblings }: { siblings: NonNullable<MessageViewProps['s
   )
 }
 
+interface StreamingReplyProps {
+  streaming: StreamedReply
+}
+
 /** The reasoning and text streamed so far, shown until the reply's record arrives. */
-export function StreamingReply({ streaming }: { streaming: StreamedReply }) {
+export function StreamingReply(props: StreamingReplyProps) {
   return (
     <>
-      {streaming.reasoning && (
+      {props.streaming.reasoning && (
         <details>
           <summary>Reasoning</summary>
-          <p className="text">{streaming.reasoning}</p>
+          <p className="text">{props.streaming.reasoning}</p>
         </details>
       )}
-      {streaming.text && <Markdown text={streaming.text} />}
+      {props.streaming.text && <Markdown text={props.streaming.text} />}
     </>
   )
 }
 
+interface StatusProps extends Pick<MessageViewProps, 'record' | 'pending'> {}
+
 /** A line for a message that is still thinking, failed, or was stopped. */
-function Status({ record, pending }: Pick<MessageViewProps, 'record' | 'pending'>) {
-  switch (record.status) {
+function Status(props: StatusProps) {
+  switch (props.record.status) {
     case 'pending':
-      return pending === undefined ? <p>Thinking...</p> : null
+      return props.pending === undefined ? <p>Thinking...</p> : null
     case 'error':
-      return <p role="alert">Error{record.error ? `: ${record.error as string}` : ''}</p>
+      return (
+        <p role="alert">Error{props.record.error ? `: ${props.record.error as string}` : ''}</p>
+      )
     case 'cancelled':
       return <p>Stopped.</p>
     default:
@@ -188,34 +218,35 @@ function Status({ record, pending }: Pick<MessageViewProps, 'record' | 'pending'
 }
 
 /** One message: its parts, its state, sibling controls, and actions. */
-export function MessageView({ id, record, pending, blobUrl, siblings, actions }: MessageViewProps) {
+export function MessageView(props: MessageViewProps) {
+  const record = props.record
   const content = record.content as { $type: string; parts?: Part[] }
   const encrypted = content.$type.endsWith('#encryptedContent')
   const parts = content.parts ?? []
   const sources = parts.filter((part) => kind(part) === 'sourcePart')
   const shown = withKeys(parts.filter((part) => kind(part) !== 'sourcePart'))
   return (
-    <article id={id} className={`message ${record.role as string}`}>
+    <article id={props.id} className={`message ${record.role as string}`}>
       <header>
         <strong>{record.role === 'user' ? 'You' : 'Assistant'}</strong>
-        {siblings && siblings.count > 1 && <SiblingPicker siblings={siblings} />}
+        {props.siblings && props.siblings.count > 1 && <SiblingPicker siblings={props.siblings} />}
       </header>
       {shown.map(({ part, key }) => (
-        <PartView key={key} part={part} role={record.role} blobUrl={blobUrl} />
+        <PartView key={key} part={part} role={record.role} blobUrl={props.blobUrl} />
       ))}
-      {record.status === 'pending' && pending}
+      {record.status === 'pending' && props.pending}
       {sources.length > 0 && (
         <ul>
           {sources.map((part) => (
             <li key={part.url as string}>
-              <PartView part={part} role={record.role} blobUrl={blobUrl} />
+              <PartView part={part} role={record.role} blobUrl={props.blobUrl} />
             </li>
           ))}
         </ul>
       )}
       {encrypted && <p>This message is encrypted.</p>}
-      <Status record={record} pending={pending} />
-      {actions && <footer>{actions}</footer>}
+      <Status record={record} pending={props.pending} />
+      {props.actions && <footer>{props.actions}</footer>}
     </article>
   )
 }
