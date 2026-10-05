@@ -172,6 +172,7 @@ It ends with the rules a fork should keep, linking the ADRs:
 - **Keys and tables.** Part views are keyed by the `$type` fragment, like `textPart`, so they read the same as the lexicon. The tables and the action list are plain objects and arrays in one file each, not registries with registration functions, since the only people adding to them are editing this code.
 - **Fallback.** The web search view falls back to the default view rather than showing an error, so a change in the plugin's output never hides it.
 - **Copy.** It copies the message's text parts, as Markdown for replies, and not its tool output or attachments.
+- **Header operations.** `ConversationHeader` holds the controls and the rename form, and `ConversationView` keeps the rename and sync mutations and passes them in, as it does the operations message actions get. Their errors therefore stay in the conversation's one alert with stop and regenerate, where the action that ran last wins.
 
 ## Acceptance Criteria
 

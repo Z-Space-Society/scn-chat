@@ -4,28 +4,25 @@ import { api, json, read } from '../api.ts'
 import { blobUrlFor } from '../lib/blob-url.ts'
 import { lastError } from '../lib/errors.ts'
 import { inheritedModel, type ModelOption, modelRef } from '../lib/models.ts'
-import { useMe } from '../session.tsx'
 import { messageText } from '../store/core.ts'
 import { conversationRefreshKey, useConversation } from '../store/react.tsx'
 import { Composer } from './Composer.tsx'
+import { ConversationHeader } from './ConversationHeader.tsx'
 import { MessageView } from './MessageView.tsx'
 import { ModelSelect } from './ModelSelect.tsx'
 import { ReplyStream } from './ReplyStream.tsx'
-import { ShareControl } from './ShareControl.tsx'
 import { useBranch } from './useBranch.ts'
 import { useModels } from './useModels.ts'
 import { useReplyStream } from './useReplyStream.ts'
 import { useStickToBottom } from './useStickToBottom.ts'
 
 export function ConversationView({ skey }: { skey: string }) {
-  const me = useMe()
   const queryClient = useQueryClient()
   const { conversation, error: loadError } = useConversation(skey)
   const [editing, setEditing] = useState<{ rkey: string; parent?: string; text: string } | null>(
     null,
   )
   const { models } = useModels()
-  const [renaming, setRenaming] = useState<string | null>(null)
 
   const messages = conversation?.messages ?? []
   /** Refresh the conversation from the PDS after a change to it. */
@@ -80,9 +77,9 @@ export function ConversationView({ skey }: { skey: string }) {
     await read(api.chats.conversations[':skey'].sync.$post({ param: { skey } }))
   }
 
-  const rename = async (value: string) => {
+  const rename = async ({ value, onSaved }: { value: string; onSaved: () => void }) => {
     await read(api.chats.conversations[':skey'].$patch({ param: { skey } }, json({ title: value })))
-    setRenaming(null)
+    onSaved()
   }
 
   const renamingTitle = useMutation({ mutationFn: rename, onSuccess: refresh })
@@ -99,34 +96,12 @@ export function ConversationView({ skey }: { skey: string }) {
 
   return (
     <section className="conversation" ref={section}>
-      <header>
-        {renaming === null ? (
-          <h2>
-            {title}{' '}
-            <button type="button" onClick={() => setRenaming(title)}>
-              Rename
-            </button>
-          </h2>
-        ) : (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              renamingTitle.mutate(renaming)
-            }}
-          >
-            <input
-              aria-label="Title"
-              value={renaming}
-              onChange={(e) => setRenaming(e.target.value)}
-            />
-            <button type="submit">Save</button>
-          </form>
-        )}
-        <button type="button" onClick={() => syncing.mutate()}>
-          Sync
-        </button>
-        {me.storageMode === 'space' && <ShareControl skey={skey} ownerDid={me.did} />}
-      </header>
+      <ConversationHeader
+        skey={skey}
+        title={title}
+        onRename={(value, onSaved) => renamingTitle.mutate({ value, onSaved })}
+        onSync={() => syncing.mutate()}
+      />
       {(error ?? loadError) && <p role="alert">{error ?? loadError}</p>}
       {branch.map(({ message, siblings, index }) => {
         const record = message.record

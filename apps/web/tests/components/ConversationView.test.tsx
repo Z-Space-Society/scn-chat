@@ -351,6 +351,39 @@ describe('ConversationView errors', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('The title is too long')
   })
 
+  it('closes the rename form once the title is saved', async () => {
+    const fetch = vi.fn(async () => Response.json({}))
+    stubFetch(fetch)
+    const store = fakeStore([user('u', 'question')])
+    await renderWith(store, <ConversationView skey="s1" />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Rename' }))
+    await userEvent.clear(screen.getByRole('textbox', { name: 'Title' }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Title' }), 'Floors')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await screen.findByRole('button', { name: 'Rename' })
+    const init = (writes(fetch)[0] as [string, RequestInit])[1]
+    expect(JSON.parse(String(init.body))).toEqual({ title: 'Floors' })
+  })
+
+  it("shows a failed sync in the conversation's one alert, until a later stop succeeds", async () => {
+    stubFetch(
+      vi.fn(async (url: string) =>
+        url.endsWith('/sync')
+          ? Response.json(
+              { error: 'UpstreamFailure', message: 'The PDS is unreachable' },
+              { status: 502 },
+            )
+          : Response.json({ cancelled: true }),
+      ),
+    )
+    const store = fakeStore([user('u', 'q'), reply('u.r0', '', 'u', 'pending')])
+    await renderWith(store, <ConversationView skey="s1" />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Sync' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('The PDS is unreachable')
+    await userEvent.click(screen.getByRole('button', { name: 'Stop' }))
+    await vi.waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
+  })
+
   it('says so when Stop has nothing to stop', async () => {
     stubFetch(vi.fn(async () => Response.json({ cancelled: false })))
     const store = fakeStore([user('u', 'q'), reply('u.r0', '', 'u', 'pending')])
