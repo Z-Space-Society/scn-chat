@@ -47,8 +47,17 @@ afterEach(() => {
 })
 
 /** A server with a signed-in user, answering every other read with an empty body. */
-function signedIn() {
-  const me = { did: 'did:plc:alice', handle: 'alice', storageMode: 'local', roles: ['user'] }
+function signedIn(changes: Record<string, unknown> = {}) {
+  const me = {
+    did: 'did:plc:alice',
+    handle: 'alice',
+    storageMode: 'local',
+    roles: ['user'],
+    admin: false,
+    access: 'full',
+    accessMessage: null,
+    ...changes,
+  }
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
   stubFetch(
     async (url: string) => {
@@ -57,7 +66,12 @@ function signedIn() {
         return Response.json({ backgroundSync: true, allowUserOptOut: false })
       return Response.json({})
     },
-    { '/api/preferences': { preferences: { timezone } } },
+    {
+      '/api/preferences': { preferences: { timezone } },
+      '/api/admin/users?q=': { users: [], cursor: null },
+      '/api/admin/invites': { invites: [] },
+      '/api/admin/roles': { roles: [], environmentAdmins: [] },
+    },
   )
 }
 
@@ -107,6 +121,42 @@ describe('App', () => {
       await screen.findByText('Start a new chat, or pick one from the list.'),
     ).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/')
+  })
+
+  it("sends a viewer to the login page with the server's access message, and signs them out", async () => {
+    signedIn({ access: 'viewer', accessMessage: 'This server is invite-only.' })
+    const assign = vi.fn()
+    vi.stubGlobal('location', { ...window.location, assign })
+    const router = renderApp('/chat/abc')
+    expect(await screen.findByRole('status')).toHaveTextContent('This server is invite-only.')
+    expect(router.state.location.pathname).toBe('/login')
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Sign out' }))
+    await vi.waitFor(() => expect(assign).toHaveBeenCalledWith('/login'))
+    expect(openStore).not.toHaveBeenCalled()
+  })
+
+  it('still opens a shared chat for a viewer', async () => {
+    signedIn({ access: 'viewer', accessMessage: 'This server is invite-only.' })
+    const router = renderApp('/shared/did:plc:alice/3aaa')
+    await vi.waitFor(() => expect(router.state.status).toBe('idle'))
+    expect(router.state.location.pathname).toBe('/shared/did:plc:alice/3aaa')
+  })
+
+  it('sends users who are not admins from the admin area to their chats', async () => {
+    signedIn()
+    const router = renderApp('/admin/roles')
+    expect(
+      await screen.findByText('Start a new chat, or pick one from the list.'),
+    ).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/')
+  })
+
+  it('opens the admin area on its users for an admin', async () => {
+    signedIn({ admin: true })
+    const router = renderApp('/admin')
+    expect(await screen.findByRole('heading', { name: 'Users' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/admin/users')
   })
 
   it('opens the store on the settings page only when an action needs it', async () => {

@@ -25,7 +25,10 @@ export type SyncEngineDeps = {
   resolveSigningKey: (did: string) => Promise<string>
   publicUrl: string
   logger: Logger
-  backfillWindowMs: number
+  /** How old a synced message asking for a reply can be, read on each use. */
+  backfillWindowMs: () => number
+  /** Whether the server may act for the user. Users without access are never synced. */
+  hasAccess: (did: string) => Promise<boolean>
   now?: () => number
 }
 
@@ -48,6 +51,10 @@ export class SyncEngine {
   private async context(did: string): Promise<Context | null> {
     const account = await getAccount(this.deps.db, did)
     if (account?.storageMode !== 'space') return null
+    if (!(await this.deps.hasAccess(did))) {
+      this.deps.logger.debug({ did }, 'not syncing a user without access')
+      return null
+    }
     const chats = this.deps.services.forAccount(account)
     return { account, chats, store: chats.store }
   }
@@ -142,7 +149,7 @@ export class SyncEngine {
     const space = ctx.chats.settingsUri
     const head = await ctx.store.headRev(space)
     const { conversations } = await ctx.chats.listConversations()
-    const cutoff = this.now() - this.deps.backfillWindowMs
+    const cutoff = this.now() - this.deps.backfillWindowMs()
     for (const conversation of conversations) {
       if (Date.parse(conversation.updatedAt) >= cutoff)
         await this.runConversationSync(ctx, conversation.skey, false)

@@ -142,6 +142,7 @@ Then it gives one recipe per common change, each naming the files to touch with 
 - **Add a page:** add a route file under `src/routes/`.
 - **Add a control to the composer.**
 - **Add a settings section:** a route file, a section component in `pages/settings/`, a query, and an entry in `sections` in `pages/settings/layout.tsx` for the sidebar link.
+- **Add an admin section:** the same, under `routes/_app/admin/` and `pages/admin/`, with a server route under `/api/admin`.
 - **Read or write new server data:** a Hono route, its type in `api-types.ts`, a query factory in `queries.ts`, and a mutation.
 - **Add a server tool:** a plugin, as `docs/plugins.md` describes, then its tool view.
 - **Change the look:** `theme.css` for now, until the styling phase replaces it.

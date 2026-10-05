@@ -1,6 +1,19 @@
-export function LoginPage({ error, next }: { error?: string; next?: string }) {
+import type { ReactNode } from 'react'
+
+export function LoginPage({
+  error,
+  next,
+  notice,
+  children,
+}: {
+  error?: string
+  next?: string
+  notice?: string | null
+  children?: ReactNode
+}) {
   return (
     <main className="login">
+      {notice && <p role="status">{notice}</p>}
       <h1>Sign in</h1>
       <form method="get" action="/oauth/login">
         <label>
@@ -16,6 +29,7 @@ export function LoginPage({ error, next }: { error?: string; next?: string }) {
         <button type="submit">Sign in</button>
       </form>
       {error && <p role="alert">{error}</p>}
+      {children}
     </main>
   )
 }

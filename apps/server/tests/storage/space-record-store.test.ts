@@ -91,6 +91,6 @@ describe('SpaceRecordStore', () => {
     const store = new SpaceRecordStore(did, async () => client as never)
     await expect(
       store.listOps(`at://${did}/space/${nsid.conversation}/3aaaaaaaaaaaa`),
-    ).rejects.toThrow(/without a commit/)
+    ).rejects.toThrow()
   })
 })

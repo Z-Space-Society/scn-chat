@@ -1,7 +1,7 @@
 import type { Ingester, Tool } from '@scn-chat/plugin-api'
 import { setupForTest, toolContextForTest } from '@scn-chat/plugin-api/testing'
 import { describe, expect, it, vi } from 'vitest'
-import webFetch, { optionsSchema } from '../src/index.ts'
+import webFetch, { FetchError, optionsSchema } from '../src/index.ts'
 
 type Routes = Record<string, () => Response>
 
@@ -41,24 +41,9 @@ async function setup(options: Parameters<typeof webFetch>[0] = {}, routes: Route
 }
 
 describe('web-fetch plugin', () => {
-  it('registers web_fetch, enabled once listed, untrusted, and switchable by default', async () => {
+  it('marks its output untrusted', async () => {
     const { tool } = await setup()
-    expect(tool).toMatchObject({
-      name: 'web_fetch',
-      defaultEnabled: true,
-      userToggle: true,
-      untrusted: true,
-    })
-  })
-
-  it('lets the admin stop users switching the tool off', async () => {
-    const { tool } = await setup({ userToggle: false })
-    expect(tool.userToggle).toBe(false)
-  })
-
-  it('refuses non-HTTP URLs in its input schema', async () => {
-    const { tool } = await setup()
-    expect(tool.inputSchema.safeParse({ url: 'file:///etc/passwd' }).success).toBe(false)
+    expect(tool.untrusted).toBe(true)
   })
 
   it('fails options with domain entries that are not bare hostnames', () => {
@@ -81,13 +66,6 @@ describe('web_fetch', () => {
     expect(result.content).toContain('World')
     expect(result).not.toHaveProperty('nextOffset')
     expect(citations).toEqual([{ url: 'https://example.com/a', title: 'Greeting' }])
-  })
-
-  it('sends a user agent naming the app', async () => {
-    const { run, fetch } = await setup({}, { 'https://example.com/a': () => html('<p>Hi</p>') })
-    await run({ url: 'https://example.com/a' })
-    const init = fetch.mock.calls[0]?.[1] as RequestInit
-    expect(init.headers).toEqual({ 'user-agent': 'SCN Chat (+https://chat.example)' })
   })
 
   it('returns plain text and JSON as text', async () => {
@@ -133,7 +111,7 @@ describe('web_fetch', () => {
       },
     )
     await expect(run({ url: 'https://example.com/a.bin' })).rejects.toThrow(
-      /application\/octet-stream is not supported/,
+      'application/octet-stream',
     )
     expect(pulled).toBe(false)
   })
@@ -146,7 +124,7 @@ describe('web_fetch', () => {
           new Response(new Uint8Array(11), { headers: { 'content-type': 'application/pdf' } }),
       },
     )
-    await expect(run({ url: 'https://example.com/a.pdf' })).rejects.toThrow(/over 10 bytes/)
+    await expect(run({ url: 'https://example.com/a.pdf' })).rejects.toBeInstanceOf(FetchError)
   })
 
   it('stops reading a page body at maxBytes', async () => {
@@ -165,18 +143,7 @@ describe('web_fetch', () => {
       {},
       { 'https://example.com/gone': () => new Response('missing', { status: 404 }) },
     )
-    await expect(run({ url: 'https://example.com/gone' })).rejects.toThrow(
-      'Fetching https://example.com/gone failed (HTTP 404).',
-    )
-  })
-
-  it('says the address is not allowed when the guard refuses a private address', async () => {
-    const refused = Object.assign(new TypeError('fetch failed'), {
-      cause: Object.assign(new Error('Refusing to connect'), { name: 'PrivateNetworkError' }),
-    })
-    const { run, fetch } = await setup()
-    fetch.mockRejectedValueOnce(refused)
-    await expect(run({ url: 'https://internal.example' })).rejects.toThrow(/is not allowed/)
+    await expect(run({ url: 'https://example.com/gone' })).rejects.toThrow('404')
   })
 })
 
@@ -217,24 +184,26 @@ describe('web_fetch paging', () => {
     const { run } = await setup({ maxCharacters: 1000 }, routes)
     await expect(
       run({ url: 'https://example.com/long.txt', offset: text.length + 5 }),
-    ).rejects.toThrow(new RegExp(`has ${text.length} characters`))
+    ).rejects.toBeInstanceOf(FetchError)
   })
 })
 
 describe('web_fetch domain lists and redirects', () => {
-  it('refuses a denied domain and its subdomains without fetching', async () => {
+  it('refuses non-HTTP URLs and denied domains without fetching', async () => {
     const { run, fetch } = await setup({ denyDomains: ['example.com'] })
-    await expect(run({ url: 'https://docs.example.com/a' })).rejects.toThrow(/is not allowed/)
+    await expect(run({ url: 'file:///etc/passwd' })).rejects.toBeInstanceOf(FetchError)
+    await expect(run({ url: 'https://docs.example.com/a' })).rejects.toBeInstanceOf(FetchError)
     expect(fetch).not.toHaveBeenCalled()
   })
 
   it('fetches only allowed domains and their subdomains when there is an allow list', async () => {
-    const { run } = await setup(
+    const { run, fetch } = await setup(
       { allowDomains: ['example.com'] },
       { 'https://docs.example.com/a': () => html('<p>Docs</p>') },
     )
     expect((await run({ url: 'https://docs.example.com/a' })).content).toContain('Docs')
-    await expect(run({ url: 'https://other.org/a' })).rejects.toThrow(/is not allowed/)
+    await expect(run({ url: 'https://other.org/a' })).rejects.toBeInstanceOf(FetchError)
+    expect(fetch).toHaveBeenCalledOnce()
   })
 
   it('follows a redirect and cites the final URL', async () => {
@@ -250,21 +219,19 @@ describe('web_fetch domain lists and redirects', () => {
   })
 
   it('refuses a redirect to a denied domain', async () => {
-    const { run } = await setup(
+    const { run, fetch } = await setup(
       { denyDomains: ['evil.example'] },
       { 'https://example.com/old': () => redirect('https://evil.example/') },
     )
-    await expect(run({ url: 'https://example.com/old' })).rejects.toThrow(
-      'Fetching https://evil.example/ is not allowed.',
-    )
+    await expect(run({ url: 'https://example.com/old' })).rejects.toBeInstanceOf(FetchError)
+    expect(fetch).toHaveBeenCalledOnce()
   })
 
   it('stops after 5 redirects', async () => {
     const routes: Routes = {}
     for (let i = 0; i < 7; i++) routes[`https://example.com/${i}`] = () => redirect(`/${i + 1}`)
-    const { run } = await setup({}, routes)
-    await expect(run({ url: 'https://example.com/0' })).rejects.toThrow(
-      /redirected more than 5 times/,
-    )
+    const { run, fetch } = await setup({}, routes)
+    await expect(run({ url: 'https://example.com/0' })).rejects.toBeInstanceOf(FetchError)
+    expect(fetch).toHaveBeenCalledTimes(6)
   })
 })

@@ -1,5 +1,10 @@
 {
   "name": "good-plugin",
+  "description": "The good test plugin",
+  "version": "1.0.0",
   "type": "module",
+  "keywords": [
+    "scn-chat-plugin"
+  ],
   "exports": "./index.ts"
 }

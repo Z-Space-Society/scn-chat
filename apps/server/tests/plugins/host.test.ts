@@ -1,7 +1,13 @@
-import { definePlugin, type ModelProvider, type Plugin } from '@scn-chat/plugin-api'
+import {
+  definePlugin,
+  type ModelProvider,
+  type Plugin,
+  type PluginContext,
+} from '@scn-chat/plugin-api'
 import pino from 'pino'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { loadPlugins, PluginLoadError, type PluginServices } from '../../src/plugins/host.ts'
+import { DuplicateRegistrationError } from '../../src/plugins/registry.ts'
 
 const logger = pino({ level: 'silent' })
 const app = { name: 'Test', publicUrl: 'http://127.0.0.1:3000' }
@@ -11,6 +17,8 @@ beforeEach(() => {
     generateText: vi.fn(async () => ({ text: 'generated', finishReason: 'stop' })),
     updateInfo: vi.fn(async () => {}),
     userSettings: vi.fn(async () => ({ enabled: true })),
+    suspendAccount: vi.fn(async () => true),
+    restoreAccount: vi.fn(async () => true),
   }
 })
 
@@ -20,19 +28,7 @@ const plugin = (id: string, setup: Plugin['setup'] = () => {}, apiVersion = 1) =
 const provider = (id: string) => ({ id }) as ModelProvider
 
 describe('loadPlugins', () => {
-  it('calls each setup once, in config order', async () => {
-    const calls: string[] = []
-    await loadPlugins(
-      [
-        plugin('first', () => void calls.push('first')),
-        plugin('second', () => void calls.push('second')),
-      ],
-      { services, logger, app },
-    )
-    expect(calls).toEqual(['first', 'second'])
-  })
-
-  it('waits for async setups before loading the next plugin', async () => {
+  it('calls each setup in config order, waiting for async ones', async () => {
     const calls: string[] = []
     const slow = plugin('slow', async () => {
       await new Promise((resolve) => setTimeout(resolve, 10))
@@ -46,49 +42,43 @@ describe('loadPlugins', () => {
     expect(calls).toEqual(['slow', 'fast'])
   })
 
-  it('fails when two plugins share an ID, naming it', async () => {
-    await expect(
-      loadPlugins([plugin('dup'), plugin('dup')], { services, logger, app }),
-    ).rejects.toThrow(/Two plugins use the ID "dup"/)
-  })
-
-  it('fails for an unsupported apiVersion, naming the plugin and version', async () => {
-    const promise = loadPlugins([plugin('future', () => {}, 2)], { services, logger, app })
-    await expect(promise).rejects.toBeInstanceOf(PluginLoadError)
-    await expect(promise).rejects.toThrow(/"future".*version 2/)
-  })
-
-  it('fails for an invalid plugin ID', async () => {
-    await expect(loadPlugins([plugin('Bad ID')], { services, logger, app })).rejects.toThrow(
-      /must match/,
+  it.each([
+    ['a duplicate ID', [plugin('dup'), plugin('dup')]],
+    ['an unsupported apiVersion', [plugin('future', () => {}, 2)]],
+    ['an invalid ID', [plugin('Bad ID')]],
+  ])('refuses %s', async (_case, plugins) => {
+    await expect(loadPlugins(plugins, { services, logger, app })).rejects.toBeInstanceOf(
+      PluginLoadError,
     )
   })
 
-  it('fails when two plugins register the same provider ID', async () => {
-    const a = plugin('a', (ctx) => ctx.providers.register(provider('anthropic')))
-    const b = plugin('b', (ctx) => ctx.providers.register(provider('anthropic')))
-    await expect(loadPlugins([a, b], { services, logger, app })).rejects.toThrow(/anthropic/)
-  })
-
-  it('fails when two plugins register the same tool name or ingester ID', async () => {
-    const tool = {
-      name: 'search',
-      description: '',
-      inputSchema: {} as never,
-      run: async () => null,
-    }
-    const toolA = plugin('a', (ctx) => ctx.tools.register(tool))
-    const toolB = plugin('b', (ctx) => ctx.tools.register(tool))
-    await expect(loadPlugins([toolA, toolB], { services, logger, app })).rejects.toThrow(/search/)
-    const ingester = {
-      id: 'pdf',
-      accepts: ['application/pdf'],
-      method: 'text' as const,
-      ingest: async () => ({ text: '' }),
-    }
-    const ingA = plugin('a', (ctx) => ctx.ingesters.register(ingester))
-    const ingB = plugin('b', (ctx) => ctx.ingesters.register(ingester))
-    await expect(loadPlugins([ingA, ingB], { services, logger, app })).rejects.toThrow(/pdf/)
+  it.each<[string, Plugin['setup']]>([
+    ['provider', (ctx) => ctx.providers.register(provider('anthropic'))],
+    [
+      'tool',
+      (ctx) =>
+        ctx.tools.register({
+          name: 'search',
+          description: '',
+          inputSchema: {} as never,
+          run: async () => null,
+        }),
+    ],
+    [
+      'ingester',
+      (ctx) =>
+        ctx.ingesters.register({
+          id: 'pdf',
+          accepts: ['application/pdf'],
+          method: 'text',
+          ingest: async () => ({ text: '' }),
+        }),
+    ],
+    ['role source', (ctx) => ctx.roleSources.register({ id: 'members', rolesFor: async () => [] })],
+  ])('fails when two plugins register the same %s', async (_kind, setup) => {
+    await expect(
+      loadPlugins([plugin('a', setup), plugin('b', setup)], { services, logger, app }),
+    ).rejects.toBeInstanceOf(DuplicateRegistrationError)
   })
 
   it("lets a plugin reach other plugins' ingesters by MIME type, with the highest priority winning", async () => {
@@ -117,36 +107,6 @@ describe('loadPlugins', () => {
     expect(found).toEqual({ accepts: true, text: 'ocr', other: undefined })
   })
 
-  it('says no ingester accepts a type none registered', async () => {
-    let accepts: boolean | undefined
-    const probe = plugin('probe', (ctx) => {
-      accepts = ctx.ingesters.accepts('application/pdf')
-    })
-    await loadPlugins([probe], { services, logger, app })
-    expect(accepts).toBe(false)
-  })
-
-  it('gives plugins the services through their context', async () => {
-    let seen: unknown
-    const reader = plugin('reader', async (ctx) => {
-      seen = await ctx.userSettings('did:plc:a')
-      await ctx.conversations.updateInfo(
-        'did:plc:a',
-        'at://x',
-        { title: 'T' },
-        { unlessUserTitled: true },
-      )
-    })
-    await loadPlugins([reader], { services, logger, app })
-    expect(seen).toEqual({ enabled: true })
-    expect(services.updateInfo).toHaveBeenCalledWith(
-      'did:plc:a',
-      'at://x',
-      { title: 'T' },
-      { unlessUserTitled: true },
-    )
-  })
-
   it('runs registered cleanup at close, newest first', async () => {
     const order: string[] = []
     const host = await loadPlugins(
@@ -158,5 +118,105 @@ describe('loadPlugins', () => {
     )
     await host.close()
     expect(order).toEqual(['b', 'a'])
+  })
+})
+
+describe('loadPlugins with onFailure', () => {
+  it('skips a plugin whose setup throws, discards what it registered, and keeps the rest', async () => {
+    const closed: string[] = []
+    const failures: [number, string][] = []
+    const host = await loadPlugins(
+      [
+        plugin('broken', (ctx) => {
+          ctx.providers.register(provider('half'))
+          ctx.onClose(() => void closed.push('broken'))
+          throw new Error('boom')
+        }),
+        plugin('fine', (ctx) => ctx.providers.register(provider('whole'))),
+      ],
+      { services, logger, app },
+      { onFailure: (index, error) => void failures.push([index, error.message]) },
+    )
+    expect(failures).toEqual([[0, 'boom']])
+    expect(host.plugins.map((p) => p.id)).toEqual(['fine'])
+    expect(host.providers.get('half')).toBeUndefined()
+    expect(host.providers.get('whole')).toBeDefined()
+    expect(closed).toEqual(['broken'])
+  })
+
+  it('skips the later of two plugins that register the same provider, keeping the first', async () => {
+    const failures: number[] = []
+    const host = await loadPlugins(
+      [
+        plugin('a', (ctx) => ctx.providers.register(provider('same'))),
+        plugin('b', (ctx) => ctx.providers.register(provider('same'))),
+      ],
+      { services, logger, app },
+      { onFailure: (index) => void failures.push(index) },
+    )
+    expect(failures).toEqual([1])
+    expect(host.providers.owner('same')).toBe('a')
+  })
+
+  it('closes the plugins already loaded when one fails without onFailure', async () => {
+    const closed: string[] = []
+    await expect(
+      loadPlugins(
+        [
+          plugin('first', (ctx) => ctx.onClose(() => void closed.push('first'))),
+          plugin('second', () => {
+            throw new Error('boom')
+          }),
+        ],
+        { services, logger, app },
+      ),
+    ).rejects.toThrow('boom')
+    expect(closed).toEqual(['first'])
+  })
+
+  it('suspends and restores accounts on behalf of the plugin', async () => {
+    let changed: boolean[] = []
+    await loadPlugins(
+      [
+        plugin('members', async (ctx) => {
+          changed = [
+            await ctx.accounts.suspend('did:plc:bob', { reason: 'Application revoked' }),
+            await ctx.accounts.restore('did:plc:bob'),
+          ]
+        }),
+      ],
+      { services, logger, app },
+    )
+    expect(changed).toEqual([true, true])
+    expect(services.suspendAccount).toHaveBeenCalledWith(
+      'did:plc:bob',
+      'plugin:members',
+      'Application revoked',
+    )
+    expect(services.restoreAccount).toHaveBeenCalledWith('did:plc:bob', 'plugin:members')
+  })
+
+  it('reads the app name live', async () => {
+    let name = 'Before'
+    let context: PluginContext | undefined
+    await loadPlugins(
+      [
+        plugin('reader', (ctx) => {
+          context = ctx
+        }),
+      ],
+      {
+        services,
+        logger,
+        app: {
+          get name() {
+            return name
+          },
+          publicUrl: 'http://x',
+        },
+      },
+    )
+    name = 'After'
+    expect(context?.app.name).toBe('After')
   })
 })

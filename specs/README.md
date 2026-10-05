@@ -31,6 +31,10 @@ The later phases of the web rebuild, each spec written before its phase starts:
 - [[extending]]: the web app made easy to change in a fork, with tables of part and tool views, tool status and steps, message actions as a list with Copy, a Markdown seam with code block copy, smaller components, and a guide in `docs/extending.md`.
 - styling: the styling stack, a theme of design tokens for light and dark, and the designer's default look.
 
+Other features:
+
+- [[encrypted-conversations]]
+
 ### Completed
 
 Phase 1, initial build-out, implemented and tested, awaiting a check against a real spaces PDS:
@@ -50,3 +54,6 @@ After the initial build-out:
 
 - [[search]]
 - [[web-search]]
+- [[admin]]
+- [[admin-plugins]]
+- [[admin-settings]]

@@ -33,6 +33,6 @@ describe('httpApi', () => {
     )
     await expect(
       httpApi(fetch as unknown as typeof globalThis.fetch).fetchConversation('3abc'),
-    ).rejects.toThrow(/404: Space not found/)
+    ).rejects.toThrow('Space not found')
   })
 })

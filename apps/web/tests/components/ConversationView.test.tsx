@@ -103,6 +103,9 @@ function renderWith(store: ReturnType<typeof fakeStore>, children: ReactNode, pa
         storageMode: 'local',
         backgroundSync: true,
         roles: ['user'],
+        admin: false,
+        access: 'full',
+        accessMessage: null,
       }}
     >
       <StoreProvider store={store as unknown as StoreClient}>{children}</StoreProvider>

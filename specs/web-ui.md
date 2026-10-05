@@ -2,7 +2,7 @@
 
 ## Summary
 
-The web UI is a deliberately plain React app built on TanStack Start. It exposes every feature with plain HTML elements and almost no styling, so its look can come entirely from a theme later without fighting existing design decisions. It covers signing in, the chat list, a conversation with branch navigation, the composer with model and effort choice and attachments, streaming replies, sharing, and settings for preferences, API keys, and plugin settings. The Hono server owns the process and runs Start inside it, and the app talks to the server only through Hono's typed client, so API changes surface as type errors.
+The web UI is a deliberately plain React app built on TanStack Start. It exposes every feature with plain HTML elements and almost no styling, so its look can come entirely from a theme later without fighting existing design decisions. It covers signing in, the chat list, a conversation with branch navigation, the composer with model and effort choice and attachments, streaming replies, sharing, settings for preferences, API keys, and plugin settings, and the admin area from the admin specs. The Hono server owns the process and runs Start inside it, and the app talks to the server only through Hono's typed client, so API changes surface as type errors.
 
 ## Motivation
 
@@ -19,7 +19,7 @@ The first build used Vite and React with `wouter` and hand-written data hooks. I
 - TanStack Router with file-based routes in `src/routes/`. Each route validates its search params.
 - `hono/client`'s `hc` with the server's exported route types, for a typed API client with no hand-written API types. There are no Start server functions: Hono is the only API.
 - TanStack Query for all data, both server calls and chats read from the browser store through its worker API.
-- TanStack Form for the settings and sharing forms, including the plugin form built from schemas.
+- TanStack Form for the settings, admin, and sharing forms, including the forms built from schemas.
 - `EventSource` for reply streams, read through Query's `streamedQuery`, which Query still exports as `experimental_streamedQuery`.
 - One small stylesheet carried over from the first build, for layout and a stand-in look. No component library or CSS framework yet. The styling stack is the styling spec's decision.
 
@@ -34,9 +34,9 @@ The server process runs Hono, and Hono runs Start, so the server and plugins sta
 
 ### Data
 
-- **Server data.** Query wraps every typed-client call, keyed by route, such as `['models']` or `['preferences']`, from the factories in `src/queries.ts`. Writes are mutations that invalidate the keys they change. A 401 from any call ends the session as before. Queries do not retry or refetch on window focus, so failures show at once, as they did before Query.
+- **Server data.** Query wraps every typed-client call, keyed by route, such as `['models']` or `['preferences']`, from the factories in `src/queries.ts`. Writes are mutations that invalidate the keys they change. A 401 from any call ends the session as before. Queries do not retry or refetch on window focus, so failures show at once, as they did before Query. Admin data is keyed under `['admin']`, such as `['admin', 'roles']`, and the users list is an infinite query, `['admin', 'users', q]`, paged by the server's cursor.
 - **Chats.** The chat list is the query `['conversations']`, a conversation is `['conversation', skey]`, and a search is `['search', q]`, all read from the browser store's worker. `StoreProvider` turns the store's change events into invalidations: an `index` change invalidates the chat list, a `conversation` change invalidates that conversation, and any change invalidates searches. Queries wait while the store is held by another tab. Opening a conversation also refreshes it from the PDS through the query `['conversation', skey, 'refresh']`, whose changes come back as store events.
-- **URL state.** On a conversation, and on a shared conversation, `m` names a focused message, and the branch on screen is its ancestors, then the newest sibling at each level below it. Choosing a sibling, regenerating, or editing replaces `m` with the chosen message, so the URL always names the branch on screen, and reloading or sharing the link keeps it. On every chat route, `q` holds the sidebar search: the box starts from it, and the search goes back into it once typing pauses. The chat layout validates `q` and keeps it on every navigation between chat routes with the router's `retainSearchParams`, so opening a result, another chat, or a new chat keeps the search until it is cleared. Changes to `m` and `q` replace the history entry rather than adding one, and the routes validate them in `src/lib/search-params.ts`.
+- **URL state.** On a conversation, and on a shared conversation, `m` names a focused message, and the branch on screen is its ancestors, then the newest sibling at each level below it. Choosing a sibling, regenerating, or editing replaces `m` with the chosen message, so the URL always names the branch on screen, and reloading or sharing the link keeps it. On every chat route, `q` holds the sidebar search: the box starts from it, and the search goes back into it once typing pauses. The chat layout validates `q` and keeps it on every navigation between chat routes with the router's `retainSearchParams`, so opening a result, another chat, or a new chat keeps the search until it is cleared. On `/admin/users`, `q` holds the users search, set when the search is submitted. Changes to `m` and `q` replace the history entry rather than adding one, and the routes validate them in `src/lib/search-params.ts`.
 
 ### Routes
 
@@ -48,8 +48,12 @@ The server process runs Hono, and Hono runs Start, so the server and plugins sta
 | `/shared/:ownerDid/:skey` | A shared conversation, read-only | No |
 | `/settings` | Preferences, with a sidebar linking to each settings section | Yes |
 | `/settings/api-keys`, `/settings/plugins`, `/settings/sync` | The other settings sections | Yes |
+| `/admin` | Redirects to `/admin/users` | Yes |
+| `/admin/users`, `/admin/roles`, `/admin/access` | The admin area's people sections, from the admin spec | Yes |
+| `/admin/plugins`, `/admin/plugins/new`, `/admin/plugins/:id`, `/admin/models` | Plugins and models, from the admin-plugins spec | Yes |
+| `/admin/general`, `/admin/turns`, `/admin/sync` | The app's settings, from the admin-settings spec | Yes |
 
-The root route's `beforeLoad` asks `/api/me` who is signed in, through the query cache, so on the server the answer reaches the browser with the page. A 401 means signed out, and any other failure shows the root's error. The signed-in routes share the layout `_app`, whose `beforeLoad` redirects signed-out requests to `/login`, so the server answers them with a redirect before rendering anything. `/login` redirects signed-in users to `/`. Inside `_app`, the chat routes share a client-only layout, `_app/_chats`, which opens the browser store, since chats live there. The settings routes are server-rendered, and each prefetches its section's queries in its loader, so the section renders with its data. They open the browser store only for an action that needs it, signing out or rebuilding the device's copy. A shared route shows a sign-in prompt instead of redirecting.
+The root route's `beforeLoad` asks `/api/me` who is signed in, through the query cache, so on the server the answer reaches the browser with the page. A 401 means signed out, and any other failure shows the root's error. The signed-in routes share the layout `_app`, whose `beforeLoad` redirects signed-out requests to `/login`, so the server answers them with a redirect before rendering anything. It redirects viewers, who may only open shared chats, to `/login` too, where they see the server's access message above the sign-in form, with a sign-out button. `/login` redirects other signed-in users to `/`. Inside `_app`, the chat routes share a client-only layout, `_app/_chats`, which opens the browser store, since chats live there. The settings routes are server-rendered, and each prefetches its section's queries in its loader, so the section renders with its data. They open the browser store only for an action that needs it, signing out or rebuilding the device's copy. The admin routes share the layout `_app/admin`, whose `beforeLoad` redirects users who are not admins to `/`. They are server-rendered and prefetch in their loaders like the settings routes, and never open the browser store. A shared route shows a sign-in prompt instead of redirecting.
 
 ### Components
 
@@ -64,11 +68,12 @@ The root route's `beforeLoad` asks `/api/me` who is signed in, through the query
   - A pending reply shows streamed text as it arrives. An errored reply shows its error, and a cancelled reply is labeled as stopped.
 - **Message actions.** On user messages, edit, which opens the composer prefilled and sends a sibling. Editing another message starts the composer over from that message. On assistant replies, regenerate, with an optional model change chosen for that reply alone. While generating, stop.
 - **Composer.** A textarea, a model select from `/api/models`, an effort select for models with the reasoning capability, and an attach button. The effort is sent only while its select is shown. The attach button accepts images only for models with vision, plus any type an ingester supports. Attachments upload when chosen and show a progress state. Enter sends, and Shift+Enter adds a newline. The model select offers "Default model" only when the server can choose a model without one, following chat-turns: an earlier completed reply on the branch names a model, or the user's preferences or the admin set a default. Otherwise the composer asks for a model, and sending waits until one is chosen.
-- **Settings.** A sidebar links back to the chats and to each section, marks the current one, and holds sign out. Only the current section is shown.
+- **Settings.** A sidebar links back to the chats, to the admin area for admins, and to each section, marks the current one, and holds sign out. Only the current section is shown.
   - Preferences: default model, default effort, custom instructions, and generate titles. Saving also stores the browser's time zone, which the app saves on sign-in as well when it differs from the stored one. A stored default model the model list no longer offers, as after its key is deleted, shows as unavailable and is kept on save until the user picks another.
   - API keys: add, list with the last four characters, and delete. For providers with user endpoints, a base URL field.
   - Plugins: one form with a group per plugin and a single Save at the end, which saves every plugin's settings and any tool switches that changed. A group has a checkbox for each tool the user may switch, labeled "Enabled" when it is the plugin's only one and by tool name otherwise, then the fields generated from the plugin's JSON schema.
   - Sync: the background sync switch, shown only when the admin allows users to opt out, and a button that deletes and rebuilds the browser store.
+- **Admin.** The admin specs describe each section. `pages/admin/` mirrors `pages/settings/`: `layout.tsx` for the sidebar, which links back to the chats and to the account settings and marks the current section, a plugin's page counting as Plugins, and one file per section. A form that edits stored values starts from them, and starts over when they change after a save. A failed save shows its message, and the field issues the server returns show beside their fields.
 
 ### Schema forms
 
@@ -92,7 +97,6 @@ While the reader is at the bottom of the conversation, it stays scrolled to the 
 - No code highlighting.
 - No PWA, offline support, or notifications.
 - No mobile-specific layout beyond what the browser does.
-- No admin screens.
 
 ## Edge Cases and Decisions
 
@@ -124,6 +128,10 @@ While the reader is at the bottom of the conversation, it stays scrolled to the 
 - A pending reply keeps showing its streamed text after its stream drops, until the final record arrives, instead of going back to "Thinking...".
 - Each wait on the same replies is its own poll query, keyed by the replies waited on, so the backoff starts over for each new wait.
 - Shared links show a sign-in prompt when signed out, and every other route sends signed-out users to `/login`.
+- Viewers go to `/login` rather than seeing the access message on every route, so the server answers with a redirect before rendering, as it does for signed-out users, and the chat routes never open a store for an account without access. Signing a viewer out deletes nothing, since they have no chats on the device.
+- The admin forms send what the form holds and leave validation to the server, like the settings forms. The server's 400 carries `issues` with field paths, which `ApiError` keeps, so `SchemaFields` can show each one beside its field.
+- The General, Turns, and Sync sections save their groups one at a time, so a failure names the group whose fields its issues belong to.
+- A change to a plugin rebuilds the server's plugins, so it invalidates the admin's plugins and models, and the admin's own models, providers, plugin settings, and attachment types. A change to an admin model invalidates the admin models and the model list.
 
 ## Acceptance Criteria
 
@@ -150,3 +158,6 @@ While the reader is at the bottom of the conversation, it stays scrolled to the 
 - [ ] The sync button syncs the conversation and shows changes written from another client.
 - [ ] The background sync switch appears only when the admin allows opting out, and saves the account setting.
 - [ ] The page title and `application-name` meta tag show the configured app name.
+- [ ] A viewer requesting a chat or settings route is redirected to `/login`, which shows the access message, sign-in, and sign-out, and a shared link still opens for them.
+- [ ] A user who is not an admin requesting an admin route gets a redirect to `/` from the server.
+- [ ] `/admin` opens on the users section, and the users search is kept in the URL.

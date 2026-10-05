@@ -12,14 +12,26 @@ import { Route as rootRouteImport } from './routes/__root.tsx'
 import { Route as AppRouteImport } from './routes/_app.tsx'
 import { Route as LoginRouteImport } from './routes/login.tsx'
 import { Route as AppChatsRouteImport } from './routes/_app/_chats.tsx'
+import { Route as AppAdminRouteImport } from './routes/_app/admin.tsx'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings.tsx'
 import { Route as AppChatsIndexRouteImport } from './routes/_app/_chats/index.tsx'
+import { Route as AppAdminIndexRouteImport } from './routes/_app/admin/index.tsx'
+import { Route as AppAdminAccessRouteImport } from './routes/_app/admin/access.tsx'
+import { Route as AppAdminGeneralRouteImport } from './routes/_app/admin/general.tsx'
+import { Route as AppAdminModelsRouteImport } from './routes/_app/admin/models.tsx'
+import { Route as AppAdminRolesRouteImport } from './routes/_app/admin/roles.tsx'
+import { Route as AppAdminSyncRouteImport } from './routes/_app/admin/sync.tsx'
+import { Route as AppAdminTurnsRouteImport } from './routes/_app/admin/turns.tsx'
+import { Route as AppAdminUsersRouteImport } from './routes/_app/admin/users.tsx'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index.tsx'
 import { Route as AppSettingsApiKeysRouteImport } from './routes/_app/settings/api-keys.tsx'
 import { Route as AppSettingsPluginsRouteImport } from './routes/_app/settings/plugins.tsx'
 import { Route as AppSettingsSyncRouteImport } from './routes/_app/settings/sync.tsx'
 import { Route as SharedOwnerDidSkeyRouteImport } from './routes/shared/$ownerDid/$skey.tsx'
 import { Route as AppChatsChatSkeyRouteImport } from './routes/_app/_chats/chat/$skey.tsx'
+import { Route as AppAdminPluginsIndexRouteImport } from './routes/_app/admin/plugins/index.tsx'
+import { Route as AppAdminPluginsIdRouteImport } from './routes/_app/admin/plugins/$id.tsx'
+import { Route as AppAdminPluginsNewRouteImport } from './routes/_app/admin/plugins/new.tsx'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -34,6 +46,11 @@ const AppChatsRoute = AppChatsRouteImport.update({
   id: '/_chats',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAdminRoute = AppAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -43,6 +60,46 @@ const AppChatsIndexRoute = AppChatsIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AppChatsRoute,
+} as any)
+const AppAdminIndexRoute = AppAdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminAccessRoute = AppAdminAccessRouteImport.update({
+  id: '/access',
+  path: '/access',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminGeneralRoute = AppAdminGeneralRouteImport.update({
+  id: '/general',
+  path: '/general',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminModelsRoute = AppAdminModelsRouteImport.update({
+  id: '/models',
+  path: '/models',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminRolesRoute = AppAdminRolesRouteImport.update({
+  id: '/roles',
+  path: '/roles',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminSyncRoute = AppAdminSyncRouteImport.update({
+  id: '/sync',
+  path: '/sync',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminTurnsRoute = AppAdminTurnsRouteImport.update({
+  id: '/turns',
+  path: '/turns',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminUsersRoute = AppAdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AppAdminRoute,
 } as any)
 const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
   id: '/',
@@ -74,77 +131,162 @@ const AppChatsChatSkeyRoute = AppChatsChatSkeyRouteImport.update({
   path: '/chat/$skey',
   getParentRoute: () => AppChatsRoute,
 } as any)
+const AppAdminPluginsIndexRoute = AppAdminPluginsIndexRouteImport.update({
+  id: '/plugins/',
+  path: '/plugins/',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminPluginsIdRoute = AppAdminPluginsIdRouteImport.update({
+  id: '/plugins/$id',
+  path: '/plugins/$id',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminPluginsNewRoute = AppAdminPluginsNewRouteImport.update({
+  id: '/plugins/new',
+  path: '/plugins/new',
+  getParentRoute: () => AppAdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppChatsIndexRoute
   '/login': typeof LoginRoute
+  '/admin': typeof AppAdminRouteWithChildren
   '/settings': typeof AppSettingsRouteWithChildren
+  '/admin/access': typeof AppAdminAccessRoute
+  '/admin/general': typeof AppAdminGeneralRoute
+  '/admin/models': typeof AppAdminModelsRoute
+  '/admin/roles': typeof AppAdminRolesRoute
+  '/admin/sync': typeof AppAdminSyncRoute
+  '/admin/turns': typeof AppAdminTurnsRoute
+  '/admin/users': typeof AppAdminUsersRoute
   '/settings/api-keys': typeof AppSettingsApiKeysRoute
   '/settings/plugins': typeof AppSettingsPluginsRoute
   '/settings/sync': typeof AppSettingsSyncRoute
   '/shared/$ownerDid/$skey': typeof SharedOwnerDidSkeyRoute
+  '/admin/': typeof AppAdminIndexRoute
   '/settings/': typeof AppSettingsIndexRoute
   '/chat/$skey': typeof AppChatsChatSkeyRoute
+  '/admin/plugins/$id': typeof AppAdminPluginsIdRoute
+  '/admin/plugins/new': typeof AppAdminPluginsNewRoute
+  '/admin/plugins/': typeof AppAdminPluginsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof AppChatsIndexRoute
   '/login': typeof LoginRoute
+  '/admin/access': typeof AppAdminAccessRoute
+  '/admin/general': typeof AppAdminGeneralRoute
+  '/admin/models': typeof AppAdminModelsRoute
+  '/admin/roles': typeof AppAdminRolesRoute
+  '/admin/sync': typeof AppAdminSyncRoute
+  '/admin/turns': typeof AppAdminTurnsRoute
+  '/admin/users': typeof AppAdminUsersRoute
   '/settings/api-keys': typeof AppSettingsApiKeysRoute
   '/settings/plugins': typeof AppSettingsPluginsRoute
   '/settings/sync': typeof AppSettingsSyncRoute
   '/shared/$ownerDid/$skey': typeof SharedOwnerDidSkeyRoute
+  '/admin': typeof AppAdminIndexRoute
   '/settings': typeof AppSettingsIndexRoute
   '/chat/$skey': typeof AppChatsChatSkeyRoute
+  '/admin/plugins/$id': typeof AppAdminPluginsIdRoute
+  '/admin/plugins/new': typeof AppAdminPluginsNewRoute
+  '/admin/plugins': typeof AppAdminPluginsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
   '/_app/_chats': typeof AppChatsRouteWithChildren
+  '/_app/admin': typeof AppAdminRouteWithChildren
   '/_app/settings': typeof AppSettingsRouteWithChildren
+  '/_app/admin/access': typeof AppAdminAccessRoute
+  '/_app/admin/general': typeof AppAdminGeneralRoute
+  '/_app/admin/models': typeof AppAdminModelsRoute
+  '/_app/admin/roles': typeof AppAdminRolesRoute
+  '/_app/admin/sync': typeof AppAdminSyncRoute
+  '/_app/admin/turns': typeof AppAdminTurnsRoute
+  '/_app/admin/users': typeof AppAdminUsersRoute
   '/_app/settings/api-keys': typeof AppSettingsApiKeysRoute
   '/_app/settings/plugins': typeof AppSettingsPluginsRoute
   '/_app/settings/sync': typeof AppSettingsSyncRoute
   '/shared/$ownerDid/$skey': typeof SharedOwnerDidSkeyRoute
   '/_app/_chats/': typeof AppChatsIndexRoute
+  '/_app/admin/': typeof AppAdminIndexRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
   '/_app/_chats/chat/$skey': typeof AppChatsChatSkeyRoute
+  '/_app/admin/plugins/$id': typeof AppAdminPluginsIdRoute
+  '/_app/admin/plugins/new': typeof AppAdminPluginsNewRoute
+  '/_app/admin/plugins/': typeof AppAdminPluginsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/login'
+    | '/admin'
     | '/settings'
+    | '/admin/access'
+    | '/admin/general'
+    | '/admin/models'
+    | '/admin/roles'
+    | '/admin/sync'
+    | '/admin/turns'
+    | '/admin/users'
     | '/settings/api-keys'
     | '/settings/plugins'
     | '/settings/sync'
     | '/shared/$ownerDid/$skey'
+    | '/admin/'
     | '/settings/'
     | '/chat/$skey'
+    | '/admin/plugins/$id'
+    | '/admin/plugins/new'
+    | '/admin/plugins/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
+    | '/admin/access'
+    | '/admin/general'
+    | '/admin/models'
+    | '/admin/roles'
+    | '/admin/sync'
+    | '/admin/turns'
+    | '/admin/users'
     | '/settings/api-keys'
     | '/settings/plugins'
     | '/settings/sync'
     | '/shared/$ownerDid/$skey'
+    | '/admin'
     | '/settings'
     | '/chat/$skey'
+    | '/admin/plugins/$id'
+    | '/admin/plugins/new'
+    | '/admin/plugins'
   id:
     | '__root__'
     | '/_app'
     | '/login'
     | '/_app/_chats'
+    | '/_app/admin'
     | '/_app/settings'
+    | '/_app/admin/access'
+    | '/_app/admin/general'
+    | '/_app/admin/models'
+    | '/_app/admin/roles'
+    | '/_app/admin/sync'
+    | '/_app/admin/turns'
+    | '/_app/admin/users'
     | '/_app/settings/api-keys'
     | '/_app/settings/plugins'
     | '/_app/settings/sync'
     | '/shared/$ownerDid/$skey'
     | '/_app/_chats/'
+    | '/_app/admin/'
     | '/_app/settings/'
     | '/_app/_chats/chat/$skey'
+    | '/_app/admin/plugins/$id'
+    | '/_app/admin/plugins/new'
+    | '/_app/admin/plugins/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -176,6 +318,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppChatsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/admin': {
+      id: '/_app/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AppAdminRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/settings': {
       id: '/_app/settings'
       path: '/settings'
@@ -189,6 +338,62 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof AppChatsIndexRouteImport
       parentRoute: typeof AppChatsRoute
+    }
+    '/_app/admin/': {
+      id: '/_app/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AppAdminIndexRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/access': {
+      id: '/_app/admin/access'
+      path: '/access'
+      fullPath: '/admin/access'
+      preLoaderRoute: typeof AppAdminAccessRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/general': {
+      id: '/_app/admin/general'
+      path: '/general'
+      fullPath: '/admin/general'
+      preLoaderRoute: typeof AppAdminGeneralRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/models': {
+      id: '/_app/admin/models'
+      path: '/models'
+      fullPath: '/admin/models'
+      preLoaderRoute: typeof AppAdminModelsRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/roles': {
+      id: '/_app/admin/roles'
+      path: '/roles'
+      fullPath: '/admin/roles'
+      preLoaderRoute: typeof AppAdminRolesRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/sync': {
+      id: '/_app/admin/sync'
+      path: '/sync'
+      fullPath: '/admin/sync'
+      preLoaderRoute: typeof AppAdminSyncRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/turns': {
+      id: '/_app/admin/turns'
+      path: '/turns'
+      fullPath: '/admin/turns'
+      preLoaderRoute: typeof AppAdminTurnsRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/users': {
+      id: '/_app/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AppAdminUsersRouteImport
+      parentRoute: typeof AppAdminRoute
     }
     '/_app/settings/': {
       id: '/_app/settings/'
@@ -232,6 +437,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppChatsChatSkeyRouteImport
       parentRoute: typeof AppChatsRoute
     }
+    '/_app/admin/plugins/': {
+      id: '/_app/admin/plugins/'
+      path: '/plugins'
+      fullPath: '/admin/plugins/'
+      preLoaderRoute: typeof AppAdminPluginsIndexRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/plugins/$id': {
+      id: '/_app/admin/plugins/$id'
+      path: '/plugins/$id'
+      fullPath: '/admin/plugins/$id'
+      preLoaderRoute: typeof AppAdminPluginsIdRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/plugins/new': {
+      id: '/_app/admin/plugins/new'
+      path: '/plugins/new'
+      fullPath: '/admin/plugins/new'
+      preLoaderRoute: typeof AppAdminPluginsNewRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
   }
 }
 
@@ -247,6 +473,38 @@ const AppChatsRouteChildren: AppChatsRouteChildren = {
 
 const AppChatsRouteWithChildren = AppChatsRoute._addFileChildren(
   AppChatsRouteChildren,
+)
+
+interface AppAdminRouteChildren {
+  AppAdminAccessRoute: typeof AppAdminAccessRoute
+  AppAdminGeneralRoute: typeof AppAdminGeneralRoute
+  AppAdminModelsRoute: typeof AppAdminModelsRoute
+  AppAdminRolesRoute: typeof AppAdminRolesRoute
+  AppAdminSyncRoute: typeof AppAdminSyncRoute
+  AppAdminTurnsRoute: typeof AppAdminTurnsRoute
+  AppAdminUsersRoute: typeof AppAdminUsersRoute
+  AppAdminIndexRoute: typeof AppAdminIndexRoute
+  AppAdminPluginsIdRoute: typeof AppAdminPluginsIdRoute
+  AppAdminPluginsNewRoute: typeof AppAdminPluginsNewRoute
+  AppAdminPluginsIndexRoute: typeof AppAdminPluginsIndexRoute
+}
+
+const AppAdminRouteChildren: AppAdminRouteChildren = {
+  AppAdminAccessRoute: AppAdminAccessRoute,
+  AppAdminGeneralRoute: AppAdminGeneralRoute,
+  AppAdminModelsRoute: AppAdminModelsRoute,
+  AppAdminRolesRoute: AppAdminRolesRoute,
+  AppAdminSyncRoute: AppAdminSyncRoute,
+  AppAdminTurnsRoute: AppAdminTurnsRoute,
+  AppAdminUsersRoute: AppAdminUsersRoute,
+  AppAdminIndexRoute: AppAdminIndexRoute,
+  AppAdminPluginsIdRoute: AppAdminPluginsIdRoute,
+  AppAdminPluginsNewRoute: AppAdminPluginsNewRoute,
+  AppAdminPluginsIndexRoute: AppAdminPluginsIndexRoute,
+}
+
+const AppAdminRouteWithChildren = AppAdminRoute._addFileChildren(
+  AppAdminRouteChildren,
 )
 
 interface AppSettingsRouteChildren {
@@ -269,11 +527,13 @@ const AppSettingsRouteWithChildren = AppSettingsRoute._addFileChildren(
 
 interface AppRouteChildren {
   AppChatsRoute: typeof AppChatsRouteWithChildren
+  AppAdminRoute: typeof AppAdminRouteWithChildren
   AppSettingsRoute: typeof AppSettingsRouteWithChildren
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppChatsRoute: AppChatsRouteWithChildren,
+  AppAdminRoute: AppAdminRouteWithChildren,
   AppSettingsRoute: AppSettingsRouteWithChildren,
 }
 

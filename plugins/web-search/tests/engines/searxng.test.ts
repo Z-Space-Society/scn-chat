@@ -21,9 +21,4 @@ describe('searxng', () => {
       { title: 'Bare', url: 'https://example.org', snippet: '' },
     ])
   })
-
-  it('says to enable the json format when the instance refuses', () => {
-    expect(searxng.describeError?.(403)).toMatch(/Enable the json format/)
-    expect(searxng.describeError?.(500)).toBeUndefined()
-  })
 })

@@ -5,10 +5,14 @@ import { onUnauthorized } from '../api.ts'
 import { syncTimeZone } from '../lib/time-zone.ts'
 import { endSession, MeContext } from '../session.tsx'
 
-/** The signed-in routes. Signed-out requests are sent to the login page, from the server too. */
+/**
+ * The signed-in routes. Signed-out requests are sent to the login page, from the server too, and
+ * so are viewers, who may only open shared chats and see why on the login page.
+ */
 export const Route = createFileRoute('/_app')({
   beforeLoad: ({ context }) => {
-    if (context.session.state !== 'signed-in') throw redirect({ to: '/login' })
+    if (context.session.state !== 'signed-in' || context.session.me.access !== 'full')
+      throw redirect({ to: '/login' })
     return { me: context.session.me }
   },
   component: SignedIn,

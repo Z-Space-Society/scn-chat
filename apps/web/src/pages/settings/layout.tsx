@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { useSignOut } from '../../components/useSignOut.ts'
 import { messageOf } from '../../lib/errors.ts'
+import { useMe } from '../../session.tsx'
 
 const sections = [
   { to: '/settings', label: 'Preferences' },
@@ -14,12 +15,14 @@ const sections = [
 /** The settings sidebar around the current section. */
 export function SettingsLayout({ children }: { children: ReactNode }) {
   const signOut = useMutation({ mutationFn: useSignOut() })
+  const { admin } = useMe()
   return (
     <div className="layout settings">
       <nav className="sidebar">
         <Link to="/" activeOptions={{ exact: true }}>
           Back to chats
         </Link>
+        {admin && <Link to="/admin">Admin</Link>}
         <ul>
           {sections.map((section) => (
             <li key={section.to}>

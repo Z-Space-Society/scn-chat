@@ -60,7 +60,12 @@ async function setup(storageMode: 'space' | 'local') {
     db: h.db,
     logger: h.logger,
     auth: authDeps(h.db, { oauth }),
-    blobs: { blobsFor: stores.forAccount, services: h.services, ingesters, logger: h.logger },
+    blobs: {
+      blobsFor: stores.forAccount,
+      services: h.services,
+      ingesters: () => ingesters,
+      logger: h.logger,
+    },
   })
   const cookie = sessionCookie(await app.request('/oauth/callback?code=a&state=b', loginCookie))
   const upload = async (bytes: Uint8Array, type: string, name = 'file') => {
@@ -164,13 +169,13 @@ describe.each(['space', 'local'] as const)('attachments for a %s account', (mode
     expect((await upload(new Uint8Array([1]), 'application/pdf', '%E0%A4%A')).status).toBe(400)
   })
 
-  it('lists the file types it can read', async () => {
+  it('lists the file types the installed ingesters can read', async () => {
     const { app, cookie } = await setup(mode)
     const res = await app.request('/api/attachments/types', { headers: { cookie } })
-    expect(await res.json()).toEqual({
-      images: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'],
-      files: ['application/pdf', 'application/x-huge'],
-    })
+    expect(((await res.json()) as { files: string[] }).files).toEqual([
+      'application/pdf',
+      'application/x-huge',
+    ])
   })
 })
 

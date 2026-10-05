@@ -62,16 +62,16 @@ describe.each(dialects)('user credentials on $name', ({ create }) => {
     const endpoint = { apiKey: 'k', baseUrl: 'https://x.example/v1', models: [] }
     await expect(
       saveCredential(db, box, did, fakeProvider().provider, { ...endpoint, slug: 'x' }),
-    ).rejects.toThrow(/user endpoints/)
+    ).rejects.toBeInstanceOf(CredentialInputError)
     const { provider } = fakeProvider({ userEndpoints: true })
     await expect(
       saveCredential(db, box, did, provider, { ...endpoint, slug: 'Bad Slug' }),
-    ).rejects.toThrow(/slug/)
+    ).rejects.toBeInstanceOf(CredentialInputError)
     const saved = await saveCredential(db, box, did, provider, { ...endpoint, slug: 'mine' })
     expect(saved.modelProvider).toBe('user:mine')
     await expect(
       saveCredential(db, box, did, provider, { ...endpoint, slug: 'mine' }),
-    ).rejects.toThrow(/already/)
+    ).rejects.toBeInstanceOf(CredentialInputError)
     await db.destroy()
   })
 

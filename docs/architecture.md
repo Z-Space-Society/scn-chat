@@ -8,7 +8,7 @@ This in an AI assistant chat app that uses the users' spaces-enabled PDS as a so
 
 ## The web app
 
-The web app is built on [TanStack Start](https://tanstack.com/start), but the Hono server owns the process. Hono answers `/api`, `/oauth`, `/xrpc`, and `/.well-known` itself, serves the web app's built assets, and passes every other request to Start. In development the same server runs Vite in middleware mode, so `pnpm dev` is one process. Only the shell, login, and settings are server-rendered. Chat routes render in the browser, since their data lives in the browser's local copy.
+The web app is built on [TanStack Start](https://tanstack.com/start), but the Hono server owns the process. Hono answers `/api`, `/oauth`, `/xrpc`, and `/.well-known` itself, serves the web app's built assets, and passes every other request to Start. In development the same server runs Vite in middleware mode, so `pnpm dev` is one process. Only the shell, login, settings, and the admin area are server-rendered. Chat routes render in the browser, since their data lives in the browser's local copy.
 
 Hono is the only API. The web app calls it through Hono's typed client, in process during server rendering and over HTTP in the browser, with TanStack Query on top. See [ADR 0001](adr/0001-tanstack-start-inside-hono.md) and [specs/web-ui.md](../specs/web-ui.md).
 
@@ -56,6 +56,12 @@ The storage type is chosen on first login and currently cannot be changed. So if
 
 See [specs/auth.md](../specs/auth.md).
 
+## Settings and the admin area
+
+Configure `.env` before first run. Bootstrap settings and secrets. The rest of the settings, plugins, models, roles, users, etc., can be configured in **Settings** > **Admin**.
+
+Changes in the admin area apply without restarting the server. The admin area is at `/admin`, and only admins can open it. Someone signed in without access, such as a suspended user or someone who signed in from a share link on a closed server, can only open chats shared with them, and every other route sends them to the login page, which says why. See [specs/admin.md](../specs/admin.md).
+
 ## Decisions
 
 The [ADRs](adr/) record the choices a reader might otherwise undo:
@@ -66,4 +72,4 @@ The [ADRs](adr/) record the choices a reader might otherwise undo:
 
 ## Plugins
 
-The system is built to support custom model providers, tools, file ingesters, and support a hook system. These are configured in `config.yml` and loaded startup. See [plugins.md](plugins.md).
+The system is built to support custom model providers, tools, file ingesters, and support a hook system. Plugins are installed with the server and configured in the admin area. See [plugins.md](plugins.md).

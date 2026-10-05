@@ -1,4 +1,5 @@
 import type {
+  AdminApi,
   AuthApi,
   BlobsApi,
   PluginsApi,
@@ -10,7 +11,7 @@ import type {
 import { getGlobalStartContext } from '@tanstack/react-start'
 import { type ClientResponse, hc } from 'hono/client'
 import type { SuccessStatusCode } from 'hono/utils/http-status'
-import { errorMessage } from './lib/response.ts'
+import { errorDetails, type Issue } from './lib/response.ts'
 
 /**
  * Call the server: in process while rendering on the server, with the page request's session,
@@ -31,6 +32,7 @@ export const api = {
   plugins: hc<PluginsApi>('/api/plugins', { fetch: apiFetch }),
   blobs: hc<BlobsApi>('/api', { fetch: apiFetch }),
   sharing: hc<SharingApi>('/api', { fetch: apiFetch }),
+  admin: hc<AdminApi>('/api/admin', { fetch: apiFetch }),
 }
 
 /** Build the request options for a JSON body with api calls. */
@@ -48,11 +50,14 @@ export function onUnauthorized(listener: () => void): () => void {
 
 export class ApiError extends Error {
   readonly status: number
+  /** Problems with individual form fields. */
+  readonly issues: Issue[]
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, issues: Issue[] = []) {
     super(message)
     this.name = 'ApiError'
     this.status = status
+    this.issues = issues
   }
 }
 
@@ -70,6 +75,10 @@ export async function read<R extends ClientResponse<unknown, number, string>>(
 ): Promise<SuccessBody<R>> {
   const res = await response
   if (res.status === 401) for (const listener of unauthorized) listener()
-  if (!res.ok) throw new ApiError(res.status, await errorMessage(res))
+  if (!res.ok) {
+    const { message, issues } = await errorDetails(res)
+    if (res.status !== 401) console.error(`Request failed: ${res.status} ${res.url}`, message)
+    throw new ApiError(res.status, message, issues)
+  }
   return (await res.json()) as SuccessBody<R>
 }

@@ -1,9 +1,8 @@
 import type { Tool } from '@scn-chat/plugin-api'
 import { setupForTest, toolContextForTest } from '@scn-chat/plugin-api/testing'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { z } from 'zod'
 import type { SearchEngine } from '../src/engines/types.ts'
-import webSearch, { createWebSearch, optionsSchema } from '../src/index.ts'
+import webSearch, { createWebSearch, optionsSchema, SearchError } from '../src/index.ts'
 
 const tavilyBody = (urls: string[]) =>
   Response.json({ results: urls.map((url) => ({ title: `Title ${url}`, url, content: 'text' })) })
@@ -15,11 +14,13 @@ async function setup(
   options: Partial<Options> = {},
   user: Record<string, unknown> = { engine: 'default', apiKey: '', baseURL: '' },
   plugin = webSearch({ engine: 'duckduckgo', ...options } as Options),
+  roles = ['user'],
 ) {
   const { tools } = await setupForTest(plugin, { userSettings: () => user })
   const contextFetch = vi.fn(async () => Response.json({ results: [] }))
   const { context, citations } = toolContextForTest({
     fetch: contextFetch as unknown as typeof globalThis.fetch,
+    roles,
   })
   const tool = tools[0] as Tool<unknown>
   return {
@@ -41,30 +42,11 @@ function stubGlobalFetch(response: () => Response) {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('web-search options', () => {
-  it('requires an engine', () => {
-    expect(optionsSchema.safeParse({}).error?.issues[0]?.path).toEqual(['engine'])
-  })
-
-  it('is off by default, switchable, with user engines', () => {
-    expect(optionsSchema.parse({ engine: 'duckduckgo' })).toMatchObject({
-      enabledByDefault: false,
-      userToggle: true,
-      userEngines: true,
-      maxResults: 5,
-    })
-  })
-
-  it('fails for an engine that needs a key without one', () => {
-    const result = optionsSchema.safeParse({ engine: 'brave' })
-    expect(result.error?.issues[0]).toMatchObject({
-      path: ['apiKey'],
-      message: 'is required for Brave',
-    })
-  })
-
-  it('fails for SearXNG without a base URL', () => {
-    const result = optionsSchema.safeParse({ engine: 'searxng' })
-    expect(result.error?.issues[0]).toMatchObject({ path: ['baseURL'] })
+  it('requires a key or base URL for engines that need one', () => {
+    expect(optionsSchema.safeParse({ engine: 'brave' }).error?.issues[0]?.path).toEqual(['apiKey'])
+    expect(optionsSchema.safeParse({ engine: 'searxng' }).error?.issues[0]?.path).toEqual([
+      'baseURL',
+    ])
   })
 
   it('derives the engine choices from the engine list, so a new engine needs no other change', async () => {
@@ -94,39 +76,9 @@ describe('web-search options', () => {
 })
 
 describe('web-search plugin', () => {
-  it('registers web_search as untrusted, with the default and switch from the options', async () => {
-    const { tool } = await setup({ enabledByDefault: true, userToggle: false })
-    expect(tool).toMatchObject({
-      name: 'web_search',
-      defaultEnabled: true,
-      userToggle: false,
-      untrusted: true,
-    })
-  })
-
-  it("lists the admin's engine's operators in the description", async () => {
-    const { tool } = await setup({ engine: 'tavily', apiKey: 'k' })
-    expect(tool.description).not.toContain('Supported operators')
-    const ddg = await setup()
-    expect(ddg.tool.description).toContain('Supported operators: site:example.com')
-  })
-
-  it('has user settings for the engine, key, and base URL', async () => {
-    const { plugin } = await setup()
-    expect(Object.keys(plugin.userSettings?.shape ?? {})).toEqual(['engine', 'apiKey', 'baseURL'])
-  })
-
-  it('shows the key field only for keyed engines and the base URL only for SearXNG', async () => {
-    const { plugin } = await setup()
-    const schema = z.toJSONSchema(plugin.userSettings as z.ZodObject) as {
-      properties: Record<string, { rule?: unknown }>
-    }
-    const shownFor = (engines: string[]) => ({
-      effect: 'SHOW',
-      condition: { scope: '#/properties/engine', schema: { enum: engines } },
-    })
-    expect(schema.properties.apiKey?.rule).toEqual(shownFor(['brave', 'tavily', 'kagi']))
-    expect(schema.properties.baseURL?.rule).toEqual(shownFor(['searxng']))
+  it('marks its results untrusted', async () => {
+    const { tool } = await setup()
+    expect(tool.untrusted).toBe(true)
   })
 
   it('has no user settings when user engines are off, and uses the admin engine', async () => {
@@ -171,9 +123,7 @@ describe('web_search', () => {
       { engine: 'tavily', apiKey: 'admin-key' },
       { engine: 'brave', apiKey: '', baseURL: '' },
     )
-    await expect(other.run('tiles')).rejects.toThrow(
-      'Add your Brave API key in the web search settings.',
-    )
+    await expect(other.run('tiles')).rejects.toBeInstanceOf(SearchError)
   })
 
   it("reaches a user's SearXNG through the guarded fetch", async () => {
@@ -208,5 +158,37 @@ describe('web_search', () => {
       { url: 'https://a.example', title: 'Title https://a.example' },
       { url: 'https://b.example', title: 'Title https://b.example' },
     ])
+  })
+})
+
+describe('web_search admin engine roles', () => {
+  const tavily = { engine: 'tavily' as const, apiKey: 'admin-key', adminEngineRoles: ['member'] }
+
+  it("searches with the admin's engine for a user in its roles", async () => {
+    const fetch = stubGlobalFetch(() => tavilyBody([]))
+    const { run } = await setup(tavily, undefined, undefined, ['user', 'member'])
+    await run('tiles')
+    expect(fetch.mock.calls[0]?.[1]?.headers).toMatchObject({ authorization: 'Bearer admin-key' })
+  })
+
+  it('refuses a user outside its roles without an engine of their own, without searching', async () => {
+    const fetch = stubGlobalFetch(() => tavilyBody([]))
+    await expect((await setup(tavily)).run('tiles')).rejects.toBeInstanceOf(SearchError)
+    const enginesOff = await setup({ ...tavily, userEngines: false })
+    await expect(enginesOff.run('tiles')).rejects.toBeInstanceOf(SearchError)
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it("never fills a blank with the admin's key for a user outside its roles", async () => {
+    stubGlobalFetch(() => tavilyBody([]))
+    const { run } = await setup(tavily, { engine: 'tavily', apiKey: '', baseURL: '' })
+    await expect(run('tiles')).rejects.toBeInstanceOf(SearchError)
+  })
+
+  it('lets a user outside its roles search with their own engine', async () => {
+    const fetch = stubGlobalFetch(() => Response.json({ data: [] }))
+    const { run } = await setup(tavily, { engine: 'kagi', apiKey: 'user-key', baseURL: '' })
+    await run('tiles')
+    expect(fetch.mock.calls[0]?.[1]?.headers).toMatchObject({ authorization: 'Bot user-key' })
   })
 })

@@ -3,4 +3,3 @@
 apps/web/dist
 data
 .env
-config.yml

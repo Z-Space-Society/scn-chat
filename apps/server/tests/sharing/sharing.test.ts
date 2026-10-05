@@ -156,13 +156,13 @@ describe('share settings', () => {
     expect(pds.policies.get(uri)?.readPolicy).toMatch(/publicPolicy/)
   })
 
-  it('refuses a member list that is not a list', async () => {
+  it('refuses a member list that is not a list, or a member that looks like a DID but is not one', async () => {
     const { appFor, skey } = await setup()
-    const res = await (await appFor('did:plc:alice')).put(`/conversations/${skey}/sharing`, {
-      mode: 'people',
-      members: 'bob.test',
-    })
-    expect(res.status).toBe(400)
+    const alice = await appFor('did:plc:alice')
+    const share = (members: unknown) =>
+      alice.put(`/conversations/${skey}/sharing`, { mode: 'people', members })
+    expect((await share('bob.test')).status).toBe(400)
+    expect((await share(['did:nope'])).status).toBe(400)
   })
 
   it('returns 404 for the share settings of a conversation that does not exist', async () => {
@@ -172,15 +172,6 @@ describe('share settings', () => {
     expect(
       (await alice.put('/conversations/3zzzzzzzzzzzz/sharing', { mode: 'public' })).status,
     ).toBe(404)
-  })
-
-  it('refuses a member that looks like a DID but is not one', async () => {
-    const { appFor, skey } = await setup()
-    const res = await (await appFor('did:plc:alice')).put(`/conversations/${skey}/sharing`, {
-      mode: 'people',
-      members: ['did:nope'],
-    })
-    expect(res.status).toBe(400)
   })
 
   it('reflects changes made outside the app', async () => {

@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, onUnauthorized, read } from '../src/api.ts'
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.restoreAllMocks()
+})
 
 describe('read', () => {
   it('tells listeners when a request finds the session has ended', async () => {
@@ -14,6 +17,7 @@ describe('read', () => {
   })
 
   it('reports the status when an error body is not JSON', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
     const response = Promise.resolve(new Response('<html>Bad gateway</html>', { status: 502 }))
     await expect(read(response as never)).rejects.toMatchObject({
       status: 502,

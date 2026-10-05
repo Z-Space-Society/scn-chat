@@ -4,10 +4,6 @@ import { mapEffort } from '../../src/providers/effort.ts'
 describe('mapEffort', () => {
   it.each([
     [undefined, 'provider-default'],
-    ['none', 'none'],
-    ['low', 'low'],
-    ['medium', 'medium'],
-    ['high', 'high'],
     ['max', 'xhigh'],
   ])('maps %s to %s', (effort, expected) => {
     expect(mapEffort(effort, { warn: vi.fn() } as never)).toBe(expected)

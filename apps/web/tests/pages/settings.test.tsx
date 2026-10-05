@@ -6,6 +6,7 @@ import { SettingsLayout } from '../../src/pages/settings/layout.tsx'
 import { PluginSettings } from '../../src/pages/settings/plugins.tsx'
 import { PreferencesSettings } from '../../src/pages/settings/preferences.tsx'
 import { SyncSettings } from '../../src/pages/settings/sync.tsx'
+import { type Me, MeContext } from '../../src/session.tsx'
 import type { StoreClient } from '../../src/store/client.ts'
 import { StoreProvider } from '../../src/store/react.tsx'
 import { renderAt } from '../helpers/router.tsx'
@@ -51,15 +52,28 @@ const sections = {
   '/sync': SyncSettings,
 }
 
+const me: Me = {
+  did: 'did:plc:alice',
+  handle: 'alice',
+  storageMode: 'local',
+  backgroundSync: true,
+  roles: ['user'],
+  admin: false,
+  access: 'full',
+  accessMessage: null,
+}
+
 /** Render a settings section at its path, such as '/plugins'. */
-const renderPage = (section: keyof typeof sections = '') => {
+const renderPage = (section: keyof typeof sections = '', admin = false) => {
   const Section = sections[section]
   return renderAt(
-    <StoreProvider store={store}>
-      <SettingsLayout>
-        <Section />
-      </SettingsLayout>
-    </StoreProvider>,
+    <MeContext.Provider value={{ ...me, admin }}>
+      <StoreProvider store={store}>
+        <SettingsLayout>
+          <Section />
+        </SettingsLayout>
+      </StoreProvider>
+    </MeContext.Provider>,
     `/settings${section}`,
   )
 }
@@ -211,6 +225,15 @@ describe('Settings sections', () => {
     stubServer({ '/api/preferences': () => Response.json({ preferences: null }) })
     await renderPage()
     expect(await screen.findByRole('heading', { name: 'Preferences' })).toBeInTheDocument()
+  })
+
+  it('links to the admin area for admins only', async () => {
+    stubServer({})
+    const { unmount } = await renderPage('/sync')
+    expect(screen.queryByRole('link', { name: 'Admin' })).toBeNull()
+    unmount()
+    await renderPage('/sync', true)
+    expect(screen.getByRole('link', { name: 'Admin' })).toHaveAttribute('href', '/admin')
   })
 })
 

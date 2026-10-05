@@ -67,15 +67,6 @@ describe.each(dialects)('LocalRecordStore on $name', ({ create }) => {
     await db.destroy()
   })
 
-  it('throws SpaceNotFound for a missing space', async () => {
-    const { store, db } = await setup()
-    const missing = spaceUri(did, nsid.conversation, '3bbbbbbbbbbbb')
-    await expect(store.putRecord(missing, nsid.info, 'self', info())).rejects.toBeInstanceOf(
-      SpaceNotFound,
-    )
-    await db.destroy()
-  })
-
   it('computes the same CID an independent atproto CBOR encoder does', async () => {
     const { store, space, db } = await setup()
     const record = info('CID check')
@@ -134,9 +125,12 @@ describe.each(dialects)('LocalRecordStore on $name', ({ create }) => {
     await db.destroy()
   })
 
-  it('raises SpaceNotFound when reading a space that does not exist, as a PDS does', async () => {
+  it('raises SpaceNotFound for a space that does not exist, as a PDS does', async () => {
     const { store, db } = await setup()
-    const missing = 'at://did:plc:alice/space/network.sharedcomputer.chat.conversation/nope'
+    const missing = spaceUri(did, nsid.conversation, '3bbbbbbbbbbbb')
+    await expect(store.putRecord(missing, nsid.info, 'self', info())).rejects.toBeInstanceOf(
+      SpaceNotFound,
+    )
     await expect(store.getRecord(missing, nsid.info, 'self')).rejects.toBeInstanceOf(SpaceNotFound)
     await expect(store.listRecords(missing, nsid.message)).rejects.toBeInstanceOf(SpaceNotFound)
     await expect(store.headRev(missing)).rejects.toBeInstanceOf(SpaceNotFound)

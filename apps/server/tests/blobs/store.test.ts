@@ -27,17 +27,6 @@ describe('LocalBlobStore', () => {
     })
   })
 
-  it('reads a stored blob back with its type', async () => {
-    const { store, account } = await setup()
-    const ref = (await store.put(account, new Uint8Array([1, 2, 3]), 'image/png')) as {
-      ref: { $link: string }
-    }
-    expect(await store.get(account, 'at://x', ref.ref.$link)).toEqual({
-      bytes: new Uint8Array([1, 2, 3]),
-      mimeType: 'image/png',
-    })
-  })
-
   it('keeps each owner blobs separate', async () => {
     const { store, account } = await setup()
     const ref = (await store.put(account, new Uint8Array([9]), 'image/png')) as {

@@ -20,6 +20,12 @@ export const validateLoginSearch = (
   return { ...(error && { error }), ...(next && { next }) }
 }
 
+/** `q` searches the admin's users list by the start of a handle or DID. */
+export const validateUserSearch = (search: Record<string, unknown>): { q?: string } => {
+  const q = text(search.q)
+  return q ? { q } : {}
+}
+
 /** `m` names the focused message, which picks the branch on screen. */
 export const validateBranchSearch = (search: Record<string, unknown>): { m?: string } => {
   const m = text(search.m)

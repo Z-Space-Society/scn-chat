@@ -9,8 +9,12 @@ A copy of this project that a programmer changes and runs as their own app. The 
 _Avoid_: Web plugin, extension, customization
 
 **Plugin**:
-A package an admin installs and lists in the config to add to the server, such as a model provider, a tool, or a turn hook.
+A package installed with the server that adds to it, such as a model provider, a tool, or a turn hook.
 _Avoid_: Extension, add-on
+
+**Plugin instance**:
+One plugin an admin has added in the admin area, with its own options. A plugin is added once, unless it allows several instances.
+_Avoid_: Plugin config, plugin entry
 
 **Tool**:
 A capability a plugin offers that the model can call during a turn.
@@ -35,6 +39,16 @@ _Avoid_: Tool group, chain of thought
 **Message action**:
 A control under a message, like copy, edit, regenerate, or stop.
 _Avoid_: Message button, hover action
+
+## Access
+
+**Role**:
+A named group of users, held through explicit membership, a matching PDS host or handle domain, or a plugin's answer. Roles decide invites and admin models.
+_Avoid_: Group, permission
+
+**Viewer**:
+A signed-in user without access to the chat app, who can only open chats shared with them.
+_Avoid_: Guest, read-only user
 
 ## Turns
 

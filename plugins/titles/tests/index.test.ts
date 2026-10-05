@@ -1,7 +1,7 @@
 import type { TurnContext } from '@scn-chat/plugin-api'
 import { setupForTest } from '@scn-chat/plugin-api/testing'
 import { describe, expect, it, vi } from 'vitest'
-import titles, { cleanTitle, optionsSchema, wantsTitle } from '../src/index.ts'
+import titles, { cleanTitle, wantsTitle } from '../src/index.ts'
 
 const text = (value: string) => ({
   $type: 'network.sharedcomputer.chat.defs#plainContent',
@@ -86,18 +86,14 @@ describe('titles plugin', () => {
     expect(warn).toHaveBeenCalled()
   })
 
-  it('treats an empty result as a failure', async () => {
-    const { updateInfo } = await run(turn(), '  "" ')
+  it('treats an empty result as a failure and logs the finish reason', async () => {
+    const { updateInfo, warn } = await run(turn(), '  "" ')
     expect(updateInfo).not.toHaveBeenCalled()
-  })
-
-  it('names the finish reason when the result is empty', async () => {
-    const { warn } = await run(turn(), '')
     expect(warn).toHaveBeenCalledWith(
       expect.objectContaining({
         err: expect.objectContaining({ message: expect.stringContaining('stop') }),
       }),
-      'title generation failed',
+      expect.anything(),
     )
   })
 
@@ -141,17 +137,5 @@ describe('cleanTitle', () => {
 
   it('cuts long output to 300 graphemes', () => {
     expect([...cleanTitle('👩‍👩‍👧'.repeat(400))]).toHaveLength(300 * [...'👩‍👩‍👧'].length)
-  })
-})
-
-describe('titles optionsSchema', () => {
-  it('accepts valid options', () => {
-    expect(
-      optionsSchema.safeParse({ maxWords: 5, model: { provider: 'p', id: 'm' } }).success,
-    ).toBe(true)
-  })
-
-  it('rejects invalid or unknown options', () => {
-    expect(optionsSchema.safeParse({ maxWords: 0 }).success).toBe(false)
   })
 })

@@ -2,7 +2,7 @@
 
 ## Summary
 
-A conversation's owner can share it read-only with specific people, by handle, or with anyone who has an atproto account. Sharing changes the conversation space's read policy and member list through `com.atproto.simplespace`, so the owner's PDS enforces it for every app, not just ours. A shared conversation opens at `/shared/<ownerDid>/<skey>`. The viewer signs in, and the server reads the conversation with the viewer's own space credential, so the owner's PDS decides whether the viewer may see it. Sharing needs spaces on both sides: fallback users can neither share nor view shared chats.
+A conversation's owner can share it read-only with specific people, by handle, or with anyone who has an atproto account. Sharing changes the conversation space's read policy and member list through `com.atproto.simplespace`, so the owner's PDS enforces it for every app, not just ours. A shared conversation opens at `/shared/<ownerDid>/<skey>`. The viewer signs in, and the server reads the conversation with the viewer's own space credential, so the owner's PDS decides whether the viewer may see it. The viewer doesn't need access to the server's chat app: anyone signing in from a share link gets at least a viewer session, as the admin spec describes. Sharing needs spaces on both sides: fallback users can neither share nor view shared chats.
 
 ## Motivation
 

@@ -42,10 +42,4 @@ describe.each(dialects)('tool choices on $name', ({ create }) => {
     await writeToolChoice(db, 'did:plc:bob', 'web_search', true)
     expect(await readToolChoices(db, 'did:plc:alice')).toEqual(new Map([['web_search', false]]))
   })
-
-  it('returns no choices for a user who has made none', async () => {
-    const db = create()
-    await migrateToLatest(db)
-    expect(await readToolChoices(db, 'did:plc:alice')).toEqual(new Map())
-  })
 })

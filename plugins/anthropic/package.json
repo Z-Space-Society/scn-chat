@@ -1,6 +1,10 @@
 {
   "name": "@scn-chat/plugin-anthropic",
   "version": "0.0.0",
+  "description": "Anthropic models, such as Claude, as a model provider.",
+  "keywords": [
+    "scn-chat-plugin"
+  ],
   "private": true,
   "type": "module",
   "exports": "./src/index.ts",

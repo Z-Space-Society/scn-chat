@@ -1,3 +1,4 @@
+import { DidError, OAuthResolverError } from '@atproto/oauth-client-node'
 import pino from 'pino'
 import { describe, expect, it, vi } from 'vitest'
 import { createApp } from '../../src/app.ts'
@@ -29,13 +30,17 @@ async function signIn(app: Awaited<ReturnType<typeof setup>>['app']) {
   return sessionCookie(res)
 }
 
-describe('client metadata and keys', () => {
-  it('serves the client metadata and public keys', async () => {
-    const { app } = await setup()
+describe('client metadata name', () => {
+  it('serves the current app name in confidential client metadata', async () => {
+    const oauth = fakeOAuth({
+      clientMetadata: { client_id: 'https://chat.example.com/meta', client_name: 'Startup' },
+    } as never)
+    const { app, auth } = await setup({ oauth })
+    await auth.settings.set('general', { appName: 'Renamed' }, 'did:plc:admin')
     expect(await (await app.request('/oauth-client-metadata.json')).json()).toEqual({
-      client_id: 'http://localhost',
+      client_id: 'https://chat.example.com/meta',
+      client_name: 'Renamed',
     })
-    expect(await (await app.request('/oauth/jwks.json')).json()).toEqual({ keys: [] })
   })
 })
 
@@ -52,12 +57,6 @@ describe('GET /oauth/login', () => {
     expect(res.headers.get('set-cookie')).toMatch(/scn_login=[^;]+;.*HttpOnly/)
   })
 
-  it('sends the user back to the login page without an identifier', async () => {
-    const { app } = await setup()
-    const res = await app.request('/oauth/login')
-    expect(res.headers.get('location')).toMatch(/^\/login\?error=/)
-  })
-
   it('shows an invalid_scope error from the PDS on the login page', async () => {
     const oauth = fakeOAuth({
       authorize: vi.fn(async () => {
@@ -68,13 +67,52 @@ describe('GET /oauth/login', () => {
     const res = await app.request('/oauth/login?identifier=alice.test')
     expect(decodeURIComponent(res.headers.get('location') ?? '')).toContain('invalid_scope')
   })
+
+  /** The login page's error after authorize throws. */
+  async function loginErrorFor(error: unknown, identifier = 'alice.test') {
+    const oauth = fakeOAuth({
+      authorize: vi.fn(async () => {
+        throw error
+      }),
+    })
+    const { app } = await setup({ oauth })
+    const res = await app.request(`/oauth/login?identifier=${identifier}`)
+    return new URL(res.headers.get('location') ?? '', 'http://x').searchParams.get('error')
+  }
+
+  it("explains an unknown handle and an unknown DID differently, instead of the resolver's message", async () => {
+    const handleCause = Object.assign(new Error('Handle "alice.test" does not resolve to a DID'), {
+      name: 'IdentityResolverError',
+    })
+    const handle = await loginErrorFor(
+      new OAuthResolverError('Failed to resolve identity: alice.test', { cause: handleCause }),
+    )
+    const didCause = new DidError('did:plc:nobody', 'DID not found', 'did-unknown', 404)
+    const did = await loginErrorFor(
+      new OAuthResolverError('Failed to resolve identity: did:plc:nobody', { cause: didCause }),
+      'did:plc:nobody',
+    )
+    expect(handle).not.toContain('Failed to resolve')
+    expect(did).not.toContain('Failed to resolve')
+    expect(handle).not.toBe(did)
+  })
+
+  it("keeps the resolver's message for failures after the account was found", async () => {
+    const error = new OAuthResolverError(
+      'Failed to resolve OAuth server metadata for https://pds.test',
+    )
+    expect(await loginErrorFor(error)).toContain('Failed to resolve OAuth server metadata')
+  })
 })
 
 describe('GET /oauth/callback', () => {
-  it('refuses a callback from a browser that did not start the sign-in, and revokes its tokens', async () => {
+  it.each([
+    ['no login cookie', {}],
+    ['a login cookie for another sign-in', { headers: { cookie: 'scn_login=someone-else' } }],
+  ])('refuses a callback with %s, and revokes its tokens', async (_, init) => {
     const { app, auth } = await setup()
-    const res = await app.request('/oauth/callback?code=abc&state=xyz')
-    expect(decodeURIComponent(res.headers.get('location') ?? '')).toContain('different browser')
+    const res = await app.request('/oauth/callback?code=abc&state=xyz', init)
+    expect(res.headers.get('location')).toMatch(/^\/login\?error=/)
     expect(res.headers.get('set-cookie') ?? '').not.toMatch(/scn_session=[^;]/)
     expect(auth.oauth.revoke).toHaveBeenCalledWith('did:plc:alice')
   })
@@ -82,13 +120,15 @@ describe('GET /oauth/callback', () => {
   it('returns to the page the sign-in started from, if it is on this site', async () => {
     const { app } = await setup()
     const login = await app.request(
-      '/oauth/login?identifier=alice.test&next=%2Fs%2Fdid%3Aplc%3Abob%2F3abc',
+      '/oauth/login?identifier=alice.test&next=%2Fshared%2Fdid%3Aplc%3Abob%2F3abc',
     )
     expect(login.headers.get('set-cookie')).toMatch(/scn_next=/)
     const res = await app.request('/oauth/callback?code=abc&state=xyz', {
-      headers: { cookie: `${loginCookie.headers.cookie}; scn_next=%2Fs%2Fdid%3Aplc%3Abob%2F3abc` },
+      headers: {
+        cookie: `${loginCookie.headers.cookie}; scn_next=%2Fshared%2Fdid%3Aplc%3Abob%2F3abc`,
+      },
     })
-    expect(res.headers.get('location')).toBe('/s/did:plc:bob/3abc')
+    expect(res.headers.get('location')).toBe('/shared/did:plc:bob/3abc')
   })
 
   it('ignores a return address on another site', async () => {
@@ -107,14 +147,6 @@ describe('GET /oauth/callback', () => {
     expect(res.headers.get('location')).toBe('/')
   })
 
-  it('refuses a callback whose state does not match the login cookie', async () => {
-    const { app } = await setup()
-    const res = await app.request('/oauth/callback?code=abc&state=xyz', {
-      headers: { cookie: 'scn_login=someone-else' },
-    })
-    expect(decodeURIComponent(res.headers.get('location') ?? '')).toContain('different browser')
-  })
-
   it('sets an HttpOnly, SameSite=Lax session cookie and redirects home', async () => {
     const { app } = await setup()
     const res = await app.request('/oauth/callback?code=abc&state=xyz', loginCookie)
@@ -123,15 +155,6 @@ describe('GET /oauth/callback', () => {
     const cookie = res.headers.get('set-cookie') ?? ''
     expect(cookie).toMatch(/HttpOnly/)
     expect(cookie).toMatch(/SameSite=Lax/)
-  })
-
-  it('creates a space account when the granted scope allows spaces', async () => {
-    const { app } = await setup()
-    const cookie = await signIn(app)
-    const me = (await (await app.request('/api/me', { headers: { cookie } })).json()) as {
-      storageMode: string
-    }
-    expect(me).toMatchObject({ did: 'did:plc:alice', handle: 'alice.test', storageMode: 'space' })
   })
 
   it('creates a local account when the PDS dropped the space permissions', async () => {
@@ -149,7 +172,7 @@ describe('GET /oauth/callback', () => {
     expect(me.storageMode).toBe('local')
   })
 
-  it('explains the failure when a space account loses spaces support', async () => {
+  it('turns away a space account that loses spaces support, and revokes its tokens', async () => {
     const { app, db } = await setup()
     await signIn(app)
     const oauth = fakeOAuth({
@@ -168,6 +191,7 @@ describe('GET /oauth/callback', () => {
     expect(decodeURIComponent(res.headers.get('location') ?? '')).toContain(
       new SpacesLostError().message,
     )
+    expect(oauth.revoke).toHaveBeenCalledWith('did:plc:alice')
   })
 })
 
@@ -195,47 +219,17 @@ describe('API session handling', () => {
     expect(res.headers.get('set-cookie')).toBeNull()
   })
 
-  it('revokes the stored tokens when a spaces account signs in without spaces', async () => {
-    const { app, db } = await setup()
-    await signIn(app)
-    const oauth = fakeOAuth({
-      callback: vi.fn(async () => ({
-        session: fakeSession('did:plc:alice', 'atproto'),
-        state: LOGIN_STATE,
-      })),
-    })
-    const again = createApp({
-      config: testConfig(),
-      db,
-      logger: pino({ level: 'silent' }),
-      auth: authDeps(db, { oauth }),
-    })
-    await again.request('/oauth/callback?code=abc&state=xyz', loginCookie)
-    expect(oauth.revoke).toHaveBeenCalledWith('did:plc:alice')
-  })
-
-  it('includes the user roles in /api/me', async () => {
+  it('refuses a non-GET API request with a foreign Origin or none', async () => {
     const { app } = await setup()
     const cookie = await signIn(app)
-    const me = (await (await app.request('/api/me', { headers: { cookie } })).json()) as {
-      roles: string[]
-    }
-    expect(me.roles).toEqual(['user', 'staff'])
-  })
-
-  it('refuses a non-GET API request with a foreign Origin', async () => {
-    const { app } = await setup()
-    const cookie = await signIn(app)
-    const res = await app.request('/api/logout', {
+    const foreign = await app.request('/api/logout', {
       method: 'POST',
       headers: { cookie, origin: 'https://evil.test' },
     })
-    expect(res.status).toBe(403)
-  })
-
-  it('refuses a non-GET API request with no Origin', async () => {
-    const { app } = await setup()
-    expect((await app.request('/api/logout', { method: 'POST' })).status).toBe(403)
+    expect(foreign.status).toBe(403)
+    expect((await app.request('/api/logout', { method: 'POST', headers: { cookie } })).status).toBe(
+      403,
+    )
   })
 })
 

@@ -2,10 +2,15 @@ import { loadConfig } from '../../src/config.ts'
 
 export const TEST_SECRET_KEY = Buffer.alloc(32, 1).toString('base64')
 
-/** A test config: env holds secrets and overrides, file holds config.yml's contents. */
-export function testConfig(env: Record<string, string> = {}, file: Record<string, unknown> = {}) {
+/** The admin every test config lists in ADMIN_DIDS. */
+export const TEST_ADMIN = 'did:plc:admin'
+
+/** A test config from the environment, with the secrets and an admin filled in. */
+export function testConfig(env: Record<string, string> = {}) {
   return loadConfig({
-    env: { NODE_ENV: 'test', SECRET_KEY: TEST_SECRET_KEY, ...env },
-    file: { app: { name: 'Test Chat' }, ...file },
+    NODE_ENV: 'test',
+    SECRET_KEY: TEST_SECRET_KEY,
+    ADMIN_DIDS: TEST_ADMIN,
+    ...env,
   })
 }
