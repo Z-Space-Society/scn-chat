@@ -266,6 +266,53 @@ describe('ConversationView', () => {
     await vi.waitFor(() => expect(store.worker.refreshConversation).toHaveBeenCalled())
   })
 
+  it('scrolls to the bottom on send, even after the reader scrolled up', async () => {
+    const fetch = vi.fn(async () =>
+      Response.json({ rkey: 'v', replyRkey: null, status: null }, { status: 201 }),
+    )
+    stubFetch(fetch)
+    const store = fakeStore([user('u', 'question'), reply('u.r0', 'answer', 'u')])
+    await renderWith(
+      store,
+      <main data-testid="scroller" style={{ overflowY: 'auto' }}>
+        <ConversationView skey="s1" />
+      </main>,
+    )
+    await screen.findByText('answer')
+    const scroller = screen.getByTestId('scroller')
+    Object.defineProperty(scroller, 'scrollHeight', { configurable: true, get: () => 1000 })
+    Object.defineProperty(scroller, 'clientHeight', { configurable: true, get: () => 400 })
+    scroller.scrollTop = 200
+    act(() => void scroller.dispatchEvent(new Event('scroll')))
+    await userEvent.type(screen.getByPlaceholderText('Message'), 'more{Enter}')
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalled())
+    await vi.waitFor(() => expect(scroller.scrollTop).toBe(1000))
+  })
+
+  it('syncs and shows a message written from another client', async () => {
+    const fetch = vi.fn(async () => Response.json({}))
+    stubFetch(fetch)
+    const store = fakeStore([user('u', 'question'), reply('u.r0', 'answer', 'u')])
+    await renderWith(store, <ConversationView skey="s1" />)
+    await screen.findByText('answer')
+    await vi.waitFor(() => expect(store.worker.refreshConversation).toHaveBeenCalled())
+    store.worker.refreshConversation.mockClear()
+    // The refresh brings in a message another client wrote to the PDS.
+    store.worker.refreshConversation.mockImplementation(async () =>
+      act(() =>
+        store.update([
+          ...store.data.messages,
+          user('v', 'from my phone', 'u.r0', '2026-09-26T00:00:02Z'),
+        ]),
+      ),
+    )
+    expect(screen.queryByText('from my phone')).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Sync' }))
+    expect(await screen.findByText('from my phone')).toBeInTheDocument()
+    expect(String((writes(fetch)[0] as [string])[0])).toBe('/api/conversations/s1/sync')
+    expect(store.worker.refreshConversation).toHaveBeenCalledWith('s1')
+  })
+
   it('keeps refreshing until the reply finishes when the stream drops', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     try {

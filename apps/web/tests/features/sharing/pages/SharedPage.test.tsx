@@ -42,6 +42,36 @@ describe('SharedPage', () => {
     expect(screen.getByText('About $500')).toBeInTheDocument()
   })
 
+  it('shows the shared conversation read-only, with no way to write to it', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          owner: { did: 'did:plc:alice', handle: 'alice.test' },
+          title: 'Tile quotes',
+          messages: [
+            message('u', 'user', 'How much for tiles?'),
+            message('u.r0', 'assistant', 'About $500', 'u'),
+            message('u.r1', 'assistant', 'Roughly $450', 'u'),
+          ],
+        }),
+      ),
+    )
+    const { container } = await renderAt(
+      <SharedPage ownerDid="did:plc:alice" skey="3abc" signedIn />,
+    )
+    expect(await screen.findByText('Roughly $450')).toBeInTheDocument()
+    // Switching between replies is the only control: no composer, edit, regenerate, stop, rename,
+    // share, or sync.
+    expect(screen.getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual([
+      'Previous version',
+      'Next version',
+    ])
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+    expect(container.querySelector('form, input, textarea, select')).toBeNull()
+  })
+
   it('asks a signed-out viewer to sign in, returning to the shared link', async () => {
     await renderAt(<SharedPage ownerDid="did:plc:alice" skey="3abc" signedIn={false} />)
     expect(screen.getByRole('link', { name: 'Sign in' }).getAttribute('href')).toMatch(

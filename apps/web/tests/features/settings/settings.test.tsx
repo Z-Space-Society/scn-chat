@@ -225,6 +225,26 @@ describe('Settings API keys', () => {
     )
     expect(JSON.parse(String(post?.[1]?.body))).toMatchObject({ providerId: 'mistral', models: [] })
   })
+
+  it('deletes a stored key and drops it from the list', async () => {
+    let credentials = [
+      { id: 'k1', providerId: 'openai', name: 'Work', slug: null, baseUrl: null, keyHint: 'abcd' },
+    ]
+    const fetch = stubServer({
+      '/api/credentials': () => Response.json({ credentials }),
+      '/api/credentials/k1': () => {
+        credentials = []
+        return Response.json({ ok: true })
+      },
+    })
+    await renderPage('/api-keys')
+    expect(await screen.findByText(/Work ending abcd/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    await vi.waitFor(() => expect(screen.queryByText(/Work ending abcd/)).toBeNull())
+    expect(
+      fetch.mock.calls.filter(([, init]) => init?.method === 'DELETE').map(([url]) => url),
+    ).toEqual(['/api/credentials/k1'])
+  })
 })
 
 describe('Settings sections', () => {
@@ -336,5 +356,39 @@ describe('Settings plugins', () => {
         ['/api/plugins/web-fetch/tools/web_fetch', { enabled: false }],
       ]),
     )
+  })
+})
+
+describe('Settings sync', () => {
+  const account = (allowUserOptOut: boolean) => ({
+    '/api/account': () => Response.json({ backgroundSync: true, allowUserOptOut }),
+  })
+  const syncSwitch = { name: 'Keep my chats in sync in the background' }
+
+  it('hides the background sync switch when the admin does not allow opting out', async () => {
+    const fetch = stubServer(account(false))
+    await renderPage('/sync')
+    await screen.findByRole('heading', { name: 'Sync' })
+    await vi.waitFor(() =>
+      expect(fetch.mock.calls.some(([url]) => url === '/api/account')).toBe(true),
+    )
+    expect(screen.queryByRole('checkbox', syncSwitch)).toBeNull()
+  })
+
+  it('shows the background sync switch with the account setting when opting out is allowed', async () => {
+    stubServer(account(true))
+    await renderPage('/sync')
+    expect(await screen.findByRole('checkbox', syncSwitch)).toBeChecked()
+  })
+
+  it('saves the account setting when the background sync switch is turned off', async () => {
+    const fetch = stubServer(account(true))
+    await renderPage('/sync')
+    await userEvent.click(await screen.findByRole('checkbox', syncSwitch))
+    await vi.waitFor(() => expect(screen.getByRole('checkbox', syncSwitch)).not.toBeChecked())
+    const put = fetch.mock.calls.find(
+      ([url, init]) => url === '/api/account' && init?.method === 'PUT',
+    )
+    expect(JSON.parse(String(put?.[1]?.body))).toEqual({ backgroundSync: false })
   })
 })

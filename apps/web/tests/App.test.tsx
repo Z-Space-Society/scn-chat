@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { getRouter } from '../src/router.tsx'
 import { stubFetch } from './helpers/fetch.ts'
 
-const { openStore, store } = vi.hoisted(() => {
+const { openStore, question, store } = vi.hoisted(() => {
   const question = {
     rkey: 'u',
     author: 'did:plc:alice',
@@ -36,7 +36,7 @@ const { openStore, store } = vi.hoisted(() => {
     claim: async () => 'active',
     deleteLocalCopy: vi.fn(async () => {}),
   }
-  return { store, openStore: vi.fn(() => store) }
+  return { store, question, openStore: vi.fn(() => store) }
 })
 vi.mock('../src/store/client.ts', () => ({ openStore }))
 
@@ -46,8 +46,11 @@ afterEach(() => {
   store.deleteLocalCopy.mockClear()
 })
 
-/** A server with a signed-in user, answering every other read with an empty body. */
-function signedIn(changes: Record<string, unknown> = {}) {
+/**
+ * A server with a signed-in user, answering the reads in `answers` by path and every other read
+ * with an empty body.
+ */
+function signedIn(changes: Record<string, unknown> = {}, answers: Record<string, unknown> = {}) {
   const me = {
     did: 'did:plc:alice',
     handle: 'alice',
@@ -71,6 +74,7 @@ function signedIn(changes: Record<string, unknown> = {}) {
       '/api/admin/users?q=': { users: [], cursor: null },
       '/api/admin/invites': { invites: [] },
       '/api/admin/roles': { roles: [], environmentAdmins: [] },
+      ...answers,
     },
   )
 }
@@ -136,11 +140,33 @@ describe('App', () => {
     expect(openStore).not.toHaveBeenCalled()
   })
 
-  it('still opens a shared chat for a viewer', async () => {
+  it('sends a viewer from the settings to the login page', async () => {
     signedIn({ access: 'viewer', accessMessage: 'This server is invite-only.' })
+    const router = renderApp('/settings')
+    expect(await screen.findByRole('status')).toHaveTextContent('This server is invite-only.')
+    expect(router.state.location.pathname).toBe('/login')
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
+    expect(openStore).not.toHaveBeenCalled()
+  })
+
+  it('still opens a shared chat for a viewer', async () => {
+    signedIn(
+      { access: 'viewer', accessMessage: 'This server is invite-only.' },
+      {
+        '/api/shared/did:plc:alice/3aaa': {
+          owner: { did: 'did:plc:alice', handle: 'alice.test' },
+          title: 'Tile quotes',
+          messages: [{ rkey: 'u', cid: 'c-u', value: question.record }],
+        },
+      },
+    )
     const router = renderApp('/shared/did:plc:alice/3aaa')
-    await vi.waitFor(() => expect(router.state.status).toBe('idle'))
+    expect(await screen.findByRole('heading', { name: 'Tile quotes' })).toBeInTheDocument()
+    expect(screen.getByText('Shared by alice.test')).toBeInTheDocument()
+    expect(screen.getByText('Which tiles?')).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/shared/did:plc:alice/3aaa')
+    expect(openStore).not.toHaveBeenCalled()
   })
 
   it('sends users who are not admins from the admin area to their chats', async () => {

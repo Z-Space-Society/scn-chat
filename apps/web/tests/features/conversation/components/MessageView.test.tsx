@@ -22,13 +22,20 @@ describe('MessageView', () => {
             parts: [
               { $type: d('reasoningPart'), text: 'thinking' },
               { $type: d('toolCallPart'), callId: 'c', tool: 'search', input: '{}' },
+              { $type: d('toolResultPart'), callId: 'c', output: 'found' },
               { $type: d('sourcePart'), url: 'https://example.com', title: 'Example' },
             ],
           },
         }}
       />,
     )
-    for (const details of container.querySelectorAll('details')) expect(details.open).toBe(false)
+    const details = Array.from(container.querySelectorAll('details'))
+    expect(details.map((detail) => detail.querySelector('summary')?.textContent)).toEqual([
+      'Reasoning',
+      'Tool call: search',
+      'Tool result',
+    ])
+    for (const detail of details) expect(detail.open).toBe(false)
     expect(screen.getByRole('link', { name: 'Example' })).toHaveAttribute(
       'href',
       'https://example.com',

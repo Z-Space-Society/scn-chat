@@ -137,28 +137,28 @@ While the reader is at the bottom of the conversation, it stays scrolled to the 
 ## Acceptance Criteria
 
 - [ ] Signing in with a handle starts OAuth, and the app returns to the chat list afterwards.
-- [ ] Signed-out users requesting a signed-in route get a redirect to `/login` from the server, before any page is rendered.
+- [x] Signed-out users requesting a signed-in route get a redirect to `/login` from the server, before any page is rendered.
 - [ ] `pnpm dev` serves the API and the web app from one process and port, and a production build serves both from the server entry.
 - [ ] Creating a chat, sending a message, and watching the reply stream works end to end.
 - [ ] The chat list shows new titles once they are generated.
-- [ ] Sibling controls switch branches and show the matching replies, and reloading the page keeps the chosen branch.
-- [ ] Reloading during a search keeps the search and its results.
-- [ ] Regenerating adds a sibling reply and selects it.
-- [ ] Editing a message adds a sibling user message with its own reply, and switching the edit to another message starts over from its text.
-- [ ] Stop cancels a generating reply, which then shows as stopped.
-- [ ] The effort select appears only for reasoning models, and a hidden effort is not sent.
-- [ ] With no default model anywhere, a new chat asks for a model instead of failing with "No model selected".
-- [ ] Image attachment is disabled for models without vision.
-- [ ] A PDF attachment uploads, shows its name, and reaches the model as text.
-- [ ] Settings save preferences, add and delete API keys, and save plugin settings through generated forms.
-- [ ] A shared link shows the conversation read-only to a permitted viewer.
-- [ ] Reasoning and tool details are collapsed by default.
-- [ ] Assistant text renders as Markdown, raw HTML in it is not rendered, images in it load only on click and show their full URL first, and user text stays plain.
-- [ ] If the stream drops, the reply still appears through repeated refreshes.
-- [ ] The conversation follows a streaming reply while the reader is at the bottom, not after they scroll up, and scrolls to the bottom on send.
-- [ ] The sync button syncs the conversation and shows changes written from another client.
-- [ ] The background sync switch appears only when the admin allows opting out, and saves the account setting.
-- [ ] The page title and `application-name` meta tag show the configured app name.
-- [ ] A viewer requesting a chat or settings route is redirected to `/login`, which shows the access message, sign-in, and sign-out, and a shared link still opens for them.
-- [ ] A user who is not an admin requesting an admin route gets a redirect to `/` from the server.
-- [ ] `/admin` opens on the users section, and the users search is kept in the URL.
+- [x] Sibling controls switch branches and show the matching replies, and reloading the page keeps the chosen branch.
+- [x] Reloading during a search keeps the search and its results.
+- [x] Regenerating adds a sibling reply and selects it.
+- [x] Editing a message adds a sibling user message with its own reply, and switching the edit to another message starts over from its text.
+- [x] Stop cancels a generating reply, which then shows as stopped.
+- [x] The effort select appears only for reasoning models, and a hidden effort is not sent.
+- [x] With no default model anywhere, a new chat asks for a model instead of failing with "No model selected".
+- [x] Image attachment is disabled for models without vision.
+- [x] A PDF attachment uploads, shows its name, and reaches the model as text.
+- [x] Settings save preferences, add and delete API keys, and save plugin settings through generated forms.
+- [x] A shared link shows the conversation read-only to a permitted viewer.
+- [x] Reasoning and tool details are collapsed by default.
+- [x] Assistant text renders as Markdown, raw HTML in it is not rendered, images in it load only on click and show their full URL first, and user text stays plain.
+- [x] If the stream drops, the reply still appears through repeated refreshes.
+- [x] The conversation follows a streaming reply while the reader is at the bottom, not after they scroll up, and scrolls to the bottom on send.
+- [x] The sync button syncs the conversation and shows changes written from another client.
+- [x] The background sync switch appears only when the admin allows opting out, and saves the account setting.
+- [x] The page title and `application-name` meta tag show the configured app name.
+- [x] A viewer requesting a chat or settings route is redirected to `/login`, which shows the access message, sign-in, and sign-out, and a shared link still opens for them.
+- [x] A user who is not an admin requesting an admin route gets a redirect to `/` from the server.
+- [x] `/admin` opens on the users section, and the users search is kept in the URL.

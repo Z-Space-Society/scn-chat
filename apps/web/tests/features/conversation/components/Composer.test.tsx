@@ -122,6 +122,40 @@ describe('Composer', () => {
     expect(writes(fetch).map(([url]) => url)).toEqual(['/api/attachments'])
   })
 
+  it('uploads a PDF, shows its name, and sends it as an attachment part', async () => {
+    const part = {
+      $type: 'network.sharedcomputer.chat.defs#filePart',
+      file: { $type: 'blob', ref: { $link: 'bafypdf' }, mimeType: 'application/pdf', size: 4 },
+      name: 'report.pdf',
+      extracted: {
+        text: { $type: 'blob', ref: { $link: 'bafytext' }, mimeType: 'text/plain', size: 9 },
+        method: 'pdf',
+      },
+    }
+    const fetch = serve(async (url) =>
+      url === '/api/attachments'
+        ? Response.json({ part }, { status: 201 })
+        : Response.json({ rkey: 'u1', replyRkey: 'u1.r0', status: 'claimed' }, { status: 201 }),
+    )
+    await renderComposer(<Composer skey="s1" onSent={() => {}} />)
+    const file = new File(['%PDF'], 'report.pdf', { type: 'application/pdf' })
+    await userEvent.upload(screen.getByLabelText('Attach'), file)
+    expect(await screen.findByText('report.pdf')).toBeInTheDocument()
+    const [uploadUrl, uploadInit] = writes(fetch)[0] as [string, RequestInit]
+    expect(uploadUrl).toBe('/api/attachments')
+    expect(new Headers(uploadInit.headers).get('content-type')).toBe('application/pdf')
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled())
+    await userEvent.type(screen.getByPlaceholderText('Message'), 'Summarize this{Enter}')
+    await vi.waitFor(() => expect(writes(fetch)).toHaveLength(2))
+    const [url, init] = writes(fetch)[1] as [string, RequestInit]
+    expect(String(url)).toBe('/api/conversations/s1/messages')
+    expect(JSON.parse(String(init.body)).parts).toEqual([
+      part,
+      { $type: 'network.sharedcomputer.chat.defs#textPart', text: 'Summarize this' },
+    ])
+    await vi.waitFor(() => expect(screen.queryByText('report.pdf')).toBeNull())
+  })
+
   it('adds a newline on Shift+Enter instead of sending', async () => {
     const fetch = serve()
     await renderComposer(<Composer skey="s" onSent={() => {}} />)
