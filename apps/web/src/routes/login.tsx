@@ -1,9 +1,9 @@
 import { useMutation } from '@tanstack/react-query'
 import { createFileRoute, redirect } from '@tanstack/react-router'
-import { api, read } from '../api.ts'
-import { messageOf } from '../lib/errors.ts'
-import { validateLoginSearch } from '../lib/search-params.ts'
-import { LoginPage } from '../pages/LoginPage.tsx'
+import { LoginPage } from '../features/auth/pages/LoginPage.tsx'
+import { api, read } from '../shared/api.ts'
+import { messageOf } from '../shared/errors.ts'
+import { validateLoginSearch } from '../shared/search-params.ts'
 
 export const Route = createFileRoute('/login')({
   validateSearch: validateLoginSearch,

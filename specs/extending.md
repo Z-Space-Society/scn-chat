@@ -123,7 +123,7 @@ Adding code highlighting, math, or diagrams is a plugin and possibly a component
 ### Component boundaries
 
 - `ConversationView` keeps the branch, the stream overlay, and the message list. The title, rename, sync, and share controls move to `ConversationHeader`, and the actions move to `message-actions.tsx`.
-- `pages/SettingsPage.tsx` becomes `pages/settings/`, with `layout.tsx` for the sidebar and one file per section: `preferences.tsx`, `api-keys.tsx`, `plugins.tsx`, and `sync.tsx`. The routes import from there.
+- `pages/SettingsPage.tsx` becomes `features/settings/pages/`, with `SettingsLayout.tsx` for the sidebar and one file per section: `PreferencesSettings.tsx`, `ApiKeySettings.tsx`, `PluginSettings.tsx`, and `SyncSettings.tsx`. The routes import from there.
 - Apart from the actions above, these are moves. Behavior, markup, and labels stay the same, so the existing tests pass with only their imports changed.
 
 ### The forker guide
@@ -141,9 +141,9 @@ Then it gives one recipe per common change, each naming the files to touch with 
 - **Render more in Markdown**, such as code highlighting or math: add a plugin to the lists in `parts/markdown.tsx`.
 - **Add a page:** add a route file under `src/routes/`.
 - **Add a control to the composer.**
-- **Add a settings section:** a route file, a section component in `pages/settings/`, a query, and an entry in `sections` in `pages/settings/layout.tsx` for the sidebar link.
-- **Add an admin section:** the same, under `routes/_app/admin/` and `pages/admin/`, with a server route under `/api/admin`.
-- **Read or write new server data:** a Hono route, its type in `api-types.ts`, a query factory in `queries.ts`, and a mutation.
+- **Add a settings section:** a route file, a section component in `features/settings/pages/`, a query in `features/settings/queries.ts`, and an entry in `sections` in `features/settings/pages/SettingsLayout.tsx` for the sidebar link.
+- **Add an admin section:** the same, under `routes/_app/admin/` and `features/admin/`, with a server route under `/api/admin`.
+- **Read or write new server data:** a Hono route, its type in `api-types.ts`, a query factory in the feature's `queries.ts`, and a mutation.
 - **Add a server tool:** a plugin, as `docs/plugins.md` describes, then its tool view.
 - **Change the look:** `theme.css` for now, until the styling phase replaces it.
 
@@ -196,6 +196,6 @@ It ends with the rules a fork should keep, linking the ADRs:
 ## Files
 
 - `apps/web/src/parts/`
-- `apps/web/src/components/MessageView.tsx`, `ConversationView.tsx`, `ConversationHeader.tsx`, `message-actions.tsx`
-- `apps/web/src/pages/settings/`
+- `apps/web/src/features/conversation/components/MessageView.tsx`, `ConversationView.tsx`, `ConversationHeader.tsx`, `message-actions.tsx`
+- `apps/web/src/features/settings/pages/`
 - `docs/extending.md`, `docs/plugins.md`, `docs/architecture.md`

@@ -1,7 +1,7 @@
 import { noop } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { PluginSettings } from '../../../pages/settings/plugins.tsx'
-import { pluginSettingsQuery } from '../../../queries.ts'
+import { PluginSettings } from '../../../features/settings/pages/PluginSettings.tsx'
+import { pluginSettingsQuery } from '../../../features/settings/queries.ts'
 
 export const Route = createFileRoute('/_app/settings/plugins')({
   // Prefetching renders the section with its data on the server. A failed fetch shows in the section.

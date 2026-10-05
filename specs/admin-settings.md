@@ -134,6 +134,6 @@ Provider IDs appear in the model references stored in users' records, so each pr
 - `apps/server/src/auth/web-session.ts`, `apps/server/src/auth/oauth-client.ts`
 - `apps/server/src/turns/runner.ts`, `apps/server/src/turns/prompt.ts`, `apps/server/src/sync/scheduler.ts`, `apps/server/src/sync/engine.ts`
 - `apps/server/src/app.ts`, which passes the app name to the web app with each request
-- `apps/web/src/routes/_app/admin/general.tsx`, `turns.tsx`, `sync.tsx`, `apps/web/src/pages/admin/settings.tsx`, `apps/web/src/components/SchemaFields.tsx`
+- `apps/web/src/routes/_app/admin/general.tsx`, `turns.tsx`, `sync.tsx`, `apps/web/src/features/admin/pages/SettingsAdmin.tsx`, `apps/web/src/shared/schema-fields/SchemaFields.tsx`
 - `.env.example`, `.gitignore`, `.dockerignore`, `docker-compose.yml`, `config.example.yml` (deleted)
 - `CLAUDE.md`, `README.md`, `docs/`, `specs/`, `plugins/web-search/README.md`

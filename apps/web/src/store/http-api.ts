@@ -1,4 +1,4 @@
-import { errorMessage } from '../lib/response.ts'
+import { errorMessage } from '../shared/response.ts'
 import type { ConversationChanges, IndexChanges, RecordKey, StoreApi } from './core.ts'
 
 export class Unauthorized extends Error {

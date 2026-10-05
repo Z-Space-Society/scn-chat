@@ -7,7 +7,7 @@ An AI assistant chat app where each conversation is an atproto permissioned spac
 - `lexicons/` holds our lexicon JSON, and `lexicons/upstream/` the vendored `com.atproto` lexicons the server calls.
 - `packages/lexicons` is the generated lexicon code and the `nsid` module. `packages/plugin-api` is what plugins build against.
 - `apps/server` is the Hono server. `src/server.ts` wires every service together.
-- `apps/web` is the TanStack Start app, which the server runs inside Hono. `src/store/` is the browser's local SQLite copy.
+- `apps/web` is the TanStack Start app, which the server runs inside Hono. Its code is grouped by feature in `src/features/`, with thin routes in `src/routes/` and cross-feature code in `src/shared/`. `src/store/` is the browser's local SQLite copy.
 - `plugins/` holds the shipped plugins.
 - `docs/architecture.md` is the human-facing architecture overview, and `docs/plugins.md` the plugin author guide. Update them when a change affects what they describe.
 - `GLOSSARY.md` holds the project's terms, and `docs/adr/` the decisions behind its less obvious choices. Read the relevant ADR before changing what it decided.

@@ -312,5 +312,5 @@ Admin API and area:
 - `apps/server/src/config.ts`, `apps/server/src/server.ts`
 - `apps/server/src/db/migrations/0007_admin.ts`, `apps/server/src/db/migrations/0009_registration.ts`
 - `apps/web/src/routes/_app/admin.tsx`, `apps/web/src/routes/_app/admin/`, `apps/web/src/routes/_app.tsx`, `apps/web/src/routes/login.tsx`
-- `apps/web/src/pages/admin/layout.tsx`, `users.tsx`, `roles.tsx`, `access.tsx`, `role-picker.tsx`, `apps/web/src/pages/settings/layout.tsx`, `apps/web/src/queries.ts`
+- `apps/web/src/features/admin/pages/AdminLayout.tsx`, `UsersAdmin.tsx`, `RolesAdmin.tsx`, `AccessAdmin.tsx`, `apps/web/src/features/admin/components/RolePicker.tsx`, `apps/web/src/features/admin/queries.ts`, `apps/web/src/features/settings/pages/SettingsLayout.tsx`
 - `.env.example`, `docs/architecture.md`, `docs/deployment.md`, `docs/plugins.md`, `specs/sharing.md`, `specs/plugins.md`

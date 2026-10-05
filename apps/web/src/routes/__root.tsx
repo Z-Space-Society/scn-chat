@@ -1,9 +1,9 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { createRootRouteWithContext, HeadContent, Navigate, Scripts } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
-import { appName } from '../app-name.ts'
-import { messageOf } from '../lib/errors.ts'
-import { checkSession } from '../session.tsx'
+import { checkSession } from '../features/auth/session.tsx'
+import { appName } from '../shared/app-name.ts'
+import { messageOf } from '../shared/errors.ts'
 import styles from '../styles.css?url'
 import theme from '../theme.css?url'
 

@@ -1,7 +1,11 @@
 import { noop } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { PluginAdmin } from '../../../../pages/admin/plugin.tsx'
-import { adminModelsQuery, adminPluginsQuery, adminRolesQuery } from '../../../../queries.ts'
+import { PluginAdmin } from '../../../../features/admin/pages/PluginAdmin.tsx'
+import {
+  adminModelsQuery,
+  adminPluginsQuery,
+  adminRolesQuery,
+} from '../../../../features/admin/queries.ts'
 
 export const Route = createFileRoute('/_app/admin/plugins/$id')({
   // Prefetching renders the section with its data on the server. A failed fetch shows in the section.

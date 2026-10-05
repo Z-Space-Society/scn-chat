@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { validateBranchSearch } from '../../../lib/search-params.ts'
-import { SharedPage } from '../../../pages/SharedPage.tsx'
+import { SharedPage } from '../../../features/sharing/pages/SharedPage.tsx'
+import { validateBranchSearch } from '../../../shared/search-params.ts'
 
 export const Route = createFileRoute('/shared/$ownerDid/$skey')({
   validateSearch: validateBranchSearch,

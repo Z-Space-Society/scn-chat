@@ -1,9 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
 import { useEffect } from 'react'
-import { onUnauthorized } from '../api.ts'
-import { syncTimeZone } from '../lib/time-zone.ts'
-import { endSession, MeContext } from '../session.tsx'
+import { endSession, MeContext } from '../features/auth/session.tsx'
+import { syncTimeZone } from '../features/settings/lib/time-zone.ts'
+import { onUnauthorized } from '../shared/api.ts'
 
 /**
  * The signed-in routes. Signed-out requests are sent to the login page, from the server too, and

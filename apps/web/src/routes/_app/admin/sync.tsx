@@ -1,7 +1,7 @@
 import { noop } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { SettingsAdmin } from '../../../pages/admin/settings.tsx'
-import { adminSettingsQuery } from '../../../queries.ts'
+import { SettingsAdmin } from '../../../features/admin/pages/SettingsAdmin.tsx'
+import { adminSettingsQuery } from '../../../features/admin/queries.ts'
 
 const keys = ['sync']
 

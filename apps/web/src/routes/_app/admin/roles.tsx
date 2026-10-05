@@ -1,7 +1,7 @@
 import { noop } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { RolesAdmin } from '../../../pages/admin/roles.tsx'
-import { adminRolesQuery } from '../../../queries.ts'
+import { RolesAdmin } from '../../../features/admin/pages/RolesAdmin.tsx'
+import { adminRolesQuery } from '../../../features/admin/queries.ts'
 
 export const Route = createFileRoute('/_app/admin/roles')({
   // Prefetching renders the section with its data on the server. A failed fetch shows in the section.

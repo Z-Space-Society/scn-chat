@@ -12,6 +12,8 @@ The web app is built on [TanStack Start](https://tanstack.com/start), but the Ho
 
 Hono is the only API. The web app calls it through Hono's typed client, in process during server rendering and over HTTP in the browser, with TanStack Query on top. See [ADR 0001](adr/0001-tanstack-start-inside-hono.md) and [specs/web-ui.md](../specs/web-ui.md).
 
+The web app's code is grouped by feature. Each folder in `apps/web/src/features/`, such as `conversation` or `admin`, holds that feature's pages, components, hooks, and queries. The files in `src/routes/` stay thin: each one loads data and renders a page from a feature. `src/store/` is the browser's local copy, and `src/shared/` holds what several features use, such as the API client.
+
 ## Chat history storage
 
 The goal is to keep users in control of their own chat data. The server should not keep a copy of the chat records. The records are stored in the browser in a wasm sqlite db to allow easy listing and search without having to perform intensive operations on the PDS.

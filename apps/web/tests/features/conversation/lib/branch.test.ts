@@ -1,0 +1,111 @@
+import { describe, expect, it } from 'vitest'
+import {
+  childrenByParent,
+  choicesFor,
+  currentBranch,
+  inheritedModel,
+} from '../../../../src/features/conversation/lib/branch.ts'
+
+const m = (rkey: string, parent?: string, createdAt = '2026-09-26T00:00:00Z') => ({
+  rkey,
+  record: { parent, createdAt },
+})
+
+describe('currentBranch', () => {
+  const messages = [
+    m('a', undefined, '2026-09-26T00:00:00Z'),
+    m('a.r0', 'a', '2026-09-26T00:01:00Z'),
+    m('a.r1', 'a', '2026-09-26T00:02:00Z'),
+    m('b', 'a.r1', '2026-09-26T00:03:00Z'),
+    m('c', 'a.r0', '2026-09-26T00:04:00Z'),
+  ]
+
+  it('follows the newest sibling at each level by default', () => {
+    expect(currentBranch(messages, {}).map((s) => s.message.rkey)).toEqual(['a', 'a.r1', 'b'])
+  })
+
+  it('groups messages whose parent is missing at the root, where the root choice picks them', () => {
+    const orphans = [m('x', 'gone', '2026-09-26T00:00:00Z'), m('y', 'gone', '2026-09-26T00:01:00Z')]
+    expect(currentBranch(orphans, {})[0]).toMatchObject({ parent: null, message: { rkey: 'y' } })
+    expect(currentBranch(orphans, { '': 'x' })[0]?.message.rkey).toBe('x')
+  })
+
+  it('follows a chosen sibling and what comes after it', () => {
+    expect(currentBranch(messages, { a: 'a.r0' }).map((s) => s.message.rkey)).toEqual([
+      'a',
+      'a.r0',
+      'c',
+    ])
+  })
+
+  it('reports each step siblings and position', () => {
+    const step = currentBranch(messages, {})[1]
+    expect(step?.siblings.map((s) => s.rkey)).toEqual(['a.r0', 'a.r1'])
+    expect(step?.index).toBe(1)
+  })
+})
+
+describe('childrenByParent', () => {
+  it('orders regenerations by attempt number, not by key', () => {
+    const replies = Array.from({ length: 11 }, (_, i) => m(`u.r${i}`, 'u'))
+    const order = childrenByParent([m('u'), ...replies])
+      .get('u')
+      ?.map((r) => r.rkey)
+    expect(order?.at(-1)).toBe('u.r10')
+    expect(order?.[2]).toBe('u.r2')
+  })
+
+  it('treats messages with a missing parent as roots', () => {
+    expect(
+      childrenByParent([m('orphan', 'gone')])
+        .get(null)
+        ?.map((r) => r.rkey),
+    ).toEqual(['orphan'])
+  })
+})
+
+describe('choicesFor', () => {
+  const messages = [
+    m('a', undefined, '2026-09-26T00:00:00Z'),
+    m('a.r0', 'a', '2026-09-26T00:01:00Z'),
+    m('a.r1', 'a', '2026-09-26T00:02:00Z'),
+    m('c', 'a.r0', '2026-09-26T00:04:00Z'),
+  ]
+
+  it('chooses every ancestor of the message, so the branch passes through it', () => {
+    const choices = choicesFor(messages, 'c')
+    expect(currentBranch(messages, choices).map((s) => s.message.rkey)).toEqual(['a', 'a.r0', 'c'])
+  })
+
+  it('chooses nothing for an unknown message', () => {
+    expect(choicesFor(messages, 'gone')).toEqual({})
+  })
+})
+
+const smart = { provider: 'p', id: 'smart' }
+const fast = { provider: 'p', id: 'fast' }
+
+const step = (rkey: string, record: Record<string, unknown>) => ({ message: { rkey, record } })
+const user = (rkey: string) => step(rkey, { role: 'user' })
+const reply = (rkey: string, model: object, status = 'complete') =>
+  step(rkey, { role: 'assistant', status, model })
+
+describe('inheritedModel', () => {
+  const branch = [user('a'), reply('a.r0', smart), user('b'), reply('b.r0', fast), user('c')]
+
+  it("takes the nearest completed reply's model at or above the parent", () => {
+    expect(inheritedModel(branch, 'c')).toEqual(fast)
+    expect(inheritedModel(branch, 'b')).toEqual(smart)
+  })
+
+  it('skips replies that did not complete', () => {
+    const failed = [user('a'), reply('a.r0', smart), user('b'), reply('b.r0', fast, 'error')]
+    expect(inheritedModel(failed, 'b.r0')).toEqual(smart)
+  })
+
+  it('has none above the first message, or for a parent off the branch', () => {
+    expect(inheritedModel(branch, 'a')).toBeNull()
+    expect(inheritedModel(branch, undefined)).toBeNull()
+    expect(inheritedModel(branch, 'gone')).toBeNull()
+  })
+})

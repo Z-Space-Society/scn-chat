@@ -1,8 +1,12 @@
 import { noop } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { validateUserSearch } from '../../../lib/search-params.ts'
-import { UsersAdmin } from '../../../pages/admin/users.tsx'
-import { adminInvitesQuery, adminRolesQuery, adminUsersQuery } from '../../../queries.ts'
+import { UsersAdmin } from '../../../features/admin/pages/UsersAdmin.tsx'
+import {
+  adminInvitesQuery,
+  adminRolesQuery,
+  adminUsersQuery,
+} from '../../../features/admin/queries.ts'
+import { validateUserSearch } from '../../../shared/search-params.ts'
 
 export const Route = createFileRoute('/_app/admin/users')({
   validateSearch: validateUserSearch,
