@@ -19,9 +19,8 @@ import { useStickToBottom } from './useStickToBottom.ts'
 export function ConversationView({ skey }: { skey: string }) {
   const queryClient = useQueryClient()
   const { conversation, error: loadError } = useConversation(skey)
-  const [editing, setEditing] = useState<{ rkey: string; parent?: string; text: string } | null>(
-    null,
-  )
+  // The user message being edited, by rkey, so the composer reads it from the conversation.
+  const [editingRkey, setEditingRkey] = useState<string | null>(null)
   const { models } = useModels()
 
   const messages = conversation?.messages ?? []
@@ -47,6 +46,8 @@ export function ConversationView({ skey }: { skey: string }) {
     document.getElementById(`m-${focus}`)?.scrollIntoView({ block: 'center' })
   }, [focus, focusShown])
   const leaf = branch.at(-1)?.message
+  const editing = messages.find((m) => m.rkey === editingRkey)
+  const editingParent = editing?.record.parent as string | undefined
   const blobUrl = blobUrlFor(`/api/conversations/${skey}`)
   const title = (conversation?.info?.title as string | undefined) ?? 'New chat'
 
@@ -77,9 +78,8 @@ export function ConversationView({ skey }: { skey: string }) {
     await read(api.chats.conversations[':skey'].sync.$post({ param: { skey } }))
   }
 
-  const rename = async ({ value, onSaved }: { value: string; onSaved: () => void }) => {
-    await read(api.chats.conversations[':skey'].$patch({ param: { skey } }, json({ title: value })))
-    onSaved()
+  const rename = async (title: string) => {
+    await read(api.chats.conversations[':skey'].$patch({ param: { skey } }, json({ title })))
   }
 
   const renamingTitle = useMutation({ mutationFn: rename, onSuccess: refresh })
@@ -99,7 +99,7 @@ export function ConversationView({ skey }: { skey: string }) {
       <ConversationHeader
         skey={skey}
         title={title}
-        onRename={(value, onSaved) => renamingTitle.mutate({ value, onSaved })}
+        onRename={(title, onSaved) => renamingTitle.mutate(title, { onSuccess: onSaved })}
         onSync={() => syncing.mutate()}
       />
       {(error ?? loadError) && <p role="alert">{error ?? loadError}</p>}
@@ -108,16 +108,7 @@ export function ConversationView({ skey }: { skey: string }) {
         const parent = (record.parent as string | undefined) ?? null
         const actions =
           record.role === 'user' ? (
-            <button
-              type="button"
-              onClick={() =>
-                setEditing({
-                  rkey: message.rkey,
-                  parent: parent ?? undefined,
-                  text: messageText(record),
-                })
-              }
-            >
+            <button type="button" onClick={() => setEditingRkey(message.rkey)}>
               Edit
             </button>
           ) : record.status === 'pending' ? (
@@ -151,16 +142,16 @@ export function ConversationView({ skey }: { skey: string }) {
           // Editing another message starts the composer over from that message.
           key={`edit-${editing.rkey}`}
           skey={skey}
-          parent={editing.parent}
-          inherited={inheritedModel(branch, editing.parent)}
-          initialText={editing.text}
+          parent={editingParent}
+          inherited={inheritedModel(branch, editingParent)}
+          initialText={messageText(editing.record)}
           onSent={(sent) => {
             pin()
-            setEditing(null)
+            setEditingRkey(null)
             choose(sent.rkey)
             if (sent.replyRkey) follow(sent.replyRkey)
           }}
-          onCancel={() => setEditing(null)}
+          onCancel={() => setEditingRkey(null)}
         />
       ) : (
         <Composer
