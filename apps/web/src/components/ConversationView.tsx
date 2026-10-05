@@ -25,7 +25,6 @@ export function ConversationView({ skey }: { skey: string }) {
     null,
   )
   const { models } = useModels()
-  const [regenModel, setRegenModel] = useState<ModelOption | null>(null)
   const [renaming, setRenaming] = useState<string | null>(null)
 
   const messages = conversation?.messages ?? []
@@ -54,8 +53,8 @@ export function ConversationView({ skey }: { skey: string }) {
   const blobUrl = blobUrlFor(`/api/conversations/${skey}`)
   const title = (conversation?.info?.title as string | undefined) ?? 'New chat'
 
-  const regenerate = async (userRkey: string) => {
-    const body = regenModel ? { model: modelRef(regenModel) } : {}
+  const regenerate = async (userRkey: string, model: ModelOption | null) => {
+    const body = model ? { model: modelRef(model) } : {}
     const result = await read(
       api.turns.conversations[':skey'].messages[':rkey'].regenerate.$post(
         { param: { skey, rkey: userRkey } },
@@ -90,9 +89,9 @@ export function ConversationView({ skey }: { skey: string }) {
   const syncing = useMutation({ mutationFn: sync, onSuccess: refresh })
   const stopping = useMutation({ mutationFn: stop, onSuccess: refresh })
   const regenerating = useMutation({
-    mutationFn: (parent: string | null) => {
+    mutationFn: ({ parent, model }: { parent: string | null; model: ModelOption | null }) => {
       if (!parent) throw new Error('This reply has no user message to regenerate')
-      return regenerate(parent)
+      return regenerate(parent, model)
     },
     onSuccess: refresh,
   })
@@ -151,19 +150,10 @@ export function ConversationView({ skey }: { skey: string }) {
               Stop
             </button>
           ) : (
-            <>
-              <ModelSelect
-                aria-label="Regenerate with"
-                models={models}
-                value={regenModel}
-                onChange={setRegenModel}
-              >
-                <option value="">Same model</option>
-              </ModelSelect>
-              <button type="button" onClick={() => regenerating.mutate(parent)}>
-                Regenerate
-              </button>
-            </>
+            <RegenerateAction
+              models={models}
+              onRegenerate={(model) => regenerating.mutate({ parent, model })}
+            />
           )
         return (
           <MessageView
@@ -210,5 +200,26 @@ export function ConversationView({ skey }: { skey: string }) {
         />
       )}
     </section>
+  )
+}
+
+/** Regenerate a reply with the same model, or with a model chosen for this reply. */
+function RegenerateAction({
+  models,
+  onRegenerate,
+}: {
+  models: ModelOption[]
+  onRegenerate: (model: ModelOption | null) => void
+}) {
+  const [model, setModel] = useState<ModelOption | null>(null)
+  return (
+    <>
+      <ModelSelect aria-label="Regenerate with" models={models} value={model} onChange={setModel}>
+        <option value="">Same model</option>
+      </ModelSelect>
+      <button type="button" onClick={() => onRegenerate(model)}>
+        Regenerate
+      </button>
+    </>
   )
 }

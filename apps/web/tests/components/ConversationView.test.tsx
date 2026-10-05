@@ -314,6 +314,27 @@ describe('ConversationView errors', () => {
     })
   })
 
+  it("keeps each reply's regenerate model to that reply", async () => {
+    const fetch = vi.fn(async () => Response.json({ replyRkey: 'v.r1', status: 'claimed' }))
+    const models = [{ provider: 'p', id: 'm', name: 'M', capabilities: caps }]
+    stubFetch(fetch, { '/api/models': { models, defaultModel: null } })
+    const store = fakeStore([
+      user('u', 'first'),
+      reply('u.r0', 'one', 'u'),
+      user('v', 'second', 'u.r0', '2026-09-26T00:00:02Z'),
+      reply('v.r0', 'two', 'v'),
+    ])
+    await renderWith(store, <ConversationView skey="s1" />)
+    await screen.findAllByRole('option', { name: 'M' })
+    const [first, second] = screen.getAllByRole('combobox', { name: 'Regenerate with' })
+    await userEvent.selectOptions(first as HTMLElement, 'p/m')
+    expect(second).toHaveValue('')
+    await userEvent.click(screen.getAllByRole('button', { name: 'Regenerate' })[1] as HTMLElement)
+    const [url, init] = writes(fetch)[0] as [string, RequestInit]
+    expect(String(url)).toBe('/api/conversations/s1/messages/v/regenerate')
+    expect(JSON.parse(String(init.body))).toEqual({})
+  })
+
   it('shows why a rename failed', async () => {
     stubFetch(
       vi.fn(async () =>
