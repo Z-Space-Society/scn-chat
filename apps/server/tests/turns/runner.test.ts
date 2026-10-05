@@ -138,6 +138,21 @@ describe('TurnRunner.start', () => {
     expect(h.created).toEqual(['admin-default', 'requested', 'requested', 'preferred'])
   })
 
+  it('skips an admin default the user may not use, and keeps it out of the reply', async () => {
+    const h = await turnsHarness({
+      adminModels: [{ id: 'admin-default', default: true, roles: ['staff'] }],
+    })
+    const { skey } = await h.chats.createConversation()
+    await sendUser(h, skey, '3uuuuuuuuuuu1')
+    await h.runner.start(ALICE, skey, '3uuuuuuuuuuu1')
+    await h.runner.idle()
+    const reply = (await h.messages(skey)).get('3uuuuuuuuuuu1.r0')
+    expect(reply?.status).toBe('error')
+    expect(reply?.model).toBeUndefined()
+    expect(JSON.stringify(reply)).not.toContain('admin-default')
+    expect(h.created).toEqual([])
+  })
+
   it('sends only the branch, with custom instructions and the system prompt as instructions', async () => {
     const script = scriptedModel(textReply('ok'))
     const h = await turnsHarness({ model: () => script.model })

@@ -1,4 +1,4 @@
-import type { Logger, RoleIdentity, RoleSource } from '@scn-chat/plugin-api'
+import type { Logger, RoleContext, RoleIdentity, RoleSource } from '@scn-chat/plugin-api'
 import type { Db } from '../db/index.ts'
 
 export const IMPLICIT_ROLE = 'user'
@@ -7,7 +7,7 @@ export const ADMIN_ROLE = 'admin'
 /** Where a role came from: the environment, an explicit membership, a PDS host, a handle domain, or a role source. */
 export type RoleGrant = { role: string; source: string }
 
-export const ROLE_SOURCE_TIMEOUT_MS = 2000
+export const ROLE_SOURCE_TIMEOUT_MS = 10_000
 
 export type RolesDeps = {
   db: Db
@@ -49,7 +49,10 @@ export class Roles {
   }
 
   /** Each role the user holds with where it came from. The implicit role is left out. */
-  async grantsFor(identity: RoleIdentity): Promise<RoleGrant[]> {
+  async grantsFor(
+    identity: RoleIdentity,
+    context: RoleContext = { signIn: false },
+  ): Promise<RoleGrant[]> {
     const { db } = this.deps
     const grants: RoleGrant[] = []
     if (this.isEnvironmentAdmin(identity.did))
@@ -68,8 +71,10 @@ export class Roles {
       if (domain) grants.push({ role: role.name, source: `handle:${domain}` })
     }
     const known = new Set(roles.map((role) => role.name))
-    for (const source of this.deps.sources()) {
-      for (const role of await this.ask(source, identity)) {
+    const sources = this.deps.sources()
+    const answers = await Promise.all(sources.map((source) => this.ask(source, identity, context)))
+    for (const [i, source] of sources.entries()) {
+      for (const role of answers[i] as string[]) {
         if (role === ADMIN_ROLE || !known.has(role)) {
           this.deps.logger.warn(
             { source: source.id, role, did: identity.did },
@@ -84,13 +89,17 @@ export class Roles {
   }
 
   /** The implicit role plus every role the user holds. */
-  async rolesFor(identity: RoleIdentity): Promise<string[]> {
-    const grants = await this.grantsFor(identity)
+  async rolesFor(identity: RoleIdentity, context?: RoleContext): Promise<string[]> {
+    const grants = await this.grantsFor(identity, context)
     return [IMPLICIT_ROLE, ...new Set(grants.map((grant) => grant.role))]
   }
 
   /** A role source's answer, or none when it fails or takes too long. */
-  private async ask(source: RoleSource, identity: RoleIdentity): Promise<string[]> {
+  private async ask(
+    source: RoleSource,
+    identity: RoleIdentity,
+    context: RoleContext,
+  ): Promise<string[]> {
     let timer: NodeJS.Timeout | undefined
     const timeout = new Promise<never>((_, reject) => {
       timer = setTimeout(
@@ -99,7 +108,7 @@ export class Roles {
       )
     })
     try {
-      const roles = await Promise.race([source.rolesFor(identity), timeout])
+      const roles = await Promise.race([source.rolesFor(identity, context), timeout])
       return Array.isArray(roles) ? roles.filter((role) => typeof role === 'string') : []
     } catch (err) {
       this.deps.logger.warn({ err, source: source.id, did: identity.did }, 'role source failed')

@@ -71,6 +71,24 @@ describe('ModelCatalog.resolve', () => {
     expect(resolved.capabilities).toEqual(caps)
   })
 
+  it('never reveals an admin model to a user whose roles do not allow it', async () => {
+    const { catalog } = await catalogWith(
+      [model({ default: true, roles: ['staff'] })],
+      fakeProvider().provider,
+    )
+    expect(await catalog.defaultModelFor('did:plc:alice')).toBeUndefined()
+    expect(await catalog.defaultModelFor('did:plc:staff')).toEqual({ provider: 'fake', id: 'big' })
+    const refused = await catalog
+      .resolve('did:plc:alice', { provider: 'fake', id: 'big' })
+      .catch((err: Error) => err)
+    expect(refused).toBeInstanceOf(ModelUnavailable)
+    expect((refused as Error).message).not.toMatch(/fake|big/)
+    const unknown = await catalog
+      .resolve('did:plc:alice', { provider: 'fake', id: 'ghost' })
+      .catch((err: Error) => err)
+    expect((unknown as Error).message).toBe((refused as Error).message)
+  })
+
   it('refuses an admin model the user roles do not allow, but allows the user own key for it', async () => {
     const { provider } = fakeProvider()
     const { db, box, catalog } = await catalogWith([model({ roles: ['staff'] })], provider)
@@ -87,13 +105,6 @@ describe('ModelCatalog.resolve', () => {
     await expect(
       catalog.resolve('did:plc:alice', { provider: 'fake', id: 'big' }),
     ).resolves.toBeDefined()
-  })
-
-  it('fails with ModelUnavailable naming the model', async () => {
-    const { catalog } = await catalogWith([], fakeProvider().provider)
-    await expect(
-      catalog.resolve('did:plc:alice', { provider: 'fake', id: 'ghost' }),
-    ).rejects.toThrow(/fake\/ghost/)
   })
 
   it('reaches a user endpoint by its slug through the guarded fetch', async () => {
@@ -147,7 +158,7 @@ describe('ModelCatalog.listForUser', () => {
     })
     const models = await catalog.listForUser('did:plc:alice')
     expect(models.map((m) => `${m.source}:${m.id}`)).toEqual(['admin:big', 'user:mine'])
-    expect(await catalog.defaultModel()).toEqual({ provider: 'fake', id: 'big' })
+    expect(await catalog.defaultModelFor('did:plc:alice')).toEqual({ provider: 'fake', id: 'big' })
   })
 
   it('hides admin models whose provider is not loaded or has no admin key', async () => {
@@ -162,7 +173,7 @@ describe('ModelCatalog.listForUser', () => {
     )
     const models = await catalog.listForUser('did:plc:alice')
     expect(models.map((m) => `${m.provider}/${m.id}`)).toEqual(['fake/ok'])
-    expect(await catalog.defaultModel()).toBeUndefined()
+    expect(await catalog.defaultModelFor('did:plc:alice')).toBeUndefined()
   })
 
   it('applies a model change on the next call', async () => {

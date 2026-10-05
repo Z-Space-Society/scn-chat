@@ -10,7 +10,7 @@ export class ModelUnavailable extends Error {
   readonly ref: ModelRef
 
   constructor(ref: ModelRef) {
-    super(`Model ${ref.provider}/${ref.id} is not available to you`)
+    super('This model is not available. Choose another model.')
     this.name = 'ModelUnavailable'
     this.ref = ref
   }
@@ -64,8 +64,9 @@ export class ModelCatalog {
     )
   }
 
-  async defaultModel(): Promise<ModelRef | undefined> {
-    const model = (await this.availableAdminModels()).find((m) => m.default)
+  /** The admin default, when the user's roles allow it. */
+  async defaultModelFor(did: string): Promise<ModelRef | undefined> {
+    const model = (await this.adminModelsFor(did)).find((m) => m.default)
     return model ? { provider: model.provider, id: model.id } : undefined
   }
 

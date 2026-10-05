@@ -48,7 +48,7 @@ When sync emits `message:invalid` for a user message that carries a generation r
 `startTurn(user, conversation, userMessageKey)` runs the turn in the background and returns once the reply is claimed:
 
 1. **Load.** It reads the conversation's info record and every message from the record store, once per turn, and keeps them in memory only for the turn. The reply key is `<userMessageKey>.r<attempt>`, with `attempt` defaulting to 0.
-2. **Choose the model.** The model reference is `generation.model`, else the model of the nearest completed assistant reply up the branch, else the user's `defaultModel` preference, else the admin default. The effort is `generation.effort`, else the `defaultEffort` preference.
+2. **Choose the model.** The model reference is `generation.model`, else the model of the nearest completed assistant reply up the branch, else the user's `defaultModel` preference, else the admin default if the user's roles allow it. An admin default the user can't use is skipped, so it never appears in their reply. The effort is `generation.effort`, else the `defaultEffort` preference.
 3. **Rate limit.** A user may start `turns.ratePerMinute` turns per minute, default 10. Past that, the turn waits in an in-memory queue per user and starts when the limit allows, without claiming the reply yet. The web UI's stream shows a `queued` status meanwhile.
 4. **Claim.** It calls `createMessage` at the reply key with a placeholder: `role: "assistant"`, the parent key, empty `plainContent` parts, the chosen model and effort, `status: "pending"`, and `createdAt`. If that throws `RecordExists`, another runner, possibly another deployment watching the same space, owns the attempt, and `startTurn` stops. On success it records the reply URI in a local `turn_claim` table.
 5. **Resolve.** The providers spec resolves the model reference to an AI SDK model. A failure rewrites the placeholder with `status: "error"` and a message saying why.
@@ -139,6 +139,7 @@ The `turns` admin setting, from the admin-settings spec, holds `ratePerMinute`, 
 - [ ] Regenerating raises the attempt and writes the reply at `<key>.r<attempt>`, keeping earlier replies.
 - [ ] An edit creates a sibling message with the same parent and its own reply.
 - [ ] Model resolution follows request, then last completed reply on the branch, then preferences, then the admin default.
+- [ ] An admin default the user's roles don't allow is skipped, and the reply fails without naming it.
 - [ ] The prompt contains only the branch from the root to the user message, with custom instructions and the system prompt as instructions.
 - [ ] The instructions start with the base prompt, with the date in the user's time zone, falling back to UTC for a missing or unknown zone.
 - [ ] Hooks receive the names of the tools offered this turn.

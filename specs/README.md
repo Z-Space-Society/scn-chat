@@ -22,6 +22,8 @@ The overview at the end of this file lists every spec and whether it is active, 
 
 ### Active
 
+- [[scn-member-registry]]
+
 ### Planned
 
 - [[encrypted-conversations]]

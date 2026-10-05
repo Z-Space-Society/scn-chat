@@ -45,7 +45,7 @@ Any route except `/login` and a shared route redirects to `/login` when `/api/me
   - Images are shown inline, and files as their names.
   - A pending reply shows streamed text as it arrives. An errored reply shows its error, and a cancelled reply is labeled as stopped.
 - **Message actions.** On user messages, edit, which opens the composer prefilled and sends a sibling. On assistant replies, regenerate, with an optional model change. While generating, stop.
-- **Composer.** A textarea, a model select from `/api/models`, an effort select for models with the reasoning capability, and an attach button. The attach button accepts images only for models with vision, plus any type an ingester supports. Attachments upload when chosen and show a progress state. Enter sends, and Shift+Enter adds a newline.
+- **Composer.** A textarea, a model select from `/api/models`, an effort select for models with the reasoning capability, and an attach button. The attach button accepts images only for models with vision, plus any type an ingester supports. Attachments upload when chosen and show a progress state. Enter sends, and Shift+Enter adds a newline. When `/api/models` lists no models at all, Send is disabled and a note points to Settings to add an API key.
 - **Settings.** A sidebar links back to the chats, to the admin area for admins, and to each section, marks the current one, and holds sign out. Only the current section is shown.
   - Preferences: default model, default effort, custom instructions, and generate titles. Saving also stores the browser's time zone, which the app saves on sign-in as well when it differs from the stored one.
   - API keys: add, list with the last four characters, and delete. For providers with user endpoints, a base URL field.

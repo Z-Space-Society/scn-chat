@@ -13,7 +13,15 @@ import { useBranch } from './useBranch.ts'
 import { useReplyStream } from './useReplyStream.ts'
 import { useStickToBottom } from './useStickToBottom.ts'
 
-export function ConversationView({ skey, models }: { skey: string; models: ModelOption[] }) {
+export function ConversationView({
+  skey,
+  models,
+  noModels,
+}: {
+  skey: string
+  models: ModelOption[]
+  noModels?: boolean
+}) {
   const me = useMe()
   const store = useStore()
   const { conversation, error: loadError } = useConversation(skey)
@@ -181,6 +189,7 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
           skey={skey}
           parent={editing.parent}
           models={models}
+          noModels={noModels}
           initialText={editing.text}
           onSent={(sent) => {
             pin()
@@ -197,6 +206,7 @@ export function ConversationView({ skey, models }: { skey: string; models: Model
           skey={skey}
           parent={leaf?.rkey}
           models={models}
+          noModels={noModels}
           onSent={(sent) => {
             pin()
             if (sent.replyRkey) follow(sent.replyRkey)

@@ -26,6 +26,7 @@ export async function setupForTest(
   const roleSources: RoleSource[] = []
   const accountChanges: { action: 'suspend' | 'restore'; did: string; reason?: string }[] = []
   const hooks: { name: string; handler: unknown }[] = []
+  const closers: (() => void | Promise<void>)[] = []
   const reachable = () => [...ingesters, ...(options.ingesters ?? [])]
   const noop = () => {}
   const ctx = {
@@ -55,10 +56,14 @@ export async function setupForTest(
     userSettings: async (user: string) => options.userSettings?.(user) ?? {},
     logger: { debug: noop, info: noop, warn: noop, error: noop },
     app: options.app ?? { name: 'Test', publicUrl: 'http://127.0.0.1:3000' },
-    onClose: noop,
+    onClose: (fn: () => void | Promise<void>) => void closers.push(fn),
   } as unknown as PluginContext
   await plugin.setup(ctx)
-  return { providers, tools, ingesters, roleSources, accountChanges, hooks, ctx }
+  /** Run the plugin's onClose handlers, as when its runtime is swapped out. */
+  const close = async () => {
+    for (const fn of closers) await fn()
+  }
+  return { providers, tools, ingesters, roleSources, accountChanges, hooks, ctx, close }
 }
 
 /** A tool context that records citations, for tool tests. */

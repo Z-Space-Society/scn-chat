@@ -63,15 +63,18 @@ A plugin can decide role membership from outside the database by registering a r
 ```ts
 interface RoleSource {
   id: string // unique among role sources, like other registries
-  rolesFor(identity: { did: string; handle?: string; pdsUrl: string }): Promise<string[]>
+  rolesFor(
+    identity: { did: string; handle?: string; pdsUrl: string },
+    context: { signIn: boolean },
+  ): Promise<string[]>
 }
 
 ctx.roleSources.register(source)
 ```
 
-- **When it runs.** Every `rolesFor` call asks every role source, so a source is consulted at sign-in, before the access check, and on every request. A grant or revocation in the external system applies on the user's next request.
+- **When it runs.** Every `rolesFor` call asks every role source, in parallel, so a source is consulted at sign-in, before the access check, and on every request. A grant or revocation in the external system applies on the user's next request. `context.signIn` is true only for the check in the OAuth callback, so a source can fetch fresh data at sign-in and answer from its own copy the rest of the time.
 - **Caching** belongs to the plugin. Core doesn't remember a source's answers, so a source backed by a remote service caches inside the plugin, for as long as it judges safe.
-- **Failures.** Core gives each call 2 seconds. A source that throws or times out contributes no roles for that call, and core logs a warning with the source ID and the DID. A plugin that wants to ride out an outage of its backend keeps its last good answer itself.
+- **Failures.** Core gives each call 10 seconds, long enough to call a remote service at sign-in. A source that throws or times out contributes no roles for that call, and core logs a warning with the source ID and the DID. A plugin that wants to ride out an outage of its backend keeps its last good answer itself.
 - **Names.** A source can only grant roles that exist. Unknown names and `admin` are ignored with a warning, so admin rights only ever come from the database and `ADMIN_DIDS`. A plugin that grants a role takes the role name as an option, so the admin picks it.
 - **Plugin runtime.** Role sources live in the plugin host alongside providers and tools, so in [[admin-plugins]] they come from the current runtime, and saving a plugin's options changes them without a restart.
 - **The admin area** shows a role granted by a source with the source's ID, and it can't be removed there.
@@ -254,7 +257,8 @@ Role sources:
 
 - [ ] Roles a source grants are included in `rolesFor`, and count as invite roles at sign-in.
 - [ ] A source's change in answer applies on the user's next request.
-- [ ] A source that throws or takes longer than 2 seconds contributes no roles and logs a warning, and the other sources still count.
+- [ ] A source that throws or takes longer than 10 seconds contributes no roles and logs a warning, and the other sources still count.
+- [ ] Role sources get `{ signIn: true }` from the OAuth callback and `{ signIn: false }` everywhere else.
 - [ ] Unknown role names and `admin` from a source are ignored with a warning.
 - [ ] Registering two role sources with the same ID fails, like other registries.
 - [ ] The users list shows roles from a source with the source's ID, and doesn't offer to remove them.

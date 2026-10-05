@@ -1,5 +1,6 @@
 import { nsid } from '@scn-chat/lexicons/nsid'
 import { useEffect, useState } from 'react'
+import { Link } from 'wouter'
 import { api, json, read } from '../api.ts'
 import { messageOf, useAction } from './useAction.ts'
 
@@ -14,6 +15,8 @@ export type ComposerProps = {
   skey: string
   parent?: string
   models: ModelOption[]
+  /** The user has no models at all, so there's nothing to send to. */
+  noModels?: boolean
   initialModel?: { provider: string; id: string } | null
   initialText?: string
   onSent: (sent: { rkey: string; replyRkey: string | null }) => void
@@ -31,6 +34,7 @@ export function Composer({
   skey,
   parent,
   models,
+  noModels,
   initialModel,
   initialText = '',
   onSent,
@@ -85,7 +89,7 @@ export function Composer({
   }
 
   const send = async () => {
-    if (uploading > 0 || (!text.trim() && attachments.length === 0)) return
+    if (noModels || uploading > 0 || (!text.trim() && attachments.length === 0)) return
     const parts = [
       ...attachments,
       ...(text.trim() ? [{ $type: `${nsid.defs}#textPart`, text }] : []),
@@ -154,7 +158,7 @@ export function Composer({
         {attachments.map((part) => (
           <span key={blobCid(part)}>{(part.name as string | undefined) ?? 'Image'}</span>
         ))}
-        <button type="submit" disabled={uploading > 0}>
+        <button type="submit" disabled={noModels || uploading > 0}>
           Send
         </button>
         {onCancel && (
@@ -163,6 +167,12 @@ export function Composer({
           </button>
         )}
       </div>
+      {noModels && (
+        <p>
+          No models are available to you. Add your own API key in{' '}
+          <Link href="/settings">Settings</Link>.
+        </p>
+      )}
       {error && <p role="alert">{error}</p>}
     </form>
   )

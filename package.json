@@ -86,6 +86,7 @@
     "@scn-chat/plugin-openai": "workspace:*",
     "@scn-chat/plugin-openai-compatible": "workspace:*",
     "@scn-chat/plugin-pdf-text": "workspace:*",
+    "@scn-chat/plugin-scn-member-registry": "workspace:*",
     "@scn-chat/plugin-titles": "workspace:*",
     "@scn-chat/plugin-web-fetch": "workspace:*",
     "@scn-chat/plugin-web-search": "workspace:*"
