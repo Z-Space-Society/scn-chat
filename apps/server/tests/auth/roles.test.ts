@@ -70,7 +70,7 @@ describe.each(dialects)('Roles on $name', ({ create }) => {
     expect(await roles.grantsFor(alice)).toEqual([{ role: 'staff', source: 'plugin:members' }])
     rolesFor.mockResolvedValueOnce([])
     expect(await roles.rolesFor(alice)).toEqual(['user'])
-    expect(rolesFor).toHaveBeenCalledWith(alice)
+    expect(rolesFor).toHaveBeenCalledWith(alice, { signIn: false })
   })
 
   it('ignores a failing source with a warning and keeps the others', async () => {

@@ -212,7 +212,7 @@ export function oauthRoutes(deps: AuthDeps) {
         const { scope } = await session.getTokenInfo(false)
         const identity = await deps.identity.resolve(session.did)
         const existing = await getAccount(deps.db, session.did)
-        const roles = await deps.roles.rolesFor(identity)
+        const roles = await deps.roles.rolesFor(identity, { signIn: true })
         const full = await deps.access.allowsSignIn(session.did, existing, roles)
         if (!full && !(next && isSharePath(next)))
           throw new AccessDenied(await deps.access.deniedMessage(session.did, existing, roles))

@@ -134,11 +134,14 @@ export function matchIngester(ingesters: Ingester[], mimeType: string): Ingester
 /** Who is asking about roles: their DID, verified handle, and PDS. */
 export type RoleIdentity = { did: string; handle?: string | null; pdsUrl: string }
 
+/** Whether roles are being checked for a sign-in, or for a request from someone signed in. */
+export type RoleContext = { signIn: boolean }
+
 /** Decides role membership outside the app database, such as from an external member list. */
 export interface RoleSource {
   id: string
-  /** The role names the user holds. Asked on every check, so cache slow lookups in the plugin. */
-  rolesFor(identity: RoleIdentity): Promise<string[]>
+  /** The role names the user holds. Asked on every request, so cache slow lookups in the plugin. */
+  rolesFor(identity: RoleIdentity, context: RoleContext): Promise<string[]>
 }
 
 // Hooks

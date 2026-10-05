@@ -57,7 +57,7 @@ export function providerRoutes(deps: ProviderRoutesDeps) {
       const { did } = signedInUser(c)
       return c.json({
         models: await deps.catalog().listForUser(did),
-        defaultModel: (await deps.catalog().defaultModel()) ?? null,
+        defaultModel: (await deps.catalog().defaultModelFor(did)) ?? null,
       })
     })
     .get('/providers', (c) =>

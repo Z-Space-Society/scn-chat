@@ -171,9 +171,12 @@ A role source allows plugins to set role membership on login.
 ```ts
 ctx.roleSources.register({
   id: 'members',
-  rolesFor: async ({ did, handle, pdsUrl }) => ((await isMember(did)) ? [options.role] : []),
+  rolesFor: async ({ did, handle, pdsUrl }, { signIn }) =>
+    (await isMember(did, { fresh: signIn })) ? [options.role] : [],
 })
 ```
+
+See [`plugins/scn-member-registry`](../plugins/scn-member-registry/src/index.ts) as an example.
 
 ## File ingesters
 

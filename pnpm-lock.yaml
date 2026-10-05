@@ -73,6 +73,9 @@ importers:
       '@scn-chat/plugin-pdf-text':
         specifier: workspace:*
         version: link:plugins/pdf-text
+      '@scn-chat/plugin-scn-member-registry':
+        specifier: workspace:*
+        version: link:plugins/scn-member-registry
       '@scn-chat/plugin-titles':
         specifier: workspace:*
         version: link:plugins/titles
@@ -347,6 +350,15 @@ importers:
       unpdf:
         specifier: 1.8.1
         version: 1.8.1
+      zod:
+        specifier: 4.6.5
+        version: 4.6.5
+
+  plugins/scn-member-registry:
+    dependencies:
+      '@scn-chat/plugin-api':
+        specifier: workspace:*
+        version: link:../../packages/plugin-api
       zod:
         specifier: 4.6.5
         version: 4.6.5

@@ -244,7 +244,7 @@ export class TurnRunner {
       generation.model ??
       lastReplyModel(branch) ??
       (loaded.preferences?.defaultModel as ModelRef | undefined) ??
-      (await lease.runtime.catalog.defaultModel())
+      (await lease.runtime.catalog.defaultModelFor(did))
     const effort = generation.effort ?? (loaded.preferences?.defaultEffort as string | undefined)
     const placeholder: JsonRecord = {
       $type: nsid.message,

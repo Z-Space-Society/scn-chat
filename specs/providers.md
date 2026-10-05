@@ -76,7 +76,7 @@ Given a user and a `modelRef` `{ provider, id }`:
 
 1. If the user has a credential for `provider` that lists `id`, use it.
 2. Otherwise, if `{ provider, id }` is in the admin `models` list and one of the user's roles is allowed to use it, use the admin key.
-3. Otherwise fail with `ModelUnavailable`, naming the model.
+3. Otherwise fail with `ModelUnavailable`. Its message doesn't name the model, and is the same whether the model doesn't exist or the user's roles don't allow it, so a user can't learn which admin models exist.
 
 The user's own key wins over the admin's, so users who bring a key pay for their own usage.
 
@@ -149,4 +149,5 @@ The provider data is stored in the `providerData` field of reasoning, text, and 
 - [ ] A user endpoint's model references use the user's slug.
 - [ ] Each lexicon effort value maps to the AI SDK reasoning value in the table.
 - [ ] Reasoning from a different provider than the current turn's is not replayed.
-- [ ] `GET /api/models` lists the admin models the user may use plus the models from the user's credentials.
+- [ ] `GET /api/models` lists the admin models the user may use plus the models from the user's credentials, and returns the admin default only when the user may use it.
+- [ ] `ModelUnavailable` names no model, and reads the same for a model that doesn't exist and one the user's roles don't allow.

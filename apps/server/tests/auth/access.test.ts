@@ -90,6 +90,15 @@ describe('registration modes', () => {
     expect((await signIn()).headers.get('location')).toBe('/')
   })
 
+  it('tells role sources whether they are asked for a sign-in or a request', async () => {
+    const rolesFor = vi.fn(async () => [])
+    const { signIn, chats } = await setup({}, [{ id: 'members', rolesFor }])
+    const cookie = sessionCookie(await signIn())
+    expect(rolesFor).toHaveBeenLastCalledWith(expect.anything(), { signIn: true })
+    await chats(cookie)
+    expect(rolesFor).toHaveBeenLastCalledWith(expect.anything(), { signIn: false })
+  })
+
   it('in closed mode lets in only added people and admins', async () => {
     const { db, signIn } = await setup({ access: { registration: 'closed', inviteRoles: [] } })
     await addInvite(db, 'did:plc:bob', 'did:plc:admin')
