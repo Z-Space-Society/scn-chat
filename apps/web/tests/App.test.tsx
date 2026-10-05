@@ -134,4 +134,17 @@ describe('App', () => {
     // The router's reset to the top would otherwise run after it.
     expect(scrollTo).not.toHaveBeenCalled()
   })
+
+  it('keeps the sidebar search across chat routes until it is cleared', async () => {
+    signedIn()
+    Element.prototype.scrollIntoView = () => {}
+    const router = renderApp('/?q=tiles')
+    await userEvent.click(await screen.findByRole('link', { name: /Tiles/ }))
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe('/chat/s1'))
+    expect(router.state.location.search).toEqual({ q: 'tiles', m: 'u' })
+    const box = screen.getByRole('searchbox', { name: 'Search chats' })
+    expect(box).toHaveValue('tiles')
+    await userEvent.clear(box)
+    await vi.waitFor(() => expect(router.state.location.search).toEqual({ m: 'u' }))
+  })
 })

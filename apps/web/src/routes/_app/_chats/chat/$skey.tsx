@@ -1,12 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { validateBranchSearch, validateChatListSearch } from '../../../../lib/search-params.ts'
+import { validateBranchSearch } from '../../../../lib/search-params.ts'
 import { ChatPage } from '../../../../pages/ChatPage.tsx'
 
 export const Route = createFileRoute('/_app/_chats/chat/$skey')({
-  validateSearch: (search: Record<string, unknown>) => ({
-    ...validateChatListSearch(search),
-    ...validateBranchSearch(search),
-  }),
+  validateSearch: validateBranchSearch,
   component: Conversation,
 })
 
