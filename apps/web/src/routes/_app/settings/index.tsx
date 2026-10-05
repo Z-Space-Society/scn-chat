@@ -1,6 +1,6 @@
 import { noop } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { PreferencesSettings } from '../../../pages/SettingsPage.tsx'
+import { PreferencesSettings } from '../../../pages/settings/preferences.tsx'
 import { modelsQuery, preferencesQuery } from '../../../queries.ts'
 
 export const Route = createFileRoute('/_app/settings/')({

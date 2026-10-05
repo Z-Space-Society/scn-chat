@@ -329,6 +329,6 @@ Web fetch:
 - `apps/server/src/turns/prompt.ts`, for wrapping replayed untrusted output
 - `apps/server/src/plugins/host.ts`, `apps/server/src/plugins/routes.ts`, `apps/server/src/plugins/user-tools.ts`
 - `apps/server/src/db/migrations/0006_user_tool_settings.ts`
-- `apps/web/src/pages/SettingsPage.tsx`
+- `apps/web/src/pages/settings/plugins.tsx`
 - `plugins/web-search/`, `plugins/web-fetch/`
 - `config.example.yml`, `docs/plugins.md`

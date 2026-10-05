@@ -1,13 +1,11 @@
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import {
-  ApiKeys,
-  Device,
-  PluginSettings,
-  PreferencesSettings,
-  SettingsLayout,
-} from '../../src/pages/SettingsPage.tsx'
+import { ApiKeySettings } from '../../src/pages/settings/api-keys.tsx'
+import { SettingsLayout } from '../../src/pages/settings/layout.tsx'
+import { PluginSettings } from '../../src/pages/settings/plugins.tsx'
+import { PreferencesSettings } from '../../src/pages/settings/preferences.tsx'
+import { SyncSettings } from '../../src/pages/settings/sync.tsx'
 import type { StoreClient } from '../../src/store/client.ts'
 import { StoreProvider } from '../../src/store/react.tsx'
 import { renderAt } from '../helpers/router.tsx'
@@ -48,9 +46,9 @@ function stubServer(overrides: Record<string, () => Response>) {
 
 const sections = {
   '': PreferencesSettings,
-  '/api-keys': ApiKeys,
+  '/api-keys': ApiKeySettings,
   '/plugins': PluginSettings,
-  '/sync': Device,
+  '/sync': SyncSettings,
 }
 
 /** Render a settings section at its path, such as '/plugins'. */

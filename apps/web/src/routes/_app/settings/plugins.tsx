@@ -1,6 +1,6 @@
 import { noop } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { PluginSettings } from '../../../pages/SettingsPage.tsx'
+import { PluginSettings } from '../../../pages/settings/plugins.tsx'
 import { pluginSettingsQuery } from '../../../queries.ts'
 
 export const Route = createFileRoute('/_app/settings/plugins')({
