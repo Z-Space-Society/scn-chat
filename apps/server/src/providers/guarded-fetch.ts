@@ -16,7 +16,6 @@ const BLOCKED_RANGES = new Set([
   'uniqueLocal',
   'ipv4Mapped',
   'rfc6145',
-  'rfc6052',
   '6to4',
   'teredo',
 ])
@@ -28,11 +27,22 @@ export class PrivateNetworkError extends Error {
   }
 }
 
+/** The IPv4 address inside a NAT64 address under the well-known prefix, 64:ff9b::/96. */
+function nat64Target(address: ipaddr.IPv6): ipaddr.IPv4 {
+  const [high = 0, low = 0] = address.parts.slice(6)
+  return new ipaddr.IPv4([high >> 8, high & 0xff, low >> 8, low & 0xff])
+}
+
 /** Is this an address a user endpoint must not reach? Unparseable addresses count as private. */
 export function isPrivateAddress(address: string): boolean {
   const bare = address.replace(/^\[|\]$/g, '')
   if (!ipaddr.isValid(bare)) return true
-  return BLOCKED_RANGES.has(ipaddr.process(bare).range())
+  const parsed = ipaddr.process(bare)
+  // On IPv6-only networks, DNS64 gives every IPv4-only host a NAT64 address, which the network
+  // translates back to the IPv4 address inside. So that address decides, public or private.
+  if (parsed instanceof ipaddr.IPv6 && parsed.range() === 'rfc6052')
+    return BLOCKED_RANGES.has(nat64Target(parsed).range())
+  return BLOCKED_RANGES.has(parsed.range())
 }
 
 type LookupCallback = (

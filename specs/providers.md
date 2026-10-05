@@ -68,7 +68,7 @@ Credentials are stored in a `provider_credential` table: ID, owner DID, provider
 
 ### Private network guard
 
-Requests to a user-supplied base URL go through a dedicated `fetch` passed to the AI SDK provider factory. It refuses loopback, private, link-local, and unique-local addresses, unless the provider was configured with `allowPrivateNetworks: true`, in three places. The parsed URL's host is checked first when it is an IP literal, including IPv4-mapped IPv6 addresses, since no DNS lookup happens for those. The undici `Agent`'s DNS lookup checks every resolved address. Its connect step checks the socket's actual remote address before sending anything. The last two mean the address that was checked is the one connected to, so DNS rebinding cannot slip past. Redirects are not followed. That stops users from making the server fetch internal services. Admin-configured base URLs are trusted.
+Requests to a user-supplied base URL go through a dedicated `fetch` passed to the AI SDK provider factory. It refuses loopback, private, link-local, and unique-local addresses, unless the provider was configured with `allowPrivateNetworks: true`, in three places. The parsed URL's host is checked first when it is an IP literal, including IPv4-mapped IPv6 addresses, since no DNS lookup happens for those. A NAT64 address under the well-known prefix `64:ff9b::/96`, which DNS64 gives every IPv4-only host on an IPv6-only network, is judged by the IPv4 address inside it, so public hosts stay reachable on such networks and private ones stay refused. The undici `Agent`'s DNS lookup checks every resolved address. Its connect step checks the socket's actual remote address before sending anything. The last two mean the address that was checked is the one connected to, so DNS rebinding cannot slip past. Redirects are not followed. That stops users from making the server fetch internal services. Admin-configured base URLs are trusted.
 
 ### Resolving a model reference
 
@@ -120,6 +120,7 @@ The provider data is stored in the `providerData` field of reasoning, text, and 
 
 - A user's own key takes priority over the admin key for the same model.
 - Private network addresses are refused for user endpoints by default, and allowed per provider for self-hosters running local models.
+- NAT64 addresses are judged by the IPv4 address inside them, not refused as a range. Refusing the range broke sign-in and every guarded fetch on IPv6-only networks, where DNS64 adds one for each IPv4-only host, and the network translates them to the IPv4 address anyway.
 - Provider data is kept as an opaque JSON string per part, so any provider's replay data fits without lexicon changes.
 - The plugin API depends on `@ai-sdk/provider`'s model specification, not on the `ai` runtime. If the AI SDK were ever abandoned, an adapter implementing that interface keeps existing plugins working.
 - The provider routes are `GET /api/models`, `GET /api/providers`, `POST /api/providers/:id/list-models`, and `GET`, `POST`, and `DELETE` under `/api/credentials`.
