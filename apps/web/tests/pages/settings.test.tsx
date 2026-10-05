@@ -267,6 +267,14 @@ describe('Settings plugins', () => {
       .filter(([, init]) => init?.method === 'PUT')
       .map(([url, init]) => [url, JSON.parse(String(init?.body))])
 
+  it('says so when no plugin has settings for the user, instead of showing nothing', async () => {
+    stubServer({})
+    await renderPage('/plugins')
+    expect(await screen.findByRole('heading', { name: 'Plugins' })).toBeInTheDocument()
+    expect(screen.getByText('No plugins have settings for you yet.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
+  })
+
   it("labels a plugin's one switchable tool Enabled, and hides tools users cannot switch", async () => {
     stubServer({ '/api/plugins/settings': () => Response.json({ plugins: [fetcher] }) })
     await renderPage('/plugins')

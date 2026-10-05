@@ -62,7 +62,14 @@ export function PluginSettings() {
     onSuccess: reload,
   })
   const error = lastError(save, reset) ?? (query.error && messageOf(query.error))
-  if (!plugins?.length) return error ? <p role="alert">{error}</p> : null
+  if (!plugins) return error ? <p role="alert">{error}</p> : null
+  if (!plugins.length)
+    return (
+      <section>
+        <h2>Plugins</h2>
+        <p>No plugins have settings for you yet.</p>
+      </section>
+    )
   return (
     <section>
       <h2>Plugins</h2>
