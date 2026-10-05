@@ -141,7 +141,7 @@ Then it gives one recipe per common change, each naming the files to touch with 
 - **Render more in Markdown**, such as code highlighting or math: add a plugin to the lists in `parts/markdown.tsx`.
 - **Add a page:** add a route file under `src/routes/`.
 - **Add a control to the composer.**
-- **Add a settings section:** a route file, a section component, and a query.
+- **Add a settings section:** a route file, a section component in `pages/settings/`, a query, and an entry in `sections` in `pages/settings/layout.tsx` for the sidebar link.
 - **Read or write new server data:** a Hono route, its type in `api-types.ts`, a query factory in `queries.ts`, and a mutation.
 - **Add a server tool:** a plugin, as `docs/plugins.md` describes, then its tool view.
 - **Change the look:** `theme.css` for now, until the styling phase replaces it.
