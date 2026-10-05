@@ -64,7 +64,7 @@ const renderPage = (section: keyof typeof sections = '') => {
   )
 }
 
-describe('SettingsPage preferences', () => {
+describe('Settings preferences', () => {
   it('shows the load error and no form when preferences cannot be read', async () => {
     stubServer({
       '/api/preferences': () => Response.json({ error: 'InternalServerError' }, { status: 500 }),
@@ -112,7 +112,7 @@ describe('SettingsPage preferences', () => {
   })
 })
 
-describe('SettingsPage preferences fields', () => {
+describe('Settings preferences fields', () => {
   it('shows and keeps a default model the list no longer offers', async () => {
     const fetch = stubServer({
       '/api/preferences': () =>
@@ -160,7 +160,7 @@ describe('SettingsPage preferences fields', () => {
   })
 })
 
-describe('SettingsPage API keys', () => {
+describe('Settings API keys', () => {
   it('adds a key and clears the form once it is saved', async () => {
     const fetch = stubServer({
       '/api/providers': () =>
@@ -186,7 +186,7 @@ describe('SettingsPage API keys', () => {
   })
 })
 
-describe('SettingsPage sections', () => {
+describe('Settings sections', () => {
   it('links to each section from the sidebar and marks the current one', async () => {
     stubServer({})
     await renderPage('/plugins')
@@ -214,7 +214,7 @@ describe('SettingsPage sections', () => {
   })
 })
 
-describe('SettingsPage plugins', () => {
+describe('Settings plugins', () => {
   const tool = (name: string, userToggle = true) => ({
     name,
     description: `The ${name} tool`,
