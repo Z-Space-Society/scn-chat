@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from '@tanstack/react-router'
+import { ClientOnly, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { api, json, read } from '../../../shared/api.ts'
 import { lastError, messageOf } from '../../../shared/errors.ts'
@@ -95,7 +95,12 @@ export function UsersAdmin({ q }: { q: string }) {
                   </span>
                 ))}
               </td>
-              <td>{new Date(user.lastActiveAt).toLocaleString()}</td>
+              <td>
+                {/* In the browser's locale and time zone, which the server rendering the page lacks. */}
+                <time dateTime={user.lastActiveAt}>
+                  <ClientOnly>{new Date(user.lastActiveAt).toLocaleString()}</ClientOnly>
+                </time>
+              </td>
               <td>
                 <select
                   aria-label={`Add ${user.handle ?? user.did} to a role`}
