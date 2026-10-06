@@ -39,7 +39,7 @@ Search covers every conversation the browser store has downloaded. On a new devi
 
 ### Web UI
 
-A search box above the chat list. Searching starts at two characters and waits for a 150 ms pause in typing. Results replace the list while a query is active, and choosing one opens the conversation scrolled to that message. Result links are `/c/<skey>?m=<rkey>`. When the message is on another branch, the conversation opens on the branch that holds it.
+A search box above the chat list. Searching starts at two characters and waits for a 150 ms pause in typing. Results replace the list while a query is active, and choosing one opens the conversation scrolled to that message. Result links are `/chat/<skey>?m=<rkey>`. When the message is on another branch, the conversation opens on the branch that holds it.
 
 ## Scope Boundaries
 

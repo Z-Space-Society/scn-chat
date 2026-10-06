@@ -54,10 +54,9 @@ async function loadSqlite(): Promise<Sqlite> {
   return sqlite
 }
 
-/** Get the OPFS file pool, or null if the browser has no OPFS. */
-async function filePool(): Promise<Pool | null> {
+/** Get the OPFS file pool installed on this SQLite, or null if the browser has no OPFS. */
+async function filePool(sqlite3: Sqlite): Promise<Pool | null> {
   if (pool !== undefined) return pool
-  const sqlite3 = await loadSqlite()
   const handles = globalThis.FileSystemFileHandle?.prototype
   if (!handles || !('createSyncAccessHandle' in handles) || !navigator.storage?.getDirectory) {
     console.warn('This browser has no origin private file system, keeping chats in memory')
@@ -75,7 +74,7 @@ const api = {
   /** Open this account's database, persisting it in the origin private file system when possible. */
   async open(did: string): Promise<void> {
     const sqlite3 = await loadSqlite()
-    const files = await filePool()
+    const files = await filePool(sqlite3)
     if (files?.isPaused()) await files.unpauseVfs()
     db = files ? new files.OpfsSAHPoolDb(await fileFor(did)) : new sqlite3.oo1.DB(':memory:')
     const sql = adapt(db)
@@ -105,7 +104,7 @@ const api = {
   /** Delete this account's database, on sign-out or an ended session. */
   async deleteDatabase(did: string): Promise<void> {
     api.pause()
-    const files = await filePool()
+    const files = await filePool(await loadSqlite())
     if (!files) return
     await files.unpauseVfs()
     files.unlink(await fileFor(did))

@@ -6,6 +6,12 @@ This document describes the SCN Chat architecture at a high level. Each feature 
 
 This in an AI assistant chat app that uses the users' spaces-enabled PDS as a source of truth for their chat history. Due to the alpha nature of spaces the app will also store the chat history in its own database. This feature will be removed when spaces are in widespread production use.
 
+## The web app
+
+The web app uses Hono server, listing on port 3000 by default. It runs [TanStack Start](https://tanstack.com/start) inside of the Hono process.
+
+Code is grouped by feature in `src/features/`, and `src/routes/` maps each URL to a feature's page.
+
 ## Chat history storage
 
 The goal is to keep users in control of their own chat data. The server should not keep a copy of the chat records. The records are stored in the browser in a wasm sqlite db to allow easy listing and search without having to perform intensive operations on the PDS.
@@ -55,6 +61,14 @@ See [specs/auth.md](../specs/auth.md).
 Configure `.env` before first run. Bootstrap settings and secrets. The rest of the settings, plugins, models, roles, users, etc., can be configured in **Settings** > **Admin**.
 
 Changes in the admin area apply without restarting the server.
+
+## Decisions
+
+The [ADRs](adr/) record the choices a reader might otherwise undo:
+
+- [0001](adr/0001-tanstack-start-inside-hono.md): TanStack Start runs inside the Hono server.
+- [0002](adr/0002-web-app-extended-in-code.md): The web app is extended in code, not through plugins.
+- [0003](adr/0003-no-chat-library-owns-messages.md): No AI chat library owns message state in the browser.
 
 ## Plugins
 

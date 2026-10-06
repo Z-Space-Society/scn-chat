@@ -66,7 +66,7 @@ const NEXT_COOKIE = 'scn_next'
 const isLocalPath = (path: string) => /^\/(?![/\\])/.test(path)
 
 /** Is this the path of a shared chat, where anyone may sign in as a viewer? */
-const isSharePath = (path: string) => /^\/s\/[^/]+\/[^/]+$/.test(path)
+const isSharePath = (path: string) => /^\/shared\/[^/]+\/[^/]+$/.test(path)
 
 /** API paths opened to API keys, which never use the session cookie. */
 const API_KEY_PATHS = [/^\/api\/cron$/]

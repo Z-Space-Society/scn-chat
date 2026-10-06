@@ -216,6 +216,7 @@ Admin area:
 - `apps/server/src/turns/runner.ts`, `apps/server/src/blobs/routes.ts`, `apps/server/src/storage/routes.ts`
 - `apps/server/src/server.ts`, `apps/server/src/config.ts`
 - `apps/server/src/db/migrations/0008_plugin_instances.ts`
-- `apps/web/src/pages/AdminPage.tsx`, `apps/web/src/components/SchemaFields.tsx`
+- `apps/web/src/routes/_app/admin/plugins/`, `apps/web/src/routes/_app/admin/models.tsx`
+- `apps/web/src/features/admin/pages/PluginsAdmin.tsx`, `PluginAdmin.tsx`, `NewPluginAdmin.tsx`, `ModelsAdmin.tsx`, `apps/web/src/features/admin/hooks/changes.ts`, `apps/web/src/shared/schema-fields/SchemaFields.tsx`
 - `packages/plugin-api/src/index.ts`, every `plugins/*/package.json`, `plugins/anthropic/`, `plugins/openai/`, `plugins/google/`, `plugins/openai-compatible/`, `plugins/web-search/src/index.ts`
 - `package.json`, `docs/plugins.md`

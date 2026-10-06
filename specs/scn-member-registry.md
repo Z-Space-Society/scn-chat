@@ -144,5 +144,5 @@ The plugin:
 - `apps/server/src/auth/roles.ts`, `apps/server/src/auth/routes.ts`
 - `apps/server/src/plugins/host.ts`, `apps/server/src/server.ts`
 - `packages/plugin-api/src/index.ts`, `packages/plugin-api/src/testing.ts`
-- `apps/web/src/pages/AdminPage.tsx`
+- `apps/web/src/features/admin/`, `apps/web/src/routes/_app/admin/`
 - `specs/admin.md`, `specs/plugins.md`, `specs/admin-plugins.md`, `docs/plugins.md`

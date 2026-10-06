@@ -7,5 +7,5 @@
     "jsx": "react-jsx",
     "types": ["vite/client", "@testing-library/jest-dom/vitest"]
   },
-  "include": ["src", "tests", "vite.config.ts"]
+  "include": ["src", "tests", "vite.config.ts", "vitest.config.ts"]
 }

@@ -25,8 +25,16 @@ The overview at the end of this file lists every spec and whether it is active, 
 - [[api-keys]]
 - [[cron]]
 - [[scn-member-registry]]
+- [[web-ui]]: rebuilding the web app on TanStack Start inside Hono, at parity with its acceptance criteria. Phase 1 of the web rebuild.
 
 ### Planned
+
+The later phases of the web rebuild, each spec written before its phase starts:
+
+- [[extending]]: the web app made easy to change in a fork, with tables of part and tool views, tool status and steps, message actions as a list with Copy, a Markdown seam with code block copy, smaller components, and a guide in `docs/extending.md`.
+- styling: the styling stack, a theme of design tokens for light and dark, and the designer's default look.
+
+Other features:
 
 - [[encrypted-conversations]]
 
@@ -44,7 +52,6 @@ Phase 1, initial build-out, implemented and tested, awaiting a check against a r
 - [[titles]]
 - [[sharing]]
 - [[browser-store]]
-- [[web-ui]]
 
 After the initial build-out:
 

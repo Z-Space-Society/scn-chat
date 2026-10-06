@@ -1,6 +1,4 @@
 import { randomBytes } from 'node:crypto'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
 import { sql } from 'kysely'
@@ -41,7 +39,18 @@ import { InvalidSpaceUri } from './storage/records.ts'
 import { type StorageRoutesDeps, storageRoutes } from './storage/routes.ts'
 import { type SyncRoutesDeps, syncRoutes } from './sync/routes.ts'
 import { type TurnRoutesDeps, turnRoutes } from './turns/routes.ts'
-import { renderIndexHtml } from './web-html.ts'
+
+/**
+ * What the web app's server-side routes receive with each request: the app name, and a `fetch`
+ * that calls this app in process as the requesting user, for rendering pages with their data.
+ */
+export type WebContext = { appName: string; fetch: typeof fetch }
+
+/** The web app: its built client assets, if any, and a handler that renders every other page. */
+export type Web = {
+  assets?: string
+  fetch: (request: Request, context: WebContext) => Promise<Response>
+}
 
 export type AppDeps = {
   config: Config
@@ -49,8 +58,7 @@ export type AppDeps = {
   logger: Logger
   /** Admin settings. Without them the defaults apply. */
   settings?: SettingsStore
-  /** Built web app to serve, in production. */
-  webDist?: string
+  web?: Web
   auth?: AuthDeps
   plugins?: PluginRoutesDeps
   storage?: StorageRoutesDeps
@@ -161,16 +169,28 @@ export function createApp(deps: AppDeps) {
   })
   app.all('/api/*', (c) => c.json({ error: 'NotFound' }, 404))
 
-  if (deps.webDist) {
-    const raw = readFileSync(join(deps.webDist, 'index.html'), 'utf8')
-    const index = () => renderIndexHtml(raw, appName())
-    app.get('/', (c) => c.html(index()))
-    app.get('/index.html', (c) => c.html(index()))
-    app.use('*', serveStatic({ root: deps.webDist }))
-    app.get('*', (c) => c.html(index()))
+  const web = deps.web
+  if (web) {
+    if (web.assets) app.use('*', serveStatic({ root: web.assets }))
+    app.get('*', (c) =>
+      web.fetch(c.req.raw, { appName: appName(), fetch: inProcessFetch(app, c.req.raw) }),
+    )
   }
 
   return app
 }
 
 export type AppType = ReturnType<typeof createApp>
+
+/** A `fetch` that calls the app in process, as the user whose page is being rendered. */
+export function inProcessFetch(app: Hono<AppEnv>, incoming: Request): typeof fetch {
+  return (input, init) => {
+    const request =
+      input instanceof Request
+        ? new Request(input, init)
+        : new Request(new URL(input, incoming.url), init)
+    const cookie = incoming.headers.get('cookie')
+    if (cookie && !request.headers.has('cookie')) request.headers.set('cookie', cookie)
+    return Promise.resolve(app.fetch(request))
+  }
+}

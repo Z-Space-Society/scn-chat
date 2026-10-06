@@ -77,5 +77,5 @@ Keys never appear in logs. A rejected request logs the route and the reason, and
 - `apps/server/src/auth/api-keys.ts`
 - `apps/server/src/admin/routes.ts`
 - `apps/server/src/db/migrations/`
-- `apps/web/src/pages/AdminPage.tsx`
+- `apps/web/src/features/admin/`, `apps/web/src/routes/_app/admin/`
 - `CLAUDE.md`, `docs/architecture.md`, `docs/deployment.md`

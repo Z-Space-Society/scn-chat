@@ -47,7 +47,7 @@ Each group is a key in the settings store, with a zod schema in `apps/server/src
 
 Consumers read the current value from the settings store when they need it, and never copy it at startup:
 
-- **App name.** The HTML shell, the OAuth client metadata's `client_name`, the `{{appName}}` placeholder, and `ctx.app.name` all read it per use.
+- **App name.** The page title the server renders, the OAuth client metadata's `client_name`, the `{{appName}}` placeholder, and `ctx.app.name` all read it per use.
 - **Session lifetime.** Applies to sessions created or extended after the change. Existing expiry times stay as they are.
 - **Turns.** The rate limiter reads the rate on each check. A turn reads the step limit, timeout, and system prompt when it starts. The sync engine reads the backfill window per sync.
 - **Sync.** The scheduler subscribes to `sync` and restarts its timers with the new intervals. `allowUserOptOut` is read per request.
@@ -118,7 +118,7 @@ Provider IDs appear in the model references stored in users' records, so each pr
 
 - [ ] Every setting group reads as today's defaults on a fresh database.
 - [ ] Saving a group with an invalid value returns 400 with the issues, and a valid save applies without a restart.
-- [ ] A renamed app shows in the HTML shell, the OAuth client metadata, and the system prompt placeholder.
+- [ ] A renamed app shows in the rendered page title, the OAuth client metadata, and the system prompt placeholder.
 - [ ] A new session lifetime applies to new sessions and leaves existing expiry times alone.
 - [ ] New turn limits and a new system prompt apply to the next turn.
 - [ ] Changing sync intervals restarts the scheduler with them.
@@ -133,7 +133,7 @@ Provider IDs appear in the model references stored in users' records, so each pr
 - `apps/server/src/settings/schemas.ts`, `apps/server/src/admin/routes.ts`
 - `apps/server/src/auth/web-session.ts`, `apps/server/src/auth/oauth-client.ts`
 - `apps/server/src/turns/runner.ts`, `apps/server/src/turns/prompt.ts`, `apps/server/src/sync/scheduler.ts`, `apps/server/src/sync/engine.ts`
-- `apps/server/src/web-html.ts`
-- `apps/web/src/pages/AdminPage.tsx`, `apps/web/src/components/SchemaFields.tsx`
+- `apps/server/src/app.ts`, which passes the app name to the web app with each request
+- `apps/web/src/routes/_app/admin/general.tsx`, `turns.tsx`, `sync.tsx`, `apps/web/src/features/admin/pages/SettingsAdmin.tsx`, `apps/web/src/shared/schema-fields/SchemaFields.tsx`
 - `.env.example`, `.gitignore`, `.dockerignore`, `docker-compose.yml`, `config.example.yml` (deleted)
 - `CLAUDE.md`, `README.md`, `docs/`, `specs/`, `plugins/web-search/README.md`

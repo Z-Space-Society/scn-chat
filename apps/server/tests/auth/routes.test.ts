@@ -120,13 +120,15 @@ describe('GET /oauth/callback', () => {
   it('returns to the page the sign-in started from, if it is on this site', async () => {
     const { app } = await setup()
     const login = await app.request(
-      '/oauth/login?identifier=alice.test&next=%2Fs%2Fdid%3Aplc%3Abob%2F3abc',
+      '/oauth/login?identifier=alice.test&next=%2Fshared%2Fdid%3Aplc%3Abob%2F3abc',
     )
     expect(login.headers.get('set-cookie')).toMatch(/scn_next=/)
     const res = await app.request('/oauth/callback?code=abc&state=xyz', {
-      headers: { cookie: `${loginCookie.headers.cookie}; scn_next=%2Fs%2Fdid%3Aplc%3Abob%2F3abc` },
+      headers: {
+        cookie: `${loginCookie.headers.cookie}; scn_next=%2Fshared%2Fdid%3Aplc%3Abob%2F3abc`,
+      },
     })
-    expect(res.headers.get('location')).toBe('/s/did:plc:bob/3abc')
+    expect(res.headers.get('location')).toBe('/shared/did:plc:bob/3abc')
   })
 
   it('ignores a return address on another site', async () => {
