@@ -1,0 +1,41 @@
+/**
+ * The router parses search values as JSON, so a value like `2024` arrives as a number. Text
+ * params take either, and drop anything else or empty.
+ */
+const text = (value: unknown) =>
+  typeof value === 'string' || typeof value === 'number' ? String(value) || undefined : undefined
+
+/** `q` is the sidebar search, on every chat route. */
+export const validateChatListSearch = (search: Record<string, unknown>): { q?: string } => {
+  const q = text(search.q)
+  return q ? { q } : {}
+}
+
+/** The login page shows `error` from a failed sign-in, and returns to `next` after one. */
+export const validateLoginSearch = (
+  search: Record<string, unknown>,
+): { error?: string; next?: string } => {
+  const error = text(search.error)
+  const next = text(search.next)
+  return { ...(error && { error }), ...(next && { next }) }
+}
+
+/** `q` searches the admin's users list by the start of a handle or DID. */
+export const validateUserSearch = (search: Record<string, unknown>): { q?: string } => {
+  const q = text(search.q)
+  return q ? { q } : {}
+}
+
+/** `m` names the focused message, which picks the branch on screen. */
+export const validateBranchSearch = (search: Record<string, unknown>): { m?: string } => {
+  const m = text(search.m)
+  return m ? { m } : {}
+}
+
+/** An admin model's page names it by `provider` and `id`, since model IDs can hold slashes. */
+export const validateModelSearch = (
+  search: Record<string, unknown>,
+): { provider: string; id: string } => ({
+  provider: text(search.provider) ?? '',
+  id: text(search.id) ?? '',
+})

@@ -7,7 +7,7 @@
     "node": ">=22.18"
   },
   "scripts": {
-    "dev": "pnpm --parallel --filter @scn-chat/server --filter @scn-chat/web dev",
+    "dev": "pnpm --filter @scn-chat/server dev",
     "build": "pnpm --filter @scn-chat/web build",
     "start": "pnpm --filter @scn-chat/server start",
     "test": "vitest run",

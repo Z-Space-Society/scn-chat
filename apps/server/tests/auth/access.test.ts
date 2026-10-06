@@ -21,7 +21,7 @@ import { testConfig } from '../helpers/config.ts'
 import { createSqliteDb } from '../helpers/db.ts'
 import { testRoles, testSettings } from '../helpers/settings.ts'
 
-const SHARE = '/s/did:plc:owner/3aaaaaaaaaaaa'
+const SHARE = '/shared/did:plc:owner/3aaaaaaaaaaaa'
 const logger = pino({ level: 'silent' })
 
 /** An app whose sign-ins are for whichever DID `as` names. */

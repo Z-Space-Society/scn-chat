@@ -1,4 +1,4 @@
-import { errorMessage } from '../lib/response.ts'
+import { errorMessage } from '../shared/response.ts'
 import type { ConversationChanges, IndexChanges, RecordKey, StoreApi } from './core.ts'
 
 export class Unauthorized extends Error {
@@ -17,7 +17,6 @@ async function get<T>(fetchImpl: typeof fetch, path: string): Promise<T> {
 
 const since = (rev?: string | null) => (rev ? `?since=${encodeURIComponent(rev)}` : '')
 
-/** The server routes the store syncs through. */
 export function httpApi(fetchImpl: typeof fetch = fetch): StoreApi {
   return {
     fetchIndex: (rev) => get<IndexChanges>(fetchImpl, `/api/conversations${since(rev)}`),

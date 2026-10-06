@@ -4,22 +4,27 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
     "@scn-chat/lexicons": "workspace:*",
     "@sqlite.org/sqlite-wasm": "3.53.4-build1",
+    "@tanstack/react-form": "1.33.5",
+    "@tanstack/react-query": "5.104.1",
+    "@tanstack/react-router": "1.170.41",
+    "@tanstack/react-router-ssr-query": "1.167.3",
+    "@tanstack/react-start": "1.168.60",
     "comlink": "4.4.2",
     "hono": "4.13.9",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-markdown": "10.1.0",
-    "remark-gfm": "4.0.1",
-    "wouter": "3.11.0"
+    "remark-gfm": "4.0.1"
   },
   "devDependencies": {
+    "@babel/core": "7.29.7",
+    "@rolldown/plugin-babel": "0.2.4",
     "@scn-chat/server": "workspace:*",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",
@@ -28,8 +33,10 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.1",
+    "babel-plugin-react-compiler": "1.0.0",
     "better-sqlite3": "13.0.3",
     "jsdom": "30.1.1",
+    "react-scan": "0.5.3",
     "vite": "8.3.1"
   }
 }

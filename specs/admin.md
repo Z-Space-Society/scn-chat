@@ -115,9 +115,9 @@ Access is checked in three places:
 - **Sign-in.** `GET /oauth/callback` resolves the identity, as it does today, then decides before it creates or updates the account or a web session:
   - An admin, or an existing full account that isn't suspended, signs in as today.
   - Anyone else who may create an account under the current mode creates it: the sign-in clears `viewer_only`, runs the login hook, and deletes their `account_invite` row.
-  - Anyone else whose `next` parameter is a share path, `/s/<ownerDid>/<skey>`, signs in as a viewer and returns to the shared chat.
+  - Anyone else whose `next` parameter is a share path, `/shared/<ownerDid>/<skey>`, signs in as a viewer and returns to the shared chat.
   - Anyone else has their new OAuth session revoked and goes back to the login page with a message. No account row is created for them.
-- **Every `/api` request.** The session middleware resolves the account, then checks access for every route a viewer can't reach. A user without full access gets 403 `{ error: 'AccessDenied', message }`. Their web session is kept, so shared chats still open. The web app shows the message, with sign-out and sign-in buttons, in place of the chat app on every route except shared chats.
+- **Every `/api` request.** The session middleware resolves the account, then checks access for every route a viewer can't reach. A user without full access gets 403 `{ error: 'AccessDenied', message }`. Their web session is kept, so shared chats still open. The web app sends them from every route except shared chats to the login page, which shows the message with sign-in and sign-out buttons.
 - **Background work.** The turn runner doesn't start a turn for a user without full access, and logs the skip at info. The sync scheduler, discovery, and notification registration skip them the same way.
 
 The messages, which name the user's DID so they can pass it to an admin:
@@ -153,7 +153,7 @@ Writes are validated with zod, and a failure is a 400 with `{ error: 'InvalidReq
 
 ### Admin area
 
-The web app gets an admin area at `/admin`, visible only to admins. It reuses the settings layout: a sidebar in the same style as the chat list, linking back to the chats and to each section, with only the current section shown. Non-admins who open an `/admin` route are redirected to `/`. The settings sidebar shows an "Admin" link for admins.
+The web app gets an admin area at `/admin`, visible only to admins. It reuses the settings layout: a sidebar in the same style as the chat list, linking back to the chats, to the account settings, and to each section, with only the current section shown. Non-admins who open an `/admin` route are redirected to `/`, by the server when it renders the page. The settings sidebar shows an "Admin" link for admins.
 
 Sections in this spec:
 
@@ -282,5 +282,6 @@ Admin API and area:
 - `apps/server/src/turns/runner.ts`, `apps/server/src/sync/scheduler.ts`
 - `apps/server/src/config.ts`, `apps/server/src/server.ts`
 - `apps/server/src/db/migrations/0007_admin.ts`, `apps/server/src/db/migrations/0009_registration.ts`
-- `apps/web/src/pages/AdminPage.tsx`, `apps/web/src/pages/SettingsPage.tsx`, `apps/web/src/App.tsx`
+- `apps/web/src/routes/_app/admin.tsx`, `apps/web/src/routes/_app/admin/`, `apps/web/src/routes/_app.tsx`, `apps/web/src/routes/login.tsx`
+- `apps/web/src/features/admin/pages/AdminLayout.tsx`, `UsersAdmin.tsx`, `RolesAdmin.tsx`, `AccessAdmin.tsx`, `apps/web/src/features/admin/components/RolePicker.tsx`, `apps/web/src/features/admin/queries.ts`, `apps/web/src/features/settings/pages/SettingsLayout.tsx`
 - `.env.example`, `docs/architecture.md`, `docs/deployment.md`, `docs/plugins.md`, `specs/sharing.md`, `specs/plugins.md`

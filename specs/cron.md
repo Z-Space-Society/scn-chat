@@ -76,5 +76,5 @@ One row, replaced at the start and end of each run.
 - `apps/server/src/app.ts`, `apps/server/src/admin/routes.ts`
 - `apps/server/src/db/migrations/`
 - `packages/plugin-api/src/index.ts`
-- `apps/web/src/pages/AdminPage.tsx`
+- `apps/web/src/features/admin/`, `apps/web/src/routes/_app/admin/`
 - `docs/plugins.md`, `docs/deployment.md`

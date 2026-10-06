@@ -56,6 +56,12 @@ describe('isPrivateAddress', () => {
     ['not an address', true],
     ['93.184.216.34', false],
     ['2606:4700:4700::1111', false],
+    // NAT64 addresses, as DNS64 gives on IPv6-only networks, are judged by the IPv4 inside.
+    ['64:ff9b::d8c6:4f01', false],
+    ['64:ff9b::216.198.79.1', false],
+    ['64:ff9b::7f00:1', true],
+    ['64:ff9b::a00:1', true],
+    ['64:ff9b::a9fe:a9fe', true],
   ])('%s is private: %s', (address, expected) => {
     expect(isPrivateAddress(address)).toBe(expected)
   })
