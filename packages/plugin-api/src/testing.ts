@@ -5,7 +5,6 @@ import {
   matchIngester,
   type Plugin,
   type PluginContext,
-  type RoleSource,
   type Tool,
   type ToolContext,
 } from './index.ts'
@@ -18,12 +17,15 @@ export async function setupForTest(
     ingesters?: Ingester[]
     userSettings?: (user: string) => unknown
     app?: { name: string; publicUrl: string }
+    /** DIDs that have an account, which `roles.syncMembers` adds when listed. */
+    accounts?: string[]
   } = {},
 ) {
   const providers: ModelProvider[] = []
   const tools: Tool<unknown>[] = []
   const ingesters: Ingester[] = []
-  const roleSources: RoleSource[] = []
+  const roleMembers = new Map<string, string[]>()
+  const accountDids = new Set(options.accounts)
   const accountChanges: { action: 'suspend' | 'restore'; did: string; reason?: string }[] = []
   const hooks: { name: string; handler: unknown }[] = []
   const closers: (() => void | Promise<void>)[] = []
@@ -33,7 +35,20 @@ export async function setupForTest(
     providers: { register: (provider: ModelProvider) => void providers.push(provider) },
     tools: { register: (tool: Tool<unknown>) => void tools.push(tool) },
     toolSources: { register: noop },
-    roleSources: { register: (source: RoleSource) => void roleSources.push(source) },
+    roles: {
+      syncMembers: async (role: string, dids: string[]) => {
+        const listed = new Set(dids)
+        const current = roleMembers.get(role) ?? []
+        const kept = current.filter((did) => listed.has(did))
+        const added = dids.filter((did) => accountDids.has(did) && !current.includes(did))
+        roleMembers.set(role, [...kept, ...added])
+        return { added: added.length, removed: current.length - kept.length }
+      },
+      addMember: async (role: string, did: string) => {
+        const current = roleMembers.get(role) ?? []
+        if (!current.includes(did)) roleMembers.set(role, [...current, did])
+      },
+    },
     accounts: {
       suspend: async (did: string, options?: { reason?: string }) => {
         accountChanges.push({ action: 'suspend', did, ...options })
@@ -63,7 +78,22 @@ export async function setupForTest(
   const close = async () => {
     for (const fn of closers) await fn()
   }
-  return { providers, tools, ingesters, roleSources, accountChanges, hooks, ctx, close }
+  /** Run the plugin's handlers for an action hook, as core would. */
+  const fire = async (name: string, payload: unknown) => {
+    for (const hook of hooks.filter((h) => h.name === name))
+      await (hook.handler as (p: unknown) => unknown)(payload)
+  }
+  return {
+    providers,
+    tools,
+    ingesters,
+    roleMembers,
+    accountChanges,
+    hooks,
+    fire,
+    ctx,
+    close,
+  }
 }
 
 /** A tool context that records citations, for tool tests. */

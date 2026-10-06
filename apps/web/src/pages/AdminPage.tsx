@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, Route, Switch, useLocation } from 'wouter'
+import { Link, Route, Switch, useLocation, useSearchParams } from 'wouter'
 import { api, json, read } from '../api.ts'
 import { type Schema, SchemaFields } from '../components/SchemaFields.tsx'
 import { useAction } from '../components/useAction.ts'
@@ -19,7 +19,7 @@ type User = {
 }
 type Invite = { did: string; handle: string | null; addedBy: string; addedAt: string }
 type Registration = 'open' | 'invite' | 'closed'
-type Member = { did: string; handle: string | null }
+type Member = { did: string; handle: string | null; addedBy: string }
 type Role = {
   name: string
   description: string
@@ -342,19 +342,41 @@ function Users() {
   )
 }
 
-function RoleBlock({
+/** Every role, and the admins from the environment, who belong to `admin` without being stored. */
+function useRoles() {
+  const [roles, setRoles] = useState<Role[] | null>(null)
+  const [environmentAdmins, setEnvironmentAdmins] = useState<string[]>([])
+  const { error, run } = useAction()
+  const reload = useCallback(
+    () =>
+      run(async () => {
+        const body = await read(api.admin.roles.$get())
+        setRoles(body.roles as Role[])
+        setEnvironmentAdmins(body.environmentAdmins)
+      }),
+    [run],
+  )
+  useEffect(reload, [reload])
+  return { roles, environmentAdmins, error, run, reload }
+}
+
+/** One role's description, matching rules, and explicit members. */
+function RoleForm({
   role,
   environmentAdmins,
   reload,
+  removed,
 }: {
   role: Role
   environmentAdmins: string[]
   reload: () => void
+  removed: () => void
 }) {
   const [description, setDescription] = useState(role.description)
   const [hosts, setHosts] = useState(role.pdsHosts.join('\n'))
   const [domains, setDomains] = useState(role.handleDomains.join('\n'))
   const [identifier, setIdentifier] = useState('')
+  const [saved, setSaved] = useState(false)
   const { error, run } = useAction()
   const name = role.name
   const then = (action: () => Promise<unknown>) =>
@@ -363,42 +385,45 @@ function RoleBlock({
       reload()
     })
   return (
-    <fieldset>
-      <legend>{name}</legend>
-      <label>
-        Description <input value={description} onChange={(e) => setDescription(e.target.value)} />
-      </label>
-      <label>
-        PDS hosts, one per line
-        <textarea value={hosts} onChange={(e) => setHosts(e.target.value)} />
-      </label>
-      <label>
-        Handle domains, one per line
-        <textarea value={domains} onChange={(e) => setDomains(e.target.value)} />
-      </label>
-      <button
-        type="button"
-        onClick={() =>
-          then(() =>
-            read(
+    <section>
+      <h2>{name}</h2>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          setSaved(false)
+          then(async () => {
+            await read(
               api.admin.roles[':name'].$patch(
                 { param: { name } },
                 json({ description, pdsHosts: lines(hosts), handleDomains: lines(domains) }),
               ),
-            ),
-          )
-        }
+            )
+            setSaved(true)
+          })
+        }}
       >
-        Save
-      </button>
-      <h4>Members</h4>
+        <label>
+          Description <input value={description} onChange={(e) => setDescription(e.target.value)} />
+        </label>
+        <label>
+          PDS hosts, one per line
+          <textarea value={hosts} onChange={(e) => setHosts(e.target.value)} />
+        </label>
+        <label>
+          Handle domains, one per line
+          <textarea value={domains} onChange={(e) => setDomains(e.target.value)} />
+        </label>
+        <button type="submit">Save</button>
+        {saved && <span>Saved.</span>}
+      </form>
+      <h3>Members</h3>
       <ul>
         {name === 'admin' &&
           environmentAdmins.map((did) => <li key={did}>{did} (from ADMIN_DIDS)</li>)}
         {role.members.map((member) => (
           <li key={member.did}>
             {member.handle ? `${member.handle} ` : ''}
-            {member.did}{' '}
+            {member.did} (added by {member.addedBy}){' '}
             <button
               type="button"
               onClick={() =>
@@ -439,53 +464,89 @@ function RoleBlock({
       {!role.builtIn && (
         <button
           type="button"
-          onClick={() => then(() => read(api.admin.roles[':name'].$delete({ param: { name } })))}
+          onClick={() =>
+            run(async () => {
+              await read(api.admin.roles[':name'].$delete({ param: { name } }))
+              removed()
+            })
+          }
         >
           Delete role
         </button>
       )}
       {error && <p role="alert">{error}</p>}
-    </fieldset>
+    </section>
   )
 }
 
-function Roles() {
-  const [roles, setRoles] = useState<Role[]>([])
-  const [environmentAdmins, setEnvironmentAdmins] = useState<string[]>([])
-  const [draft, setDraft] = useState({ name: '', description: '' })
-  const { error, run } = useAction()
-  const reload = useCallback(
-    () =>
-      run(async () => {
-        const body = await read(api.admin.roles.$get())
-        setRoles(body.roles as Role[])
-        setEnvironmentAdmins(body.environmentAdmins)
-      }),
-    [run],
+/** One role on its own page. */
+function RolePage({ name }: { name: string }) {
+  const [, navigate] = useLocation()
+  const { roles, environmentAdmins, error, reload } = useRoles()
+  const role = roles?.find((candidate) => candidate.name === name)
+  return (
+    <>
+      <Link href="/roles">Back to roles</Link>
+      {role ? (
+        <RoleForm
+          key={JSON.stringify(role)}
+          role={role}
+          environmentAdmins={environmentAdmins}
+          reload={reload}
+          removed={() => navigate('/roles')}
+        />
+      ) : (
+        roles && <p role="alert">This role doesn't exist.</p>
+      )}
+      {error && <p role="alert">{error}</p>}
+    </>
   )
-  useEffect(reload, [reload])
+}
+
+/** A summary of every role, each linking to its page, and a form to create one. */
+function Roles() {
+  const [, navigate] = useLocation()
+  const { roles, environmentAdmins, error, run } = useRoles()
+  const [draft, setDraft] = useState({ name: '', description: '' })
   return (
     <section>
       <h2>Roles</h2>
       <p>
         Everyone who has signed in holds the <code>user</code> role. A role's members are the people
-        added here, plus everyone whose PDS host or handle domain matches.
+        added to it, plus everyone whose PDS host or handle domain matches.
       </p>
-      {roles.map((role) => (
-        <RoleBlock
-          key={`${role.name}:${JSON.stringify(role)}`}
-          role={role}
-          environmentAdmins={environmentAdmins}
-          reload={reload}
-        />
-      ))}
+      <table>
+        <thead>
+          <tr>
+            <th>Role</th>
+            <th>Description</th>
+            <th>Members</th>
+            <th>PDS hosts</th>
+            <th>Handle domains</th>
+          </tr>
+        </thead>
+        <tbody>
+          {(roles ?? []).map((role) => (
+            <tr key={role.name}>
+              <td>
+                <Link href={`/roles/${role.name}`}>{role.name}</Link>
+              </td>
+              <td>{role.description}</td>
+              <td>
+                {role.members.length + (role.name === 'admin' ? environmentAdmins.length : 0)}
+              </td>
+              <td>{role.pdsHosts.join(', ')}</td>
+              <td>{role.handleDomains.join(', ')}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
       <form
         onSubmit={(e) => {
           e.preventDefault()
           run(async () => {
             await read(api.admin.roles.$post({}, json(draft)))
-            setDraft({ name: '', description: '' })
-            reload()
+            navigate(`/roles/${draft.name}`)
           })
         }}
       >
@@ -578,68 +639,70 @@ function Access() {
   )
 }
 
-/** A provider's admin models, with a model list fetched using the plugin form's current values. */
+const CAPABILITIES = ['vision', 'reasoning', 'tools'] as const
+
+/** A model's page. Model IDs can hold slashes and colons, so they go in the query string. */
+const modelHref = (instanceId: string, model: AdminModel) =>
+  `/plugins/${instanceId}/model?${new URLSearchParams({ provider: model.provider, id: model.id })}`
+
+/** A summary of a provider's admin models, and the ways to add more. */
 function ProviderModels({
   instance,
   options,
   provider,
   models,
-  roleNames,
   reload,
 }: {
   instance: Instance
   options: Json
   provider: Provider
   models: AdminModel[]
-  roleNames: string[]
   reload: () => void
 }) {
   const [listed, setListed] = useState<Listed[]>([])
   const [typed, setTyped] = useState('')
   const { error, run } = useAction()
   const offered = new Set(models.map((model) => model.id))
-  const save = (method: 'post' | 'put', model: AdminModel) =>
+  const offer = (id: string, name: string, capabilities: Capabilities) =>
     run(async () => {
-      const { warning: _warning, ...body } = model
       await read(
-        method === 'post'
-          ? api.admin.models.$post({}, json(body))
-          : api.admin.models.$put({}, json(body)),
+        api.admin.models.$post(
+          {},
+          json({ provider: provider.id, id, name, capabilities, roles: ['user'], default: false }),
+        ),
       )
       reload()
     })
-  const offer = (id: string, name: string, capabilities: Capabilities) =>
-    save('post', {
-      provider: provider.id,
-      id,
-      name,
-      capabilities,
-      roles: ['user'],
-      default: false,
-    })
   return (
     <div>
-      <h4>Models for {provider.name}</h4>
+      <h3>Models for {provider.name}</h3>
       {!provider.hasAdminKey && <p>Add an admin key to offer this provider's models.</p>}
-      <ul>
-        {models.map((model) => (
-          <li key={model.id}>
-            <ModelEditor
-              model={model}
-              roleNames={roleNames}
-              onSave={(changed) => save('put', changed)}
-              onRemove={() =>
-                run(async () => {
-                  await read(
-                    api.admin.models.$delete({}, json({ provider: model.provider, id: model.id })),
-                  )
-                  reload()
-                })
-              }
-            />
-          </li>
-        ))}
-      </ul>
+      {models.length > 0 && (
+        <table>
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th>ID</th>
+              <th>Capabilities</th>
+              <th>Roles</th>
+              <th>Default</th>
+            </tr>
+          </thead>
+          <tbody>
+            {models.map((model) => (
+              <tr key={model.id}>
+                <td>
+                  <Link href={modelHref(instance.id, model)}>{model.name}</Link>
+                </td>
+                <td>{model.id}</td>
+                <td>{CAPABILITIES.filter((c) => model.capabilities[c]).join(', ')}</td>
+                <td>{model.roles.join(', ')}</td>
+                <td>{model.default ? 'Yes' : ''}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
       {provider.listsModels && (
         <button
           type="button"
@@ -699,55 +762,119 @@ function ProviderModels({
 }
 
 /** One admin model's name, capabilities, and roles. */
-function ModelEditor({
+function ModelForm({
   model,
   roleNames,
-  onSave,
-  onRemove,
+  reload,
+  removed,
 }: {
   model: AdminModel
   roleNames: string[]
-  onSave: (model: AdminModel) => void
-  onRemove: () => void
+  reload: () => void
+  removed: () => void
 }) {
-  const [draft, setDraft] = useState(model)
+  const { warning: _warning, ...stored } = model
+  const [draft, setDraft] = useState(stored)
+  const [saved, setSaved] = useState(false)
+  const { error, run } = useAction()
+  const key = { provider: model.provider, id: model.id }
   return (
-    <fieldset>
-      <legend>{model.id}</legend>
-      <label>
-        Name{' '}
-        <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
-      </label>
-      {(['vision', 'reasoning', 'tools'] as const).map((capability) => (
-        <label key={capability}>
+    <section>
+      <h2>{model.name}</h2>
+      <p>
+        <code>
+          {model.provider}/{model.id}
+        </code>
+      </p>
+      {model.warning && <p role="alert">{model.warning}</p>}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          setSaved(false)
+          run(async () => {
+            await read(api.admin.models.$put({}, json(draft)))
+            setSaved(true)
+            reload()
+          })
+        }}
+      >
+        <label>
+          Name{' '}
           <input
-            type="checkbox"
-            checked={draft.capabilities[capability]}
-            onChange={(e) =>
-              setDraft({
-                ...draft,
-                capabilities: { ...draft.capabilities, [capability]: e.target.checked },
-              })
-            }
-          />{' '}
-          {capability}
+            value={draft.name}
+            onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+          />
         </label>
-      ))}
-      <div>
-        Roles:{' '}
-        <RolePicker
-          names={roleNames}
-          picked={draft.roles}
-          onChange={(roles) => setDraft({ ...draft, roles })}
+        <fieldset>
+          <legend>Capabilities</legend>
+          {CAPABILITIES.map((capability) => (
+            <label key={capability}>
+              <input
+                type="checkbox"
+                checked={draft.capabilities[capability]}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    capabilities: { ...draft.capabilities, [capability]: e.target.checked },
+                  })
+                }
+              />{' '}
+              {capability}
+            </label>
+          ))}
+        </fieldset>
+        <fieldset>
+          <legend>Roles</legend>
+          <RolePicker
+            names={roleNames}
+            picked={draft.roles}
+            onChange={(roles) => setDraft({ ...draft, roles })}
+          />
+        </fieldset>
+        <button type="submit">Save</button>{' '}
+        <button
+          type="button"
+          onClick={() =>
+            run(async () => {
+              await read(api.admin.models.$delete({}, json(key)))
+              removed()
+            })
+          }
+        >
+          Remove model
+        </button>
+        {saved && <span>Saved.</span>}
+      </form>
+      {error && <p role="alert">{error}</p>}
+    </section>
+  )
+}
+
+/** One of a plugin's admin models on its own page. */
+function ModelPage({ id }: { id: string }) {
+  const [, navigate] = useLocation()
+  const [params] = useSearchParams()
+  const { instances, models, version, roleNames, error, reload } = usePlugins()
+  const model = models.find(
+    (candidate) =>
+      candidate.provider === params.get('provider') && candidate.id === params.get('id'),
+  )
+  return (
+    <>
+      <Link href={`/plugins/${id}`}>Back to plugin</Link>
+      {model ? (
+        <ModelForm
+          key={version}
+          model={model}
+          roleNames={roleNames}
+          reload={reload}
+          removed={() => navigate(`/plugins/${id}`)}
         />
-      </div>
-      <button type="button" onClick={() => onSave(draft)}>
-        Save model
-      </button>{' '}
-      <button type="button" onClick={onRemove}>
-        Remove
-      </button>
-    </fieldset>
+      ) : (
+        instances && <p role="alert">This model isn't offered.</p>
+      )}
+      {error && <p role="alert">{error}</p>}
+    </>
   )
 }
 
@@ -783,13 +910,11 @@ function usePlugins() {
 function PluginForm({
   instance,
   models,
-  roleNames,
   reload,
   removed,
 }: {
   instance: Instance
   models: AdminModel[]
-  roleNames: string[]
   reload: () => void
   removed: () => void
 }) {
@@ -799,6 +924,11 @@ function PluginForm({
   const [saved, setSaved] = useState(false)
   const { error, issues, run } = useAction()
   const id = instance.id
+  // Options the plugin no longer has are dropped, so a save after an upgrade clears them.
+  const known = (values: Json) =>
+    Object.fromEntries(
+      Object.entries(values).filter(([key]) => key in (instance.schema?.properties ?? values)),
+    )
   return (
     <section>
       <h2>{instance.name ?? instance.package}</h2>
@@ -814,7 +944,7 @@ function PluginForm({
             await read(
               api.admin.plugins[':id'].$put(
                 { param: { id } },
-                json({ options, enabled, clearSecrets: cleared }),
+                json({ options: known(options), enabled, clearSecrets: cleared }),
               ),
             )
             setSaved(true)
@@ -864,7 +994,6 @@ function PluginForm({
           options={options}
           provider={provider}
           models={models.filter((model) => model.provider === provider.id)}
-          roleNames={roleNames}
           reload={reload}
         />
       ))}
@@ -875,7 +1004,7 @@ function PluginForm({
 /** One plugin on its own page. */
 function PluginPage({ id }: { id: string }) {
   const [, navigate] = useLocation()
-  const { instances, models, version, roleNames, error, reload } = usePlugins()
+  const { instances, models, version, error, reload } = usePlugins()
   const instance = instances?.find((candidate) => candidate.id === id)
   return (
     <>
@@ -885,7 +1014,6 @@ function PluginPage({ id }: { id: string }) {
           key={version}
           instance={instance}
           models={models}
-          roleNames={roleNames}
           reload={reload}
           removed={() => navigate('/plugins')}
         />
@@ -1119,6 +1247,145 @@ function SettingsForm({ title, keys }: { title: string; keys: string[] }) {
   )
 }
 
+type ApiKey = {
+  id: string
+  label: string
+  roles: string[]
+  createdAt: string
+  lastUsedAt: string | null
+}
+
+/** Issue and revoke the keys that scripts, such as a crontab, send as a Bearer token. */
+function ApiKeys() {
+  const [keys, setKeys] = useState<ApiKey[]>([])
+  const [draft, setDraft] = useState({ label: '', roles: [] as string[] })
+  const [issued, setIssued] = useState<string | null>(null)
+  const roleNames = useRoleNames()
+  const { error, run } = useAction()
+  const reload = useCallback(
+    () => run(async () => setKeys((await read(api.admin['api-keys'].$get())).keys as ApiKey[])),
+    [run],
+  )
+  useEffect(reload, [reload])
+  return (
+    <section>
+      <h2>API keys</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Label</th>
+            <th>Roles</th>
+            <th>Created</th>
+            <th>Last used</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          {keys.map((key) => (
+            <tr key={key.id}>
+              <td>{key.label}</td>
+              <td>{key.roles.join(', ')}</td>
+              <td>{new Date(key.createdAt).toLocaleString()}</td>
+              <td>{key.lastUsedAt ? new Date(key.lastUsedAt).toLocaleString() : 'Never'}</td>
+              <td>
+                <button
+                  type="button"
+                  onClick={() =>
+                    run(async () => {
+                      await read(api.admin['api-keys'][':id'].$delete({ param: { id: key.id } }))
+                      reload()
+                    })
+                  }
+                >
+                  Revoke
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          run(async () => {
+            const body = await read(api.admin['api-keys'].$post({}, json(draft)))
+            setIssued(body.key)
+            setDraft({ label: '', roles: [] })
+            reload()
+          })
+        }}
+      >
+        <h3>New key</h3>
+        <input
+          aria-label="Key label"
+          placeholder="Label"
+          value={draft.label}
+          onChange={(e) => setDraft({ ...draft, label: e.target.value })}
+          required
+        />
+        <fieldset>
+          <legend>Roles</legend>
+          <RolePicker
+            names={roleNames}
+            picked={draft.roles}
+            onChange={(roles) => setDraft({ ...draft, roles })}
+          />
+        </fieldset>
+        <button type="submit">Issue key</button>
+      </form>
+      {issued && (
+        <p>
+          Copy this key now. It can't be shown again: <code>{issued}</code>
+        </p>
+      )}
+      {error && <p role="alert">{error}</p>}
+    </section>
+  )
+}
+
+type CronRun = { startedAt: string; finishedAt: string | null; failed: string[] }
+
+const DAY_MS = 86_400_000
+
+/** When cron last ran, and how to set it up. */
+function CronStatus() {
+  const [lastRun, setLastRun] = useState<CronRun | null | undefined>(undefined)
+  const { error, run } = useAction()
+  useEffect(() => {
+    run(async () => setLastRun((await read(api.admin.cron.$get())).lastRun as CronRun | null))
+  }, [run])
+  const stale =
+    lastRun !== undefined && (!lastRun || Date.now() - Date.parse(lastRun.startedAt) > DAY_MS)
+  return (
+    <section>
+      <h2>Cron</h2>
+      {stale && (
+        <p role="alert">
+          {lastRun ? "Cron hasn't run in over a day." : 'Cron has never run.'} Plugins that work on
+          a schedule, such as member lists, aren't being updated.
+        </p>
+      )}
+      {lastRun && (
+        <p>
+          Last run started {new Date(lastRun.startedAt).toLocaleString()}
+          {lastRun.finishedAt
+            ? ` and finished ${new Date(lastRun.finishedAt).toLocaleString()}`
+            : ' and is still going'}
+          .{lastRun.failed.length > 0 && ` Failed: ${lastRun.failed.join(', ')}.`}
+        </p>
+      )}
+      <p>
+        Issue a key with the <code>admin</code> role on the <Link href="/api-keys">API keys</Link>{' '}
+        page, then call cron on a schedule, for example from a crontab:
+      </p>
+      <pre>
+        {`*/5 * * * * curl -fsS -X POST -H "Authorization: Bearer <key>" ${window.location.origin}/api/cron`}
+      </pre>
+      {error && <p role="alert">{error}</p>}
+    </section>
+  )
+}
+
 const GENERAL = ['general', 'sessions']
 const TURNS = ['turns']
 const SYNC = ['sync']
@@ -1132,6 +1399,8 @@ const sections = [
   { path: '/general', label: 'General' },
   { path: '/turns', label: 'Turns' },
   { path: '/sync', label: 'Sync' },
+  { path: '/api-keys', label: 'API keys' },
+  { path: '/cron', label: 'Cron' },
 ]
 
 /** The admin area: users, roles, access, plugins, models, and the app's settings. */
@@ -1162,6 +1431,7 @@ export function AdminPage() {
       </nav>
       <main>
         <Switch>
+          <Route path="/roles/:name">{(params) => <RolePage name={params.name} />}</Route>
           <Route path="/roles">
             <Roles />
           </Route>
@@ -1171,6 +1441,7 @@ export function AdminPage() {
           <Route path="/plugins/new">
             <NewPlugin />
           </Route>
+          <Route path="/plugins/:id/model">{(params) => <ModelPage id={params.id} />}</Route>
           <Route path="/plugins/:id">{(params) => <PluginPage id={params.id} />}</Route>
           <Route path="/plugins">
             <PluginList />
@@ -1186,6 +1457,12 @@ export function AdminPage() {
           </Route>
           <Route path="/sync">
             <SettingsForm title="Sync" keys={SYNC} />
+          </Route>
+          <Route path="/api-keys">
+            <ApiKeys />
+          </Route>
+          <Route path="/cron">
+            <CronStatus />
           </Route>
           <Route>
             <Users />

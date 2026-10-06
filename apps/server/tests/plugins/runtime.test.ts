@@ -91,6 +91,11 @@ describe('runtimeBuilder', () => {
     expect(failed('crash').error).toMatch(/kaboom/)
   })
 
+  it('ignores stored options the plugin no longer has', async () => {
+    const built = await build([instance({ options: { name: 'kept', pollMinutes: 5 } })])
+    expect(built.host.plugins.map((p) => p.id)).toEqual(['kept'])
+  })
+
   it('passes stored secrets to the plugin with its options', async () => {
     const built = await build([instance({ options: {}, secrets: { name: 'from-secret' } })])
     expect(built.host.plugins.map((p) => p.id)).toEqual(['from-secret'])

@@ -13,7 +13,7 @@ export const testSettings = (db: Db, values: Partial<Settings> = {}) =>
   new SettingsStore(db, logger, values)
 
 export const testRoles = (db: Db, options: Partial<ConstructorParameters<typeof Roles>[0]> = {}) =>
-  new Roles({ db, adminDids: new Set([TEST_ADMIN]), sources: () => [], logger, ...options })
+  new Roles({ db, adminDids: new Set([TEST_ADMIN]), ...options })
 
 /** Roles, settings, and access over one database. */
 export function testAccess(db: Db, values: Partial<Settings> = {}) {

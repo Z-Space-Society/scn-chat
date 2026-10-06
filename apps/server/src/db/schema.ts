@@ -95,6 +95,16 @@ export type Database = {
     updated_at: string
   }
   role_member: { role: string; did: string; added_at: string; added_by: string }
+  api_key: {
+    id: string
+    label: string
+    key_hash: string
+    roles_json: string
+    created_by: string
+    created_at: string
+    last_used_at: string | null
+  }
+  cron_run: { id: number; started_at: string; finished_at: string | null; failed_json: string }
   plugin_instance: {
     id: string
     package: string

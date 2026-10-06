@@ -2,7 +2,7 @@
 
 ## Summary
 
-SCN Chat gets an admin area in the web app, and the database starts holding the settings that used to live in `config.yml`. This spec builds the foundation the other admin specs sit on: a store for admin settings, a built-in `admin` role seeded from the environment, the admin area itself, and user access control. Roles move from `config.yml` into the database. A role's members can be listed one by one, matched by the PDS they use or their handle's domain, or decided by a plugin, such as one that checks an external membership system. A registration setting decides who can create an account: anyone, members of chosen roles, or only people an admin adds. Once someone has an account they keep it whatever the setting says, until an admin or a plugin suspends it. Anyone turned away is told why and given their DID to pass to an admin. Someone who signs in from a shared chat link gets a viewer session that can open shared chats and nothing else.
+SCN Chat gets an admin area in the web app, and the database starts holding the settings that used to live in `config.yml`. This spec builds the foundation the other admin specs sit on: a store for admin settings, a built-in `admin` role seeded from the environment, the admin area itself, and user access control. Roles move from `config.yml` into the database. A role's members can be listed one by one, matched by the PDS they use or their handle's domain, or set by a plugin from an external membership system. A registration setting decides who can create an account: anyone, members of chosen roles, or only people an admin adds. Once someone has an account they keep it whatever the setting says, until an admin or a plugin suspends it. Anyone turned away is told why and given their DID to pass to an admin. Someone who signs in from a shared chat link gets a viewer session that can open shared chats and nothing else.
 
 This is the first of three specs. [[admin-plugins]] moves plugins and admin models into the admin area, and [[admin-settings]] moves the remaining settings and removes `config.yml`.
 
@@ -10,7 +10,7 @@ This is the first of three specs. [[admin-plugins]] moves plugins and admin mode
 
 Until now anyone with an atproto account could sign in, and a server had no way to limit that. SCN Chat is a community project, so servers differ: some are open to anyone, some only to a community's members, and some only to people an admin picks. Admin models and the admin's web search engine are gated by role either way, so an open server doesn't pay for strangers. Keeping roles as DID lists in `config.yml` doesn't scale either: every change means editing a file and restarting the server, and the admin has to find each person's DID by hand.
 
-A community running its own PDS, or handing out handles under its own domain, wants all of its people let in without listing anyone. Explicit members cover everyone else. Some communities already decide membership elsewhere. SCN members apply through a public record and are approved by admins in HappyView, and the server should honor that without an admin copying each approval by hand. Plugins can therefore act as role sources. Groups are otherwise kept in a plain internal schema for now. Once an atproto group model settles, likely on spaces, roles migrate to it, either directly or through a role source plugin.
+A community running its own PDS, or handing out handles under its own domain, wants all of its people let in without listing anyone. Explicit members cover everyone else. Some communities already decide membership elsewhere. SCN members apply through a public record and are approved by admins in HappyView, and the server should honor that without an admin copying each approval by hand. Plugins can therefore set a role's members from an outside list. Groups are otherwise kept in a plain internal schema for now. Once an atproto group model settles, likely on spaces, roles migrate to it, either directly or through a plugin.
 
 Sharing must keep working on a closed server. A shared chat is read with the viewer's own credential, so the viewer has to sign in, and the owner shouldn't need the viewer to be a member of the server first.
 
@@ -48,36 +48,16 @@ role_member (role, did, added_at, added_by), primary key (role, did)
 - **Built-in roles.** `user` is implicit, held by everyone who has signed in, and is never stored. `admin` is created by the migration and cannot be deleted. Neither can be renamed.
 - **Names.** Role names match `^[a-z][a-z0-9-]*$` and cannot be changed after creation, since settings and models refer to roles by name.
 - **Members.** A role's members come from the sources below, and a DID holds the role if any of them matches:
-  - **Explicit members** in `role_member`. The admin adds them by handle or DID, and the server resolves a handle to its DID when it is added. People who have never signed in can be added ahead of time.
+  - **Explicit members** in `role_member`. The admin adds them by handle or DID, and the server resolves a handle to its DID when it is added. People who have never signed in can be added ahead of time. A plugin can change a role's rows with `ctx.roles.syncMembers` and `ctx.roles.addMember`.
   - **PDS hosts** in `pds_hosts_json`, a list of hostnames such as `pds.commonscomputer.com`. A DID matches when the host of its PDS URL, from its DID document, equals one of them exactly.
   - **Handle domains** in `handle_domains_json`, a list of domains such as `commonscomputer.com`. A DID matches when its verified handle is the domain or ends in `.` plus the domain. Only the owner of a domain can hand out handles under it, and the server only stores handles that resolve back to the same DID, so the match can't be claimed by someone outside the domain.
-  - **Role sources** registered by plugins, described below.
-- **Deleting.** Deleting a role is refused while access or any admin model names it, and the error lists them.
+- **Deleting.** Deleting a role is refused while access, any admin model, or an API key names it, and the error lists them.
 
-`apps/server/src/auth/roles.ts` becomes a `Roles` service. `rolesFor({ did, handle, pdsUrl })` returns `user`, `admin` when the DID is in `ADMIN_DIDS`, every role whose database sources match, and every role the plugin role sources grant. It reads the database and asks the role sources on every call, so a change applies on the user's next request without a new login. The PDS URL and handle come from the `account` row, which sign-in updates, or from identity resolution during sign-in, before the row exists.
+`apps/server/src/auth/roles.ts` becomes a `Roles` service. `rolesFor({ did, handle, pdsUrl })` returns `user`, `admin` when the DID is in `ADMIN_DIDS`, and every role whose explicit members, PDS hosts, or handle domains match. It reads the database on every call, so a change applies on the user's next request without a new login. The PDS URL and handle come from the `account` row, which sign-in updates, or from identity resolution during sign-in, before the row exists.
 
-### Role sources
+### Roles from plugins
 
-A plugin can decide role membership from outside the database by registering a role source in `setup`:
-
-```ts
-interface RoleSource {
-  id: string // unique among role sources, like other registries
-  rolesFor(
-    identity: { did: string; handle?: string; pdsUrl: string },
-    context: { signIn: boolean },
-  ): Promise<string[]>
-}
-
-ctx.roleSources.register(source)
-```
-
-- **When it runs.** Every `rolesFor` call asks every role source, in parallel, so a source is consulted at sign-in, before the access check, and on every request. A grant or revocation in the external system applies on the user's next request. `context.signIn` is true only for the check in the OAuth callback, so a source can fetch fresh data at sign-in and answer from its own copy the rest of the time.
-- **Caching** belongs to the plugin. Core doesn't remember a source's answers, so a source backed by a remote service caches inside the plugin, for as long as it judges safe.
-- **Failures.** Core gives each call 10 seconds, long enough to call a remote service at sign-in. A source that throws or times out contributes no roles for that call, and core logs a warning with the source ID and the DID. A plugin that wants to ride out an outage of its backend keeps its last good answer itself.
-- **Names.** A source can only grant roles that exist. Unknown names and `admin` are ignored with a warning, so admin rights only ever come from the database and `ADMIN_DIDS`. A plugin that grants a role takes the role name as an option, so the admin picks it.
-- **Plugin runtime.** Role sources live in the plugin host alongside providers and tools, so in [[admin-plugins]] they come from the current runtime, and saving a plugin's options changes them without a restart.
-- **The admin area** shows a role granted by a source with the source's ID, and it can't be removed there.
+A plugin can keep a role in step with an outside system by changing the role's members with `ctx.roles.syncMembers` and `ctx.roles.addMember`, from a [[cron]] handler and the `signIn:before` hook. Role checks only read the database, so they never call a plugin. [[scn-member-registry]] describes both.
 
 ### Registration
 
@@ -93,7 +73,7 @@ access: {
 | Mode | Who can create an account |
 |---|---|
 | `open` | Anyone with an atproto account. |
-| `invite` | Anyone holding a role in `inviteRoles`, from any role source, and anyone an admin added. |
+| `invite` | Anyone holding a role in `inviteRoles`, and anyone an admin added. |
 | `closed` | Only people an admin added. |
 
 Creating an account means a first full sign-in, which records the account and runs the login hook. Admins can always create one. Every name in `inviteRoles` must be an existing role, checked on save.
@@ -157,11 +137,11 @@ The messages, which name the user's DID so they can pass it to an admin:
 
 | Route | Purpose |
 |---|---|
-| `GET /api/admin/users?q=&cursor=` | Accounts, 50 at a time, newest activity first. Each has the DID, handle, storage mode, whether it is a viewer, its suspension, roles, and each role's source, including role sources, which are asked for each listed account, plus created and last-active times. `q` matches the start of a handle or DID. |
+| `GET /api/admin/users?q=&cursor=` | Accounts, 50 at a time, newest activity first. Each has the DID, handle, storage mode, whether it is a viewer, its suspension, roles, and each role's source, plus created and last-active times. `q` matches the start of a handle or DID. |
 | `POST /api/admin/users` | Add a person from `{ identifier }`, a handle or DID, so they can create an account. |
 | `GET /api/admin/invites`, `DELETE /api/admin/invites/:did` | People added who haven't created an account yet, and removing one. |
 | `POST /api/admin/users/:did/suspend`, `POST /api/admin/users/:did/restore` | Suspend an account with an optional `{ reason }`, or restore it. |
-| `GET /api/admin/roles` | Every role, with its description, explicit members with their handles, PDS hosts, and handle domains. `admin` also lists the DIDs from the environment, marked as such. |
+| `GET /api/admin/roles` | Every role, with its description, members with their handles and who added them, PDS hosts, and handle domains. `admin` also lists the DIDs from the environment, marked as such. |
 | `POST /api/admin/roles` | Create a role from `{ name, description }`. |
 | `PATCH /api/admin/roles/:name` | Change `description`, `pdsHosts`, or `handleDomains`. Hosts and domains must be valid hostnames. |
 | `DELETE /api/admin/roles/:name` | Delete a role, refused for built-in roles and roles still in use. |
@@ -177,8 +157,8 @@ The web app gets an admin area at `/admin`, visible only to admins. It reuses th
 
 Sections in this spec:
 
-- **Users** (`/admin/users`, the default). A form to add a person by handle or DID, the list of people added who haven't signed in yet, a search box, and a table of accounts with their handle, DID, storage mode, roles, last activity, and suspension, with viewers marked, and a "Load more" button. Each row can add the user to a role, remove them from one they hold explicitly, and suspend or restore them. Roles that come from a PDS host, handle domain, or role source are shown with their source but can't be removed there.
-- **Roles** (`/admin/roles`). One block per role: its description, explicit members with a remove button, an input to add a member by handle or DID, and the PDS hosts and handle domains, one per line. A form at the end creates a role.
+- **Users** (`/admin/users`, the default). A form to add a person by handle or DID, the list of people added who haven't signed in yet, a search box, and a table of accounts with their handle, DID, storage mode, roles, last activity, and suspension, with viewers marked, and a "Load more" button. Each row can add the user to a role, remove them from one they hold explicitly, and suspend or restore them. Roles that come from a PDS host or handle domain are shown with their source but can't be removed there.
+- **Roles** (`/admin/roles`). A table of the roles with their description, member count, PDS hosts, and handle domains, each linking to the role's page, and a form that creates a role and opens its page. A role's page (`/admin/roles/<name>`) edits its description and the PDS hosts and handle domains, one per line, lists its explicit members with who added them and a remove button, has an input to add a member by handle or DID, and deletes the role.
 - **Access** (`/admin/access`). The registration mode, a checkbox per role for `inviteRoles`, shown in `invite` mode, and a Save button.
 
 The UI stays as bare as the rest of the web app.
@@ -191,7 +171,7 @@ The UI stays as bare as the rest of the web app.
 
 ### Docs
 
-`docs/architecture.md` gains a section on the admin area, access and viewers, and the split between environment and database settings. `docs/plugins.md` and the plugins spec document `ctx.roleSources.register`, and `setupForTest` records role sources like other registrations. `docs/deployment.md` explains `ADMIN_DIDS` and that a new server is open until an admin changes the registration mode. `docs/plugins.md` and the plugins spec document `ctx.accounts`. The sharing spec notes that viewers don't need access.
+`docs/architecture.md` gains a section on the admin area, access and viewers, and the split between environment and database settings. `docs/plugins.md` and the plugins spec document `ctx.roles`. `docs/deployment.md` explains `ADMIN_DIDS` and that a new server is open until an admin changes the registration mode. `docs/plugins.md` and the plugins spec document `ctx.accounts`. The sharing spec notes that viewers don't need access.
 
 ## Scope Boundaries
 
@@ -200,15 +180,14 @@ The UI stays as bare as the rest of the web app.
 - No suspending accounts automatically in core. A plugin can do it.
 - No per-role limits on usage, quotas, or billing.
 - No audit log table. Admin changes are written to the server log.
-- No built-in roles from atproto lists, follows, or external group services. A role source plugin can provide them, and none ships with this spec.
-- No caching of role source answers in core.
+- No built-in roles from atproto lists, follows, or external group services. A plugin can provide them with `ctx.roles`.
 - No separate admin permissions. Every admin can change everything.
 - No settings export or import.
 - No multi-process deployments. The settings store assumes one server process.
 
 ## Edge Cases and Decisions
 
-- `ADMIN_DIDS` is the one role source in the environment, so a broken database state or a mistaken edit can't lock every admin out.
+- `ADMIN_DIDS` is the one role grant in the environment, so a broken database state or a mistaken edit can't lock every admin out.
 - A new server is open, since servers run by different communities want different things, and an open server is what most people expect when they try it.
 - The mode only decides who can create an account. Access follows the account, so changing the mode never cuts anyone off, and a lost role doesn't either. Removing someone is an explicit suspension, by an admin or a plugin.
 - A plugin acts on a revocation elsewhere by suspending the account, on its own schedule. Vetoing access on every request instead would mean an outage of the plugin's backend either locked members out or let revoked people in.
@@ -224,11 +203,9 @@ The UI stays as bare as the rest of the web app.
 - Admin error messages are shown to the admin as they are, so `InvalidBody` carries the message without a prefix, and its `issues` with the field paths.
 - The users list pages with an offset cursor. Accounts are few enough that keyset paging isn't worth it.
 - The user search matches the lowercased query against handles and DIDs with `LIKE`, escaping `%` and `_`.
-- Role sources are asked on every check instead of storing what they grant, so a revocation in the external system applies without anyone removing a stored membership.
-- A failing role source grants nothing, so an outage can lock its members out once the plugin's own cache runs out. Granting stale roles from core would hide the outage and keep revoked users in.
-- Role sources can't grant `admin`, so a plugin can't hand out admin rights.
+- Plugins store a role's members rather than being asked on every check, so a slow outside system never slows a request, and the admin area can show who holds a role. A plugin whose outside system is down leaves the stored members alone, so an outage doesn't lock members out, and revocations wait for it to end.
+- Plugins can't set `admin`'s members, so a plugin can't hand out admin rights.
 - An added person's row is kept until they create an account, so adding someone in `open` mode, where they don't need it, does no harm.
-- Deleting a role that a plugin's options name isn't checked, since core can't tell which options are role names. The source's grants of it are then ignored with a warning.
 
 ## Acceptance Criteria
 
@@ -252,16 +229,6 @@ Roles:
 - [ ] A role change applies on the user's next request without a new login.
 - [ ] Creating a role with an invalid name is refused, and built-in roles can't be deleted.
 - [ ] Deleting a role named by access or an admin model is refused, listing what names it.
-
-Role sources:
-
-- [ ] Roles a source grants are included in `rolesFor`, and count as invite roles at sign-in.
-- [ ] A source's change in answer applies on the user's next request.
-- [ ] A source that throws or takes longer than 10 seconds contributes no roles and logs a warning, and the other sources still count.
-- [ ] Role sources get `{ signIn: true }` from the OAuth callback and `{ signIn: false }` everywhere else.
-- [ ] Unknown role names and `admin` from a source are ignored with a warning.
-- [ ] Registering two role sources with the same ID fails, like other registries.
-- [ ] The users list shows roles from a source with the source's ID, and doesn't offer to remove them.
 
 Registration and access:
 

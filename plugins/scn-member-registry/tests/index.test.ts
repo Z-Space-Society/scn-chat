@@ -1,13 +1,12 @@
-import type { RoleSource } from '@scn-chat/plugin-api'
 import { setupForTest } from '@scn-chat/plugin-api/testing'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import scnMemberRegistry from '../src/index.ts'
 
 const TOKEN = 't'.repeat(48)
-const ALICE = { did: 'did:plc:alice', pdsUrl: 'https://pds.example' }
-const BOB = { did: 'did:plc:bob', pdsUrl: 'https://pds.example' }
-const REQUEST = { signIn: false }
-const SIGN_IN = { signIn: true }
+const ALICE = 'did:plc:alice'
+const BOB = 'did:plc:bob'
+const CRON = { startedAt: '2026-10-05T00:00:00Z' }
+const signIn = (did: string) => ({ did, handle: null, pdsUrl: 'https://pds.example' })
 
 const list = (...dids: string[]) =>
   Response.json({ members: dids.map((did) => ({ did, active: true, grantedAt: 'x' })) })
@@ -20,46 +19,40 @@ async function setup(...responses: (Response | Error | Promise<Response>)[]) {
     return ((await next) as Response).clone()
   })
   vi.stubGlobal('fetch', fetch)
-  const test = await setupForTest(scnMemberRegistry({ token: TOKEN, pollMinutes: 5 }))
+  const test = await setupForTest(scnMemberRegistry({ token: TOKEN }), { accounts: [ALICE] })
   const warn = vi.fn()
   const error = vi.fn()
   Object.assign(test.ctx.logger, { warn, error })
-  const source = test.roleSources[0] as RoleSource
-  return { ...test, fetch, warn, error, source }
+  const members = () => test.roleMembers.get('scn-member')
+  return { ...test, fetch, warn, error, members }
 }
 
-afterEach(() => {
-  vi.useRealTimers()
-  vi.unstubAllGlobals()
-})
+afterEach(() => vi.unstubAllGlobals())
 
 describe('scn-member-registry', () => {
-  it('gives the role to listed members only, asking for active members with the token', async () => {
-    const { source, fetch, close } = await setup(list(ALICE.did))
-    expect(await source.rolesFor(ALICE, REQUEST)).toEqual(['scn-member'])
-    expect(await source.rolesFor(BOB, REQUEST)).toEqual([])
+  it('adds members with an account at cron, asking for active members with the token', async () => {
+    const { fire, fetch, members } = await setup(list(ALICE, BOB))
+    await fire('cron', CRON)
+    expect(members()).toEqual([ALICE])
     const url = new URL(String(fetch.mock.calls[0]?.[0 as never]))
     expect(url.pathname).toBe('/xrpc/network.sharedcomputer.membership.listMembers')
     expect(url.searchParams.get('activeOnly')).toBe('true')
     expect(url.searchParams.get('token')).toBe(TOKEN)
-    await close()
   })
 
-  it('fetches again at sign-in, so someone approved since the last fetch gets the role', async () => {
-    const { source, fetch, close } = await setup(list(ALICE.did), list(ALICE.did, BOB.did))
-    expect(await source.rolesFor(BOB, REQUEST)).toEqual([])
-    expect(await source.rolesFor(BOB, SIGN_IN)).toEqual(['scn-member'])
-    expect(fetch).toHaveBeenCalledTimes(2)
-    await close()
+  it('adds a member signing in for the first time, and not someone the registry lacks', async () => {
+    const { fire, members } = await setup(list(BOB))
+    await fire('signIn:before', signIn('did:plc:carol'))
+    expect(members()).toEqual([])
+    await fire('signIn:before', signIn(BOB))
+    expect(members()).toEqual([BOB])
   })
 
-  it('waits for the first fetch rather than answering with no roles', async () => {
-    let answer!: (res: Response) => void
-    const { source, close } = await setup(new Promise<Response>((resolve) => (answer = resolve)))
-    const roles = source.rolesFor(ALICE, REQUEST)
-    answer(list(ALICE.did))
-    expect(await roles).toEqual(['scn-member'])
-    await close()
+  it('removes revoked members at cron', async () => {
+    const { fire, members } = await setup(list(BOB), list(ALICE))
+    await fire('signIn:before', signIn(BOB))
+    await fire('cron', CRON)
+    expect(members()).toEqual([ALICE])
   })
 
   it.each([
@@ -68,45 +61,30 @@ describe('scn-member-registry', () => {
       'an error answer',
       Response.json(
         { error: 'script_error', message: 'forbidden: invalid service token' },
-        {
-          status: 500,
-        },
+        { status: 500 },
       ),
     ],
-    ['a malformed list', Response.json({ members: [{ id: 'did:plc:bob' }] })],
-  ])('keeps the previous list after %s, and never logs the token', async (_, failure) => {
-    const { source, warn, close } = await setup(list(ALICE.did), failure)
-    expect(await source.rolesFor(ALICE, SIGN_IN)).toEqual(['scn-member'])
-    expect(await source.rolesFor(ALICE, SIGN_IN)).toEqual(['scn-member'])
+    ['a malformed list', Response.json({ members: [{ id: BOB }] })],
+  ])('keeps the stored members after %s, and never logs the token', async (_, failure) => {
+    const { fire, warn, members } = await setup(list(ALICE), failure)
+    await fire('cron', CRON)
+    await fire('cron', CRON)
+    expect(members()).toEqual([ALICE])
     expect(warn).toHaveBeenCalled()
     expect(JSON.stringify(warn.mock.calls)).not.toContain(TOKEN)
-    await close()
   })
 
   it('applies an empty list that replaces members, and logs it as an error', async () => {
-    const { source, error, close } = await setup(list(ALICE.did), list())
-    await source.rolesFor(ALICE, REQUEST)
-    expect(await source.rolesFor(ALICE, SIGN_IN)).toEqual([])
+    const { fire, error, members } = await setup(list(ALICE), list())
+    await fire('cron', CRON)
+    await fire('cron', CRON)
+    expect(members()).toEqual([])
     expect(error).toHaveBeenCalledOnce()
-    await close()
   })
 
-  it('shares one fetch between sign-ins that arrive together', async () => {
-    const { source, fetch, close } = await setup(list(ALICE.did))
-    await source.rolesFor(ALICE, REQUEST)
-    await Promise.all([source.rolesFor(ALICE, SIGN_IN), source.rolesFor(BOB, SIGN_IN)])
-    expect(fetch).toHaveBeenCalledTimes(2)
-    await close()
-  })
-
-  it('polls every pollMinutes, and stops once closed', async () => {
-    vi.useFakeTimers()
-    const { source, fetch, close } = await setup(list(ALICE.did))
-    await source.rolesFor(ALICE, REQUEST)
-    await vi.advanceTimersByTimeAsync(5 * 60_000)
-    expect(fetch).toHaveBeenCalledTimes(2)
-    await close()
-    await vi.advanceTimersByTimeAsync(60 * 60_000)
-    expect(fetch).toHaveBeenCalledTimes(2)
+  it('shares one fetch between syncs that arrive together', async () => {
+    const { fire, fetch } = await setup(list(ALICE))
+    await Promise.all([fire('signIn:before', signIn(BOB)), fire('cron', CRON)])
+    expect(fetch).toHaveBeenCalledOnce()
   })
 })

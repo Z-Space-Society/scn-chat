@@ -5,7 +5,9 @@ import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
 import { sql } from 'kysely'
 import { type AdminRoutesDeps, adminRoutes } from './admin/routes.ts'
+import { requireApiKey } from './auth/api-keys.ts'
 import { SessionExpired } from './auth/pds.ts'
+import { ADMIN_ROLE } from './auth/roles.ts'
 import {
   type AuthDeps,
   accessGate,
@@ -17,6 +19,7 @@ import {
 import { type BlobRoutesDeps, blobRoutes } from './blobs/routes.ts'
 import { InvalidBody } from './body.ts'
 import type { Config } from './config.ts'
+import { type Cron, CronRunning } from './cron.ts'
 import type { Db } from './db/index.ts'
 import type { AppEnv } from './env.ts'
 import { pdsFailure } from './lex-errors.ts'
@@ -57,6 +60,7 @@ export type AppDeps = {
   sharing?: SharingService
   sync?: SyncRoutesDeps
   admin?: AdminRoutesDeps
+  cron?: Cron
 }
 
 export function createApp(deps: AppDeps) {
@@ -93,6 +97,19 @@ export function createApp(deps: AppDeps) {
       return c.json({ status: 'error' as const }, 503)
     }
   })
+
+  // Key routes come before the routers below, whose middleware wants a session.
+  const cron = deps.cron
+  if (cron)
+    api.post('/cron', requireApiKey({ db, logger }, ADMIN_ROLE), async (c) => {
+      try {
+        return c.json(await cron.run())
+      } catch (err) {
+        if (err instanceof CronRunning)
+          return c.json({ error: 'CronRunning', message: err.message }, 409)
+        throw err
+      }
+    })
 
   if (deps.auth) api.route('/', authApiRoutes(deps.auth))
   if (deps.plugins) api.route('/plugins', pluginRoutes(deps.plugins))

@@ -4,6 +4,7 @@ import { sql } from 'kysely'
 import { z } from 'zod'
 import { type Access, CannotSuspendAdmin } from '../auth/access.ts'
 import { getAccount } from '../auth/accounts.ts'
+import { issueApiKey, listApiKeys, revokeApiKey } from '../auth/api-keys.ts'
 import type { IdentityResolver } from '../auth/identity.ts'
 import { addInvite, listInvites, removeInvite } from '../auth/invites.ts'
 import {
@@ -19,6 +20,7 @@ import {
 import { ADMIN_ROLE, IMPLICIT_ROLE } from '../auth/roles.ts'
 import { requireAdmin, signedInUser } from '../auth/routes.ts'
 import { InvalidBody, jsonBody } from '../body.ts'
+import type { Cron } from '../cron.ts'
 import type { AppEnv } from '../env.ts'
 import type { SettingsStore } from '../settings/store.ts'
 import { type PluginAdminRoutesDeps, pluginAdminRoutes } from './plugin-routes.ts'
@@ -26,6 +28,7 @@ import { settingsAdminRoutes } from './settings-routes.ts'
 
 export type AdminRoutesDeps = PluginAdminRoutesDeps & {
   access: Access
+  cron: Cron
   settings: SettingsStore
   identity: IdentityResolver
 }
@@ -65,6 +68,9 @@ async function roleUses(deps: AdminRoutesDeps, name: string): Promise<string[]> 
   for (const model of models) {
     if ((JSON.parse(model.roles_json) as string[]).includes(name))
       uses.push(`model ${model.provider}/${model.model_id}`)
+  }
+  for (const key of await listApiKeys(deps.db)) {
+    if (key.roles.includes(name)) uses.push(`API key ${key.label}`)
   }
   return uses
 }
@@ -288,11 +294,40 @@ function peopleRoutes(deps: AdminRoutesDeps) {
     })
 }
 
+/** Issuing and revoking API keys. */
+function apiKeyRoutes(deps: AdminRoutesDeps) {
+  return new Hono<AppEnv>()
+    .get('/api-keys', async (c) => c.json({ keys: await listApiKeys(deps.db) }))
+    .post('/api-keys', async (c) => {
+      const body = await jsonBody(
+        c,
+        z.object({ label: z.string().trim().min(1), roles: z.array(z.string()).min(1) }),
+      )
+      const known = await deps.roles.names()
+      const unknown = body.roles.filter((role) => !known.has(role))
+      if (unknown.length)
+        throw new InvalidBody(`No such role: ${unknown.join(', ')}`, [
+          { path: ['roles'], message: `No such role: ${unknown.join(', ')}` },
+        ])
+      const admin = signedInUser(c).did
+      const issued = await issueApiKey(deps.db, body, admin)
+      deps.logger.info({ admin, key: body.label, roles: body.roles }, 'API key issued')
+      return c.json(issued, 201)
+    })
+    .delete('/api-keys/:id', async (c) => {
+      if (!(await revokeApiKey(deps.db, c.req.param('id')))) return c.json(notFound('API key'), 404)
+      deps.logger.info({ admin: signedInUser(c).did, id: c.req.param('id') }, 'API key revoked')
+      return c.json({ ok: true })
+    })
+}
+
 /** Everything in the admin area, for admins only. */
 export function adminRoutes(deps: AdminRoutesDeps) {
   return new Hono<AppEnv>()
     .use(requireAdmin)
     .route('/', peopleRoutes(deps))
+    .route('/', apiKeyRoutes(deps))
+    .get('/cron', async (c) => c.json({ lastRun: await deps.cron.lastRun() }))
     .route('/', pluginAdminRoutes(deps))
     .route('/', settingsAdminRoutes(deps))
 }

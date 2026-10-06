@@ -65,7 +65,7 @@ The plugin the factory returns:
 | `ctx.providers.register(provider)` | Add a model provider. See the providers spec. |
 | `ctx.tools.register(tool)` | Add a tool the model can call. |
 | `ctx.toolSources.register(source)` | Add a source of tools that change at runtime, such as an MCP server. |
-| `ctx.roleSources.register(source)` | Decide role membership outside the database. See the admin spec. |
+| `ctx.roles.syncMembers(role, dids)`, `ctx.roles.addMember(role, did)` | Change a role's members. See the scn-member-registry spec. |
 | `ctx.accounts.suspend(did, { reason })`, `ctx.accounts.restore(did)` | Suspend or restore an account, as the admin spec describes. Each returns whether an account changed. |
 | `ctx.ingesters.register(ingester)` | Add a file ingester. See the attachments spec. |
 | `ctx.hooks.on(name, handler, options?)` | Handle a hook. |
@@ -83,7 +83,6 @@ Registries hold implementations picked by ID or by match. Registering a duplicat
 - **Providers**, picked by provider ID. The providers spec defines the interface.
 - **Tools**, picked by name. A tool has a `name`, a `description`, a zod `inputSchema`, and `run(input, context)`, which returns text or JSON-encodable data. A result that would push the record past the size cap is stored as a blob. The web-search spec adds tool switches, untrusted output, and the tool context's `fetch`, `cite`, and `turnCache`.
 - **Tool sources**, each with `list(user)` and `call(user, name, input)`. Their tools are merged with registered tools, with names prefixed by the source ID.
-- **Role sources**, picked by ID. The admin spec defines them.
 - **Ingesters**, matched by MIME type. The attachments spec defines the interface.
 
 The web search and fetch plugins are the first tools. MCP servers are expected to arrive as tool sources.
@@ -99,6 +98,8 @@ Hooks let many plugins act on the same event. Every payload uses our own normali
 | `turn:after` | action | The finished turn: conversation, user, request, and the written reply |
 | `conversation:created` | action | The new conversation and its owner |
 | `conversation:deleted` | action | The deleted conversation and its owner |
+| `signIn:before` | action | The DID, handle, and PDS of someone signing in, before the access check. See the scn-member-registry spec. |
+| `cron` | action | When the cron run started. See the cron spec. |
 
 - **Filters** run in order, and each handler returns the value the next one receives. A filter that throws fails the turn, which ends with status `error` and an error naming the plugin.
 - **Actions** run in order, and their return values are ignored. An action that throws is logged with the plugin ID, and the turn is unaffected.
@@ -139,7 +140,7 @@ Per-user settings are stored in a `plugin_user_settings` table: DID, plugin ID, 
 - [ ] Options that fail a plugin's schema are reported, naming the option.
 - [ ] Two plugins with the same ID fail to load, naming the ID.
 - [ ] A plugin with an unsupported `apiVersion` fails to load, naming the plugin and version.
-- [ ] Registering a duplicate provider ID, tool name, role source ID, or ingester ID fails to load.
+- [ ] Registering a duplicate provider ID, tool name, or ingester ID fails to load.
 - [ ] A plugin whose `setup` throws contributes none of its registrations.
 - [ ] Filter handlers run in order, with pre before normal before post, and plugin order within each group.
 - [ ] Each filter receives the previous filter's return value.

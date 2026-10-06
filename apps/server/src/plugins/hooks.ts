@@ -70,19 +70,36 @@ export class HookRunner {
     return current
   }
 
-  /** Run every action, logging failures without stopping the others. */
+  /**
+   * Run every action, logging failures without stopping the others, until the signal aborts.
+   * Returns the plugins whose handler threw or didn't get to finish.
+   */
   async action<N extends keyof ActionHooks>(
     name: N,
     payload: ActionHooks[N],
     logger: Logger,
-  ): Promise<void> {
+    signal?: AbortSignal,
+  ): Promise<string[]> {
+    const failed: string[] = []
+    const aborted = new Promise<never>((_, reject) => {
+      if (signal?.aborted) reject(signal.reason)
+      signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
+    })
+    aborted.catch(() => {})
     for (const entry of this.entries.get(name) ?? []) {
+      if (signal?.aborted) {
+        logger.error({ pluginId: entry.pluginId, hook: name }, 'plugin action skipped, out of time')
+        failed.push(entry.pluginId)
+        continue
+      }
       try {
-        await (entry.handler as (p: typeof payload) => unknown)(payload)
+        await Promise.race([(entry.handler as (p: typeof payload) => unknown)(payload), aborted])
       } catch (err) {
         logger.error({ err, pluginId: entry.pluginId, hook: name }, 'plugin action failed')
+        failed.push(entry.pluginId)
       }
     }
+    return failed
   }
 
   /** The resolved handler order for each hook, by plugin ID. */

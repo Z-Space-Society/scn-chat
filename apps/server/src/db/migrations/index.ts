@@ -8,6 +8,7 @@ import * as m0006 from './0006_user_tool_settings.ts'
 import * as m0007 from './0007_admin.ts'
 import * as m0008 from './0008_plugin_instances.ts'
 import * as m0009 from './0009_registration.ts'
+import * as m0010 from './0010_api_keys_and_cron.ts'
 
 /** App migrations in order. Keys sort in the order they run. */
 export const migrations: Record<string, Migration> = {
@@ -20,4 +21,5 @@ export const migrations: Record<string, Migration> = {
   '0007_admin': m0007,
   '0008_plugin_instances': m0008,
   '0009_registration': m0009,
+  '0010_api_keys_and_cron': m0010,
 }

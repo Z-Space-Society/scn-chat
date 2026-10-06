@@ -111,7 +111,8 @@ Context passed to the plugins `setup` handler can include the following data. Pl
 | `ctx.providers.register(provider)` | Add a model provider. |
 | `ctx.tools.register(tool)` | Add a tool the model can call. |
 | `ctx.toolSources.register(source)` | Add a set of tools. |
-| `ctx.roleSources.register(source)` | See [Role sources](#role-sources). |
+| `ctx.roles.syncMembers(role, dids)` | See [Roles](#roles). |
+| `ctx.roles.addMember(role, did)` | See [Roles](#roles). |
 | `ctx.accounts.suspend(did, { reason })` | Suspend an account. |
 | `ctx.accounts.restore(did)` | Restore a suspended account. |
 | `ctx.ingesters.register(ingester)` | Add a file ingester. |
@@ -164,17 +165,13 @@ A tool supports:
 
 The model gets tools listed in `generation.tools`. Defaults to tools the user has switched on.
 
-## Role sources
+## Roles
 
-A role source allows plugins to set role membership on login.
+A plugin can manage role membership itself.
 
-```ts
-ctx.roleSources.register({
-  id: 'members',
-  rolesFor: async ({ did, handle, pdsUrl }, { signIn }) =>
-    (await isMember(did, { fresh: signIn })) ? [options.role] : [],
-})
-```
+- `ctx.roles.syncMembers(role, dids)` remove / add DIDs to a role. Returns the count of adds/removes.
+- `ctx.roles.addMember(role, did)` add one member. An account isn't required to add a DID to a role.
+
 
 See [`plugins/scn-member-registry`](../plugins/scn-member-registry/src/index.ts) as an example.
 
@@ -198,6 +195,8 @@ See [`plugins/pdf-text`](../plugins/pdf-text/src/index.ts) as an example.
 | `turn:after` | action | The completed turn, including the written reply. |
 | `conversation:created` | action | The owner's DID and the conversation URI. |
 | `conversation:deleted` | action | The owner's DID and the conversation URI. |
+| `signIn:before` | action | The DID, handle, and PDS of the user signing in. |
+| `cron` | action | Cron run start time. |
 
 - **Filters:** Each handlers return value is sent to the next filter.
 - **Actions:** Return values are ignored. If an action raises an exception it's logged and the turn and later actions continue.

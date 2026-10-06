@@ -1,10 +1,9 @@
-import type { RoleIdentity } from '@scn-chat/plugin-api'
 import type { Db } from '../db/index.ts'
 import type { Logger } from '../logger.ts'
 import type { SettingsStore } from '../settings/store.ts'
 import { type Account, getAccount, restoreAccount, suspendAccount } from './accounts.ts'
 import { isInvited } from './invites.ts'
-import { ADMIN_ROLE, type Roles } from './roles.ts'
+import { ADMIN_ROLE, type RoleIdentity, type Roles } from './roles.ts'
 
 export const inviteOnlyMessage = (did: string) =>
   `This server is invite-only. Ask an admin to add you, and give them your DID: ${did}`

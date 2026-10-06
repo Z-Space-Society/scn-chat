@@ -52,15 +52,26 @@ describe('HookRunner.action', () => {
       throw new Error('boom')
     })
     hooks.add('conversation:created', 'fine', 1, later)
-    await hooks.action(
+    const failed = await hooks.action(
       'conversation:created',
       { user: 'did:plc:a', conversation: 'at://x' },
       logger,
     )
     expect(later).toHaveBeenCalledOnce()
+    expect(failed).toEqual(['broken'])
     expect(logger.error).toHaveBeenCalledWith(
       expect.objectContaining({ pluginId: 'broken' }),
       expect.anything(),
     )
+  })
+
+  it('stops waiting once the signal aborts, failing the handler running and those not reached', async () => {
+    const hooks = new HookRunner()
+    const skipped = vi.fn()
+    hooks.add('cron', 'slow', 0, () => new Promise(() => {}))
+    hooks.add('cron', 'after', 1, skipped)
+    const failed = await hooks.action('cron', { startedAt: '' }, logger, AbortSignal.timeout(10))
+    expect(failed).toEqual(['slow', 'after'])
+    expect(skipped).not.toHaveBeenCalled()
   })
 })

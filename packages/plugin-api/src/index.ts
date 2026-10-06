@@ -129,21 +129,6 @@ export function matchIngester(ingesters: Ingester[], mimeType: string): Ingester
   return best
 }
 
-// Role sources
-
-/** Who is asking about roles: their DID, verified handle, and PDS. */
-export type RoleIdentity = { did: string; handle?: string | null; pdsUrl: string }
-
-/** Whether roles are being checked for a sign-in, or for a request from someone signed in. */
-export type RoleContext = { signIn: boolean }
-
-/** Decides role membership outside the app database, such as from an external member list. */
-export interface RoleSource {
-  id: string
-  /** The role names the user holds. Asked on every request, so cache slow lookups in the plugin. */
-  rolesFor(identity: RoleIdentity, context: RoleContext): Promise<string[]>
-}
-
 // Hooks
 
 export type TurnContext = {
@@ -173,6 +158,10 @@ export type ActionHooks = {
   'turn:after': TurnContext
   'conversation:created': { user: string; conversation: string }
   'conversation:deleted': { user: string; conversation: string }
+  /** Someone is signing in, before their roles are checked for access. */
+  'signIn:before': { did: string; handle?: string | null; pdsUrl: string }
+  /** A cron run started. */
+  cron: { startedAt: string }
 }
 
 export type HookName = keyof FilterHooks | keyof ActionHooks
@@ -220,7 +209,13 @@ export interface PluginContext<UserSettings = unknown> {
   providers: { register(provider: ModelProvider): void }
   tools: { register<Input>(tool: Tool<Input>): void }
   toolSources: { register(source: ToolSource): void }
-  roleSources: { register(source: RoleSource): void }
+  /** Change a role's members. Each throws for `admin`, a missing role, or an entry that isn't a DID. */
+  roles: {
+    /** Drop members who aren't listed, and add listed DIDs that have an account. */
+    syncMembers(role: string, dids: string[]): Promise<{ added: number; removed: number }>
+    /** Add one member, whether or not they have an account yet. */
+    addMember(role: string, did: string): Promise<void>
+  }
   /** Suspend or restore an account. Each returns whether an account changed. Admins can't be suspended. */
   accounts: {
     suspend(did: string, options?: { reason?: string }): Promise<boolean>
