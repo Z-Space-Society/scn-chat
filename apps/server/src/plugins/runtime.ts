@@ -1,4 +1,5 @@
 import type { Logger, Plugin } from '@scn-chat/plugin-api'
+import type { z } from 'zod'
 import { describeIssues, type Issue, issuesOf } from '../body.ts'
 import type { ModelCatalog } from '../providers/catalog.ts'
 import { safeErrorMessage } from '../safe-error.ts'
@@ -40,6 +41,10 @@ export type RuntimeBuilderDeps = {
   logger: Logger
 }
 
+/** The schema with unknown keys ignored, so options a plugin dropped in an upgrade don't break it. */
+const lenient = (schema: z.ZodType): z.ZodType =>
+  'strip' in schema && typeof schema.strip === 'function' ? (schema.strip() as z.ZodType) : schema
+
 /** Validate an instance's options and call its plugin's factory. */
 export function instantiate(installed: InstalledPlugins, instance: PluginInstance): Plugin {
   const found = installed.get(instance.package)
@@ -50,7 +55,7 @@ export function instantiate(installed: InstalledPlugins, instance: PluginInstanc
     )
   let options: unknown = { ...instance.options, ...instance.secrets }
   if (found.optionsSchema) {
-    const result = found.optionsSchema.safeParse(options)
+    const result = lenient(found.optionsSchema).safeParse(options)
     if (!result.success) {
       const issues = issuesOf(result.error)
       throw new PluginInstanceError(

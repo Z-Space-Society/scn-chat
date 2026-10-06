@@ -13,21 +13,13 @@ export const optionsSchema = z
       secret: true,
     }),
     role: z.string().min(1).default('scn-member').meta({ title: 'Role for members' }),
-    // setTimeout can't wait longer than about 24.8 days, and fires at once past that.
-    pollMinutes: z
-      .number()
-      .int()
-      .min(1)
-      .max(35_000)
-      .default(5)
-      .meta({ title: 'Minutes between checks' }),
   })
   .strict()
 
 export type ScnMemberRegistryOptions = z.input<typeof optionsSchema>
 
 const LIST_MEMBERS = 'network.sharedcomputer.membership.listMembers'
-// Inside core's 10 second limit on a role source, so a sign-in can fall back to the last list.
+// Inside core's 10 second wait for sign-in hooks.
 const FETCH_TIMEOUT_MS = 8_000
 
 const memberList = z.object({ members: z.array(z.object({ did: z.string() })) })
@@ -48,11 +40,9 @@ export default function scnMemberRegistry(config: ScnMemberRegistryOptions) {
     apiVersion: 1,
     setup(ctx) {
       const closed = new AbortController()
-      let members: Set<string> | undefined
-      let inFlight: Promise<void> | undefined
-      let timer: NodeJS.Timeout | undefined
+      let inFlight: Promise<Set<string> | undefined> | undefined
 
-      async function fetchMembers(): Promise<Set<string>> {
+      async function fetchMembers(): Promise<string[]> {
         const url = new URL(`/xrpc/${LIST_MEMBERS}`, options.url)
         url.searchParams.set('activeOnly', 'true')
         url.searchParams.set('token', options.token)
@@ -66,50 +56,40 @@ export default function scnMemberRegistry(config: ScnMemberRegistryOptions) {
         }
         const parsed = memberList.safeParse(body)
         if (!parsed.success) throw new Error('The response is not a member list')
-        return new Set(parsed.data.members.map((member) => member.did))
+        return parsed.data.members.map((member) => member.did)
       }
 
-      /** Fetch the member list, joining a fetch already running, then schedule the next one. */
-      function refresh(): Promise<void> {
+      /** Bring the role in line with the registry, joining a sync already running. */
+      function sync(): Promise<Set<string> | undefined> {
         inFlight ??= (async () => {
           try {
-            const next = await fetchMembers()
-            if (next.size === 0 && members?.size)
+            const dids = await fetchMembers()
+            const { removed } = await ctx.roles.syncMembers(options.role, dids)
+            if (dids.length === 0 && removed > 0)
               ctx.logger.error(
-                { previous: members.size },
+                { removed },
                 'The SCN member registry returned no members, so every member lost the role',
               )
-            members = next
+            return new Set(dids)
           } catch (err) {
             if (!closed.signal.aborted)
               ctx.logger.warn(
                 { error: describe(err) },
-                'Could not fetch the SCN member list, keeping the previous one',
+                'Could not sync the SCN member list, keeping the stored members',
               )
+            return undefined
           } finally {
             inFlight = undefined
-            clearTimeout(timer)
-            if (!closed.signal.aborted)
-              timer = setTimeout(refresh, options.pollMinutes * 60_000).unref()
           }
         })()
         return inFlight
       }
 
-      const first = refresh()
-
-      ctx.roleSources.register({
-        id: 'scn-member-registry',
-        async rolesFor({ did }, { signIn }) {
-          await (signIn ? refresh() : members ? undefined : first)
-          return members?.has(did) ? [options.role] : []
-        },
+      ctx.hooks.on('cron', async () => void (await sync()))
+      ctx.hooks.on('signIn:before', async ({ did }) => {
+        if ((await sync())?.has(did)) await ctx.roles.addMember(options.role, did)
       })
-
-      ctx.onClose(() => {
-        closed.abort()
-        clearTimeout(timer)
-      })
+      ctx.onClose(() => closed.abort())
     },
   })
 }

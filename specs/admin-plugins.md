@@ -65,7 +65,7 @@ interface RuntimeHolder {
 Every change to plugin instances, whether adding, editing, reordering, enabling, disabling, or deleting, goes through one path, one change at a time:
 
 1. Build a candidate runtime from the full proposed instance list, the same way startup does, recording each instance that fails.
-2. Refuse the change, with 400 and nothing changed, when the changed instance failed, or an instance that is loaded now would fail, or a loaded instance's plugin ID would change. Invalid options come back with `{ error: 'InvalidRequest', issues }`, with issue paths pointing at option fields. Refinements that span fields, like web search requiring a key for Brave, come back the same way. A factory or `setup` that throws, a duplicate plugin ID, a duplicate provider, tool, role source, or ingester, or an unsupported plugin API version comes back as the message.
+2. Refuse the change, with 400 and nothing changed, when the changed instance failed, or an instance that is loaded now would fail, or a loaded instance's plugin ID would change. Invalid options come back with `{ error: 'InvalidRequest', issues }`, with issue paths pointing at option fields. Refinements that span fields, like web search requiring a key for Brave, come back the same way. A factory or `setup` that throws, a duplicate plugin ID, a duplicate provider, tool, or ingester, or an unsupported plugin API version comes back as the message.
 3. Check the admin models against the candidate, as described below. A model left without its provider refuses the change.
 4. Write the instances in one transaction, then swap the candidate in. A refused candidate is closed.
 
@@ -120,7 +120,7 @@ Two sections join the admin sidebar:
 - **Plugins** (`/admin/plugins`). The instances in load order, each with its name linking to its page, its package, its status and error, and up and down buttons, then an "Add plugin" link.
 - **A plugin's page** (`/admin/plugins/:id`). A link back to the list, the plugin's status and error, the options form generated from the schema with `SchemaFields`, an Enabled checkbox, Save, and "Remove plugin", which goes back to the list. Each plugin saves on its own, since each save rebuilds the runtime and can fail on its own. Secret fields show "set" when a value is stored, and a "Clear" checkbox.
 - **Adding a plugin** (`/admin/plugins/new`). A link back to the list, a picker of the installed packages that aren't added yet or allow more than one instance, the chosen package's description and form, and Add, which opens the new plugin's page.
-- **Models on a provider's page.** A provider plugin's page lists its admin models below the options form, each with name, capabilities, roles, and Remove, plus the Refresh button and the list of models to tick. Models save through the models routes, separately from the plugin's options.
+- **Models on a provider's page.** A provider plugin's page shows a table of its admin models below the options form, with each one's name, ID, capabilities, roles, and whether it's the default, plus the Refresh button and the list of models to tick. Each model links to its own page (`/admin/plugins/<id>/model?provider=…&id=…`), which edits its name, capabilities, and roles and removes it. Models save through the models routes, separately from the plugin's options.
 - **Models** (`/admin/models`). The admin models from every provider in one list, for picking the default and setting the order across providers, with a link to each model's provider block.
 
 Admin option forms support the same JSON Forms rules as user settings. Web search adds rules to its options, showing `apiKey` for engines that need a key and `baseURL` for SearXNG.
@@ -143,6 +143,7 @@ Admin option forms support the same JSON Forms rules as user settings. Web searc
 
 ## Edge Cases and Decisions
 
+- Options are validated without the schema's own check for unknown keys, so an option a plugin drops in an upgrade is ignored rather than breaking the plugin, and the admin form leaves it out on the next save.
 - Saving is strict and startup is lenient. A save that would break a plugin is refused, but a plugin that breaks at startup, for example after an upgrade, is skipped so the admin area stays reachable to fix it.
 - A plugin ID can't change through an edit, because records and user data refer to it.
 - Turns acquire one runtime for their whole run, so a save mid-turn never changes the tools or hooks a turn is using.

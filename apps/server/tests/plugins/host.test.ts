@@ -19,6 +19,8 @@ beforeEach(() => {
     userSettings: vi.fn(async () => ({ enabled: true })),
     suspendAccount: vi.fn(async () => true),
     restoreAccount: vi.fn(async () => true),
+    syncRoleMembers: vi.fn(async () => ({ added: 0, removed: 0 })),
+    addRoleMember: vi.fn(async () => {}),
   }
 })
 
@@ -74,7 +76,6 @@ describe('loadPlugins', () => {
           ingest: async () => ({ text: '' }),
         }),
     ],
-    ['role source', (ctx) => ctx.roleSources.register({ id: 'members', rolesFor: async () => [] })],
   ])('fails when two plugins register the same %s', async (_kind, setup) => {
     await expect(
       loadPlugins([plugin('a', setup), plugin('b', setup)], { services, logger, app }),
@@ -194,6 +195,24 @@ describe('loadPlugins with onFailure', () => {
       'Application revoked',
     )
     expect(services.restoreAccount).toHaveBeenCalledWith('did:plc:bob', 'plugin:members')
+  })
+
+  it("changes a role's members on the plugin's behalf", async () => {
+    await loadPlugins(
+      [
+        plugin('members', async (ctx) => {
+          await ctx.roles.syncMembers('staff', ['did:plc:bob'])
+          await ctx.roles.addMember('staff', 'did:plc:carol')
+        }),
+      ],
+      { services, logger, app },
+    )
+    expect(services.syncRoleMembers).toHaveBeenCalledWith(
+      'staff',
+      ['did:plc:bob'],
+      'plugin:members',
+    )
+    expect(services.addRoleMember).toHaveBeenCalledWith('staff', 'did:plc:carol', 'plugin:members')
   })
 
   it('reads the app name live', async () => {

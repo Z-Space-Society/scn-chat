@@ -150,6 +150,20 @@ function stubServer(overrides: Record<string, Handler> = {}) {
           },
         ],
       })
+    if (path === '/api/admin/api-keys')
+      return Response.json({
+        keys: [
+          {
+            id: 'k1',
+            label: 'old',
+            roles: ['admin'],
+            createdBy: 'did:plc:boss',
+            createdAt: '2026-01-01T00:00:00Z',
+            lastUsedAt: null,
+          },
+        ],
+      })
+    if (path === '/api/admin/cron') return Response.json({ lastRun: null })
     if (path === '/api/admin/settings')
       return Response.json({
         settings: [
@@ -237,12 +251,13 @@ describe('AdminPage users', () => {
 })
 
 describe('AdminPage roles', () => {
-  it('saves a role', async () => {
+  it('opens a role from the summary and saves it', async () => {
     const fetch = stubServer()
-    renderAt('/roles')
-    const member = await screen.findByRole('group', { name: 'member' })
-    await userEvent.type(within(member).getByLabelText(/Handle domains/), 'example.com')
-    await userEvent.click(within(member).getByRole('button', { name: 'Save' }))
+    const location = renderAt('/roles')
+    await userEvent.click(await screen.findByRole('link', { name: 'member' }))
+    expect(location.history?.at(-1)).toBe('/admin/roles/member')
+    await userEvent.type(await screen.findByLabelText(/Handle domains/), 'example.com')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() =>
       expect(callsTo(fetch, 'PATCH', '/api/admin/roles/member')).toEqual([
         { description: 'Members', pdsHosts: ['pds.example.com'], handleDomains: ['example.com'] },
@@ -250,25 +265,33 @@ describe('AdminPage roles', () => {
     )
   })
 
-  it('adds a member by handle and creates a role', async () => {
+  it('adds a member by handle', async () => {
     const fetch = stubServer()
-    renderAt('/roles')
+    renderAt('/roles/member')
     await userEvent.type(await screen.findByLabelText('Add a member to member'), 'carol.test')
-    await userEvent.click(
-      within(screen.getByRole('group', { name: 'member' })).getByRole('button', {
-        name: 'Add member',
-      }),
-    )
+    await userEvent.click(screen.getByRole('button', { name: 'Add member' }))
     await waitFor(() =>
       expect(callsTo(fetch, 'POST', '/api/admin/roles/member/members')).toEqual([
         { identifier: 'carol.test' },
       ]),
     )
-    await userEvent.type(screen.getByLabelText('Role name'), 'x')
+  })
+
+  it('creates a role and opens its page', async () => {
+    const fetch = stubServer()
+    const location = renderAt('/roles')
+    await userEvent.type(await screen.findByLabelText('Role name'), 'x')
     await userEvent.click(screen.getByRole('button', { name: 'Create role' }))
-    await waitFor(() =>
-      expect(callsTo(fetch, 'POST', '/api/admin/roles')).toEqual([{ name: 'x', description: '' }]),
-    )
+    await waitFor(() => expect(location.history?.at(-1)).toBe('/admin/roles/x'))
+    expect(callsTo(fetch, 'POST', '/api/admin/roles')).toEqual([{ name: 'x', description: '' }])
+  })
+
+  it('deletes a role and goes back to the list', async () => {
+    const fetch = stubServer()
+    const location = renderAt('/roles/member')
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete role' }))
+    await waitFor(() => expect(location.history?.at(-1)).toBe('/admin/roles'))
+    expect(callsTo(fetch, 'DELETE', '/api/admin/roles/member')).toHaveLength(1)
   })
 })
 
@@ -363,10 +386,9 @@ describe('AdminPage plugin page', () => {
   it('saves a plugin with its options, clearing a secret', async () => {
     const fetch = stubServer()
     renderAt('/plugins/i1')
-    // The first Name field is the plugin's. The model editors below have their own.
-    const [name] = await screen.findAllByLabelText('Name')
-    await userEvent.clear(name as HTMLElement)
-    await userEvent.type(name as HTMLElement, 'Shared Computer')
+    const name = await screen.findByLabelText('Name')
+    await userEvent.clear(name)
+    await userEvent.type(name, 'Shared Computer')
     await userEvent.click(screen.getByRole('checkbox', { name: 'Clear' }))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() =>
@@ -377,6 +399,23 @@ describe('AdminPage plugin page', () => {
           clearSecrets: ['apiKey'],
         },
       ]),
+    )
+  })
+
+  it('drops stored options the plugin no longer has when saving', async () => {
+    const fetch = stubServer({
+      'GET /api/admin/plugins': () =>
+        Response.json({
+          instances: [{ ...instance, options: { ...instance.options, pollMinutes: 5 } }],
+        }),
+    })
+    renderAt('/plugins/i1')
+    await userEvent.click(await screen.findByRole('button', { name: 'Save' }))
+    await waitFor(() =>
+      expect(callsTo(fetch, 'PUT', '/api/admin/plugins/i1')[0]?.options).toEqual({
+        id: 'scn',
+        name: 'SCN',
+      }),
     )
   })
 
@@ -434,6 +473,48 @@ describe('AdminPage plugin page', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Remove plugin' }))
     await waitFor(() => expect(location.history?.at(-1)).toBe('/admin/plugins'))
     expect(callsTo(fetch, 'DELETE', '/api/admin/plugins/i1')).toHaveLength(1)
+  })
+})
+
+describe('AdminPage model page', () => {
+  const ollama = {
+    provider: 'scn',
+    id: 'meta/llama3:8b',
+    name: 'Llama 3',
+    capabilities: caps,
+    roles: ['user'],
+    default: false,
+    warning: null,
+  }
+
+  it('opens a model from its provider summary and saves it', async () => {
+    const fetch = stubServer({ 'GET /api/admin/models': () => Response.json({ models: [ollama] }) })
+    renderAt('/plugins/i1')
+    await userEvent.click(await screen.findByRole('link', { name: 'Llama 3' }))
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'tools' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() =>
+      expect(callsTo(fetch, 'PUT', '/api/admin/models')).toEqual([
+        {
+          provider: 'scn',
+          id: 'meta/llama3:8b',
+          name: 'Llama 3',
+          capabilities: { ...caps, tools: true },
+          roles: ['user'],
+          default: false,
+        },
+      ]),
+    )
+  })
+
+  it('removes a model and goes back to its plugin', async () => {
+    const fetch = stubServer({ 'GET /api/admin/models': () => Response.json({ models: [ollama] }) })
+    const location = renderAt('/plugins/i1/model?provider=scn&id=meta%2Fllama3%3A8b')
+    await userEvent.click(await screen.findByRole('button', { name: 'Remove model' }))
+    await waitFor(() => expect(location.history?.at(-1)).toBe('/admin/plugins/i1'))
+    expect(callsTo(fetch, 'DELETE', '/api/admin/models')).toEqual([
+      { provider: 'scn', id: 'meta/llama3:8b' },
+    ])
   })
 })
 
@@ -499,6 +580,33 @@ describe('AdminPage models', () => {
         },
       ]),
     )
+  })
+})
+
+describe('AdminPage API keys', () => {
+  it('issues a key, shows it once, and revokes one', async () => {
+    const fetch = stubServer({
+      'POST /api/admin/api-keys': () =>
+        Response.json({ id: 'k2', key: 'scn_secret' }, { status: 201 }),
+    })
+    renderAt('/api-keys')
+    await userEvent.type(await screen.findByLabelText('Key label'), 'crontab')
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'admin' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Issue key' }))
+    expect(await screen.findByText('scn_secret')).toBeInTheDocument()
+    expect(callsTo(fetch, 'POST', '/api/admin/api-keys')).toEqual([
+      { label: 'crontab', roles: ['admin'] },
+    ])
+    await userEvent.click(screen.getByRole('button', { name: 'Revoke' }))
+    await waitFor(() => expect(callsTo(fetch, 'DELETE', '/api/admin/api-keys/k1')).toHaveLength(1))
+  })
+})
+
+describe('AdminPage cron', () => {
+  it('warns when cron has never run', async () => {
+    stubServer()
+    renderAt('/cron')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Cron has never run')
   })
 })
 

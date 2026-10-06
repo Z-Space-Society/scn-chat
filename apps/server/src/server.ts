@@ -4,12 +4,14 @@ import { type Account, getAccount } from './auth/accounts.ts'
 import { createIdentityResolver, type IdentityResolver } from './auth/identity.ts'
 import { createOAuthClient, type OAuthClientLike } from './auth/oauth-client.ts'
 import { createPdsClientFactory } from './auth/pds.ts'
-import { Roles } from './auth/roles.ts'
+import { addPluginMember, syncMembers } from './auth/role-store.ts'
+import { type RoleIdentity, Roles } from './auth/roles.ts'
 import { buildScope } from './auth/scope.ts'
 import { sweepExpired } from './auth/web-session.ts'
 import { turnBlobs } from './blobs/routes.ts'
 import { createBlobStores } from './blobs/store.ts'
 import type { Config } from './config.ts'
+import { Cron } from './cron.ts'
 import type { Db } from './db/index.ts'
 import { migrateToLatest } from './db/migrate.ts'
 import type { Logger } from './logger.ts'
@@ -34,6 +36,9 @@ import { RecentWrites } from './sync/recent-writes.ts'
 import { startSyncScheduler } from './sync/scheduler.ts'
 import { TurnRunner } from './turns/runner.ts'
 import { StreamHub } from './turns/stream-hub.ts'
+
+/** How long sign-in waits for the plugins' signIn:before handlers. */
+const SIGN_IN_HOOK_LIMIT_MS = 10_000
 
 export type ServerDeps = {
   config: Config
@@ -74,12 +79,7 @@ export async function createServer(deps: ServerDeps) {
     if (!holder) throw new Error('Plugins are not ready yet')
     return holder.current()
   }
-  const roles = new Roles({
-    db,
-    adminDids: new Set(config.adminDids),
-    sources: () => (holder ? holder.current().host.roleSources.list() : []),
-    logger,
-  })
+  const roles = new Roles({ db, adminDids: new Set(config.adminDids) })
   const access = new Access({ db, roles, settings, logger })
   const hasAccess = (did: string) => access.hasAccess(did)
 
@@ -97,6 +97,8 @@ export async function createServer(deps: ServerDeps) {
     userSettings: (plugin, user) => readUserSettings(db, box, user, plugin),
     suspendAccount: (did, by, reason) => access.suspend(did, by, reason),
     restoreAccount: (did, by) => access.restore(did, by),
+    syncRoleMembers: (role, dids, by) => syncMembers(db, role, dids, by),
+    addRoleMember: (role, did, by) => addPluginMember(db, role, did, by),
   }
   const load = {
     services: pluginServices,
@@ -202,13 +204,33 @@ export async function createServer(deps: ServerDeps) {
     void background()
   }
 
+  const cron = new Cron({ db, plugins: holder, logger })
+  const beforeSignIn = async (identity: RoleIdentity) => {
+    const lease = holder.acquire()
+    await lease.runtime.host.hooks
+      .action('signIn:before', identity, logger, AbortSignal.timeout(SIGN_IN_HOOK_LIMIT_MS))
+      .finally(() => lease.release())
+  }
+
   const app = createApp({
     config,
     db,
     logger,
     settings,
     webDist: deps.webDist,
-    auth: { config, db, logger, oauth, identity, roles, access, settings, scope, onLogin },
+    auth: {
+      config,
+      db,
+      logger,
+      oauth,
+      identity,
+      roles,
+      access,
+      settings,
+      scope,
+      beforeSignIn,
+      onLogin,
+    },
     plugins: { db, box, host: () => runtime().host },
     storage: {
       db,
@@ -238,7 +260,8 @@ export async function createServer(deps: ServerDeps) {
       resolveSigningKey: identity.resolveSigningKey,
       logger,
     },
-    admin: { db, roles, access, settings, identity, plugins, runtime, logger },
+    admin: { db, roles, access, cron, settings, identity, plugins, runtime, logger },
+    cron,
   })
 
   const stops: (() => void)[] = []

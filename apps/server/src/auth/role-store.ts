@@ -1,3 +1,4 @@
+import { isValidDid } from '@atproto/syntax'
 import type { Db } from '../db/index.ts'
 import { ADMIN_ROLE } from './roles.ts'
 
@@ -100,4 +101,68 @@ export async function removeMember(db: Db, role: string, did: string): Promise<b
     .where('did', '=', did)
     .executeTakeFirst()
   return result.numDeletedRows > 0n
+}
+
+/** Refuse a plugin's change to `admin`, to a role that doesn't exist, or with an entry that isn't a DID. */
+async function checkPluginChange(db: Db, role: string, dids: string[]) {
+  if (role === ADMIN_ROLE) throw new Error(`Plugins can't change the "${ADMIN_ROLE}" role`)
+  const invalid = dids.find((did) => !isValidDid(did))
+  if (invalid !== undefined) throw new Error(`"${invalid}" is not a valid DID`)
+  if (!(await roleExists(db, role))) throw new Error(`There is no role named "${role}"`)
+}
+
+/** Batches that stay under the databases' limits on bound parameters. */
+const batches = <T>(list: T[], size = 500) =>
+  Array.from({ length: Math.ceil(list.length / size) }, (_, i) =>
+    list.slice(i * size, (i + 1) * size),
+  )
+
+/**
+ * Bring a role in line with an outside list, on behalf of `by`, such as plugin:<id>. Drops
+ * members who aren't listed and adds listed DIDs that have an account.
+ */
+export async function syncMembers(
+  db: Db,
+  role: string,
+  dids: string[],
+  by: string,
+): Promise<{ added: number; removed: number }> {
+  await checkPluginChange(db, role, dids)
+  const listed = new Set(dids)
+  return db.transaction().execute(async (tx) => {
+    const current = new Set(
+      (await tx.selectFrom('role_member').select('did').where('role', '=', role).execute()).map(
+        (row) => row.did,
+      ),
+    )
+    const stale = [...current].filter((did) => !listed.has(did))
+    const fresh: string[] = []
+    for (const batch of batches([...listed].filter((did) => !current.has(did)))) {
+      const accounts = await tx
+        .selectFrom('account')
+        .select('did')
+        .where('did', 'in', batch)
+        .execute()
+      fresh.push(...accounts.map((row) => row.did))
+    }
+    for (const batch of batches(stale))
+      await tx
+        .deleteFrom('role_member')
+        .where('role', '=', role)
+        .where('did', 'in', batch)
+        .execute()
+    const now = new Date().toISOString()
+    for (const batch of batches(fresh))
+      await tx
+        .insertInto('role_member')
+        .values(batch.map((did) => ({ role, did, added_at: now, added_by: by })))
+        .execute()
+    return { added: fresh.length, removed: stale.length }
+  })
+}
+
+/** Add one member on a plugin's behalf, whether or not they have an account yet. */
+export async function addPluginMember(db: Db, role: string, did: string, by: string) {
+  await checkPluginChange(db, role, [did])
+  await addMember(db, role, did, by)
 }

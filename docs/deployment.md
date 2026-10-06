@@ -18,4 +18,9 @@
    - `NODE_ENV` to `production` or `development`.
 3. Start it with `docker compose up -d --build` (For dev, `pnpm dev`).
 4. Point the reverse proxy at `http://127.0.0.1:3000`, if applicable.
-5. Sign in as an admin and open the admin area, from Settings > Admin. Add your plugins and models.
+5. Sign in and open the admin area, from Settings > Admin. Configure your plugins and models. Note that a model provider plugin will need to be enabled before models can be configured.
+6. Set up cron. Issue a key with the `admin` role under Admin > API keys. Then setup cron as so:
+
+   ```
+   */5 * * * * curl -fsS -X POST -H "Authorization: Bearer <key>" https://chat.example.com/api/cron
+   ```

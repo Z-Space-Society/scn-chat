@@ -20,7 +20,7 @@ import {
 import type { IdentityResolver } from './identity.ts'
 import { removeInvite } from './invites.ts'
 import type { OAuthClientLike } from './oauth-client.ts'
-import { ADMIN_ROLE, type Roles } from './roles.ts'
+import { ADMIN_ROLE, type RoleIdentity, type Roles } from './roles.ts'
 import { scopeAllowsSpaces } from './scope.ts'
 import {
   createWebSession,
@@ -40,6 +40,8 @@ export type AuthDeps = {
   access: Access
   settings: SettingsStore
   scope: string
+  /** Runs before the access check, so plugins can update roles first. */
+  beforeSignIn?: (identity: RoleIdentity) => Promise<void>
   /** Runs after each login to set up the user's storage. */
   onLogin?: (account: Account) => Promise<void>
 }
@@ -65,6 +67,9 @@ const isLocalPath = (path: string) => /^\/(?![/\\])/.test(path)
 
 /** Is this the path of a shared chat, where anyone may sign in as a viewer? */
 const isSharePath = (path: string) => /^\/s\/[^/]+\/[^/]+$/.test(path)
+
+/** API paths opened to API keys, which never use the session cookie. */
+const API_KEY_PATHS = [/^\/api\/cron$/]
 
 /** API paths a viewer may use. */
 const VIEWER_PATHS = [/^\/api\/me$/, /^\/api\/logout$/, /^\/api\/shared\//, /^\/api\/health$/]
@@ -141,11 +146,16 @@ export const requireAdmin: MiddlewareHandler<AppEnv> = async (c, next) => {
   await next()
 }
 
-/** Refuse state-changing API requests from other origins. */
+/** Refuse state-changing API requests from other origins, except on routes opened to API keys. */
 export function originCheck(config: Config): MiddlewareHandler<AppEnv> {
   const allowed = new URL(config.publicUrl).origin
   return async (c, next) => {
-    if (c.req.method !== 'GET' && c.req.method !== 'HEAD' && c.req.header('origin') !== allowed) {
+    if (
+      c.req.method !== 'GET' &&
+      c.req.method !== 'HEAD' &&
+      c.req.header('origin') !== allowed &&
+      !API_KEY_PATHS.some((path) => path.test(c.req.path))
+    ) {
       return c.json({ error: 'Forbidden', message: 'Cross-origin request refused' }, 403)
     }
     await next()
@@ -212,7 +222,8 @@ export function oauthRoutes(deps: AuthDeps) {
         const { scope } = await session.getTokenInfo(false)
         const identity = await deps.identity.resolve(session.did)
         const existing = await getAccount(deps.db, session.did)
-        const roles = await deps.roles.rolesFor(identity, { signIn: true })
+        await deps.beforeSignIn?.(identity)
+        const roles = await deps.roles.rolesFor(identity)
         const full = await deps.access.allowsSignIn(session.did, existing, roles)
         if (!full && !(next && isSharePath(next)))
           throw new AccessDenied(await deps.access.deniedMessage(session.did, existing, roles))

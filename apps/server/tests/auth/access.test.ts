@@ -1,11 +1,12 @@
-import type { RoleSource } from '@scn-chat/plugin-api'
 import pino from 'pino'
 import { describe, expect, it, vi } from 'vitest'
 import { createApp } from '../../src/app.ts'
 import { Access, CannotSuspendAdmin } from '../../src/auth/access.ts'
 import { getAccount, recordLogin } from '../../src/auth/accounts.ts'
 import { addInvite, isInvited } from '../../src/auth/invites.ts'
-import { addMember, createRole } from '../../src/auth/role-store.ts'
+import { addMember, addPluginMember, createRole } from '../../src/auth/role-store.ts'
+import type { RoleIdentity } from '../../src/auth/roles.ts'
+import type { Db } from '../../src/db/index.ts'
 import { migrateToLatest } from '../../src/db/migrate.ts'
 import type { Settings } from '../../src/settings/schemas.ts'
 import {
@@ -24,18 +25,28 @@ const SHARE = '/s/did:plc:owner/3aaaaaaaaaaaa'
 const logger = pino({ level: 'silent' })
 
 /** An app whose sign-ins are for whichever DID `as` names. */
-async function setup(values: Partial<Settings> = {}, sources: RoleSource[] = []) {
+async function setup(
+  values: Partial<Settings> = {},
+  beforeSignIn?: (db: Db, identity: RoleIdentity) => Promise<void>,
+) {
   const db = createSqliteDb()
   await migrateToLatest(db)
   const settings = testSettings(db, values)
-  const roles = testRoles(db, { sources: () => sources })
+  const roles = testRoles(db)
   const access = new Access({ db, roles, settings, logger })
   const onLogin = vi.fn(async () => {})
   let as = 'did:plc:alice'
   const oauth = fakeOAuth({
     callback: vi.fn(async () => ({ session: fakeSession(as, 'atproto'), state: LOGIN_STATE })),
   })
-  const auth = authDeps(db, { oauth, roles, access, settings, onLogin })
+  const auth = authDeps(db, {
+    oauth,
+    roles,
+    access,
+    settings,
+    onLogin,
+    beforeSignIn: beforeSignIn && ((identity) => beforeSignIn(db, identity)),
+  })
   const app = createApp({ config: testConfig(), db, logger, auth })
   const signIn = (did = 'did:plc:alice', next?: string) => {
     as = did
@@ -76,27 +87,13 @@ describe('registration modes', () => {
     expect(errorOf(await signIn('did:plc:carol'))).toContain('did:plc:carol')
   })
 
-  it('in invite mode counts roles a role source grants', async () => {
+  it('in invite mode counts a role set before the access check', async () => {
     const { db, signIn } = await setup(
       { access: { registration: 'invite', inviteRoles: ['member'] } },
-      [
-        {
-          id: 'applications',
-          rolesFor: async ({ did }) => (did === 'did:plc:alice' ? ['member'] : []),
-        },
-      ],
+      (db, { did }) => addPluginMember(db, 'member', did, 'plugin:members'),
     )
     await createRole(db, { name: 'member', description: '' })
     expect((await signIn()).headers.get('location')).toBe('/')
-  })
-
-  it('tells role sources whether they are asked for a sign-in or a request', async () => {
-    const rolesFor = vi.fn(async () => [])
-    const { signIn, chats } = await setup({}, [{ id: 'members', rolesFor }])
-    const cookie = sessionCookie(await signIn())
-    expect(rolesFor).toHaveBeenLastCalledWith(expect.anything(), { signIn: true })
-    await chats(cookie)
-    expect(rolesFor).toHaveBeenLastCalledWith(expect.anything(), { signIn: false })
   })
 
   it('in closed mode lets in only added people and admins', async () => {

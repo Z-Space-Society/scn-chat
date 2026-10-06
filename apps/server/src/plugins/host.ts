@@ -10,7 +10,6 @@ import {
   PLUGIN_API_VERSION,
   type Plugin,
   type PluginContext,
-  type RoleSource,
   type Tool,
   type ToolSource,
 } from '@scn-chat/plugin-api'
@@ -37,6 +36,13 @@ export type PluginServices = {
   /** Suspend or restore an account on behalf of `by`, such as plugin:<id>. */
   suspendAccount(did: string, by: string, reason?: string): Promise<boolean>
   restoreAccount(did: string, by: string): Promise<boolean>
+  /** Change a role's members on behalf of `by`, such as plugin:<id>. */
+  syncRoleMembers(
+    role: string,
+    dids: string[],
+    by: string,
+  ): Promise<{ added: number; removed: number }>
+  addRoleMember(role: string, did: string, by: string): Promise<void>
 }
 
 export type PluginHost = {
@@ -44,7 +50,6 @@ export type PluginHost = {
   providers: Registry<ModelProvider>
   tools: Registry<Tool<never>>
   toolSources: Registry<ToolSource>
-  roleSources: Registry<RoleSource>
   ingesters: IngesterRegistry
   hooks: HookRunner
   close(): Promise<void>
@@ -70,7 +75,6 @@ type Staged = {
   providers: ModelProvider[]
   tools: Tool<never>[]
   toolSources: ToolSource[]
-  roleSources: RoleSource[]
   ingesters: Ingester[]
   hooks: { name: HookName; handler: HookHandler<HookName>; order?: HookOrder }[]
   closers: Closer[]
@@ -110,7 +114,6 @@ export async function loadPlugins(
     providers: new Registry('provider', (provider) => provider.id),
     tools: new Registry('tool', (tool) => tool.name),
     toolSources: new Registry('tool source', (source) => source.id),
-    roleSources: new Registry('role source', (source) => source.id),
     ingesters: new IngesterRegistry(),
     hooks: new HookRunner(),
     close: () => runClosers(closers, deps.logger),
@@ -121,7 +124,6 @@ export async function loadPlugins(
       providers: [],
       tools: [],
       toolSources: [],
-      roleSources: [],
       ingesters: [],
       hooks: [],
       closers: [],
@@ -130,7 +132,11 @@ export async function loadPlugins(
       providers: { register: (provider) => void staged.providers.push(provider) },
       tools: { register: (tool) => void staged.tools.push(tool as Tool<never>) },
       toolSources: { register: (source) => void staged.toolSources.push(source) },
-      roleSources: { register: (source) => void staged.roleSources.push(source) },
+      roles: {
+        syncMembers: (role, dids) =>
+          deps.services.syncRoleMembers(role, dids, `plugin:${plugin.id}`),
+        addMember: (role, did) => deps.services.addRoleMember(role, did, `plugin:${plugin.id}`),
+      },
       accounts: {
         suspend: (did, suspension) =>
           deps.services.suspendAccount(did, `plugin:${plugin.id}`, suspension?.reason),
@@ -162,7 +168,6 @@ export async function loadPlugins(
       host.providers.assertFree(staged.providers, plugin.id)
       host.tools.assertFree(staged.tools, plugin.id)
       host.toolSources.assertFree(staged.toolSources, plugin.id)
-      host.roleSources.assertFree(staged.roleSources, plugin.id)
       host.ingesters.assertFree(staged.ingesters, plugin.id)
     } catch (err) {
       await runClosers(staged.closers, deps.logger)
@@ -176,7 +181,6 @@ export async function loadPlugins(
     for (const provider of staged.providers) host.providers.register(provider, plugin.id)
     for (const tool of staged.tools) host.tools.register(tool, plugin.id)
     for (const source of staged.toolSources) host.toolSources.register(source, plugin.id)
-    for (const source of staged.roleSources) host.roleSources.register(source, plugin.id)
     for (const ingester of staged.ingesters) host.ingesters.register(ingester, plugin.id)
     for (const hook of staged.hooks)
       host.hooks.add(hook.name, plugin.id, position, hook.handler as never, hook.order)
