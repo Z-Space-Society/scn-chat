@@ -16,8 +16,9 @@ interface PreferencesProps {
 function Preferences(props: PreferencesProps) {
   const { data, error } = useQuery(preferencesQuery)
   // The form only renders once the stored preferences load, and starts from them.
-  if (data === undefined)
-    return error ? <p role="alert">Could not load preferences: {messageOf(error)}</p> : null
+  if (data === undefined && error)
+    return <p role="alert">Could not load preferences: {messageOf(error)}</p>
+  if (data === undefined) return null
   return <PreferencesForm initial={data ?? {}} models={props.models} />
 }
 

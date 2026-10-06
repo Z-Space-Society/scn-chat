@@ -48,6 +48,8 @@ The web UI stays plain, with minimal code and styling, and easy for a forker to 
 
 React components take `props: Props`, declared as an `interface`, and read `props.example`, rather than destructuring props in the signature. Destructure only the values the component builds other variables from.
 
+When a component renders different things depending on a condition, return early with `if (condition) return <Something />` rather than returning a ternary.
+
 ## Lexicons
 
 - Lexicons live in `lexicons/network/sharedcomputer/chat/`. Once published, only add optional fields, new union members, or new record types. Never rename, remove, or tighten anything.

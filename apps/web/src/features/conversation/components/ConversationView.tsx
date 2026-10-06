@@ -12,7 +12,7 @@ import { useBranch } from '../hooks/useBranch.ts'
 import { useReplyStream } from '../hooks/useReplyStream.ts'
 import { useStickToBottom } from '../hooks/useStickToBottom.ts'
 import { blobUrlFor } from '../lib/blob-url.ts'
-import { inheritedModel } from '../lib/branch.ts'
+import { type BranchMessage, inheritedModel } from '../lib/branch.ts'
 import { Composer } from './Composer.tsx'
 import { ConversationHeader } from './ConversationHeader.tsx'
 import { MessageView } from './MessageView.tsx'
@@ -103,6 +103,30 @@ export function ConversationView(props: ConversationViewProps) {
   })
   const error = lastError(renamingTitle, syncing, stopping, regenerating)
 
+  /** Edit a user message, stop a pending reply, or regenerate a finished one. */
+  const actionsFor = (message: BranchMessage) => {
+    const record = message.record
+    if (record.role === 'user')
+      return (
+        <button type="button" onClick={() => setEditingRkey(message.rkey)}>
+          Edit
+        </button>
+      )
+    if (record.status === 'pending')
+      return (
+        <button type="button" onClick={() => stopping.mutate(message.rkey)}>
+          Stop
+        </button>
+      )
+    const parent = (record.parent as string | undefined) ?? null
+    return (
+      <RegenerateAction
+        models={models}
+        onRegenerate={(model) => regenerating.mutate({ parent, model })}
+      />
+    )
+  }
+
   return (
     <section className="conversation" ref={section}>
       <ConversationHeader
@@ -112,40 +136,21 @@ export function ConversationView(props: ConversationViewProps) {
         onSync={() => syncing.mutate()}
       />
       {(error ?? loadError) && <p role="alert">{error ?? loadError}</p>}
-      {branch.map(({ message, siblings, index }) => {
-        const record = message.record
-        const parent = (record.parent as string | undefined) ?? null
-        const actions =
-          record.role === 'user' ? (
-            <button type="button" onClick={() => setEditingRkey(message.rkey)}>
-              Edit
-            </button>
-          ) : record.status === 'pending' ? (
-            <button type="button" onClick={() => stopping.mutate(message.rkey)}>
-              Stop
-            </button>
-          ) : (
-            <RegenerateAction
-              models={models}
-              onRegenerate={(model) => regenerating.mutate({ parent, model })}
-            />
-          )
-        return (
-          <MessageView
-            key={message.rkey}
-            id={`m-${message.rkey}`}
-            record={record}
-            pending={<ReplyStream skey={props.skey} rkey={message.rkey} />}
-            blobUrl={blobUrl}
-            siblings={{
-              index,
-              count: siblings.length,
-              onPick: (i) => choose((siblings[i] as { rkey: string }).rkey),
-            }}
-            actions={actions}
-          />
-        )
-      })}
+      {branch.map(({ message, siblings, index }) => (
+        <MessageView
+          key={message.rkey}
+          id={`m-${message.rkey}`}
+          record={message.record}
+          pending={<ReplyStream skey={props.skey} rkey={message.rkey} />}
+          blobUrl={blobUrl}
+          siblings={{
+            index,
+            count: siblings.length,
+            onPick: (i) => choose((siblings[i] as { rkey: string }).rkey),
+          }}
+          actions={actionsFor(message)}
+        />
+      ))}
       {editing ? (
         <Composer
           // Editing another message starts the composer over from that message.

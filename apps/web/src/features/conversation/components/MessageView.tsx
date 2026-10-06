@@ -57,8 +57,10 @@ function MarkdownImage(props: MarkdownImageProps) {
 
 const markdownComponents: Components = {
   a: ({ node: _node, ...props }) => <a {...props} target="_blank" rel="noreferrer" />,
-  img: ({ src, alt }) =>
-    typeof src === 'string' && src ? <MarkdownImage src={src} alt={alt} /> : null,
+  img: ({ src, alt }) => {
+    if (typeof src !== 'string' || !src) return null
+    return <MarkdownImage src={src} alt={alt} />
+  },
 }
 
 const remarkPlugins = [remarkGfm]
@@ -84,11 +86,8 @@ interface TextProps {
 }
 
 function Text(props: TextProps) {
-  return props.role === 'assistant' ? (
-    <Markdown text={props.text} />
-  ) : (
-    <p className="text">{props.text}</p>
-  )
+  if (props.role === 'assistant') return <Markdown text={props.text} />
+  return <p className="text">{props.text}</p>
 }
 
 interface PartViewProps {
@@ -205,7 +204,8 @@ interface StatusProps extends Pick<MessageViewProps, 'record' | 'pending'> {}
 function Status(props: StatusProps) {
   switch (props.record.status) {
     case 'pending':
-      return props.pending === undefined ? <p>Thinking...</p> : null
+      if (props.pending !== undefined) return null
+      return <p>Thinking...</p>
     case 'error':
       return (
         <p role="alert">Error{props.record.error ? `: ${props.record.error as string}` : ''}</p>

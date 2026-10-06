@@ -37,7 +37,8 @@ export function SettingsAdmin(props: SettingsAdminProps) {
   })
   const failed = save.error instanceof GroupFailed ? save.error : null
   const error = save.error ? messageOf(save.error) : query.error && messageOf(query.error)
-  if (!query.data) return error ? <p role="alert">{error}</p> : null
+  if (!query.data && error) return <p role="alert">{error}</p>
+  if (!query.data) return null
   return (
     <section>
       <h2>{props.title}</h2>

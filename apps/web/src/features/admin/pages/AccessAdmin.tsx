@@ -22,7 +22,8 @@ export function AccessAdmin() {
   const access = useQuery(adminAccessQuery)
   const roles = useQuery(adminRolesQuery)
   // The form only renders once the stored setting loads, and starts from it.
-  if (!access.data) return access.error ? <p role="alert">{messageOf(access.error)}</p> : null
+  if (!access.data && access.error) return <p role="alert">{messageOf(access.error)}</p>
+  if (!access.data) return null
   return (
     <AccessForm
       initial={access.data}

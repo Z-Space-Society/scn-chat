@@ -18,5 +18,6 @@ export function ReplyStream(props: Props) {
     enabled: false,
     select: streamedReply,
   })
-  return data === undefined ? <p>Thinking...</p> : <StreamingReply streaming={data} />
+  if (data === undefined) return <p>Thinking...</p>
+  return <StreamingReply streaming={data} />
 }

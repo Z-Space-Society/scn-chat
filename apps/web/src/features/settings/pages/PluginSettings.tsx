@@ -62,7 +62,8 @@ export function PluginSettings() {
     onSuccess: reload,
   })
   const error = lastError(save, reset) ?? (query.error && messageOf(query.error))
-  if (!plugins) return error ? <p role="alert">{error}</p> : null
+  if (!plugins && error) return <p role="alert">{error}</p>
+  if (!plugins) return null
   if (!plugins.length)
     return (
       <section>
