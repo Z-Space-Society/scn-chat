@@ -16,7 +16,7 @@ export const $params = /*#__PURE__*/ l.params()
 export type $Params = l.InferOutput<typeof $params>
 
 export const $input = /*#__PURE__*/ l.jsonPayload({
-  type: /*#__PURE__*/ l.string({ format: 'nsid' }),
+  spaceType: /*#__PURE__*/ l.string({ format: 'nsid' }),
   skey: /*#__PURE__*/ l.optional(
     /*#__PURE__*/ l.string({ format: 'record-key' }),
   ),

@@ -1,45 +1,53 @@
+import { P256Keypair } from '@atproto/crypto'
 import { Client } from '@atproto/lex-client'
 import { LexError } from '@atproto/lex-data'
-import { JoseKey } from '@atproto/oauth-client-node'
-import { createDpopProof } from '@atproto/space'
+import { createSpaceSigHeaders, parseSpaceToken, SpaceTokenError } from '@atproto/space'
+import type { DidString } from '@atproto/syntax'
 import { atproto } from '@scn-chat/lexicons'
 import type { PdsClientFactory } from '../auth/pds.ts'
 import type { Loose } from '../loose.ts'
 import { parseSpaceUri } from '../storage/records.ts'
 
-const CREDENTIAL_TTL_MS = 2 * 60 * 60_000
 const REFRESH_MARGIN_MS = 5 * 60_000
+const AUTH_FAILURES = new Set([
+  'AuthenticationRequired',
+  'InvalidToken',
+  'ExpiredToken',
+  'JwtExpired',
+  'CredentialRevoked',
+])
 
-/** A DPoP-bound space credential, usable against any repo host in its space. */
+/** A space credential bound to a signing key, usable against any repo host in its space. */
 export class SpaceCredential {
   readonly token: string
   readonly expiresAt: number
-  private readonly key: JoseKey
+  private readonly key: P256Keypair
   private readonly fetchImpl: typeof fetch
 
-  constructor(token: string, key: JoseKey, expiresAt: number, fetchImpl: typeof fetch = fetch) {
+  constructor(token: string, key: P256Keypair, fetchImpl: typeof fetch = fetch) {
     this.token = token
     this.key = key
-    this.expiresAt = expiresAt
+    this.expiresAt = parseSpaceToken('credential', token).payload.exp * 1000
     this.fetchImpl = fetchImpl
   }
 
-  fetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+  /** Each request is signed for the DID of the repo it reads, or the owner's for the space itself. */
+  fetch = async (
+    input: string | URL | Request,
+    audience: string,
+    init?: RequestInit,
+  ): Promise<Response> => {
     const request = new Request(input, { ...init, redirect: 'error' })
-    request.headers.set('authorization', `DPoP ${this.token}`)
-    request.headers.set(
-      'dpop',
-      await createDpopProof(this.key, {
-        htm: request.method,
-        htu: request.url,
-        credential: this.token,
-      }),
-    )
+    const headers = await createSpaceSigHeaders(this.key, {
+      authorization: `Atproto-Space ${this.token}`,
+      audience: audience as DidString,
+    })
+    for (const [name, value] of Object.entries(headers)) request.headers.set(name, value)
     return this.fetchImpl(request)
   }
 
-  client(service: string): Client {
-    return new Client({ service, fetch: this.fetch })
+  client(service: string, audience: string): Client {
+    return new Client({ service, fetch: (input, init) => this.fetch(input, audience, init) })
   }
 }
 
@@ -68,24 +76,22 @@ export async function mintSpaceCredential(
   actorDid: string,
   space: string,
 ): Promise<SpaceCredential> {
-  const now = deps.now ?? Date.now
   const fetchImpl = deps.fetch ?? fetch
   const actor: Loose = await deps.getPdsClient(actorDid)
   const { token } = await actor.call(atproto.space.getDelegationToken, { space })
   const authorityPds = await deps.resolvePds(parseSpaceUri(space).did)
-  const key = await JoseKey.generate(['ES256'])
+  const key = await P256Keypair.create()
   const url = new URL('/xrpc/com.atproto.space.getSpaceCredential', authorityPds)
   const request = new Request(url, {
     method: 'POST',
     redirect: 'error',
     headers: {
       accept: 'application/json',
-      authorization: `Bearer ${token}`,
+      ...(await createSpaceSigHeaders(key, { authorization: `Bearer ${token}` })),
       'content-type': 'application/json',
     },
     body: JSON.stringify({ space }),
   })
-  request.headers.set('dpop', await createDpopProof(key, { htm: request.method, htu: request.url }))
   const response = await fetchImpl(request)
   const body = (await response.json().catch(() => ({}))) as {
     credential?: string
@@ -98,10 +104,15 @@ export async function mintSpaceCredential(
       body.message ?? `getSpaceCredential returned ${response.status}`,
     )
   }
-  return new SpaceCredential(body.credential, key, now() + CREDENTIAL_TTL_MS, fetchImpl)
+  try {
+    return new SpaceCredential(body.credential, key, fetchImpl)
+  } catch (err) {
+    if (!(err instanceof SpaceTokenError)) throw err
+    throw new CredentialError('InvalidResponse', `getSpaceCredential returned ${err.message}`)
+  }
 }
 
-/** Space credentials cached per space and actor for their two-hour life. */
+/** Space credentials cached per space and actor until they expire. */
 export class CredentialCache {
   private readonly cache = new Map<string, SpaceCredential>()
   private readonly deps: CredentialDeps
@@ -133,9 +144,7 @@ export class CredentialCache {
     try {
       return await fn(await this.get(actorDid, space))
     } catch (err) {
-      const code = err instanceof LexError ? err.error : undefined
-      if (code !== 'AuthenticationRequired' && code !== 'InvalidToken' && code !== 'ExpiredToken')
-        throw err
+      if (!(err instanceof LexError && AUTH_FAILURES.has(err.error))) throw err
       this.discard(actorDid, space)
       return fn(await this.get(actorDid, space))
     }

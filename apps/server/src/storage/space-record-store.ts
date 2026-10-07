@@ -49,7 +49,7 @@ export class SpaceRecordStore implements RecordStore {
   async createSpace(type: string, skey: string): Promise<string> {
     try {
       const { uri } = await this.rawCall(atproto.simplespace.createSpace, {
-        type,
+        spaceType: type,
         skey,
         readPolicy: MEMBER_LIST,
         writePolicy: MEMBER_LIST,
@@ -214,7 +214,11 @@ export class SpaceRecordStore implements RecordStore {
     const uris: string[] = []
     let cursor: string | undefined
     do {
-      const out = await this.rawCall(atproto.space.listSpaces, { type, cursor, limit: PAGE })
+      const out = await this.rawCall(atproto.space.listSpaces, {
+        spaceType: type,
+        cursor,
+        limit: PAGE,
+      })
       uris.push(...out.spaces.map((space: { uri: string }) => space.uri))
       cursor = out.cursor
     } while (cursor)

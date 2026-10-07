@@ -35,7 +35,7 @@ Both routes return 403 with a message saying sharing needs a spaces PDS when the
 `GET /api/shared/:ownerDid/:skey` requires a signed-in viewer whose storage mode is `space`. Otherwise it returns 403 with a message saying viewing shared chats needs a spaces PDS.
 
 1. The server gets a delegation token from the viewer's PDS for the conversation space, through the viewer's session. The permission set's read access to conversation spaces of any authority allows this.
-2. It exchanges the token for a space credential at the owner's PDS, the space authority, with the same DPoP code chat-storage uses for its own credentials. The owner's PDS applies the read policy and member list.
+2. It exchanges the token for a space credential at the owner's PDS, the space authority, with the same signing code chat-storage uses for its own credentials. The owner's PDS applies the read policy and member list.
 3. With the credential, it reads the owner's info record with `getRecord` and every message with `listRecords`, from the owner's PDS.
 4. It returns the title and messages. The system prompt and the owner's preferences are left out. Tags live in the owner's private settings space, so viewers never see them. Any member can still read the system prompt through the protocol, since it is in the info record, so leaving it out is a presentation choice, not a privacy guarantee.
 

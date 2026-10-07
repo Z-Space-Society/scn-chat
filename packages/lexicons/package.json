@@ -13,15 +13,15 @@
     "publish-lexicons": "node src/publish-cli.ts"
   },
   "dependencies": {
-    "@atproto/lex-json": "0.0.0-spaces-alpha-20260915165437",
-    "@atproto/lex-schema": "0.0.0-spaces-alpha-20260915165437"
+    "@atproto/lex-json": "0.0.0-spaces-alpha-20261001173819",
+    "@atproto/lex-schema": "0.0.0-spaces-alpha-20261001173819"
   },
   "devDependencies": {
-    "@atproto/identity": "0.0.0-spaces-alpha-20260915165437",
-    "@atproto/lex": "0.0.0-spaces-alpha-20260915165437",
-    "@atproto/lex-client": "0.0.0-spaces-alpha-20260915165437",
-    "@atproto/lex-data": "0.0.0-spaces-alpha-20260915165437",
-    "@atproto/lex-document": "0.0.0-spaces-alpha-20260915165437",
-    "@atproto/lex-password-session": "0.0.0-spaces-alpha-20260915165437"
+    "@atproto/identity": "0.0.0-spaces-alpha-20261001173819",
+    "@atproto/lex": "0.0.0-spaces-alpha-20261001173819",
+    "@atproto/lex-client": "0.0.0-spaces-alpha-20261001173819",
+    "@atproto/lex-data": "0.0.0-spaces-alpha-20261001173819",
+    "@atproto/lex-document": "0.0.0-spaces-alpha-20261001173819",
+    "@atproto/lex-password-session": "0.0.0-spaces-alpha-20261001173819"
   }
 }
