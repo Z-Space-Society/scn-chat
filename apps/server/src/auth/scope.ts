@@ -38,6 +38,7 @@ export function buildScope(mode: ScopeMode): string {
 
 /** Does a granted scope let the user create their own conversation spaces? */
 export function scopeAllowsSpaces(scope: string, did: string): boolean {
+  const authority = did as `did:${string}:${string}`
   const resolved = scope
     .split(' ')
     .filter(Boolean)
@@ -46,11 +47,11 @@ export function scopeAllowsSpaces(scope: string, did: string): boolean {
       const permission = SpacePermission.fromString(part)
       if (!permission)
         throw new Error(`The PDS granted a space permission this app cannot read: ${part}`)
-      return permission.withResolvedAuthority(did as `did:${string}:${string}`).toString()
+      return permission.withResolvedAuthority(authority).toString()
     })
   return new ScopePermissions(resolved).allowsSpace({
     type: nsid.conversation,
-    authority: did,
+    authority,
     skey: 'self',
     manage: 'create',
   })

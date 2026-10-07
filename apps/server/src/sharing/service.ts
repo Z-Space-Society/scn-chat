@@ -35,7 +35,7 @@ export class SharedNotFound extends Error {
   }
 }
 
-type CredentialClient = { client(service: string): Loose }
+type CredentialClient = { client(service: string, audience: string): Loose }
 
 export type SharingDeps = {
   getPdsClient: PdsClientFactory
@@ -166,7 +166,7 @@ export class SharingService {
         this.deps.mintCredential(viewer.did, space),
         this.deps.identity.resolve(ownerDid),
       ])
-      return { space, client: credential.client(owner.pdsUrl), ownerHandle: owner.handle }
+      return { space, client: credential.client(owner.pdsUrl, ownerDid), ownerHandle: owner.handle }
     } catch (err) {
       if (
         (err instanceof CredentialError && DENIED.has(err.code)) ||

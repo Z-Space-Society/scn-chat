@@ -118,7 +118,7 @@ export class FakePds {
     const uri = (collection: string, rkey: string) => `${space}/${store.did}/${collection}/${rkey}`
     switch (nsid) {
       case atproto.simplespace.createSpace.$nsid:
-        return { uri: await store.createSpace(input.type as string, input.skey as string) }
+        return { uri: await store.createSpace(input.spaceType as string, input.skey as string) }
       case atproto.simplespace.deleteSpace.$nsid:
         return store.deleteSpace(space)
       case atproto.space.getRecord.$nsid: {
@@ -224,7 +224,9 @@ export class FakePds {
         this.policy(space).members.delete(input.did as string)
         return undefined
       case atproto.space.listSpaces.$nsid:
-        return { spaces: (await store.listSpaces(input.type as string)).map((u) => ({ uri: u })) }
+        return {
+          spaces: (await store.listSpaces(input.spaceType as string)).map((u) => ({ uri: u })),
+        }
       default:
         throw new Error(`FakePds does not implement ${nsid}`)
     }

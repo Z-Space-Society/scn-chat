@@ -261,7 +261,7 @@ export class SyncEngine {
         did,
         space,
         async (credential) => {
-          const client: Loose = credential.client(ctx.account.pdsUrl)
+          const client: Loose = credential.client(ctx.account.pdsUrl, did)
           return client.call(atproto.space.registerNotify, {
             space,
             service: serviceId(this.deps.publicUrl),
