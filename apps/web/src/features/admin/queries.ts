@@ -5,14 +5,19 @@ import { staleTime } from '../../shared/queries.ts'
 /** The key every users search falls under. */
 export const adminUsersKey = ['admin', 'users'] as const
 
+const fetchAdminUsers = (q: string, cursor: string) =>
+  read(api.admin.users.$get({ query: { q, ...(cursor && { cursor }) } }))
+
+/** An account, with its roles and any suspension. */
+export type AdminUser = Awaited<ReturnType<typeof fetchAdminUsers>>['users'][number]
+
 /** Accounts for the admin's users list, 50 a page, matching the search `q`. */
 export const adminUsersQuery = (q: string) =>
   infiniteQueryOptions({
     queryKey: [...adminUsersKey, q],
     staleTime,
     initialPageParam: '',
-    queryFn: ({ pageParam }) =>
-      read(api.admin.users.$get({ query: { q, ...(pageParam && { cursor: pageParam }) } })),
+    queryFn: ({ pageParam }) => fetchAdminUsers(q, pageParam),
     getNextPageParam: (page) => page.cursor ?? undefined,
   })
 

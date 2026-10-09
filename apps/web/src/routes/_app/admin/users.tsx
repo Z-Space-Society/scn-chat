@@ -1,4 +1,3 @@
-import { noop } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { UsersAdmin } from '../../../features/admin/pages/UsersAdmin.tsx'
 import {
@@ -11,13 +10,15 @@ import { validateUserSearch } from '../../../shared/search-params.ts'
 export const Route = createFileRoute('/_app/admin/users')({
   validateSearch: validateUserSearch,
   loaderDeps: ({ search }) => ({ q: search.q ?? '' }),
-  // Prefetching renders the section with its data on the server. A failed fetch shows in the section.
   loader: ({ context, deps }) =>
     Promise.all([
-      context.queryClient.infiniteQuery(adminUsersQuery(deps.q)).then(noop, noop),
-      context.queryClient.query(adminInvitesQuery).then(noop, noop),
-      context.queryClient.query(adminRolesQuery).then(noop, noop),
+      context.queryClient.infiniteQuery(adminUsersQuery(deps.q)),
+      context.queryClient.query(adminInvitesQuery),
+      context.queryClient.query(adminRolesQuery),
     ]),
+  // A search keeps showing the current results until the new ones load, rather than the pending
+  // component, which would take the search box and its focus with it.
+  pendingMs: Number.POSITIVE_INFINITY,
   component: Users,
 })
 
