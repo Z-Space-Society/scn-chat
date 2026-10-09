@@ -22,10 +22,15 @@ export const adminInvitesQuery = queryOptions({
   queryFn: async () => (await read(api.admin.invites.$get())).invites,
 })
 
+const fetchAdminRoles = () => read(api.admin.roles.$get())
+
+/** A role, with its matching rules and explicit members. */
+export type AdminRole = Awaited<ReturnType<typeof fetchAdminRoles>>['roles'][number]
+
 export const adminRolesQuery = queryOptions({
   queryKey: ['admin', 'roles'],
   staleTime,
-  queryFn: () => read(api.admin.roles.$get()),
+  queryFn: fetchAdminRoles,
 })
 
 export const adminAccessQuery = queryOptions({
@@ -34,10 +39,15 @@ export const adminAccessQuery = queryOptions({
   queryFn: () => read(api.admin.access.$get()),
 })
 
+const fetchAdminPlugins = async () => (await read(api.admin.plugins.$get())).instances
+
+/** A configured plugin, with its options, status, and the providers it adds. */
+export type AdminPlugin = Awaited<ReturnType<typeof fetchAdminPlugins>>[number]
+
 export const adminPluginsQuery = queryOptions({
   queryKey: ['admin', 'plugins'],
   staleTime,
-  queryFn: async () => (await read(api.admin.plugins.$get())).instances,
+  queryFn: fetchAdminPlugins,
 })
 
 export const adminInstalledQuery = queryOptions({

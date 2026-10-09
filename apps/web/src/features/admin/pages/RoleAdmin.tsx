@@ -1,22 +1,12 @@
-import { useForm } from '@tanstack/react-form'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { useState } from 'react'
 import { api, json, read } from '../../../shared/api.ts'
-import { lastError, messageOf } from '../../../shared/errors.ts'
-import { formKey } from '../../../shared/form.tsx'
+import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
+import { lastError } from '../../../shared/errors.ts'
+import { formKey, useAppForm } from '../../../shared/form.tsx'
 import { splitLines } from '../../../shared/lines.ts'
 import { useRolesChanged } from '../hooks/changes.ts'
-import { adminRolesQuery } from '../queries.ts'
-
-type Role = {
-  name: string
-  description: string
-  builtIn: boolean
-  pdsHosts: string[]
-  handleDomains: string[]
-  members: { did: string; handle: string | null; addedBy: string }[]
-}
+import { type AdminRole, adminRolesQuery } from '../queries.ts'
 
 interface RoleAdminProps {
   name: string
@@ -24,53 +14,59 @@ interface RoleAdminProps {
 
 /** One role on its own page. */
 export function RoleAdmin(props: RoleAdminProps) {
-  const roles = useQuery(adminRolesQuery)
+  const { data } = useSuspenseQuery(adminRolesQuery)
   const navigate = useNavigate()
   const rolesChanged = useRolesChanged()
   const remove = useMutation({
     mutationFn: () => read(api.admin.roles[':name'].$delete({ param: { name: props.name } })),
+    // Leave first, so the page doesn't say the role it just deleted doesn't exist.
     onSuccess: async () => {
       await navigate({ to: '/admin/roles' })
       await rolesChanged()
     },
   })
-  const role = roles.data?.roles.find((candidate) => candidate.name === props.name)
-  const error = remove.error ? messageOf(remove.error) : roles.error && messageOf(roles.error)
   return (
     <>
       <Link to="/admin/roles">Back to roles</Link>
-      {role && (
-        <RoleForm
-          // Start over from the stored role whenever it changes.
-          key={formKey(role)}
-          role={role}
-          environmentAdmins={roles.data?.environmentAdmins ?? []}
-          onChange={rolesChanged}
-          onRemove={() => remove.mutate()}
-        />
-      )}
-      {roles.data && !role && <p role="alert">This role doesn't exist.</p>}
-      {error && <p role="alert">{error}</p>}
+      <RoleDetails
+        role={data.roles.find((candidate) => candidate.name === props.name)}
+        environmentAdmins={data.environmentAdmins}
+        onRemove={() => remove.mutate()}
+      />
+      <ErrorAlert error={remove.error} />
     </>
   )
 }
 
-interface RoleFormProps {
-  role: Role
+interface RoleDetailsProps {
+  role: AdminRole | undefined
   environmentAdmins: string[]
-  onChange: () => Promise<unknown>
   onRemove: () => void
 }
 
-/** One role's description, matching rules, and explicit members. */
-function RoleForm(props: RoleFormProps) {
-  const { name } = props.role
-  const [identifier, setIdentifier] = useState('')
+/** A role's description, matching rules, and members, or that it doesn't exist. */
+function RoleDetails(props: RoleDetailsProps) {
+  if (!props.role) return <p role="alert">This role doesn't exist.</p>
+  return (
+    <RoleSection
+      role={props.role}
+      environmentAdmins={props.environmentAdmins}
+      onRemove={props.onRemove}
+    />
+  )
+}
+
+interface RoleSectionProps extends RoleDetailsProps {
+  role: AdminRole
+}
+
+function RoleSection(props: RoleSectionProps) {
+  const rolesChanged = useRolesChanged()
   const save = useMutation({
     mutationFn: (draft: { description: string; hosts: string; domains: string }) =>
       read(
         api.admin.roles[':name'].$patch(
-          { param: { name } },
+          { param: { name: props.role.name } },
           json({
             description: draft.description,
             pdsHosts: splitLines(draft.hosts),
@@ -78,74 +74,87 @@ function RoleForm(props: RoleFormProps) {
           }),
         ),
       ),
-    onSuccess: props.onChange,
+    onSuccess: rolesChanged,
   })
-  const addMember = useMutation({
-    mutationFn: (identifier: string) =>
-      read(api.admin.roles[':name'].members.$post({ param: { name } }, json({ identifier }))),
-    onSuccess: () => {
-      setIdentifier('')
-      return props.onChange()
-    },
-  })
-  const removeMember = useMutation({
-    mutationFn: (did: string) =>
-      read(api.admin.roles[':name'].members[':did'].$delete({ param: { name, did } })),
-    onSuccess: props.onChange,
-  })
-  const form = useForm({
+  return (
+    <section>
+      <h2>{props.role.name}</h2>
+      <RoleForm
+        // Start over from the stored role whenever it changes.
+        key={formKey(props.role)}
+        role={props.role}
+        onSave={save.mutate}
+      />
+      <ErrorAlert error={save.error} />
+      <RoleMembers role={props.role} environmentAdmins={props.environmentAdmins} />
+      {!props.role.builtIn && (
+        <button type="button" onClick={props.onRemove}>
+          Delete role
+        </button>
+      )}
+    </section>
+  )
+}
+
+interface RoleFormProps {
+  role: AdminRole
+  onSave: (draft: { description: string; hosts: string; domains: string }) => void
+}
+
+/** A role's description, and the PDS hosts and handle domains whose accounts it matches. */
+function RoleForm(props: RoleFormProps) {
+  const form = useAppForm({
     defaultValues: {
       description: props.role.description,
       hosts: props.role.pdsHosts.join('\n'),
       domains: props.role.handleDomains.join('\n'),
     },
-    onSubmit: ({ value }) => save.mutate(value),
+    onSubmit: ({ value }) => props.onSave(value),
   })
-  const error = lastError(save, addMember, removeMember)
   return (
-    <section>
-      <h2>{name}</h2>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          void form.handleSubmit()
-        }}
-      >
-        <form.Field name="description">
-          {(field) => (
-            <label>
-              Description{' '}
-              <input
-                value={field.state.value}
-                onChange={(e) => field.handleChange(e.target.value)}
-              />
-            </label>
-          )}
-        </form.Field>
-        <form.Field name="hosts">
-          {(field) => (
-            <label>
-              PDS hosts, one per line
-              <textarea
-                value={field.state.value}
-                onChange={(e) => field.handleChange(e.target.value)}
-              />
-            </label>
-          )}
-        </form.Field>
-        <form.Field name="domains">
-          {(field) => (
-            <label>
-              Handle domains, one per line
-              <textarea
-                value={field.state.value}
-                onChange={(e) => field.handleChange(e.target.value)}
-              />
-            </label>
-          )}
-        </form.Field>
-        <button type="submit">Save</button>
-      </form>
+    <form.AppForm>
+      <form.Form>
+        <form.AppField name="description">
+          {(field) => <field.TextField label="Description" />}
+        </form.AppField>
+        <form.AppField name="hosts">
+          {(field) => <field.TextAreaField label="PDS hosts, one per line" />}
+        </form.AppField>
+        <form.AppField name="domains">
+          {(field) => <field.TextAreaField label="Handle domains, one per line" />}
+        </form.AppField>
+        <form.SubmitButton>Save</form.SubmitButton>
+      </form.Form>
+    </form.AppForm>
+  )
+}
+
+interface RoleMembersProps {
+  role: AdminRole
+  environmentAdmins: string[]
+}
+
+/** A role's explicit members, and the admins the environment names for the admin role. */
+function RoleMembers(props: RoleMembersProps) {
+  const name = props.role.name
+  const rolesChanged = useRolesChanged()
+  const addMember = useMutation({
+    mutationFn: (identifier: string) =>
+      read(api.admin.roles[':name'].members.$post({ param: { name } }, json({ identifier }))),
+    onSuccess: rolesChanged,
+  })
+  const removeMember = useMutation({
+    mutationFn: (did: string) =>
+      read(api.admin.roles[':name'].members[':did'].$delete({ param: { name, did } })),
+    onSuccess: rolesChanged,
+  })
+  const form = useAppForm({
+    defaultValues: { identifier: '' },
+    onSubmit: ({ value, formApi }) =>
+      addMember.mutate(value.identifier, { onSuccess: () => formApi.reset() }),
+  })
+  return (
+    <>
       <h3>Members</h3>
       <ul>
         {name === 'admin' &&
@@ -160,27 +169,21 @@ function RoleForm(props: RoleFormProps) {
           </li>
         ))}
       </ul>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          addMember.mutate(identifier)
-        }}
-      >
-        <input
-          aria-label={`Add a member to ${name}`}
-          placeholder="Handle or DID"
-          value={identifier}
-          onChange={(e) => setIdentifier(e.target.value)}
-          required
-        />
-        <button type="submit">Add member</button>
-      </form>
-      {!props.role.builtIn && (
-        <button type="button" onClick={props.onRemove}>
-          Delete role
-        </button>
-      )}
-      {error && <p role="alert">{error}</p>}
-    </section>
+      <form.AppForm>
+        <form.Form>
+          <form.AppField name="identifier">
+            {(field) => (
+              <field.TextField
+                aria-label={`Add a member to ${name}`}
+                placeholder="Handle or DID"
+                required
+              />
+            )}
+          </form.AppField>
+          <form.SubmitButton>Add member</form.SubmitButton>
+        </form.Form>
+      </form.AppForm>
+      <ErrorAlert error={lastError(addMember, removeMember)} />
+    </>
   )
 }
