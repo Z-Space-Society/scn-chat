@@ -1,11 +1,10 @@
-import { useMutation } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { messageOf } from '../../../shared/errors.ts'
 import { SectionNav } from '../../../shared/SectionNav.tsx'
 import { SidebarLayout } from '../../../shared/SidebarLayout.tsx'
 import { useSignOut } from '../../auth/hooks/useSignOut.ts'
-import { useMe } from '../../auth/session.tsx'
+import { useMe } from '../../auth/session.ts'
 
 const sections = [
   { to: '/settings', label: 'Preferences' },
@@ -20,7 +19,7 @@ interface Props {
 
 /** The settings sidebar around the current section. */
 export function SettingsLayout(props: Props) {
-  const signOut = useMutation({ mutationFn: useSignOut() })
+  const signOut = useSignOut()
   const { admin } = useMe()
   return (
     <SidebarLayout

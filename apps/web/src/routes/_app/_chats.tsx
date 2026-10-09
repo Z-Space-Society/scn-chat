@@ -1,6 +1,4 @@
 import { createFileRoute, Outlet, retainSearchParams } from '@tanstack/react-router'
-import { useEffect } from 'react'
-import { endSession } from '../../features/auth/session.tsx'
 import { validateChatListSearch } from '../../shared/search-params.ts'
 import { openStore } from '../../store/client.ts'
 import { StoreProvider } from '../../store/react.tsx'
@@ -17,11 +15,7 @@ export const Route = createFileRoute('/_app/_chats')({
 })
 
 function Chats() {
-  const { me, store } = Route.useRouteContext()
-  useEffect(
-    () => store.onChange((change) => change.type === 'unauthorized' && endSession(me.did)),
-    [store, me.did],
-  )
+  const { store } = Route.useRouteContext()
   return (
     <StoreProvider store={store}>
       <Outlet />

@@ -1,5 +1,4 @@
 import { act, render } from '@testing-library/react'
-import { useRef } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useStickToBottom } from '../../../../src/features/conversation/hooks/useStickToBottom.ts'
 
@@ -25,11 +24,11 @@ function stubResizeObserver() {
 let pin: () => void = () => {}
 
 function Conversation({ startPinned }: { startPinned?: boolean }) {
-  const content = useRef<HTMLElement>(null)
-  pin = useStickToBottom(content, startPinned).pin
+  const stick = useStickToBottom(startPinned)
+  pin = stick.pin
   return (
     <main data-testid="scroller" style={{ overflowY: 'auto' }}>
-      <section ref={content} />
+      <section ref={stick.ref} />
     </main>
   )
 }

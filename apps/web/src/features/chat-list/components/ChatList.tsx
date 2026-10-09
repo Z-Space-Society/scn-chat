@@ -32,7 +32,7 @@ export function ChatList() {
       await navigate({ to: '/chat/$skey', params: { skey: created.skey } })
     },
   })
-  const signOut = useMutation({ mutationFn: useSignOut() })
+  const signOut = useSignOut()
   const error = lastError(create, signOut)
   return (
     <nav className="sidebar chat-list">

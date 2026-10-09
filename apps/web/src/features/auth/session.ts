@@ -4,8 +4,9 @@ import { ApiError } from '../../shared/api.ts'
 import { messageOf } from '../../shared/errors.ts'
 import { openStore } from '../../store/client.ts'
 import { meQuery } from './queries.ts'
+import { toLogin } from './sign-out.ts'
 
-export type Me = {
+export interface Me {
   did: string
   handle: string | null
   storageMode: 'space' | 'local'
@@ -48,6 +49,5 @@ export function endSession(did: string) {
   openStore(did)
     .deleteLocalCopy()
     .catch((err: unknown) => console.error('Could not delete the local copy', err))
-    // A full page load, so nothing from the ended session stays in memory.
-    .finally(() => location.assign('/login'))
+    .finally(toLogin)
 }

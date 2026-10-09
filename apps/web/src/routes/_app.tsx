@@ -1,9 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
 import { useEffect } from 'react'
-import { endSession, MeContext } from '../features/auth/session.tsx'
+import { useEndSessionOnUnauthorized } from '../features/auth/hooks/useEndSessionOnUnauthorized.ts'
+import { MeContext } from '../features/auth/session.ts'
 import { syncTimeZone } from '../features/settings/lib/time-zone.ts'
-import { onUnauthorized } from '../shared/api.ts'
 
 /**
  * The signed-in routes. Signed-out requests are sent to the login page, from the server too, and
@@ -26,7 +26,7 @@ function SignedIn() {
       console.warn('Could not save the time zone', err),
     )
   }, [queryClient])
-  useEffect(() => onUnauthorized(() => endSession(me.did)), [me.did])
+  useEndSessionOnUnauthorized(me.did)
   return (
     <MeContext.Provider value={me}>
       <Outlet />

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMe } from '../../auth/session.tsx'
+import { useMe } from '../../auth/session.ts'
 import { ShareControl } from '../../sharing/components/ShareControl.tsx'
 
 interface Props {

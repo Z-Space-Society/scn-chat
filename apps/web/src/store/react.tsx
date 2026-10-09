@@ -1,6 +1,7 @@
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createContext, type ReactNode, useContext, useEffect, useSyncExternalStore } from 'react'
-import { MeContext } from '../features/auth/session.tsx'
+import { MeContext } from '../features/auth/session.ts'
+import { reportUnauthorized } from '../shared/api.ts'
 import { messageOf } from '../shared/errors.ts'
 import { openStore, type StoreClient } from './client.ts'
 import type { Conversation, ConversationSummary } from './core.ts'
@@ -15,12 +16,16 @@ interface Props {
   children: ReactNode
 }
 
-/** Provide the store, and turn its change events into stale queries. */
+/**
+ * Provide the store, and turn its change events into stale queries. Its sync finding the session
+ * has ended is reported as a request finding it would be.
+ */
 export function StoreProvider(props: Props) {
   const queryClient = useQueryClient()
   useEffect(
     () =>
       props.store.onChange((change) => {
+        if (change.type === 'unauthorized') return reportUnauthorized()
         if (change.type === 'index')
           void queryClient.invalidateQueries({ queryKey: ['conversations'] })
         if (change.type === 'conversation')
@@ -62,12 +67,17 @@ export function useStoreState(): HandoverState {
   return useSyncExternalStore(store.onState, store.state)
 }
 
+/** The store, and whether this tab holds it, which reading it waits for. */
+function useActiveStore() {
+  const store = useStore()
+  return { store, active: useStoreState() === 'active' }
+}
+
 /** A store failure's message, except for the store moving to another tab. */
 const storeError = (err: unknown) => (!err || isStoreClosed(err) ? null : messageOf(err))
 
 export function useConversations(): { conversations: ConversationSummary[]; error: string | null } {
-  const store = useStore()
-  const active = useStoreState() === 'active'
+  const { store, active } = useActiveStore()
   const { data, error } = useQuery({
     queryKey: ['conversations'],
     queryFn: () => store.worker.listConversations(),
@@ -84,8 +94,7 @@ export function useConversation(skey: string): {
   conversation: Conversation | null
   error: string | null
 } {
-  const store = useStore()
-  const active = useStoreState() === 'active'
+  const { store, active } = useActiveStore()
   const local = useQuery({
     queryKey: ['conversation', skey],
     queryFn: () => store.worker.getConversation(skey),
@@ -110,8 +119,7 @@ export function useChatSearch(query: string): {
   remaining: number
   error: string | null
 } {
-  const store = useStore()
-  const active = useStoreState() === 'active'
+  const { store, active } = useActiveStore()
   const { data, error } = useQuery({
     queryKey: ['search', query],
     queryFn: async () => {

@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { type Me, MeContext } from '../../../src/features/auth/session.tsx'
+import { type Me, MeContext } from '../../../src/features/auth/session.ts'
 import { ApiKeySettings } from '../../../src/features/settings/pages/ApiKeySettings.tsx'
 import { PluginSettings } from '../../../src/features/settings/pages/PluginSettings.tsx'
 import { PreferencesSettings } from '../../../src/features/settings/pages/PreferencesSettings.tsx'

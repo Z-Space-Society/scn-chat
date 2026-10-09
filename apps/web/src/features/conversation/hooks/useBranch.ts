@@ -1,5 +1,4 @@
 import { useNavigate, useSearch } from '@tanstack/react-router'
-import { useCallback } from 'react'
 import { type BranchMessage, choicesFor, currentBranch } from '../lib/branch.ts'
 
 /**
@@ -11,16 +10,13 @@ export function useBranch(messages: BranchMessage[]) {
   // Only `m`, so typing a search, which changes `q`, doesn't rerender the conversation.
   const focus = useSearch({ strict: false, select: (search) => search.m })
   const navigate = useNavigate()
-  const pick = useCallback(
-    (rkey: string) =>
-      void navigate({
-        to: '.',
-        search: (prev) => ({ ...prev, m: rkey }),
-        replace: true,
-        resetScroll: false,
-      }),
-    [navigate],
-  )
+  const pick = (rkey: string) =>
+    void navigate({
+      to: '.',
+      search: (prev) => ({ ...prev, m: rkey }),
+      replace: true,
+      resetScroll: false,
+    })
   const choices = focus ? choicesFor(messages, focus) : {}
   return { focus, branch: currentBranch(messages, choices), pick }
 }

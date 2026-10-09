@@ -37,9 +37,8 @@ export function ConversationView(props: ConversationViewProps) {
   const { follow } = useReplyStream(props.skey, pending)
 
   const { focus, branch, pick } = useBranch(messages)
-  const section = useRef<HTMLElement>(null)
   // Opening the conversation on a message scrolls to that message instead.
-  const { pin } = useStickToBottom(section, !focus)
+  const { ref: stickToBottom, pin } = useStickToBottom(!focus)
   const scrolledTo = useRef<string | null>(null)
   /** Focus a message without scrolling to it, as when switching siblings. */
   const choose = (rkey: string) => {
@@ -128,7 +127,7 @@ export function ConversationView(props: ConversationViewProps) {
   }
 
   return (
-    <section className="conversation" ref={section}>
+    <section className="conversation" ref={stickToBottom}>
       <ConversationHeader
         skey={props.skey}
         title={title}

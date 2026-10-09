@@ -32,7 +32,7 @@ const { openStore, question, store } = vi.hoisted(() => {
     },
     state: () => 'active',
     onState: () => () => {},
-    onChange: () => () => {},
+    onChange: vi.fn((_listener: (change: { type: string }) => void) => () => {}),
     claim: async () => 'active',
     deleteLocalCopy: vi.fn(async () => {}),
   }
@@ -167,6 +167,20 @@ describe('App', () => {
     expect(screen.getByText('Which tiles?')).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/shared/did:plc:alice/3aaa')
     expect(openStore).not.toHaveBeenCalled()
+  })
+
+  it("signs the device out when the store's sync finds the session has ended", async () => {
+    signedIn()
+    const assign = vi.fn()
+    vi.stubGlobal('location', { ...window.location, assign })
+    renderApp('/')
+    expect(
+      await screen.findByText('Start a new chat, or pick one from the list.'),
+    ).toBeInTheDocument()
+    const listener = store.onChange.mock.calls.at(-1)?.[0]
+    listener?.({ type: 'unauthorized' })
+    await vi.waitFor(() => expect(assign).toHaveBeenCalledWith('/login'))
+    expect(store.deleteLocalCopy).toHaveBeenCalled()
   })
 
   it('sends users who are not admins from the admin area to their chats', async () => {

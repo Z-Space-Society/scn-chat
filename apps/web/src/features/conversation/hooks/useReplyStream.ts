@@ -1,37 +1,10 @@
-import {
-  queryOptions,
-  experimental_streamedQuery as streamedQuery,
-  type UseQueryResult,
-  useQueries,
-  useQuery,
-} from '@tanstack/react-query'
-import { useCallback, useState } from 'react'
-import { conversationRefreshKey, useStore } from '../../../store/react.tsx'
-import { addEvent, FINISHED, noParts, replyEvents } from '../lib/reply-stream.ts'
+import { type UseQueryResult, useQueries, useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useStore } from '../../../store/react.tsx'
+import { replyStreamQuery } from '../queries.ts'
 
 const POLL_START_MS = 2_000
 const POLL_MAX_MS = 30_000
-
-/** A reply's stream, reduced to its parts so far. A finished status refreshes the conversation. */
-export const replyStreamQuery = (skey: string, rkey: string) =>
-  queryOptions({
-    queryKey: ['reply-stream', skey, rkey],
-    queryFn: streamedQuery({
-      streamFn: async function* ({ client, signal }) {
-        const url = `/api/conversations/${skey}/messages/${rkey}/stream`
-        for await (const event of replyEvents(url, signal)) {
-          yield event
-          if (event.type === 'status' && FINISHED.has(event.status))
-            void client.invalidateQueries({ queryKey: conversationRefreshKey(skey) })
-        }
-      },
-      reducer: addEvent,
-      initialValue: noParts,
-    }),
-    // A stream runs once. Leaving the conversation drops it, and coming back follows again.
-    staleTime: Number.POSITIVE_INFINITY,
-    gcTime: 0,
-  })
 
 /** Whether each stream has ended, by failing or by finishing. */
 const endedStreams = (results: UseQueryResult[]) =>
@@ -47,11 +20,8 @@ export function useReplyStream(skey: string, pending: string[]) {
   const store = useStore()
   // Replies followed as soon as they are sent, before their pending record reaches the local copy.
   const [followed, setFollowed] = useState<string[]>([])
-  const follow = useCallback(
-    (rkey: string) =>
-      setFollowed((current) => (current.includes(rkey) ? current : [...current, rkey])),
-    [],
-  )
+  const follow = (rkey: string) =>
+    setFollowed((current) => (current.includes(rkey) ? current : [...current, rkey]))
   const rkeys = [...new Set([...pending, ...followed])]
   const ended = useQueries({
     queries: rkeys.map((rkey) => replyStreamQuery(skey, rkey)),

@@ -1,11 +1,9 @@
-import { api, read } from '../../../shared/api.ts'
+import { useMutation } from '@tanstack/react-query'
 import { useOpenStore } from '../../../store/react.tsx'
+import { signOut } from '../sign-out.ts'
 
+/** Sign this device out, deleting its copy of the chats. */
 export function useSignOut() {
   const openStore = useOpenStore()
-  return async () => {
-    await read(api.auth.logout.$post())
-    await openStore().deleteLocalCopy()
-    location.assign('/login')
-  }
+  return useMutation({ mutationFn: () => signOut(openStore()) })
 }

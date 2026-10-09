@@ -42,10 +42,15 @@ export const json = (body: unknown) => ({
 
 const unauthorized = new Set<() => void>()
 
-/** Call a listener whenever a request finds the session has ended. */
+/** Call a listener whenever a request, or anything that reports it, finds the session has ended. */
 export function onUnauthorized(listener: () => void): () => void {
   unauthorized.add(listener)
   return () => unauthorized.delete(listener)
+}
+
+/** Tell the listeners the session has ended, as a request finding it does. */
+export function reportUnauthorized() {
+  for (const listener of unauthorized) listener()
 }
 
 export class ApiError extends Error {
@@ -74,7 +79,7 @@ export async function read<R extends ClientResponse<unknown, number, string>>(
   response: Promise<R>,
 ): Promise<SuccessBody<R>> {
   const res = await response
-  if (res.status === 401) for (const listener of unauthorized) listener()
+  if (res.status === 401) reportUnauthorized()
   if (!res.ok) {
     const { message, issues } = await errorDetails(res)
     if (res.status !== 401) console.error(`Request failed: ${res.status} ${res.url}`, message)
