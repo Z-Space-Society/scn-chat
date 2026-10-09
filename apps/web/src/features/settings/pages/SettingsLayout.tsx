@@ -2,6 +2,7 @@ import { useMutation } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { messageOf } from '../../../shared/errors.ts'
+import { SectionNav } from '../../../shared/SectionNav.tsx'
 import { SidebarLayout } from '../../../shared/SidebarLayout.tsx'
 import { useSignOut } from '../../auth/hooks/useSignOut.ts'
 import { useMe } from '../../auth/session.tsx'
@@ -29,15 +30,7 @@ export function SettingsLayout(props: Props) {
             Back to chats
           </Link>
           {admin && <Link to="/admin">Admin</Link>}
-          <ul>
-            {sections.map((section) => (
-              <li key={section.to}>
-                <Link to={section.to} activeOptions={{ exact: true }}>
-                  {section.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <SectionNav sections={sections} activeOptions={{ exact: true }} />
           <button type="button" onClick={() => signOut.mutate()}>
             Sign out
           </button>

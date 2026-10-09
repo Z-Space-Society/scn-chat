@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { replyStreamQuery } from '../hooks/useReplyStream.ts'
 import { streamedReply } from '../lib/reply-stream.ts'
-import { StreamingReply } from './MessageView.tsx'
+import { StreamingReply } from './StreamingReply.tsx'
 
 interface Props {
   skey: string

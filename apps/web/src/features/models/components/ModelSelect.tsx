@@ -2,11 +2,9 @@ import type { ModelRef } from '@scn-chat/lexicons'
 import type { ComponentProps } from 'react'
 import { effortLevels, type ModelOption, modelRef, sameModel } from '../models.ts'
 
-type SelectProps = Omit<ComponentProps<'select'>, 'value' | 'onChange'>
-
 const keyOf = (m: ModelRef) => `${m.provider}/${m.id}`
 
-interface ModelSelectProps extends SelectProps {
+interface ModelSelectProps extends Omit<ComponentProps<'select'>, 'value' | 'onChange'> {
   models: ModelOption[]
   value: ModelRef | null
   onChange: (model: ModelRef | null) => void
@@ -43,7 +41,7 @@ export function ModelSelect(props: ModelSelectProps) {
   )
 }
 
-interface EffortSelectProps extends SelectProps {
+interface EffortSelectProps extends Omit<ComponentProps<'select'>, 'value' | 'onChange'> {
   value: string
   onChange: (value: string) => void
 }

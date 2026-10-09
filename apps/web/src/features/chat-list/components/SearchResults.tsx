@@ -39,34 +39,52 @@ export function SearchResults(props: SearchResultsProps) {
           {props.remaining === 1 ? 'conversation' : 'conversations'}.
         </p>
       )}
-      {props.results.length === 0 ? (
-        <p>No matches.</p>
-      ) : (
-        <ul>
-          {props.results.map((result) => (
-            <li key={`${result.skey}/${result.rkey ?? ''}`}>
-              <Link
-                to="/chat/$skey"
-                params={{ skey: result.skey }}
-                search={result.rkey ? { m: result.rkey } : {}}
-              >
-                {result.rkey ? (
-                  <>
-                    <strong>{result.title || 'New chat'}</strong>
-                    <small>
-                      <Snippet text={result.snippet} />
-                    </small>
-                  </>
-                ) : (
-                  <strong>
-                    <Snippet text={result.snippet} />
-                  </strong>
-                )}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ResultList results={props.results} />
     </div>
+  )
+}
+
+interface ResultListProps {
+  results: SearchResult[]
+}
+
+function ResultList(props: ResultListProps) {
+  if (props.results.length === 0) return <p>No matches.</p>
+  return (
+    <ul>
+      {props.results.map((result) => (
+        <li key={`${result.skey}/${result.rkey ?? ''}`}>
+          <Link
+            to="/chat/$skey"
+            params={{ skey: result.skey }}
+            search={result.rkey ? { m: result.rkey } : {}}
+          >
+            <ResultLabel result={result} />
+          </Link>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+interface ResultLabelProps {
+  result: SearchResult
+}
+
+/** A matching message under its chat's title, or a matching title alone. */
+function ResultLabel(props: ResultLabelProps) {
+  if (!props.result.rkey)
+    return (
+      <strong>
+        <Snippet text={props.result.snippet} />
+      </strong>
+    )
+  return (
+    <>
+      <strong>{props.result.title || 'New chat'}</strong>
+      <small>
+        <Snippet text={props.result.snippet} />
+      </small>
+    </>
   )
 }

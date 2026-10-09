@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
+import { SectionNav } from '../../../shared/SectionNav.tsx'
 import { SidebarLayout } from '../../../shared/SidebarLayout.tsx'
 
 const sections = [
@@ -30,16 +31,8 @@ export function AdminLayout(props: Props) {
           <Link to="/settings" activeOptions={{ exact: true }}>
             Account settings
           </Link>
-          <ul>
-            {sections.map((section) => (
-              <li key={section.to}>
-                {/* A plugin's own page counts as the plugins section. */}
-                <Link to={section.to} activeOptions={{ includeSearch: false }}>
-                  {section.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
+          {/* A plugin's own page counts as the plugins section. */}
+          <SectionNav sections={sections} activeOptions={{ includeSearch: false }} />
         </>
       }
     >

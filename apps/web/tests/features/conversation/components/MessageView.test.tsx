@@ -1,10 +1,8 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import {
-  MessageView,
-  StreamingReply,
-} from '../../../../src/features/conversation/components/MessageView.tsx'
+import { MessageView } from '../../../../src/features/conversation/components/MessageView.tsx'
+import { StreamingReply } from '../../../../src/features/conversation/components/StreamingReply.tsx'
 
 const d = (name: string) => `network.sharedcomputer.chat.defs#${name}`
 const blobUrl = (cid: string) => `/blob/${cid}`

@@ -4,6 +4,7 @@ import { Link, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { api, json, read } from '../../../shared/api.ts'
 import { lastError, messageOf } from '../../../shared/errors.ts'
+import { splitLines } from '../../../shared/lines.ts'
 import { adminRolesQuery } from '../queries.ts'
 
 type Role = {
@@ -14,12 +15,6 @@ type Role = {
   handleDomains: string[]
   members: { did: string; handle: string | null; addedBy: string }[]
 }
-
-const lines = (text: string) =>
-  text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
 
 interface RoleAdminProps {
   name: string
@@ -82,8 +77,8 @@ function RoleForm(props: RoleFormProps) {
           { param: { name } },
           json({
             description: draft.description,
-            pdsHosts: lines(draft.hosts),
-            handleDomains: lines(draft.domains),
+            pdsHosts: splitLines(draft.hosts),
+            handleDomains: splitLines(draft.domains),
           }),
         ),
       ),
