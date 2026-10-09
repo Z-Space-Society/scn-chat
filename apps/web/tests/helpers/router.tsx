@@ -8,7 +8,7 @@ import {
 } from '@tanstack/react-router'
 import { render } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import { createQueryClient } from '../../src/router.tsx'
+import { createQueryClient, routerDefaults } from '../../src/router.tsx'
 
 /**
  * Render UI under a memory router at a path such as '/chat/s1?m=r', with a fresh query client,
@@ -20,6 +20,7 @@ export async function renderAt(ui: ReactNode, path = '/') {
   // A splat child, so every path matches and the root renders the UI.
   const any = createRoute({ getParentRoute: () => root, path: '$' })
   const router = createRouter({
+    ...routerDefaults,
     routeTree: root.addChildren([any]),
     history: createMemoryHistory({ initialEntries: [path] }),
     Wrap: ({ children }) => (

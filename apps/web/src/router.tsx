@@ -2,6 +2,7 @@ import { QueryClient } from '@tanstack/react-query'
 import { createRouter, type RouterHistory } from '@tanstack/react-router'
 import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query'
 import { routeTree } from './routeTree.gen.ts'
+import { RouteError, RoutePending } from './shared/route-states.tsx'
 
 export function createQueryClient() {
   return new QueryClient({
@@ -11,12 +12,22 @@ export function createQueryClient() {
 }
 
 /**
+ * What every route shows while loading or after failing, unless it says otherwise. Each route
+ * gets its own boundaries, so a failed section shows inside its layout.
+ */
+export const routerDefaults = {
+  defaultErrorComponent: RouteError,
+  defaultPendingComponent: RoutePending,
+}
+
+/**
  * The router, with a query client of its own, so each server request gets a fresh cache. Queries
  * that loaders fill while rendering on the server reach the browser with the page.
  */
 export function getRouter({ history }: { history?: RouterHistory } = {}) {
   const queryClient = createQueryClient()
   const router = createRouter({
+    ...routerDefaults,
     routeTree,
     history,
     context: { queryClient },
