@@ -12,6 +12,8 @@ The web app uses Hono server, listing on port 3000 by default. It runs [TanStack
 
 Code is grouped by feature in `src/features/`, and `src/routes/` maps each URL to a feature's page.
 
+Each route's loader fetches the server data its page needs, and the page reads it with `useSuspenseQuery`, so a page renders with its data and a failed load shows inside the page's layout with a Retry. Chats are the exception: they come from the browser's local copy in `src/store/`, not from loaders. Message parts are drawn by the views in `src/parts/`, looked up by part type, and `src/shared/` holds what features share, like the form kit in `form.tsx` that every form is built with.
+
 ## Chat history storage
 
 The goal is to keep users in control of their own chat data. The server should not keep a copy of the chat records. The records are stored in the browser in a wasm sqlite db to allow easy listing and search without having to perform intensive operations on the PDS.
