@@ -19,7 +19,11 @@ class FakeEventSource {
     this.listeners.set(type, [...(this.listeners.get(type) ?? []), listener])
   }
   emit(type: string, data: object) {
-    for (const listener of this.listeners.get(type) ?? []) listener({ data: JSON.stringify(data) })
+    this.emitRaw(type, JSON.stringify(data))
+  }
+  emitRaw(type: string, data: string) {
+    if (this.closed) return
+    for (const listener of this.listeners.get(type) ?? []) listener({ data })
   }
   close() {
     this.closed = true
@@ -64,6 +68,29 @@ describe('replyEvents', () => {
     const { seen, error } = await done
     expect(seen).toHaveLength(1)
     expect(error).toBeInstanceOf(Error)
+    expect(source.closed).toBe(true)
+  })
+
+  it('keeps the events sent before the connection drops, even unread', async () => {
+    const events = replyEvents('/stream', new AbortController().signal)
+    const first = events.next()
+    const source = FakeEventSource.last
+    source.emit('delta', { index: 0, text: 'Hi' })
+    source.emit('delta', { index: 0, text: ' there' })
+    source.onerror?.()
+    expect((await first).value).toEqual({ type: 'delta', index: 0, text: 'Hi' })
+    const { seen, error } = await collect(events)
+    expect(seen).toEqual([{ type: 'delta', index: 0, text: ' there' }])
+    expect(error).toBeInstanceOf(Error)
+  })
+
+  it('throws when an event is not JSON, closing the connection', async () => {
+    const done = collect(replyEvents('/stream', new AbortController().signal))
+    const source = FakeEventSource.last
+    source.emitRaw('delta', 'not json')
+    const { seen, error } = await done
+    expect(seen).toEqual([])
+    expect(error).toBeInstanceOf(SyntaxError)
     expect(source.closed).toBe(true)
   })
 
