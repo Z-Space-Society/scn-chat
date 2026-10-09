@@ -5,14 +5,34 @@ import { useStore, useStoreState } from '../../../store/react.tsx'
 export function BusyBanner() {
   const store = useStore()
   const state = useStoreState()
-  if (state !== 'busy' && state !== 'failed') return null
+  const claim = () => void store.claim()
+  if (state === 'busy')
+    return (
+      <Banner message={`${appName()} is busy in another tab.`} action="Use here" onAction={claim} />
+    )
+  if (state === 'failed')
+    return (
+      <Banner
+        message={`${appName()} couldn't open this device's copy of your chats.`}
+        action="Try again"
+        onAction={claim}
+      />
+    )
+  return null
+}
+
+interface BannerProps {
+  message: string
+  action: string
+  onAction: () => void
+}
+
+function Banner(props: BannerProps) {
   return (
     <div role="status" className="banner">
-      {state === 'busy'
-        ? `${appName()} is busy in another tab.`
-        : `${appName()} couldn't open this device's copy of your chats.`}{' '}
-      <button type="button" onClick={() => void store.claim()}>
-        {state === 'busy' ? 'Use here' : 'Try again'}
+      {props.message}{' '}
+      <button type="button" onClick={props.onAction}>
+        {props.action}
       </button>
     </div>
   )

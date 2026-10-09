@@ -1,15 +1,19 @@
 import type { ModelRef } from '@scn-chat/lexicons'
 import { nsid } from '@scn-chat/lexicons/nsid'
+import { useStore as useFormStore } from '@tanstack/react-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { useState } from 'react'
+import type { BlobRef } from '../../../parts/types.ts'
 import { api, json, read } from '../../../shared/api.ts'
+import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
 import { lastError, messageOf } from '../../../shared/errors.ts'
+import { useAppForm } from '../../../shared/form.tsx'
 import { conversationRefreshKey } from '../../../store/react.tsx'
-import { EffortSelect, ModelSelect } from '../../models/components/ModelSelect.tsx'
 import { useModels } from '../../models/hooks/useModels.ts'
 import { sameModel } from '../../models/models.ts'
+import { useAttachments } from '../hooks/useAttachments.ts'
 import { attachmentTypesQuery } from '../queries.ts'
+import { ModelPicker } from './ModelPicker.tsx'
 
 export interface ComposerProps {
   skey: string
@@ -21,174 +25,145 @@ export interface ComposerProps {
   onCancel?: () => void
 }
 
+interface Draft {
+  text: string
+  /** The chosen model by reference, so its capabilities come from the current catalog. */
+  model: ModelRef | null
+  effort: string
+}
+
 /** The CID of an attachment part's image or file. */
-const blobCid = (part: Record<string, unknown>) =>
-  ((part.image ?? part.file) as { ref: { $link: string } }).ref.$link
+const blobCid = (part: Record<string, unknown>) => ((part.image ?? part.file) as BlobRef).ref.$link
 
 /** What the attach button takes: any type an ingester reads, and images when the model sees them. */
 const acceptedTypes = (types: { images: string[]; files: string[] }, images: boolean) =>
   [...(images ? types.images : []), ...types.files].join(',')
 
-/** Upload a file the composer will attach, returning its attachment part. */
-const uploadAttachment = (file: File) =>
-  read(
-    api.blobs.attachments.$post(
-      {},
-      {
-        init: {
-          body: file,
-          headers: {
-            'content-type': file.type || 'application/octet-stream',
-            'x-filename': encodeURIComponent(file.name),
-          },
-        },
-      },
-    ),
-  )
-
 /** The message box, with model and effort choice and attachments. */
 export function Composer(props: ComposerProps) {
-  const [text, setText] = useState(props.initialText ?? '')
   const { models, fallback, noModels } = useModels(props.inherited ?? null)
-  // The chosen model by reference, so its capabilities come from the current catalog.
-  const [chosenModel, setChosenModel] = useState<ModelRef | null>(null)
+  const queryClient = useQueryClient()
+  const sending = useMutation({
+    mutationFn: (body: { parts: Record<string, unknown>[]; generation: object }) =>
+      read(
+        api.turns.conversations[':skey'].messages.$post(
+          { param: { skey: props.skey } },
+          json({ parent: props.parent, ...body }),
+        ),
+      ),
+    onSuccess: (sent) => {
+      attachments.clear()
+      props.onSent({ rkey: sent.rkey, replyRkey: sent.replyRkey })
+      // Refreshing picks up the sent message without waiting for the stream.
+      return queryClient.invalidateQueries({ queryKey: conversationRefreshKey(props.skey) })
+    },
+  })
+  const form = useAppForm({
+    defaultValues: { text: props.initialText ?? '', model: null, effort: '' } as Draft,
+    // The attachments and what the chosen model allows depend on the form's values, so they come
+    // below, and submitting reads them as they are when it runs.
+    onSubmit: ({ value, formApi }) => {
+      attachments.dismissRefused()
+      if (blocked || attachments.uploading) return
+      if (!value.text.trim() && attachments.parts.length === 0) return
+      const parts = [
+        ...attachments.parts,
+        ...(value.text.trim() ? [{ $type: `${nsid.defs}#textPart`, text: value.text }] : []),
+      ]
+      const generation = {
+        ...(value.model ? { model: value.model } : {}),
+        ...(effort ? { effort } : {}),
+      }
+      sending.mutate({ parts, generation }, { onSuccess: () => formApi.setFieldValue('text', '') })
+    },
+  })
+  const chosenModel = useFormStore(form.store, (state) => state.values.model)
+  const chosenEffort = useFormStore(form.store, (state) => state.values.effort)
   const model = chosenModel && models.find((m) => sameModel(m, chosenModel))
   // With the fallback model, the server checks vision when the turn starts. A chosen model no
   // longer on offer takes no images, as nothing says it can read them.
   const seesImages = chosenModel ? Boolean(model?.capabilities.vision) : true
-  const [effort, setEffort] = useState('')
-  const [attachments, setAttachments] = useState<Record<string, unknown>[]>([])
-  const [uploading, setUploading] = useState(0)
-  // A file this composer refused before uploading it.
-  const [refused, setRefused] = useState<string | null>(null)
+  const attachments = useAttachments(seesImages)
+  const reasons = Boolean(model?.capabilities.reasoning)
+  // Effort is sent only while its select is shown, so switching models back keeps the choice.
+  const effort = reasons ? chosenEffort : ''
   // Without a fallback model, the server has nothing to run the turn with.
   const needsModel = !chosenModel && fallback === null
   const blocked = noModels || needsModel
-  // Effort is sent only while its select is shown, so switching models back keeps the choice.
-  const chosenEffort = model?.capabilities.reasoning ? effort : ''
-  const { data: types, error: typesError } = useQuery(attachmentTypesQuery)
-  const queryClient = useQueryClient()
-  const accept = types && acceptedTypes(types, seesImages)
-
-  // Several uploads can run at once, so each one counts while it runs.
-  const uploadingFile = useMutation({
-    mutationFn: uploadAttachment,
-    onMutate: () => setUploading((n) => n + 1),
-    onSuccess: ({ part }) => setAttachments((current) => [...current, part]),
-    onSettled: () => setUploading((n) => n - 1),
-  })
-  const attach = (files: FileList | null) => {
-    setRefused(null)
-    for (const file of Array.from(files ?? [])) {
-      if (file.type.startsWith('image/') && !seesImages)
-        setRefused('This model cannot read images.')
-      else uploadingFile.mutate(file)
-    }
-  }
-
-  const send = async () => {
-    if (blocked || uploading > 0 || (!text.trim() && attachments.length === 0)) return
-    const parts = [
-      ...attachments,
-      ...(text.trim() ? [{ $type: `${nsid.defs}#textPart`, text }] : []),
-    ]
-    const generation = {
-      ...(chosenModel ? { model: chosenModel } : {}),
-      ...(chosenEffort ? { effort: chosenEffort } : {}),
-    }
-    const sent = await read(
-      api.turns.conversations[':skey'].messages.$post(
-        { param: { skey: props.skey } },
-        json({ parent: props.parent, parts, generation }),
-      ),
-    )
-    setText('')
-    setAttachments([])
-    props.onSent({ rkey: sent.rkey, replyRkey: sent.replyRkey })
-  }
-  const sending = useMutation({
-    mutationFn: send,
-    // Refreshing picks up the sent message without waiting for the stream.
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: conversationRefreshKey(props.skey) }),
-  })
-  const submit = () => {
-    setRefused(null)
-    sending.mutate()
-  }
+  const types = useQuery(attachmentTypesQuery)
   const error =
-    refused ??
-    lastError(uploadingFile, sending) ??
-    (typesError && `Could not load the attachment types: ${messageOf(typesError)}`)
+    attachments.refused ??
+    lastError(attachments.upload, sending) ??
+    (types.error && `Could not load the attachment types: ${messageOf(types.error)}`)
 
   return (
-    <form
-      className="composer"
-      onSubmit={(event) => {
-        event.preventDefault()
-        submit()
-      }}
-    >
-      <textarea
-        aria-label="Message"
-        value={text}
-        placeholder="Message"
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault()
-            submit()
-          }
-        }}
-      />
-      <div>
-        <ModelSelect
-          aria-label="Model"
-          models={models}
-          value={chosenModel}
-          onChange={setChosenModel}
-        >
-          {fallback === null ? (
-            <option value="" disabled>
-              Choose a model
-            </option>
-          ) : (
-            <option value="">Default model</option>
+    <form.AppForm>
+      <form.Form className="composer">
+        <form.AppField name="text">
+          {(field) => (
+            <field.TextAreaField
+              aria-label="Message"
+              placeholder="Message"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  void form.handleSubmit()
+                }
+              }}
+            />
           )}
-        </ModelSelect>
-        {model?.capabilities.reasoning && (
-          <EffortSelect aria-label="Effort" value={effort} onChange={setEffort}>
-            <option value="">Default effort</option>
-          </EffortSelect>
-        )}
-        <input
-          aria-label="Attach"
-          type="file"
-          multiple
-          accept={accept ?? undefined}
-          onChange={(e) => attach(e.target.files)}
-        />
-        {uploading > 0 && <span>Uploading...</span>}
-        {attachments.map((part) => (
-          <span key={blobCid(part)}>{(part.name as string | undefined) ?? 'Image'}</span>
-        ))}
-        <button type="submit" disabled={blocked || uploading > 0}>
-          Send
-        </button>
-        {props.onCancel && (
-          <button type="button" onClick={props.onCancel}>
-            Cancel
+        </form.AppField>
+        <div>
+          <ModelPicker
+            models={models}
+            fallback={fallback}
+            model={chosenModel}
+            onModelChange={(next) => form.setFieldValue('model', next)}
+            reasons={reasons}
+            effort={chosenEffort}
+            onEffortChange={(next) => form.setFieldValue('effort', next)}
+          />
+          <input
+            aria-label="Attach"
+            type="file"
+            multiple
+            accept={types.data && acceptedTypes(types.data, seesImages)}
+            onChange={(e) => attachments.attach(e.target.files)}
+          />
+          {attachments.uploading && <span>Uploading...</span>}
+          {attachments.parts.map((part) => (
+            <span key={blobCid(part)}>{(part.name as string | undefined) ?? 'Image'}</span>
+          ))}
+          <button type="submit" disabled={blocked || attachments.uploading}>
+            Send
           </button>
-        )}
-      </div>
-      {noModels && (
-        <p>
-          No models are available to you. Add your own API key in{' '}
-          <Link to="/settings/api-keys">Settings</Link>.
-        </p>
-      )}
-      {needsModel && !noModels && <p>Choose a model, or set a default model in Settings.</p>}
-      {error && <p role="alert">{error}</p>}
-    </form>
+          {props.onCancel && (
+            <button type="button" onClick={props.onCancel}>
+              Cancel
+            </button>
+          )}
+        </div>
+        <ModelNotice noModels={noModels} needsModel={needsModel} />
+        <ErrorAlert error={error} />
+      </form.Form>
+    </form.AppForm>
   )
+}
+
+interface ModelNoticeProps {
+  noModels: boolean
+  needsModel: boolean
+}
+
+/** Why the composer can't send yet, for want of a model. */
+function ModelNotice(props: ModelNoticeProps) {
+  if (props.noModels)
+    return (
+      <p>
+        No models are available to you. Add your own API key in{' '}
+        <Link to="/settings/api-keys">Settings</Link>.
+      </p>
+    )
+  if (props.needsModel) return <p>Choose a model, or set a default model in Settings.</p>
+  return null
 }

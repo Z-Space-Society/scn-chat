@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { streamedReply } from '../lib/reply-stream.ts'
 import { replyStreamQuery } from '../queries.ts'
+import { Thinking } from './Status.tsx'
 import { StreamingReply } from './StreamingReply.tsx'
 
 interface Props {
@@ -18,6 +19,6 @@ export function ReplyStream(props: Props) {
     enabled: false,
     select: streamedReply,
   })
-  if (data === undefined) return <p>Thinking...</p>
+  if (data === undefined) return <Thinking />
   return <StreamingReply streaming={data} />
 }

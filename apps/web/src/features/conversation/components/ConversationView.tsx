@@ -131,7 +131,7 @@ export function ConversationView(props: ConversationViewProps) {
       <ConversationHeader
         skey={props.skey}
         title={title}
-        onRename={(title, onSaved) => renamingTitle.mutate(title, { onSuccess: onSaved })}
+        onRename={(title) => renamingTitle.mutateAsync(title)}
         onSync={() => syncing.mutate()}
       />
       {(error ?? loadError) && <p role="alert">{error ?? loadError}</p>}
