@@ -1,7 +1,8 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { api, json, read } from '../../../shared/api.ts'
-import { lastError, messageOf } from '../../../shared/errors.ts'
+import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
+import { lastError } from '../../../shared/errors.ts'
 import { ReorderButtons } from '../components/ReorderButtons.tsx'
 import { useModelsChanged } from '../hooks/changes.ts'
 import { storedModel } from '../lib/models.ts'
@@ -10,8 +11,7 @@ import { type AdminModelEntry, adminModelsQuery } from '../queries.ts'
 
 /** The admin models from every provider, for choosing the default and the order users see. */
 export function ModelsAdmin() {
-  const query = useQuery(adminModelsQuery)
-  const models = query.data ?? []
+  const { data: models } = useSuspenseQuery(adminModelsQuery)
   const modelsChanged = useModelsChanged()
   const makeDefault = useMutation({
     mutationFn: (model: AdminModelEntry) =>
@@ -28,7 +28,6 @@ export function ModelsAdmin() {
       ),
     onSuccess: modelsChanged,
   })
-  const error = lastError(makeDefault, reorder) ?? (query.error && messageOf(query.error))
   return (
     <section>
       <h2>Models</h2>
@@ -39,26 +38,44 @@ export function ModelsAdmin() {
       </p>
       <ol>
         {models.map((model, index) => (
-          <li key={`${model.provider}/${model.id}`}>
-            <label>
-              <input
-                type="radio"
-                name="default-model"
-                checked={model.default}
-                onChange={() => makeDefault.mutate(model)}
-              />{' '}
-              {model.name} ({model.provider}/{model.id})
-            </label>{' '}
-            <ReorderButtons
-              index={index}
-              count={models.length}
-              onMove={(by) => reorder.mutate(moveItem(models, index, by))}
-            />
-            {model.warning && <p role="alert">{model.warning}</p>}
-          </li>
+          <ModelRow
+            key={`${model.provider}/${model.id}`}
+            model={model}
+            index={index}
+            count={models.length}
+            onMakeDefault={() => makeDefault.mutate(model)}
+            onMove={(by) => reorder.mutate(moveItem(models, index, by))}
+          />
         ))}
       </ol>
-      {error && <p role="alert">{error}</p>}
+      <ErrorAlert error={lastError(makeDefault, reorder)} />
     </section>
+  )
+}
+
+interface ModelRowProps {
+  model: AdminModelEntry
+  index: number
+  count: number
+  onMakeDefault: () => void
+  onMove: (by: number) => void
+}
+
+function ModelRow(props: ModelRowProps) {
+  const model = props.model
+  return (
+    <li>
+      <label>
+        <input
+          type="radio"
+          name="default-model"
+          checked={model.default}
+          onChange={props.onMakeDefault}
+        />{' '}
+        {model.name} ({model.provider}/{model.id})
+      </label>{' '}
+      <ReorderButtons index={props.index} count={props.count} onMove={props.onMove} />
+      {model.warning && <p role="alert">{model.warning}</p>}
+    </li>
   )
 }

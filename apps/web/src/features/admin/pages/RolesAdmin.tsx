@@ -1,30 +1,14 @@
-import { useForm } from '@tanstack/react-form'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { api, json, read } from '../../../shared/api.ts'
-import { messageOf } from '../../../shared/errors.ts'
+import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
+import { useAppForm } from '../../../shared/form.tsx'
 import { useRolesChanged } from '../hooks/changes.ts'
 import { adminRolesQuery } from '../queries.ts'
 
 /** A summary of every role, each linking to its page, and a form to create one. */
 export function RolesAdmin() {
-  const roles = useQuery(adminRolesQuery)
-  const rolesChanged = useRolesChanged()
-  const navigate = useNavigate()
-  const create = useMutation({
-    mutationFn: (draft: { name: string; description: string }) =>
-      read(api.admin.roles.$post({}, json(draft))),
-    onSuccess: async (_, draft) => {
-      await rolesChanged()
-      await navigate({ to: '/admin/roles/$name', params: { name: draft.name } })
-    },
-  })
-  const form = useForm({
-    defaultValues: { name: '', description: '' },
-    onSubmit: ({ value }) => create.mutate(value),
-  })
-  const environmentAdmins = roles.data?.environmentAdmins ?? []
-  const error = create.error ? messageOf(create.error) : roles.error && messageOf(roles.error)
+  const { data } = useSuspenseQuery(adminRolesQuery)
   return (
     <section>
       <h2>Roles</h2>
@@ -43,54 +27,79 @@ export function RolesAdmin() {
           </tr>
         </thead>
         <tbody>
-          {(roles.data?.roles ?? []).map((role) => (
-            <tr key={role.name}>
-              <td>
-                <Link to="/admin/roles/$name" params={{ name: role.name }}>
-                  {role.name}
-                </Link>
-              </td>
-              <td>{role.description}</td>
-              <td>
-                {role.members.length + (role.name === 'admin' ? environmentAdmins.length : 0)}
-              </td>
-              <td>{role.pdsHosts.join(', ')}</td>
-              <td>{role.handleDomains.join(', ')}</td>
-            </tr>
+          {data.roles.map((role) => (
+            <RoleRow
+              key={role.name}
+              role={role}
+              environmentAdmins={data.environmentAdmins.length}
+            />
           ))}
         </tbody>
       </table>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          void form.handleSubmit()
-        }}
-      >
-        <h3>New role</h3>
-        <form.Field name="name">
-          {(field) => (
-            <input
-              aria-label="Role name"
-              placeholder="name"
-              value={field.state.value}
-              onChange={(e) => field.handleChange(e.target.value)}
-              required
-            />
-          )}
-        </form.Field>
-        <form.Field name="description">
-          {(field) => (
-            <input
-              aria-label="Role description"
-              placeholder="Description"
-              value={field.state.value}
-              onChange={(e) => field.handleChange(e.target.value)}
-            />
-          )}
-        </form.Field>
-        <button type="submit">Create role</button>
-      </form>
-      {error && <p role="alert">{error}</p>}
+      <NewRoleForm />
     </section>
+  )
+}
+
+interface RoleRowProps {
+  role: {
+    name: string
+    description: string
+    members: unknown[]
+    pdsHosts: string[]
+    handleDomains: string[]
+  }
+  /** How many admins the environment names, who count as members of the admin role. */
+  environmentAdmins: number
+}
+
+function RoleRow(props: RoleRowProps) {
+  const role = props.role
+  return (
+    <tr>
+      <td>
+        <Link to="/admin/roles/$name" params={{ name: role.name }}>
+          {role.name}
+        </Link>
+      </td>
+      <td>{role.description}</td>
+      <td>{role.members.length + (role.name === 'admin' ? props.environmentAdmins : 0)}</td>
+      <td>{role.pdsHosts.join(', ')}</td>
+      <td>{role.handleDomains.join(', ')}</td>
+    </tr>
+  )
+}
+
+function NewRoleForm() {
+  const rolesChanged = useRolesChanged()
+  const navigate = useNavigate()
+  const create = useMutation({
+    mutationFn: (draft: { name: string; description: string }) =>
+      read(api.admin.roles.$post({}, json(draft))),
+    onSuccess: async (_, draft) => {
+      await rolesChanged()
+      await navigate({ to: '/admin/roles/$name', params: { name: draft.name } })
+    },
+  })
+  const form = useAppForm({
+    defaultValues: { name: '', description: '' },
+    onSubmit: ({ value }) => create.mutate(value),
+  })
+  return (
+    <>
+      <form.AppForm>
+        <form.Form>
+          <h3>New role</h3>
+          <form.AppField name="name">
+            {(field) => <field.TextField aria-label="Role name" placeholder="name" required />}
+          </form.AppField>
+          <form.AppField name="description">
+            {(field) => <field.TextField aria-label="Role description" placeholder="Description" />}
+          </form.AppField>
+          <form.SubmitButton>Create role</form.SubmitButton>
+        </form.Form>
+      </form.AppForm>
+      <ErrorAlert error={create.error} />
+    </>
   )
 }

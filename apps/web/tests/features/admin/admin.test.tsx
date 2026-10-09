@@ -1,7 +1,7 @@
 import { useSearch } from '@tanstack/react-router'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { ReactNode } from 'react'
+import { type ReactNode, Suspense } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AccessAdmin } from '../../../src/features/admin/pages/AccessAdmin.tsx'
 import { AdminLayout } from '../../../src/features/admin/pages/AdminLayout.tsx'
@@ -223,7 +223,13 @@ function Users() {
 
 /** Render an admin section in the admin layout at its path, such as '/admin/roles'. */
 const renderPage = (section: ReactNode, path: string) =>
-  renderAt(<AdminLayout>{section}</AdminLayout>, path)
+  renderAt(
+    <AdminLayout>
+      {/* The boundary the section's route gives it, so the layout shows while it loads. */}
+      <Suspense>{section}</Suspense>
+    </AdminLayout>,
+    path,
+  )
 
 describe('Admin layout', () => {
   it('links to each section and marks the plugins section on a plugin page', async () => {
@@ -688,6 +694,33 @@ describe('Admin settings', () => {
       ]),
     )
     expect(callsTo(fetch, 'PUT', '/api/admin/settings/sessions')).toEqual([{ ttlDays: 30 }])
+  })
+
+  it('starts over from the stored settings once saved, still saying Saved', async () => {
+    // The server stores the app name trimmed.
+    let appName = 'SCN Chat'
+    stubServer({
+      'GET /api/admin/settings': () =>
+        Response.json({
+          settings: [
+            {
+              key: 'general',
+              schema: { properties: { appName: { type: 'string', title: 'App name' } } },
+              value: { appName },
+            },
+          ],
+        }),
+      'PUT /api/admin/settings/general': (init) => {
+        appName = (JSON.parse(String(init?.body)) as { appName: string }).appName.trim()
+        return Response.json({ ok: true })
+      },
+    })
+    await renderPage(<SettingsAdmin title="General" keys={['general']} />, '/admin/general')
+    await userEvent.clear(await screen.findByLabelText('App name'))
+    await userEvent.type(screen.getByLabelText('App name'), '  My Chat  ')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(screen.getByLabelText('App name')).toHaveValue('My Chat'))
+    expect(screen.getByText('Saved.')).toBeInTheDocument()
   })
 
   it("shows a failed group's issues next to its fields, and edits the system prompt as text", async () => {

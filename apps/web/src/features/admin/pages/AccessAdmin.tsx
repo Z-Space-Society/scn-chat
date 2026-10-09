@@ -1,13 +1,18 @@
-import { useForm, useStore as useFormStore } from '@tanstack/react-form'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useStore as useFormStore } from '@tanstack/react-form'
+import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { api, json, read } from '../../../shared/api.ts'
-import { messageOf } from '../../../shared/errors.ts'
+import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
+import { formKey, useAppForm } from '../../../shared/form.tsx'
 import { RolePicker } from '../components/RolePicker.tsx'
 import { roleNames } from '../lib/roles.ts'
 import { adminAccessQuery, adminRolesQuery } from '../queries.ts'
 
 type Registration = 'open' | 'invite' | 'closed'
-type Access = { registration: Registration; inviteRoles: string[] }
+
+interface Access {
+  registration: Registration
+  inviteRoles: string[]
+}
 
 const modes: { mode: Registration; label: string }[] = [
   { mode: 'open', label: 'Open: anyone with an atproto account can create an account.' },
@@ -20,39 +25,45 @@ const modes: { mode: Registration; label: string }[] = [
 
 /** Who can create an account. */
 export function AccessAdmin() {
-  const access = useQuery(adminAccessQuery)
-  const roles = useQuery(adminRolesQuery)
-  // The form only renders once the stored setting loads, and starts from it.
-  if (!access.data && access.error) return <p role="alert">{messageOf(access.error)}</p>
-  if (!access.data) return null
-  return <AccessForm initial={access.data} roleNames={roleNames(roles.data?.roles ?? [])} />
-}
-
-interface Props {
-  initial: Access
-  roleNames: string[]
-}
-
-function AccessForm(props: Props) {
+  const { data: access } = useSuspenseQuery(adminAccessQuery)
+  const { data: roles } = useSuspenseQuery(adminRolesQuery)
   const queryClient = useQueryClient()
   const save = useMutation({
     mutationFn: (value: Access) => read(api.admin.access.$put({}, json(value))),
     onSuccess: (saved) => queryClient.setQueryData(adminAccessQuery.queryKey, saved),
   })
-  const form = useForm({
-    defaultValues: props.initial,
-    onSubmit: ({ value }) => save.mutate(value),
-  })
-  const registration = useFormStore(form.store, (state) => state.values.registration)
   return (
     <section>
       <h2>Access</h2>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          void form.handleSubmit()
-        }}
-      >
+      <AccessForm
+        // Start over from the stored setting whenever it changes.
+        key={formKey(access)}
+        stored={access}
+        roleNames={roleNames(roles.roles)}
+        saved={save.isSuccess}
+        onSave={save.mutate}
+      />
+      <ErrorAlert error={save.error} />
+    </section>
+  )
+}
+
+interface AccessFormProps {
+  stored: Access
+  roleNames: string[]
+  saved: boolean
+  onSave: (access: Access) => void
+}
+
+function AccessForm(props: AccessFormProps) {
+  const form = useAppForm({
+    defaultValues: props.stored,
+    onSubmit: ({ value }) => props.onSave(value),
+  })
+  const registration = useFormStore(form.store, (state) => state.values.registration)
+  return (
+    <form.AppForm>
+      <form.Form>
         <p>
           Who can create an account. People who already have one keep it, until you suspend them on
           the Users page. Admins can always sign in, and anyone can sign in from a share link to
@@ -87,10 +98,9 @@ function AccessForm(props: Props) {
             </form.Field>
           </fieldset>
         )}
-        <button type="submit">Save</button>
-        {save.isSuccess && <span>Saved.</span>}
-      </form>
-      {save.error && <p role="alert">{messageOf(save.error)}</p>}
-    </section>
+        <form.SubmitButton>Save</form.SubmitButton>
+        {props.saved && <span>Saved.</span>}
+      </form.Form>
+    </form.AppForm>
   )
 }
