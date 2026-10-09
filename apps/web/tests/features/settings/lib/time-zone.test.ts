@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { browserTimeZone, syncTimeZone } from '../../../../src/features/settings/lib/time-zone.ts'
+import { browserTimeZone } from '../../../../src/features/settings/lib/preferences.ts'
+import { syncTimeZone } from '../../../../src/features/settings/lib/time-zone.ts'
 import { createQueryClient } from '../../../../src/router.tsx'
 
 function stubPreferences(preferences: Record<string, unknown> | null) {

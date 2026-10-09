@@ -1,11 +1,13 @@
-import { useForm, useStore as useFormStore } from '@tanstack/react-form'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useStore as useFormStore } from '@tanstack/react-form'
+import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { api, json, read } from '../../../shared/api.ts'
-import { lastError, messageOf } from '../../../shared/errors.ts'
+import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
+import { lastError } from '../../../shared/errors.ts'
+import { useAppForm } from '../../../shared/form.tsx'
 import { modelsQuery } from '../../models/queries.ts'
 import { credentialsQuery, providersQuery } from '../queries.ts'
 
-type KeyDraft = {
+interface KeyDraft {
   providerId: string
   apiKey: string
   name: string
@@ -23,25 +25,75 @@ const emptyDraft: KeyDraft = {
   models: '',
 }
 
+/** What a model typed by its ID can do, since nothing says. */
+const noCapabilities = { vision: false, reasoning: false, tools: false }
+
+/** The user's own API keys, and a form to add one. */
 export function ApiKeySettings() {
-  const providers = useQuery(providersQuery)
-  const credentials = useQuery(credentialsQuery)
+  return (
+    <section>
+      <h2>API keys</h2>
+      <ApiKeyList />
+      <AddApiKeyForm />
+    </section>
+  )
+}
+
+/** Refresh the keys, and the models, since keys decide which of the user's own models are offered. */
+function useKeysChanged() {
   const queryClient = useQueryClient()
-  // Keys decide which of the user's own models are offered.
-  const keysChanged = () =>
+  return () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: credentialsQuery.queryKey }),
       queryClient.invalidateQueries({ queryKey: modelsQuery.queryKey }),
     ])
-  const none = { vision: false, reasoning: false, tools: false }
+}
 
+function ApiKeyList() {
+  const { data: credentials } = useSuspenseQuery(credentialsQuery)
+  const keysChanged = useKeysChanged()
+  const remove = useMutation({
+    mutationFn: (id: string) => read(api.providers.credentials[':id'].$delete({ param: { id } })),
+    onSuccess: keysChanged,
+  })
+  return (
+    <>
+      <ul>
+        {credentials.map((c) => (
+          <li key={c.id}>
+            {c.name ?? c.slug ?? c.providerId} ending {c.keyHint}{' '}
+            <button type="button" onClick={() => remove.mutate(c.id)}>
+              Delete
+            </button>
+          </li>
+        ))}
+      </ul>
+      <ErrorAlert error={remove.error} />
+    </>
+  )
+}
+
+function AddApiKeyForm() {
+  const { data: providers } = useSuspenseQuery(providersQuery)
+  const keysChanged = useKeysChanged()
+  const listModels = useMutation({
+    mutationFn: (draft: Pick<KeyDraft, 'providerId' | 'apiKey' | 'baseUrl'>) =>
+      read(
+        api.providers.providers[':id']['list-models'].$post(
+          { param: { id: draft.providerId } },
+          json({ apiKey: draft.apiKey, baseUrl: draft.baseUrl || undefined }),
+        ),
+      ),
+  })
+  // Models listed by the provider for the key being added, until what they were listed with changes.
+  const listed = listModels.data?.models ?? []
   const add = useMutation({
     mutationFn: (draft: KeyDraft) => {
       const typed = draft.models
         .split(',')
         .map((id) => id.trim())
         .filter(Boolean)
-        .map((id) => ({ id, name: id, capabilities: none }))
+        .map((id) => ({ id, name: id, capabilities: noCapabilities }))
       return read(
         api.providers.credentials.$post(
           {},
@@ -57,139 +109,65 @@ export function ApiKeySettings() {
       )
     },
     onSuccess: () => {
-      form.reset()
       listModels.reset()
       return keysChanged()
     },
   })
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: emptyDraft,
-    onSubmit: ({ value }) => add.mutate(value),
+    onSubmit: ({ value, formApi }) => add.mutate(value, { onSuccess: () => formApi.reset() }),
   })
-  const remove = useMutation({
-    mutationFn: (id: string) => read(api.providers.credentials[':id'].$delete({ param: { id } })),
-    onSuccess: keysChanged,
-  })
-  const listModels = useMutation({
-    mutationFn: () => {
-      const { providerId, apiKey, baseUrl } = form.state.values
-      return read(
-        api.providers.providers[':id']['list-models'].$post(
-          { param: { id: providerId } },
-          json({ apiKey, baseUrl: baseUrl || undefined }),
-        ),
-      )
-    },
-  })
-  // Models listed by the provider for the key being added, until what they were listed with changes.
-  const listed = listModels.data?.models ?? []
   const clearsListed = { onChange: () => listModels.reset() }
   const providerId = useFormStore(form.store, (state) => state.values.providerId)
-  const provider = providers.data?.find((p) => p.id === providerId)
-  const loadError = providers.error ?? credentials.error
-  const error = lastError(add, remove, listModels) ?? (loadError && messageOf(loadError))
+  const provider = providers.find((p) => p.id === providerId)
 
   return (
-    <section>
-      <h2>API keys</h2>
-      <ul>
-        {(credentials.data ?? []).map((c) => (
-          <li key={c.id}>
-            {c.name ?? c.slug ?? c.providerId} ending {c.keyHint}{' '}
-            <button type="button" onClick={() => remove.mutate(c.id)}>
-              Delete
-            </button>
-          </li>
-        ))}
-      </ul>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          void form.handleSubmit()
-        }}
-      >
-        <form.Field name="providerId" listeners={clearsListed}>
+    <form.AppForm>
+      <form.Form>
+        <form.AppField name="providerId" listeners={clearsListed}>
           {(field) => (
-            <select
-              aria-label="Provider"
-              value={field.state.value}
-              onChange={(e) => field.handleChange(e.target.value)}
-              required
-            >
+            <field.SelectField aria-label="Provider" required>
               <option value="">Choose a provider</option>
-              {(providers.data ?? []).map((p) => (
+              {providers.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
                 </option>
               ))}
-            </select>
+            </field.SelectField>
           )}
-        </form.Field>
-        <form.Field name="apiKey" listeners={clearsListed}>
+        </form.AppField>
+        <form.AppField name="apiKey" listeners={clearsListed}>
           {(field) => (
-            <input
-              aria-label="API key"
-              type="password"
-              placeholder="API key"
-              value={field.state.value}
-              onChange={(e) => field.handleChange(e.target.value)}
-              required
-            />
+            <field.TextField aria-label="API key" type="password" placeholder="API key" required />
           )}
-        </form.Field>
-        <form.Field name="name">
-          {(field) => (
-            <input
-              aria-label="Name"
-              placeholder="Name (optional)"
-              value={field.state.value}
-              onChange={(e) => field.handleChange(e.target.value)}
-            />
-          )}
-        </form.Field>
+        </form.AppField>
+        <form.AppField name="name">
+          {(field) => <field.TextField aria-label="Name" placeholder="Name (optional)" />}
+        </form.AppField>
         {provider?.userEndpoints && (
           <>
-            <form.Field name="baseUrl" listeners={clearsListed}>
-              {(field) => (
-                <input
-                  aria-label="Base URL"
-                  placeholder="https://host/v1"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                />
-              )}
-            </form.Field>
-            <form.Field name="slug">
-              {(field) => (
-                <input
-                  aria-label="Slug"
-                  placeholder="my-endpoint"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                />
-              )}
-            </form.Field>
+            <form.AppField name="baseUrl" listeners={clearsListed}>
+              {(field) => <field.TextField aria-label="Base URL" placeholder="https://host/v1" />}
+            </form.AppField>
+            <form.AppField name="slug">
+              {(field) => <field.TextField aria-label="Slug" placeholder="my-endpoint" />}
+            </form.AppField>
           </>
         )}
         {provider?.listsModels && (
-          <button type="button" onClick={() => listModels.mutate()}>
+          <button type="button" onClick={() => listModels.mutate(form.state.values)}>
             Load models
           </button>
         )}
         {listed.length > 0 && <span>{listed.length} models loaded</span>}
-        <form.Field name="models">
+        <form.AppField name="models">
           {(field) => (
-            <input
-              aria-label="Model IDs"
-              placeholder="Model IDs, separated by commas"
-              value={field.state.value}
-              onChange={(e) => field.handleChange(e.target.value)}
-            />
+            <field.TextField aria-label="Model IDs" placeholder="Model IDs, separated by commas" />
           )}
-        </form.Field>
-        <button type="submit">Add key</button>
-      </form>
-      {error && <p role="alert">{error}</p>}
-    </section>
+        </form.AppField>
+        <form.SubmitButton>Add key</form.SubmitButton>
+      </form.Form>
+      <ErrorAlert error={lastError(add, listModels)} />
+    </form.AppForm>
   )
 }

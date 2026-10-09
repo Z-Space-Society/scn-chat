@@ -159,8 +159,11 @@ function SubmitButton(props: SubmitButtonProps) {
  * The app's forms. `useAppForm` is TanStack Form's `useForm` with these controls attached: a field
  * renders `<form.AppField name="x">{(field) => <field.TextField />}</form.AppField>`, and the form
  * itself `<form.AppForm><form.Form>…<form.SubmitButton>Save</form.SubmitButton></form.Form></form.AppForm>`.
+ * A part of a form split into its own component takes the form as a prop, typed from a hook that
+ * makes the form. TanStack Form's `withForm` would do, but React Compiler skips its render
+ * functions without saying so.
  */
-export const { useAppForm, withForm } = createFormHook({
+export const { useAppForm } = createFormHook({
   fieldContext,
   formContext,
   fieldComponents: { TextField, TextAreaField, CheckboxField, SelectField },

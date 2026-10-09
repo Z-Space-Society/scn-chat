@@ -1,69 +1,26 @@
-import { useForm } from '@tanstack/react-form'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api, json, read } from '../../../shared/api.ts'
-import { lastError, messageOf } from '../../../shared/errors.ts'
-import { SchemaFields } from '../../../shared/schema-fields/SchemaFields.tsx'
-import { pluginSettingsQuery } from '../queries.ts'
+import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { api, read } from '../../../shared/api.ts'
+import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
+import { lastError } from '../../../shared/errors.ts'
+import { useAppForm } from '../../../shared/form.tsx'
+import { type Schema, SchemaFields } from '../../../shared/schema-fields/SchemaFields.tsx'
+import { type PluginValues, pluginValues, savePluginSettings } from '../lib/plugin-settings.ts'
+import { type PluginSettingsEntry, pluginSettingsQuery } from '../queries.ts'
 
-type PluginEntry = {
-  id: string
-  name: string
-  tools: { name: string; description: string; enabled: boolean; userToggle: boolean }[]
-  schema: object | null
-  values: Record<string, unknown>
-  secretFields: string[]
-  secretsSet: string[]
-  error: string | null
-}
-
-/** The plugin form's values: each plugin's settings and tool switches, by position. */
-type PluginValues = { plugins: { values: Record<string, unknown>; tools: boolean[] }[] }
-
+/** Each plugin's settings for the user, and the tools they may switch on and off. */
 export function PluginSettings() {
-  const query = useQuery(pluginSettingsQuery)
+  const query = useSuspenseQuery(pluginSettingsQuery)
+  const plugins = query.data
   const queryClient = useQueryClient()
   const reload = () => queryClient.invalidateQueries({ queryKey: pluginSettingsQuery.queryKey })
-  const plugins = query.data as PluginEntry[] | undefined
   const save = useMutation({
-    // Each write is its own row on the server, so they all go at once.
-    mutationFn: async ({ plugins: edited }: PluginValues) => {
-      const writes: Promise<unknown>[] = []
-      for (const [i, plugin] of (plugins ?? []).entries()) {
-        const draft = edited[i]
-        if (plugin.schema && !plugin.error) {
-          writes.push(
-            read(
-              api.plugins[':id'].settings.$put(
-                { param: { id: plugin.id } },
-                json(draft?.values ?? plugin.values),
-              ),
-            ),
-          )
-        }
-        for (const [j, tool] of plugin.tools.entries()) {
-          const enabled = draft?.tools[j] ?? tool.enabled
-          if (!tool.userToggle || enabled === tool.enabled) continue
-          writes.push(
-            read(
-              api.plugins[':id'].tools[':name'].$put(
-                { param: { id: plugin.id, name: tool.name } },
-                json({ enabled }),
-              ),
-            ),
-          )
-        }
-      }
-      await Promise.all(writes)
-    },
+    mutationFn: (edited: PluginValues) => savePluginSettings(plugins, edited),
     onSuccess: reload,
   })
   const reset = useMutation({
     mutationFn: (id: string) => read(api.plugins[':id'].settings.$delete({ param: { id } })),
     onSuccess: reload,
   })
-  const error = lastError(save, reset) ?? (query.error && messageOf(query.error))
-  if (!plugins && error) return <p role="alert">{error}</p>
-  if (!plugins) return null
   if (!plugins.length)
     return (
       <section>
@@ -74,91 +31,115 @@ export function PluginSettings() {
   return (
     <section>
       <h2>Plugins</h2>
-      <PluginForm
-        // Start over from the stored values whenever they load or change.
+      <PluginsForm
+        // Start over from the stored values whenever they change.
         key={query.dataUpdatedAt}
         plugins={plugins}
         saved={save.isSuccess}
         onSave={save.mutate}
         onReset={reset.mutate}
       />
-      {error && <p role="alert">{error}</p>}
+      <ErrorAlert error={lastError(save, reset)} />
     </section>
   )
 }
 
-interface Props {
-  plugins: PluginEntry[]
+/** The plugin form, starting from the stored settings. */
+function usePluginsForm(plugins: PluginSettingsEntry[], onSave: (values: PluginValues) => void) {
+  // Fields are addressed by position, since tool names and setting keys may contain dots.
+  return useAppForm({
+    defaultValues: pluginValues(plugins),
+    onSubmit: ({ value }) => onSave(value),
+  })
+}
+
+type PluginsFormApi = ReturnType<typeof usePluginsForm>
+
+interface PluginsFormProps {
+  plugins: PluginSettingsEntry[]
   saved: boolean
   onSave: (values: PluginValues) => void
   onReset: (id: string) => void
 }
 
-function PluginForm(props: Props) {
-  // Fields are addressed by position, since tool names and setting keys may contain dots.
-  const form = useForm({
-    defaultValues: {
-      plugins: props.plugins.map((plugin) => ({
-        values: plugin.values,
-        tools: plugin.tools.map((tool) => tool.enabled),
-      })),
-    } as PluginValues,
-    onSubmit: ({ value }) => props.onSave(value),
-  })
+function PluginsForm(props: PluginsFormProps) {
+  const form = usePluginsForm(props.plugins, props.onSave)
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault()
-        void form.handleSubmit()
-      }}
-    >
-      {props.plugins.map((plugin, i) => {
-        const switchable = plugin.tools.flatMap((tool, j) => (tool.userToggle ? [{ tool, j }] : []))
-        return (
-          <fieldset key={plugin.id}>
-            <legend>{plugin.name}</legend>
-            {switchable.map(({ tool, j }) => (
-              <form.Field key={tool.name} name={`plugins[${i}].tools[${j}]`}>
-                {(field) => (
-                  <label title={tool.description}>
-                    <input
-                      type="checkbox"
-                      checked={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.checked)}
-                    />
-                    {switchable.length === 1 ? 'Enabled' : tool.name}
-                  </label>
-                )}
-              </form.Field>
-            ))}
-            {plugin.error ? (
-              <p role="alert">
-                {plugin.error}{' '}
-                <button type="button" onClick={() => props.onReset(plugin.id)}>
-                  Reset
-                </button>
-              </p>
-            ) : (
-              plugin.schema && (
-                <form.Field name={`plugins[${i}].values`}>
-                  {(field) => (
-                    <SchemaFields
-                      schema={plugin.schema as object}
-                      values={field.state.value}
-                      secrets={{ fields: plugin.secretFields, stored: plugin.secretsSet }}
-                      onChange={(key, value) =>
-                        field.handleChange((current) => ({ ...current, [key]: value }))
-                      }
-                    />
-                  )}
-                </form.Field>
-              )
-            )}
-          </fieldset>
-        )
-      })}
-      <button type="submit">Save</button>
-      {props.saved && <span>Saved.</span>}
-    </form>
+    <form.AppForm>
+      <form.Form>
+        {props.plugins.map((plugin, i) => (
+          <PluginFieldset
+            key={plugin.id}
+            form={form}
+            plugin={plugin}
+            index={i}
+            onReset={() => props.onReset(plugin.id)}
+          />
+        ))}
+        <form.SubmitButton>Save</form.SubmitButton>
+        {props.saved && <span>Saved.</span>}
+      </form.Form>
+    </form.AppForm>
+  )
+}
+
+interface PluginFieldsetProps {
+  form: PluginsFormApi
+  plugin: PluginSettingsEntry
+  /** The plugin's position in the form. */
+  index: number
+  onReset: () => void
+}
+
+/** One plugin's tool switches, then its settings. */
+function PluginFieldset(props: PluginFieldsetProps) {
+  const i = props.index
+  const switchable = props.plugin.tools.flatMap((tool, j) => (tool.userToggle ? [{ tool, j }] : []))
+  return (
+    <fieldset>
+      <legend>{props.plugin.name}</legend>
+      {switchable.map(({ tool, j }) => (
+        <props.form.Field key={tool.name} name={`plugins[${i}].tools[${j}]`}>
+          {(field) => (
+            <label title={tool.description}>
+              <input
+                type="checkbox"
+                checked={field.state.value}
+                onChange={(e) => field.handleChange(e.target.checked)}
+              />
+              {switchable.length === 1 ? 'Enabled' : tool.name}
+            </label>
+          )}
+        </props.form.Field>
+      ))}
+      <PluginSchema form={props.form} plugin={props.plugin} index={i} onReset={props.onReset} />
+    </fieldset>
+  )
+}
+
+/** A plugin's settings, or the error reading them with a way to reset them. */
+function PluginSchema(props: PluginFieldsetProps) {
+  if (props.plugin.error)
+    return (
+      <p role="alert">
+        {props.plugin.error}{' '}
+        <button type="button" onClick={props.onReset}>
+          Reset
+        </button>
+      </p>
+    )
+  const schema = props.plugin.schema
+  if (!schema) return null
+  return (
+    <props.form.Field name={`plugins[${props.index}].values`}>
+      {(field) => (
+        <SchemaFields
+          schema={schema as Schema}
+          values={field.state.value}
+          secrets={{ fields: props.plugin.secretFields, stored: props.plugin.secretsSet }}
+          onChange={(key, value) => field.handleChange((current) => ({ ...current, [key]: value }))}
+        />
+      )}
+    </props.form.Field>
   )
 }

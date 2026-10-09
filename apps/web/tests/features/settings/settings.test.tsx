@@ -1,5 +1,6 @@
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { Suspense } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { type Me, MeContext } from '../../../src/features/auth/session.ts'
 import { ApiKeySettings } from '../../../src/features/settings/pages/ApiKeySettings.tsx'
@@ -11,7 +12,10 @@ import type { StoreClient } from '../../../src/store/client.ts'
 import { StoreProvider } from '../../../src/store/react.tsx'
 import { renderAt } from '../../helpers/router.tsx'
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.restoreAllMocks()
+})
 
 const store = {
   state: () => 'active',
@@ -70,7 +74,10 @@ const renderPage = (section: keyof typeof sections = '', admin = false) => {
     <MeContext.Provider value={{ ...me, admin }}>
       <StoreProvider store={store}>
         <SettingsLayout>
-          <Section />
+          {/* The boundary the section's route gives it, so the layout shows while it loads. */}
+          <Suspense>
+            <Section />
+          </Suspense>
         </SettingsLayout>
       </StoreProvider>
     </MeContext.Provider>,
@@ -83,8 +90,10 @@ describe('Settings preferences', () => {
     stubServer({
       '/api/preferences': () => Response.json({ error: 'InternalServerError' }, { status: 500 }),
     })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
     await renderPage()
-    expect(await screen.findByText(/Could not load preferences/)).toBeInTheDocument()
+    expect(await screen.findByRole('alert')).toHaveTextContent('InternalServerError')
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Preferences' })).toBeNull()
   })
 

@@ -1,9 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, json, read } from '../../../shared/api.ts'
-import { lastError, messageOf } from '../../../shared/errors.ts'
+import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
+import { lastError } from '../../../shared/errors.ts'
 import { useOpenStore } from '../../../store/react.tsx'
 import { accountQuery } from '../queries.ts'
 
+/**
+ * Background sync, and rebuilding this device's copy of the chats. The account is optional, so
+ * rebuilding works even when it fails to load.
+ */
 export function SyncSettings() {
   const openStore = useOpenStore()
   const account = useQuery(accountQuery)
@@ -24,7 +29,10 @@ export function SyncSettings() {
       location.reload()
     },
   })
-  const error = lastError(setBackgroundSync, rebuild) ?? (account.error && messageOf(account.error))
+  // While saving, the switch shows the value being saved.
+  const backgroundSync = setBackgroundSync.isPending
+    ? setBackgroundSync.variables
+    : account.data?.backgroundSync
   return (
     <section>
       <h2>Sync</h2>
@@ -32,7 +40,7 @@ export function SyncSettings() {
         <label>
           <input
             type="checkbox"
-            checked={account.data.backgroundSync}
+            checked={backgroundSync}
             onChange={(e) => setBackgroundSync.mutate(e.target.checked)}
           />{' '}
           Keep my chats in sync in the background
@@ -41,7 +49,7 @@ export function SyncSettings() {
       <button type="button" onClick={() => rebuild.mutate()}>
         Rebuild this device's copy
       </button>
-      {error && <p role="alert">{error}</p>}
+      <ErrorAlert error={lastError(setBackgroundSync, rebuild) ?? account.error} />
     </section>
   )
 }
