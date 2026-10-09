@@ -1,10 +1,12 @@
 import { useForm } from '@tanstack/react-form'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { api, json, read } from '../../../shared/api.ts'
 import { lastError, messageOf } from '../../../shared/errors.ts'
+import { formKey } from '../../../shared/form.tsx'
 import { splitLines } from '../../../shared/lines.ts'
+import { useRolesChanged } from '../hooks/changes.ts'
 import { adminRolesQuery } from '../queries.ts'
 
 type Role = {
@@ -23,14 +25,8 @@ interface RoleAdminProps {
 /** One role on its own page. */
 export function RoleAdmin(props: RoleAdminProps) {
   const roles = useQuery(adminRolesQuery)
-  const queryClient = useQueryClient()
   const navigate = useNavigate()
-  // A role's members show on the users page too.
-  const rolesChanged = () =>
-    Promise.all([
-      queryClient.invalidateQueries({ queryKey: adminRolesQuery.queryKey }),
-      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] }),
-    ])
+  const rolesChanged = useRolesChanged()
   const remove = useMutation({
     mutationFn: () => read(api.admin.roles[':name'].$delete({ param: { name: props.name } })),
     onSuccess: async () => {
@@ -46,7 +42,7 @@ export function RoleAdmin(props: RoleAdminProps) {
       {role && (
         <RoleForm
           // Start over from the stored role whenever it changes.
-          key={JSON.stringify(role)}
+          key={formKey(role)}
           role={role}
           environmentAdmins={roles.data?.environmentAdmins ?? []}
           onChange={rolesChanged}

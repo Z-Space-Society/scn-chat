@@ -7,9 +7,15 @@ import { issuesOf, lastError, messageOf } from '../../../shared/errors.ts'
 import type { Issue } from '../../../shared/response.ts'
 import { type Schema, SchemaFields } from '../../../shared/schema-fields/SchemaFields.tsx'
 import { useModelsChanged, usePluginsChanged } from '../hooks/changes.ts'
+import {
+  type AdminModel,
+  type Capabilities,
+  capabilityNames,
+  noCapabilities,
+  storedModel,
+} from '../lib/models.ts'
 import { adminModelsQuery, adminPluginsQuery } from '../queries.ts'
 
-type Capabilities = { vision: boolean; reasoning: boolean; tools: boolean }
 type Provider = { id: string; name: string; hasAdminKey: boolean; listsModels: boolean }
 type Instance = {
   id: string
@@ -25,17 +31,7 @@ type Instance = {
   error: string | null
   issues: Issue[]
 }
-type AdminModel = {
-  provider: string
-  id: string
-  name: string
-  capabilities: Capabilities
-  roles: string[]
-  default: boolean
-}
 type Change = { options: Record<string, unknown>; enabled: boolean; clearSecrets: string[] }
-
-const noCapabilities: Capabilities = { vision: false, reasoning: false, tools: false }
 
 interface PluginAdminProps {
   id: string
@@ -76,7 +72,7 @@ export function PluginAdmin(props: PluginAdminProps) {
             // Start over from the stored options whenever they load or change.
             key={plugins.dataUpdatedAt}
             instance={instance}
-            models={(models.data ?? []).map(({ warning: _warning, ...model }) => model)}
+            models={(models.data ?? []).map(storedModel)}
             issues={save.error ? issuesOf(save.error) : instance.issues}
             saved={save.isSuccess}
             onSave={save.mutate}
@@ -190,8 +186,6 @@ interface ProviderModelsProps {
   provider: Provider
   models: AdminModel[]
 }
-
-const capabilityNames = ['vision', 'reasoning', 'tools'] as const
 
 /** A summary of a provider's admin models, each linking to its page, and the ways to add more. */
 function ProviderModels(props: ProviderModelsProps) {

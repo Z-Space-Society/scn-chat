@@ -3,6 +3,8 @@ import { ClientOnly, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { api, json, read } from '../../../shared/api.ts'
 import { lastError, messageOf } from '../../../shared/errors.ts'
+import { useRolesChanged, useUsersChanged } from '../hooks/changes.ts'
+import { roleNames } from '../lib/roles.ts'
 import { adminInvitesQuery, adminRolesQuery, adminUsersQuery } from '../queries.ts'
 
 type Suspension = { at: string; by: string | null; reason: string | null }
@@ -15,14 +17,9 @@ interface UsersAdminProps {
 export function UsersAdmin(props: UsersAdminProps) {
   const users = useInfiniteQuery(adminUsersQuery(props.q))
   const roles = useQuery(adminRolesQuery)
-  const queryClient = useQueryClient()
-  const usersChanged = () => queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
+  const usersChanged = useUsersChanged()
   // Explicit members are listed on the roles page too.
-  const membersChanged = () =>
-    Promise.all([
-      usersChanged(),
-      queryClient.invalidateQueries({ queryKey: adminRolesQuery.queryKey }),
-    ])
+  const membersChanged = useRolesChanged()
   const addToRole = useMutation({
     mutationFn: ({ role, did }: { role: string; did: string }) =>
       read(
@@ -52,7 +49,7 @@ export function UsersAdmin(props: UsersAdminProps) {
     mutationFn: (did: string) => read(api.admin.users[':did'].restore.$post({ param: { did } })),
     onSuccess: usersChanged,
   })
-  const roleNames = (roles.data?.roles ?? []).map((role) => role.name)
+  const assignable = roleNames(roles.data?.roles ?? [])
   const accounts = users.data?.pages.flatMap((page) => page.users) ?? []
   const loadError = users.error ?? roles.error
   const error =
@@ -114,7 +111,7 @@ export function UsersAdmin(props: UsersAdminProps) {
                   }
                 >
                   <option value="">Choose a role</option>
-                  {roleNames.map((name) => (
+                  {assignable.map((name) => (
                     <option key={name}>{name}</option>
                   ))}
                 </select>

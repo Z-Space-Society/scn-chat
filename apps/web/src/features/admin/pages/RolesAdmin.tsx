@@ -1,20 +1,21 @@
 import { useForm } from '@tanstack/react-form'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { api, json, read } from '../../../shared/api.ts'
 import { messageOf } from '../../../shared/errors.ts'
+import { useRolesChanged } from '../hooks/changes.ts'
 import { adminRolesQuery } from '../queries.ts'
 
 /** A summary of every role, each linking to its page, and a form to create one. */
 export function RolesAdmin() {
   const roles = useQuery(adminRolesQuery)
-  const queryClient = useQueryClient()
+  const rolesChanged = useRolesChanged()
   const navigate = useNavigate()
   const create = useMutation({
     mutationFn: (draft: { name: string; description: string }) =>
       read(api.admin.roles.$post({}, json(draft))),
     onSuccess: async (_, draft) => {
-      await queryClient.invalidateQueries({ queryKey: adminRolesQuery.queryKey })
+      await rolesChanged()
       await navigate({ to: '/admin/roles/$name', params: { name: draft.name } })
     },
   })

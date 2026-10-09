@@ -4,6 +4,7 @@ import { ClientOnly } from '@tanstack/react-router'
 import { api, json, read } from '../../../shared/api.ts'
 import { lastError, messageOf } from '../../../shared/errors.ts'
 import { RolePicker } from '../components/RolePicker.tsx'
+import { rolesWithUser } from '../lib/roles.ts'
 import { adminApiKeysQuery, adminRolesQuery } from '../queries.ts'
 
 /** Issue and revoke the keys that scripts, such as a crontab, send as a Bearer token. */
@@ -28,7 +29,7 @@ export function ApiKeysAdmin() {
     defaultValues: { label: '', roles: [] as string[] },
     onSubmit: ({ value }) => issue.mutate(value),
   })
-  const roleNames = ['user', ...(roles.data?.roles ?? []).map((role) => role.name)]
+  const grantable = rolesWithUser(roles.data?.roles ?? [])
   const loadError = keys.error ?? roles.error
   const error = lastError(issue, revoke) ?? (loadError && messageOf(loadError))
   return (
@@ -89,7 +90,7 @@ export function ApiKeysAdmin() {
           <form.Field name="roles">
             {(field) => (
               <RolePicker
-                names={roleNames}
+                names={grantable}
                 picked={field.state.value}
                 onChange={field.handleChange}
               />

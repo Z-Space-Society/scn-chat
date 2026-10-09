@@ -2,10 +2,11 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { api, json, read } from '../../../shared/api.ts'
 import { lastError, messageOf } from '../../../shared/errors.ts'
+import { ReorderButtons } from '../components/ReorderButtons.tsx'
 import { useModelsChanged } from '../hooks/changes.ts'
-import { adminModelsQuery } from '../queries.ts'
-
-type ModelRef = { provider: string; id: string }
+import { storedModel } from '../lib/models.ts'
+import { moveItem } from '../lib/reorder.ts'
+import { type AdminModelEntry, adminModelsQuery } from '../queries.ts'
 
 /** The admin models from every provider, for choosing the default and the order users see. */
 export function ModelsAdmin() {
@@ -13,21 +14,20 @@ export function ModelsAdmin() {
   const models = query.data ?? []
   const modelsChanged = useModelsChanged()
   const makeDefault = useMutation({
-    mutationFn: ({ warning: _warning, ...model }: (typeof models)[number]) =>
-      read(api.admin.models.$put({}, json({ ...model, default: true }))),
+    mutationFn: (model: AdminModelEntry) =>
+      read(api.admin.models.$put({}, json({ ...storedModel(model), default: true }))),
     onSuccess: modelsChanged,
   })
   const reorder = useMutation({
-    mutationFn: (order: ModelRef[]) =>
-      read(api.admin.models.order.$put({}, json({ models: order }))),
+    mutationFn: (order: AdminModelEntry[]) =>
+      read(
+        api.admin.models.order.$put(
+          {},
+          json({ models: order.map(({ provider, id }) => ({ provider, id })) }),
+        ),
+      ),
     onSuccess: modelsChanged,
   })
-  const move = (index: number, by: number) => {
-    const order = models.map(({ provider, id }) => ({ provider, id }))
-    const [moved] = order.splice(index, 1)
-    order.splice(index + by, 0, moved as ModelRef)
-    reorder.mutate(order)
-  }
   const error = lastError(makeDefault, reorder) ?? (query.error && messageOf(query.error))
   return (
     <section>
@@ -49,16 +49,11 @@ export function ModelsAdmin() {
               />{' '}
               {model.name} ({model.provider}/{model.id})
             </label>{' '}
-            <button type="button" disabled={index === 0} onClick={() => move(index, -1)}>
-              Up
-            </button>{' '}
-            <button
-              type="button"
-              disabled={index === models.length - 1}
-              onClick={() => move(index, 1)}
-            >
-              Down
-            </button>
+            <ReorderButtons
+              index={index}
+              count={models.length}
+              onMove={(by) => reorder.mutate(moveItem(models, index, by))}
+            />
             {model.warning && <p role="alert">{model.warning}</p>}
           </li>
         ))}

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, json, read } from '../../../shared/api.ts'
 import { messageOf } from '../../../shared/errors.ts'
 import { RolePicker } from '../components/RolePicker.tsx'
+import { roleNames } from '../lib/roles.ts'
 import { adminAccessQuery, adminRolesQuery } from '../queries.ts'
 
 type Registration = 'open' | 'invite' | 'closed'
@@ -24,12 +25,7 @@ export function AccessAdmin() {
   // The form only renders once the stored setting loads, and starts from it.
   if (!access.data && access.error) return <p role="alert">{messageOf(access.error)}</p>
   if (!access.data) return null
-  return (
-    <AccessForm
-      initial={access.data}
-      roleNames={(roles.data?.roles ?? []).map((role) => role.name)}
-    />
-  )
+  return <AccessForm initial={access.data} roleNames={roleNames(roles.data?.roles ?? [])} />
 }
 
 interface Props {

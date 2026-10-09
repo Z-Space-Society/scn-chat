@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { attachmentTypesQuery } from '../../conversation/queries.ts'
 import { modelsQuery } from '../../models/queries.ts'
 import { pluginSettingsQuery, providersQuery } from '../../settings/queries.ts'
-import { adminModelsQuery, adminPluginsQuery } from '../queries.ts'
+import { adminModelsQuery, adminPluginsQuery, adminRolesQuery, adminUsersKey } from '../queries.ts'
 
 /**
  * Refresh what a plugin change can alter. Each change rebuilds the server's plugins, which decide
@@ -33,4 +33,20 @@ export function useModelsChanged() {
         queryClient.invalidateQueries({ queryKey }),
       ),
     )
+}
+
+/** Refresh the roles, and the users, since each user lists their roles and a role its members. */
+export function useRolesChanged() {
+  const queryClient = useQueryClient()
+  return () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: adminRolesQuery.queryKey }),
+      queryClient.invalidateQueries({ queryKey: adminUsersKey }),
+    ])
+}
+
+/** Refresh every users search. */
+export function useUsersChanged() {
+  const queryClient = useQueryClient()
+  return () => queryClient.invalidateQueries({ queryKey: adminUsersKey })
 }

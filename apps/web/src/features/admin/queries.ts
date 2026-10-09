@@ -2,10 +2,13 @@ import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query'
 import { api, read } from '../../shared/api.ts'
 import { staleTime } from '../../shared/queries.ts'
 
+/** The key every users search falls under. */
+export const adminUsersKey = ['admin', 'users'] as const
+
 /** Accounts for the admin's users list, 50 a page, matching the search `q`. */
 export const adminUsersQuery = (q: string) =>
   infiniteQueryOptions({
-    queryKey: ['admin', 'users', q],
+    queryKey: [...adminUsersKey, q],
     staleTime,
     initialPageParam: '',
     queryFn: ({ pageParam }) =>
@@ -43,10 +46,15 @@ export const adminInstalledQuery = queryOptions({
   queryFn: async () => (await read(api.admin.plugins.installed.$get())).plugins,
 })
 
+const fetchAdminModels = async () => (await read(api.admin.models.$get())).models
+
+/** A model the admin offers, with the server's warning about it, if any. */
+export type AdminModelEntry = Awaited<ReturnType<typeof fetchAdminModels>>[number]
+
 export const adminModelsQuery = queryOptions({
   queryKey: ['admin', 'models'],
   staleTime,
-  queryFn: async () => (await read(api.admin.models.$get())).models,
+  queryFn: fetchAdminModels,
 })
 
 export const adminSettingsQuery = queryOptions({

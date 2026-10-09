@@ -3,21 +3,12 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { api, json, read } from '../../../shared/api.ts'
 import { lastError, messageOf } from '../../../shared/errors.ts'
+import { formKey } from '../../../shared/form.tsx'
 import { RolePicker } from '../components/RolePicker.tsx'
 import { useModelsChanged } from '../hooks/changes.ts'
+import { type AdminModel, capabilityNames, storedModel } from '../lib/models.ts'
+import { rolesWithUser } from '../lib/roles.ts'
 import { adminModelsQuery, adminRolesQuery } from '../queries.ts'
-
-type AdminModel = {
-  provider: string
-  id: string
-  name: string
-  capabilities: { vision: boolean; reasoning: boolean; tools: boolean }
-  roles: string[]
-  default: boolean
-}
-
-/** The model as it's saved, without the server's warning about it. */
-const stored = ({ warning: _warning, ...model }: AdminModel & { warning?: string | null }) => model
 
 interface ModelAdminProps {
   pluginId: string
@@ -64,9 +55,9 @@ export function ModelAdmin(props: ModelAdminProps) {
           {found.warning && <p role="alert">{found.warning}</p>}
           <ModelForm
             // Start over from the stored model whenever it changes.
-            key={JSON.stringify(found)}
-            model={stored(found)}
-            roleNames={['user', ...(roles.data?.roles ?? []).map((role) => role.name)]}
+            key={formKey(found)}
+            model={storedModel(found)}
+            roleNames={rolesWithUser(roles.data?.roles ?? [])}
             saved={save.isSuccess}
             onSave={save.mutate}
             onRemove={() => remove.mutate()}
@@ -107,7 +98,7 @@ function ModelForm(props: ModelFormProps) {
       </form.Field>
       <fieldset>
         <legend>Capabilities</legend>
-        {(['vision', 'reasoning', 'tools'] as const).map((capability) => (
+        {capabilityNames.map((capability) => (
           <form.Field key={capability} name={`capabilities.${capability}`}>
             {(field) => (
               <label>

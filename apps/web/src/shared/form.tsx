@@ -171,3 +171,10 @@ export const { useAppForm } = createFormHook({
 })
 
 export { useFieldContext }
+
+/**
+ * A key that remounts a form, starting it over, when the stored record it edits changes, but not
+ * when a refetch brings back the same record. Keep the form's mutations above the keyed form, so
+ * their state, like "Saved.", survives the remount.
+ */
+export const formKey = (stored: unknown) => JSON.stringify(stored)
