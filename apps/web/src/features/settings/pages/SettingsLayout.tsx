@@ -23,6 +23,7 @@ export function SettingsLayout(props: Props) {
   const { admin } = useMe()
   return (
     <SidebarLayout
+      className="settings"
       nav={
         <>
           <Link to="/" activeOptions={{ exact: true }}>

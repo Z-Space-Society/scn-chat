@@ -171,7 +171,7 @@ summary {
   background: var(--hover);
 }
 
-.chat-list > input[type="search"] {
+.chats .sidebar > input[type="search"] {
   margin: 0.25rem 0;
 }
 

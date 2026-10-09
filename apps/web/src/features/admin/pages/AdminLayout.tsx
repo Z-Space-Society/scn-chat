@@ -23,6 +23,7 @@ interface Props {
 export function AdminLayout(props: Props) {
   return (
     <SidebarLayout
+      className="settings"
       nav={
         <>
           <Link to="/" activeOptions={{ exact: true }}>
