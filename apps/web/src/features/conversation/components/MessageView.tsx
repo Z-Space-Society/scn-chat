@@ -56,7 +56,9 @@ export function MessageView(props: MessageViewProps) {
     <article id={props.id} className={`message ${record.role as string}`}>
       <header>
         <strong>{record.role === 'user' ? 'You' : 'Assistant'}</strong>
-        {props.siblings && props.siblings.count > 1 && <SiblingPicker siblings={props.siblings} />}
+        {props.siblings && props.siblings.messages.length > 1 && (
+          <SiblingPicker siblings={props.siblings} />
+        )}
       </header>
       {shown.map(({ part, key }) => (
         <MessagePart key={key} part={part} record={record} blobUrl={props.blobUrl} />

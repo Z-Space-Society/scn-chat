@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { messageOf } from '../../../shared/errors.ts'
-import { MessageView } from '../../conversation/components/MessageView.tsx'
+import { useLocation } from '@tanstack/react-router'
+import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
+import { BranchView } from '../../conversation/components/BranchView.tsx'
 import { useBranch } from '../../conversation/hooks/useBranch.ts'
 import { blobUrlFor } from '../../conversation/lib/blob-url.ts'
 import { sharedQuery } from '../queries.ts'
@@ -13,6 +14,7 @@ interface Props {
 
 /** A shared conversation, read-only. */
 export function SharedPage(props: Props) {
+  const pathname = useLocation({ select: (location) => location.pathname })
   const { data: shared, error } = useQuery({
     ...sharedQuery(props.ownerDid, props.skey),
     enabled: props.signedIn,
@@ -23,36 +25,29 @@ export function SharedPage(props: Props) {
   }))
   const { branch, pick } = useBranch(messages)
 
-  if (!props.signedIn) {
+  if (!props.signedIn)
     return (
       <main>
         <p>Sign in with your atproto account to view this shared chat.</p>
-        <a href={`/login?next=${encodeURIComponent(location.pathname)}`}>Sign in</a>
+        <a href={`/login?next=${encodeURIComponent(pathname)}`}>Sign in</a>
       </main>
     )
-  }
-  if (error) return <main role="alert">{messageOf(error)}</main>
+  if (error)
+    return (
+      <main>
+        <ErrorAlert error={error} />
+      </main>
+    )
   if (!shared) return <main>Loading...</main>
-
-  const blobUrl = blobUrlFor(`/api/shared/${props.ownerDid}/${props.skey}`)
   return (
     <main className="conversation">
       <h2>{shared.title ?? 'Shared chat'}</h2>
       <p>Shared by {shared.owner.handle ?? shared.owner.did}</p>
-      {branch.map(({ message, siblings, index }) => {
-        return (
-          <MessageView
-            key={message.rkey}
-            record={message.record}
-            blobUrl={blobUrl}
-            siblings={{
-              index,
-              count: siblings.length,
-              onPick: (i) => pick((siblings[i] as { rkey: string }).rkey),
-            }}
-          />
-        )
-      })}
+      <BranchView
+        branch={branch}
+        blobUrl={blobUrlFor(`/api/shared/${props.ownerDid}/${props.skey}`)}
+        onPick={pick}
+      />
     </main>
   )
 }

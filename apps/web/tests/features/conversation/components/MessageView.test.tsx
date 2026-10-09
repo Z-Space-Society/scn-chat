@@ -209,12 +209,16 @@ describe('MessageView', () => {
       <MessageView
         blobUrl={blobUrl}
         record={{ role: 'assistant', content: { $type: d('plainContent'), parts: [] } }}
-        siblings={{ index: 1, count: 3, onPick }}
+        siblings={{
+          messages: ['a', 'b', 'c'].map((rkey) => ({ rkey, record: {} })),
+          index: 1,
+          onPick,
+        }}
       />,
     )
     expect(screen.getByText(/2 \/ 3/)).toBeInTheDocument()
     screen.getByRole('button', { name: 'Next version' }).click()
-    expect(onPick).toHaveBeenCalledWith(2)
+    expect(onPick).toHaveBeenCalledWith('c')
   })
 
   it('says a message is encrypted', () => {

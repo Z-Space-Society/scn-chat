@@ -186,7 +186,7 @@ It ends with the rules a fork should keep, linking the ADRs:
 - [ ] `web_search` results show as linked titles with plain-text snippets under the query, opening in a new tab.
 - [ ] The web search view falls back to the default view for an error, an output moved to a blob, or output that does not parse.
 - [ ] Adding a tool view takes one new folder and one line in `toolViews`.
-- [ ] Message actions render from `messageActions` in order, and edit, regenerate, and stop behave as before.
+- [x] Message actions render from `messageActions` in order, and edit, regenerate, and stop behave as before.
 - [ ] Copy on a finished message puts its text on the clipboard and confirms it, or shows why it failed.
 - [ ] Code blocks in replies have a Copy button that copies the block's text.
 - [ ] The Markdown plugin lists and components are exported from `parts/markdown.tsx`, and rendering is unchanged apart from the code block button.
