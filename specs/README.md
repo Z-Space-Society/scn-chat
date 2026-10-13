@@ -22,7 +22,6 @@ The overview at the end of this file lists every spec and whether it is active, 
 
 ### Active
 
-- [[styling]]: Tailwind over a theme of design tokens, a light and dark picker, code highlighting, and the design from the `design-reference` branch with its behavior, ported onto main. Phase 2 of the web rebuild.
 - [[api-keys]]
 - [[cron]]
 - [[scn-member-registry]]
@@ -63,3 +62,7 @@ After the initial build-out:
 Phase 1 of the web rebuild:
 
 - [[web-ui]]: rebuilding the web app on TanStack Start inside Hono, at parity with its acceptance criteria.
+
+Phase 2 of the web rebuild:
+
+- [[styling]]: Tailwind over a theme of design tokens, a light and dark picker, code highlighting, and the design from the `design-reference` branch with its behavior, ported onto main.

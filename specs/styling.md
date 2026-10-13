@@ -138,9 +138,9 @@ The port is done. Main's stand-in sheets, the `legacy` layer they loaded in, and
 - [x] `pnpm dev` and a production build serve the styled app from `src/styles/app.css`.
 - [x] Tailwind's default palette, type scale, radii, shadows, and breakpoints produce no utilities.
 - [x] Changing a color token in `theme.css` changes it everywhere it is used, in light and dark.
-- [ ] Appearance in Preferences switches between System, Light, and Dark at once, and the choice survives a reload with no flash, on server-rendered and client-only routes.
+- [x] Appearance in Preferences switches between System, Light, and Dark at once, and the choice survives a reload with no flash, on server-rendered and client-only routes.
 - [x] The guard test fails on a raw color or arbitrary length in a component.
-- [ ] Every area matches `design-reference` in light and dark, at desktop width and at 390px.
+- [x] Every area matches `design-reference` in light and dark, at desktop width and at 390px.
 - [x] Animations stop under reduced motion.
 - [x] A fenced code block in a reply is highlighted in theme colors in both modes, and a block in an unknown language shows as plain monospace.
 - [x] No legacy layer or stand-in sheet remains.

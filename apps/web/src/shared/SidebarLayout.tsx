@@ -42,8 +42,13 @@ export function SidebarLayout(props: Props) {
       // so the nav stays put from section to section. The nav sits as far from the window's edge
       // as the chat list does, with the chat's gutter on the other side.
       <div data-drawer-open={sidebar.drawerOpen || undefined} className="flex h-dvh">
-        <main className="relative min-w-0 flex-1 overflow-y-auto bg-panel ps-sidebar-pad pe-gutter max-wide:px-gutter max-wide:pt-[calc(var(--spacing-toggle)-(--spacing(1)))]">
-          <MainBar />
+        <main className="relative min-w-0 flex-1 overflow-y-auto bg-panel ps-sidebar-pad pe-gutter max-wide:px-gutter max-wide:pt-gutter">
+          {/* On a narrow screen the toggle opens the page, a gutter from the panel's corner like
+              the section under it, and stays there as the page scrolls, since a sticky element
+              keeps clear of its scroll container's padding. */}
+          <div className="sticky top-0 z-3 mb-3 wide:hidden w-fit">
+            <SidebarToggle className="border border-line bg-raised" />
+          </div>
           <div className="flex gap-12">
             <nav
               className={cn(
