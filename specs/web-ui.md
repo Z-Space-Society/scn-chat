@@ -43,7 +43,7 @@ The server process runs Hono, and Hono runs Start, so the server and plugins sta
 
 | Route | Screen | Server-rendered |
 |---|---|---|
-| `/login` | A handle field and a sign-in button that goes to `/oauth/login` | Yes |
+| `/login` | The app's logo and name over a handle field and Continue, which goes to `/oauth/login`, which drops a leading `@` from the handle. Continue says it is redirecting to the PDS until the page is left, and a viewer's Sign out is a quiet link under the form | Yes |
 | `/` | Chat list sidebar, and a new chat | No |
 | `/chat/:skey` | Chat list sidebar and a conversation | No |
 | `/shared/:ownerDid/:skey` | A shared conversation, read-only | No |

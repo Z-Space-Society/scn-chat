@@ -57,6 +57,12 @@ describe('GET /oauth/login', () => {
     expect(res.headers.get('set-cookie')).toMatch(/scn_login=[^;]+;.*HttpOnly/)
   })
 
+  it('drops a leading @ from the handle', async () => {
+    const { app, auth } = await setup()
+    await app.request(`/oauth/login?identifier=${encodeURIComponent(' @alice.test ')}`)
+    expect(auth.oauth.authorize).toHaveBeenCalledWith('alice.test', expect.anything())
+  })
+
   it('shows an invalid_scope error from the PDS on the login page', async () => {
     const oauth = fakeOAuth({
       authorize: vi.fn(async () => {

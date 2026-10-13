@@ -301,6 +301,8 @@
        flashes a waiting state. */
     --wait-quiet: 400ms;
     --slow: 2.8s;
+    /* How far a link's underline sits below its text. */
+    --underline-offset: 0.2em;
     /* A floating menu's padding, the gap between New chat and the search button, and its edge. */
     --menu-pad: 0.35rem;
     --menu-edge: 2px;

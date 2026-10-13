@@ -28,7 +28,7 @@ Before the lexicons are published, setting `OAUTH_SCOPE_MODE` to `raw` lets a PD
 ### Login
 
 1. The web UI sends the user to `GET /oauth/login?identifier=<handle, DID, or PDS URL>`.
-2. The server calls `client.authorize(identifier, { scope })` and redirects to the returned URL.
+2. The server drops a leading `@`, since people often type a handle as it is shown, then calls `client.authorize(identifier, { scope })` and redirects to the returned URL.
 3. `GET /oauth/callback` calls `client.callback(params)` and gets an `OAuthSession`.
 4. The server reads the granted scope with `session.getTokenInfo()`. Using `ScopePermissions` from `@atproto/oauth-scopes`, it checks whether the scope allows creating conversation spaces for the user's own DID.
 5. It upserts the `account` row and creates a web session (below), then redirects to `/`.

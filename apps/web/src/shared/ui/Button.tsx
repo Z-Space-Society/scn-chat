@@ -6,7 +6,8 @@ import { cn } from '../cn.ts'
  * A control: a small white card with a hairline border that gives a little when pressed. The main
  * action, such as a form's submit, Send, or a page's Add link, wears the green badge, as status
  * that is live or good does. Something that can't be undone is red, and a second action beside a
- * status reads as quiet text until hovered.
+ * status reads as quiet text until hovered, and a way out that shouldn't compete with the page's
+ * action, such as a viewer's sign out, reads as a link.
  */
 export const button = cva(
   'inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-small border font-medium no-underline transition-[background-color,color,scale] duration-150 ease-out [-webkit-tap-highlight-color:transparent] disabled:cursor-default disabled:opacity-40 motion-safe:active:not-disabled:scale-96',
@@ -20,13 +21,17 @@ export const button = cva(
           'border-danger-border bg-danger-soft text-danger hover:not-disabled:bg-danger-soft-hover',
         quiet:
           'border-transparent bg-transparent text-muted hover:not-disabled:bg-hover hover:not-disabled:text-ink',
+        link: 'border-transparent bg-transparent text-muted text-small underline decoration-faint underline-offset-(--underline-offset) hover:not-disabled:text-ink-strong motion-safe:active:not-disabled:scale-100',
       },
       size: {
         default: 'px-3 py-1.25',
         small: 'px-2.75 py-1 text-small',
       },
     },
-    compoundVariants: [{ tone: 'quiet', size: 'default', className: 'px-2 py-0.75 text-small' }],
+    compoundVariants: [
+      { tone: 'quiet', size: 'default', className: 'px-2 py-0.75 text-small' },
+      { tone: 'link', className: 'p-0' },
+    ],
     defaultVariants: { tone: 'default', size: 'default' },
   },
 )

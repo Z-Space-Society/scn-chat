@@ -93,7 +93,7 @@ describe('App', () => {
       vi.fn(async () => Response.json({ error: 'Unauthorized' }, { status: 401 })),
     )
     const router = renderApp('/chat/abc')
-    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Continue' })).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/login')
   })
 
@@ -134,7 +134,7 @@ describe('App', () => {
     const router = renderApp('/chat/abc')
     expect(await screen.findByRole('status')).toHaveTextContent('This server is invite-only.')
     expect(router.state.location.pathname).toBe('/login')
-    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Sign out' }))
     await vi.waitFor(() => expect(assign).toHaveBeenCalledWith('/login'))
     expect(openStore).not.toHaveBeenCalled()
@@ -145,7 +145,7 @@ describe('App', () => {
     const router = renderApp('/settings')
     expect(await screen.findByRole('status')).toHaveTextContent('This server is invite-only.')
     expect(router.state.location.pathname).toBe('/login')
-    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
     expect(openStore).not.toHaveBeenCalled()
   })

@@ -1,7 +1,9 @@
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import { createFileRoute, getRouteApi, redirect } from '@tanstack/react-router'
 import { ViewerSignOut } from '../features/auth/components/ViewerSignOut.tsx'
 import { LoginPage } from '../features/auth/pages/LoginPage.tsx'
 import { validateLoginSearch } from '../shared/search-params.ts'
+
+const root = getRouteApi('__root__')
 
 export const Route = createFileRoute('/login')({
   validateSearch: validateLoginSearch,
@@ -16,9 +18,11 @@ export const Route = createFileRoute('/login')({
 function Login() {
   const { error, next } = Route.useSearch()
   const { session } = Route.useRouteContext()
-  if (session.state === 'signed-out') return <LoginPage error={error} next={next} />
+  const appName = root.useLoaderData({ select: (data) => data.appName })
+  if (session.state === 'signed-out')
+    return <LoginPage appName={appName} error={error} next={next} />
   return (
-    <LoginPage error={error} next={next} notice={session.me.accessMessage}>
+    <LoginPage appName={appName} error={error} next={next} notice={session.me.accessMessage}>
       <ViewerSignOut />
     </LoginPage>
   )

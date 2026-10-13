@@ -188,7 +188,8 @@ export function oauthRoutes(deps: AuthDeps) {
     })
     .get('/oauth/jwks.json', (c) => c.json(deps.oauth.jwks))
     .get('/oauth/login', async (c) => {
-      const identifier = c.req.query('identifier')?.trim()
+      // People often type a handle as it's shown, with its leading @.
+      const identifier = c.req.query('identifier')?.trim().replace(/^@/, '')
       if (!identifier) return c.redirect(loginError('Enter your handle to sign in.'))
       try {
         const state = randomBytes(16).toString('base64url')

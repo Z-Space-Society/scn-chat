@@ -7,8 +7,8 @@ import { cn } from '../cn.ts'
 const [cutout, face, rim] = Array.from(logo.matchAll(/ d="([^"]+)"/g), (match) => match[1])
 
 interface Props {
-  /** The app's name, read out in place of the drawing. */
-  label: string
+  /** The app's name, read out in place of the drawing. Without one it is decoration. */
+  label?: string
   className?: string
 }
 
@@ -22,8 +22,9 @@ export function Logo(props: Props) {
     <svg
       viewBox="0 0 34 16"
       fill="none"
-      role="img"
-      aria-label={props.label}
+      role={props.label ? 'img' : undefined}
+      aria-label={props.label || undefined}
+      aria-hidden={props.label ? undefined : true}
       className={cn('h-4 w-auto', props.className)}
     >
       <mask
