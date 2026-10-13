@@ -44,7 +44,7 @@ Prefer existing libraries over writing our own, especially the official `@atprot
 
 Admins configure plugins, global models, roles, access, and every other runtime setting in the admin area, and changes apply without a restart. `.env` holds the secrets and the settings needed at startup, including `ADMIN_DIDS`, the admins no edit can remove. A registration mode decides who may create an account, and once someone has one they keep access until suspended. Roles gate invites, admin models, and admin-paid tools such as the admin's web search engine. Installing plugin packages stays outside the web UI: a plugin is a dependency of the root `package.json` with the `scn-chat-plugin` keyword.
 
-The web UI stays plain, with minimal code and styling, and easy for a forker to change. Its look will come from a theme of design tokens, which a designer will build, so core components carry as few visual decisions as possible.
+The web UI stays easy for a forker to change. Its look comes from the design tokens in `apps/web/src/styles/theme.css`, and each component styles itself with Tailwind utilities that use only those tokens, never raw colors or arbitrary lengths. A reused look is a component in `src/shared/ui/`, not a global class. `specs/styling.md` has the rules, and ADR 0004 the reasons.
 
 React components take `props: Props`, declared as an `interface`, and read `props.example`, rather than destructuring props in the signature. Destructure only the values the component builds other variables from.
 

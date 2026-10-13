@@ -22,15 +22,15 @@ The overview at the end of this file lists every spec and whether it is active, 
 
 ### Active
 
+- [[styling]]: Tailwind over a theme of design tokens, a light and dark picker, code highlighting, and the design from the `design-reference` branch with its behavior, ported onto main. Phase 2 of the web rebuild.
 - [[api-keys]]
 - [[cron]]
 - [[scn-member-registry]]
 
 ### Planned
 
-The later phases of the web rebuild, each spec written before its phase starts:
+The last phase of the web rebuild, its spec written before the phase starts:
 
-- styling: the styling stack, a theme of design tokens for light and dark, and the designer's default look. Phase 2 of the web rebuild.
 - [[extending]]: the web app made easy to change in a fork, with tables of part and tool views, tool status and steps, message actions as a list with Copy, a Markdown seam with code block copy, smaller components, and a guide in `docs/extending.md`. Phase 3 of the web rebuild.
 
 Other features:
