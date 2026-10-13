@@ -10,6 +10,7 @@ interface Props {
   text: string
   /** Show an icon in place of the words, as among a message's actions. */
   icon?: boolean
+  className?: string
 }
 
 /** Copy text, saying so for a moment once it is copied. */
@@ -22,9 +23,14 @@ export function CopyButton(props: Props) {
   }, [copied])
   const copy = () => void navigator.clipboard.writeText(props.text).then(() => setCopied(true))
   const label = copied ? 'Copied' : 'Copy'
-  if (!props.icon) return <Button onClick={copy}>{label}</Button>
+  if (!props.icon)
+    return (
+      <Button onClick={copy} className={props.className}>
+        {label}
+      </Button>
+    )
   return (
-    <IconButton aria-label={label} onClick={copy}>
+    <IconButton aria-label={label} onClick={copy} className={props.className}>
       {/* Copy gives way to the check, shrinking and blurring as it fades where motion is welcome. */}
       <span className="group inline-grid place-items-center" data-swapped={copied || undefined}>
         <CopyIcon

@@ -1,0 +1,176 @@
+/*
+ * The model's text as react-markdown builds it, under `.markdown`. The elements come from the
+ * Markdown, so they are styled here rather than with utilities, and the flow spacing Preflight
+ * removes is set back deliberately.
+ */
+
+@layer components {
+  .markdown {
+    font-family: var(--font-prose);
+    font-size: var(--text-body);
+    line-height: 1.65;
+    color: var(--color-prose);
+
+    & > :first-child {
+      margin-top: 0.25rem;
+    }
+
+    & :is(p, ul, ol) {
+      margin-block: 1em;
+    }
+
+    /* A code block keeps the room its smaller text gives it, and a table none of its own. */
+    & .code-block {
+      margin-block: 0.8em;
+    }
+
+    /* Running text keeps to a comfortable line, about 70 characters, avoids a lone word on its last
+       line, and breaks a word too long for the line, such as a URL. Code and tables take the whole
+       column and scroll instead. */
+    & :is(p, li, blockquote, h1, h2, h3, h4, h5, h6) {
+      max-inline-size: 68ch;
+      overflow-wrap: anywhere;
+    }
+
+    & :is(p, li, blockquote) {
+      text-wrap: pretty;
+    }
+
+    & strong {
+      font-weight: 600;
+      color: var(--color-ink-strong);
+    }
+
+    & em {
+      font-style: italic;
+    }
+
+    & a {
+      color: inherit;
+    }
+
+    /* Headings step down from the text's own size, so they shrink with it in reasoning. The deepest
+       levels match the text and stand apart by weight, never going smaller. */
+    & :is(h1, h2, h3, h4, h5, h6) {
+      margin-top: 1.5em;
+      margin-bottom: 0.5em;
+      font-weight: 600;
+      line-height: 1.25;
+      color: var(--color-ink-strong);
+      text-wrap: balance;
+    }
+
+    & h1 {
+      font-size: 1.4em;
+    }
+
+    & h2 {
+      font-size: 1.2em;
+    }
+
+    & h3 {
+      font-size: 1.1em;
+    }
+
+    & :is(h4, h5, h6) {
+      font-size: 1em;
+    }
+
+    & ul {
+      list-style: disc;
+      padding-inline-start: 1.5em;
+    }
+
+    & ol {
+      list-style: decimal;
+      padding-inline-start: 1.5em;
+    }
+
+    & li > :is(ul, ol) {
+      margin-block: 0;
+    }
+
+    & li::marker {
+      color: var(--color-faint);
+    }
+
+    & :not(pre) > code {
+      background: var(--color-surface);
+      border-radius: var(--radius-badge);
+      padding: 0.08rem 0.32rem;
+      font-size: var(--text-code);
+    }
+
+    & pre {
+      margin: 0;
+      padding: 0.75rem 0.9rem;
+      overflow-x: auto;
+      white-space: pre;
+      font-size: var(--text-code-block);
+      line-height: 1.5;
+      color: var(--color-ink);
+      background: var(--color-raised);
+      border: 1px solid var(--color-line);
+      border-radius: var(--radius-card);
+    }
+
+    & table {
+      display: block;
+      overflow-x: auto;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: var(--text-ui);
+      background: var(--color-raised);
+      border: 1px solid var(--color-line);
+      border-radius: var(--radius-card);
+    }
+
+    & :is(th, td) {
+      border-bottom: 1px solid var(--color-line);
+      padding: 0.45rem 0.8rem;
+      text-align: start;
+    }
+
+    & tr:last-child td {
+      border-bottom: none;
+    }
+
+    & th {
+      color: var(--color-muted);
+      font-weight: 500;
+    }
+
+    & blockquote {
+      margin-block: 1.1rem;
+      padding: 0.6rem 0.9rem;
+      background: var(--color-well);
+      border-radius: var(--radius-card);
+      color: var(--color-ink);
+
+      & > :first-child {
+        margin-top: 0;
+      }
+
+      & > :last-child {
+        margin-bottom: 0;
+      }
+    }
+
+    & hr {
+      margin-block: 1.75rem;
+      border-top: 1px solid var(--color-line);
+    }
+
+    /* Pictures get a hairline drawn just inside, so a light one doesn't bleed into the panel. */
+    & img {
+      outline: 1px solid var(--color-image-edge);
+      outline-offset: -1px;
+      border-radius: var(--radius-card);
+    }
+
+    & .image-placeholder code {
+      font-size: 0.75em;
+      word-break: break-all;
+    }
+  }
+}

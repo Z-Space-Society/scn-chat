@@ -1,17 +1,34 @@
-import { Markdown } from '../../../parts/markdown.tsx'
-import { Reasoning } from '../../../parts/ReasoningView.tsx'
-import type { StreamedReply } from '../lib/reply-stream.ts'
+import type { BlobUrl } from '../../../parts/types.ts'
+import type { ReplyParts } from '../lib/reply-stream.ts'
+import { PartsView } from './PartsView.tsx'
+import { statusLine } from './Status.tsx'
 
 interface Props {
-  streaming: StreamedReply
+  reply: ReplyParts
+  blobUrl: BlobUrl
+  /** The reply's key, so its steps' times carry over to the finished record. */
+  rkey?: string
 }
 
-/** The reasoning and text streamed so far, shown until the reply's record arrives. */
+/** The reply's record as far as the stream goes, for the part views that read it. */
+const streaming = { role: 'assistant', status: 'pending' }
+
+/**
+ * The reply streamed so far, step by step, shown until the reply's record arrives. Before anything
+ * arrives the reply's header shows it waiting, so this only explains a wait for the rate limit.
+ */
 export function StreamingReply(props: Props) {
+  if (props.reply.queued)
+    return (
+      <p className={statusLine}>In line: you have started the most replies allowed this minute.</p>
+    )
   return (
-    <>
-      {props.streaming.reasoning && <Reasoning text={props.streaming.reasoning} />}
-      {props.streaming.text && <Markdown text={props.streaming.text} />}
-    </>
+    <PartsView
+      parts={props.reply.parts}
+      record={streaming}
+      live
+      blobUrl={props.blobUrl}
+      scope={props.rkey}
+    />
   )
 }

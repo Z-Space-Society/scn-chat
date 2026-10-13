@@ -29,20 +29,22 @@ export function useConversationActions(skey: string, onRegenerated: (replyRkey: 
         }),
       )
       if (!cancelled)
-        throw new Error('This reply is not running on this server, so it cannot be stopped')
+        throw new Error('This reply may already be finishing. Sync this chat to see it.')
     },
     onSuccess: refresh,
   })
   const regenerating = useMutation({
     mutationFn: async (draft: { parent: string | null; model: ModelRef | null }) => {
-      if (!draft.parent) throw new Error('This reply has no user message to regenerate')
+      if (!draft.parent)
+        throw new Error("Couldn't regenerate this reply. Sync this chat, then try again.")
       const result = await read(
         api.turns.conversations[':skey'].messages[':rkey'].regenerate.$post(
           { param: { skey, rkey: draft.parent } },
           json(draft.model ? { model: draft.model } : {}),
         ),
       )
-      if (!result.replyRkey) throw new Error(`Regenerating was ${result.status}`)
+      if (!result.replyRkey)
+        throw new Error("Couldn't regenerate this reply. Sync this chat, then try again.")
       return result.replyRkey
     },
     onSuccess: (replyRkey) => {
@@ -57,6 +59,7 @@ export function useConversationActions(skey: string, onRegenerated: (replyRkey: 
     stop: (replyRkey: string) => stopping.mutate(replyRkey),
     regenerate: (parent: string | null, model: ModelRef | null) =>
       regenerating.mutate({ parent, model }),
+    regenerating: regenerating.isPending,
     error: lastError(renaming, syncing, stopping, regenerating),
   }
 }

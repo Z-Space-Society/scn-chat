@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
+import { RetryIcon } from '../../../shared/icons.tsx'
+import { Button } from '../../../shared/ui/Button.tsx'
 import { useConversation } from '../../../store/react.tsx'
 import { useBranch } from '../hooks/useBranch.ts'
 import { useConversationActions } from '../hooks/useConversationActions.ts'
@@ -10,6 +12,7 @@ import { blobUrlFor } from '../lib/blob-url.ts'
 import { BranchComposer } from './BranchComposer.tsx'
 import { BranchView } from './BranchView.tsx'
 import { ConversationHeader } from './ConversationHeader.tsx'
+import { LiveAuthor } from './LiveAuthor.tsx'
 import { type ConversationOperations, MessageActions } from './message-actions.tsx'
 import { ReplyStream } from './ReplyStream.tsx'
 
@@ -23,6 +26,9 @@ export function ConversationView(props: Props) {
   // The user message being edited, by rkey, so the composer reads it from the conversation.
   const [editingRkey, setEditingRkey] = useState<string | null>(null)
   const messages = conversation?.messages ?? []
+  // The messages there when the chat first loaded, which show at once. Only later ones fade in.
+  const [opened, setOpened] = useState<Set<string> | null>(null)
+  if (opened === null && conversation) setOpened(new Set(messages.map((m) => m.rkey)))
   const pending = messages.filter((m) => m.record.status === 'pending').map((m) => m.rkey)
   const { follow } = useReplyStream(props.skey, pending)
 
@@ -52,8 +58,14 @@ export function ConversationView(props: Props) {
     if (message.replyRkey) follow(message.replyRkey)
   }
 
+  const blobUrl = blobUrlFor(`/api/conversations/${props.skey}`)
+
   return (
-    <section className="conversation" ref={stickToBottom}>
+    // The conversation keeps main's stand-in class until its header and composer are ported.
+    <section
+      ref={stickToBottom}
+      className="conversation mx-auto flex w-full max-w-column flex-1 flex-col px-gutter"
+    >
       <ConversationHeader
         skey={props.skey}
         title={(conversation?.info?.title as string | undefined) ?? 'New chat'}
@@ -63,10 +75,35 @@ export function ConversationView(props: Props) {
       <ErrorAlert error={actions.error ?? loadError} />
       <BranchView
         branch={branch}
-        blobUrl={blobUrlFor(`/api/conversations/${props.skey}`)}
+        blobUrl={blobUrl}
         onPick={choose}
-        pending={(message) => <ReplyStream skey={props.skey} rkey={message.rkey} />}
+        pending={(message) => (
+          <ReplyStream skey={props.skey} rkey={message.rkey} blobUrl={blobUrl} />
+        )}
+        live={(message) => (
+          <LiveAuthor
+            skey={props.skey}
+            rkey={message.rkey}
+            model={(message.record.model as { id?: string } | undefined)?.id ?? 'Assistant'}
+            since={message.record.createdAt}
+          />
+        )}
         actions={(message) => <MessageActions message={message} operations={operations} />}
+        // A failed reply tries again with the same model.
+        retry={(message) => (
+          <Button
+            size="small"
+            className="mt-2.5"
+            disabled={actions.regenerating}
+            onClick={() =>
+              actions.regenerate((message.record.parent as string | undefined) ?? null, null)
+            }
+          >
+            <RetryIcon className="size-3.75 text-muted" />
+            Try again
+          </Button>
+        )}
+        arrived={(message) => !opened?.has(message.rkey)}
       />
       <BranchComposer
         skey={props.skey}

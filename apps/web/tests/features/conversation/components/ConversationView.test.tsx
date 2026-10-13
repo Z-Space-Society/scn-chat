@@ -182,7 +182,7 @@ describe('ConversationView', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Regenerate' }))
     act(() => store.update([...store.data.messages, reply('u.r1', 'regenerated', 'u')]))
     expect(await screen.findByText('regenerated')).toBeInTheDocument()
-    expect(screen.getByText(/2 \/ 3/)).toBeInTheDocument()
+    expect(screen.getByText('2/3')).toBeInTheDocument()
   })
 
   it('edits a message into a sibling with its own reply', async () => {
@@ -260,7 +260,8 @@ describe('ConversationView', () => {
       source.emit('delta', { index: 1, text: 'lo' })
     })
     expect(await screen.findByText('Hello')).toBeInTheDocument()
-    expect(screen.getByText('pondering').closest('details')).not.toBeNull()
+    // The work gives way to the reply once it starts.
+    expect(screen.getByText('pondering')).not.toBeVisible()
     act(() => source.emit('status', { status: 'complete' }))
     await vi.waitFor(() => expect(source.closed).toBe(true))
     await vi.waitFor(() => expect(store.worker.refreshConversation).toHaveBeenCalled())
@@ -443,7 +444,7 @@ describe('ConversationView errors', () => {
     const store = fakeStore([user('u', 'q'), reply('u.r0', '', 'u', 'pending')])
     await renderWith(store, <ConversationView skey="s1" />)
     await userEvent.click(await screen.findByRole('button', { name: 'Stop' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('cannot be stopped')
+    expect(await screen.findByRole('alert')).toHaveTextContent('may already be finishing')
   })
 
   it('shows why the conversation could not be loaded', async () => {

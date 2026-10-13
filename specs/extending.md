@@ -43,7 +43,6 @@ A survey of Open WebUI, LibreChat, LobeHub, Vercel's ai-chatbot, and assistant-u
 /** The view for each kind of part, by the part's `$type` fragment, like `textPart`. */
 export const partViews: Record<string, PartView> = {
   textPart: TextView,
-  reasoningPart: ReasoningView,
   imagePart: ImageView,
   filePart: FileView,
   sourcePart: SourceView,
@@ -77,7 +76,7 @@ export const StepsView: StepsView = Steps
 
 ### Steps
 
-A run of two or more consecutive steps, where a step is a reasoning part or a tool call with its result, is shown inside `StepsView`. It renders a collapsed `<details>` whose summary counts the steps and says whether any tool is running, with each step's own view inside. A single step is shown on its own. The group is one replaceable component, so the designer or a fork can change how runs look without touching `MessageView`.
+The styling phase brought `StepsView` over from the design: `parts/WorkSteps.tsx`, with the grouping in `parts/steps.ts`, shows every run of reasoning and tool parts as numbered steps, and reasoning has no part view of its own. This phase gives it `toolStatus` and the tool views. A run of two or more consecutive steps, where a step is a reasoning part or a tool call with its result, is shown inside `StepsView`. It renders a collapsed `<details>` whose summary counts the steps and says whether any tool is running, with each step's own view inside. A single step is shown on its own. The group is one replaceable component, so the designer or a fork can change how runs look without touching `MessageView`.
 
 ### Tool views in their own folder
 

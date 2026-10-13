@@ -1,0 +1,20 @@
+/* Opening a <details> unfolds it rather than jumping, where the browser can. */
+@utility details-unfold {
+  &::details-content {
+    block-size: 0;
+    overflow-y: clip;
+    transition:
+      block-size var(--dur-layout) var(--ease-out),
+      content-visibility var(--dur-layout) allow-discrete;
+  }
+
+  &[open]::details-content {
+    block-size: auto;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &::details-content {
+      transition: none;
+    }
+  }
+}

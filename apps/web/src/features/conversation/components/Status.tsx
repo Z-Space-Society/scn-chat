@@ -1,28 +1,37 @@
 import type { ReactNode } from 'react'
+import { AlertIcon } from '../../../shared/icons.tsx'
+
+/** A quiet line about a reply, such as that it stopped or waits its turn. */
+export const statusLine = 'text-muted text-ui'
 
 interface Props {
   record: Record<string, unknown>
-  /** What the pending message shows instead of "Thinking...", if anything. */
-  pending?: ReactNode
+  /** What a failed reply offers beside its error, such as a button to try again. */
+  retry?: ReactNode
 }
 
-/** What a pending reply shows before anything of it has streamed. */
-export function Thinking() {
-  return <p>Thinking...</p>
-}
-
-/** A line for a message that is still thinking, failed, or was stopped. */
+/** A line for a message that failed or was stopped. A pending reply's header says it is waiting. */
 export function Status(props: Props) {
   switch (props.record.status) {
-    case 'pending':
-      if (props.pending !== undefined) return null
-      return <Thinking />
     case 'error':
+      // What went wrong in red ink, the provider's own message, often long and technical, in a
+      // softer red, and the button to try again below it.
       return (
-        <p role="alert">Error{props.record.error ? `: ${props.record.error as string}` : ''}</p>
+        <div role="alert" className="my-2.5 flex items-start gap-2 text-danger text-ui">
+          <AlertIcon className="mt-0.5" />
+          <div className="min-w-0 flex-1">
+            <strong className="font-medium">The reply failed</strong>
+            {Boolean(props.record.error) && (
+              <p className="mt-0.5 text-danger-muted [overflow-wrap:anywhere]">
+                {props.record.error as string}
+              </p>
+            )}
+            {props.retry}
+          </div>
+        </div>
       )
     case 'cancelled':
-      return <p>Stopped.</p>
+      return <p className={statusLine}>Stopped before it finished.</p>
     default:
       return null
   }

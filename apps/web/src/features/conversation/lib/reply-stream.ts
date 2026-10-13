@@ -1,7 +1,9 @@
+import { nsid } from '@scn-chat/lexicons/nsid'
 import type { HubEvent } from '@scn-chat/server/api-types'
+import type { Part } from '../../../parts/types.ts'
 
-/** The reply stream events the web app follows, as the server sends them. See TurnsApi's stream route. */
-export type ReplyEvent = Extract<HubEvent, { type: 'part-start' | 'delta' | 'status' }>
+/** A reply's stream events, as the server sends them. See TurnsApi's stream route. */
+export type ReplyEvent = HubEvent
 
 /** Statuses after which the reply's record is final. Others mean another server runs the reply. */
 export const FINISHED = new Set(['complete', 'error', 'cancelled'])
@@ -22,7 +24,7 @@ export async function* replyEvents(url: string, signal: AbortSignal): AsyncGener
         source.close()
         controller.close()
       }
-      for (const type of ['part-start', 'delta', 'status'] as const)
+      for (const type of ['part-start', 'delta', 'part', 'queued', 'status'] as const)
         source.addEventListener(type, (event) => {
           try {
             controller.enqueue({ type, ...JSON.parse((event as MessageEvent).data) } as ReplyEvent)
@@ -50,28 +52,38 @@ export async function* replyEvents(url: string, signal: AbortSignal): AsyncGener
   }
 }
 
-/** A reply streamed so far: each part's type and text by index, and the final status once sent. */
-export type ReplyParts = { kinds: string[]; texts: string[]; status: string | null }
+/**
+ * A reply streamed so far: its parts in the shape of the final record, in the order the model
+ * produced them, whether it waits for the rate limit, and the final status once sent.
+ */
+export type ReplyParts = { parts: Part[]; queued: boolean; status: string | null }
 
-export const noParts: ReplyParts = { kinds: [], texts: [], status: null }
+export const noParts: ReplyParts = { parts: [], queued: false, status: null }
 
-export function addEvent(parts: ReplyParts, event: ReplyEvent): ReplyParts {
-  if (event.type === 'status') return { ...parts, status: event.status }
-  if (event.type === 'part-start') {
-    const kinds = [...parts.kinds]
-    kinds[event.index] = event.partType
-    return { ...parts, kinds }
+export function addEvent(reply: ReplyParts, event: ReplyEvent): ReplyParts {
+  switch (event.type) {
+    case 'status':
+      return { ...reply, status: event.status }
+    case 'queued':
+      return { ...reply, queued: true }
+    case 'part-start':
+      return setPart(reply, event.index, { $type: `${nsid.defs}#${event.partType}`, text: '' })
+    case 'part':
+      return setPart(reply, event.index, event.part as Part)
+    case 'delta': {
+      const part = reply.parts[event.index]
+      if (!part) return reply
+      return setPart(reply, event.index, {
+        ...part,
+        text: `${(part.text as string | undefined) ?? ''}${event.text}`,
+      })
+    }
   }
-  const texts = [...parts.texts]
-  texts[event.index] = (texts[event.index] ?? '') + event.text
-  return { ...parts, texts }
 }
 
-export type StreamedReply = { text: string; reasoning: string }
-
-/** The streamed text to show, with reasoning parts apart from the rest. */
-export function streamedReply({ kinds, texts }: ReplyParts): StreamedReply {
-  const collect = (reasoning: boolean) =>
-    texts.filter((text, i) => text && (kinds[i] === 'reasoningPart') === reasoning).join('\n\n')
-  return { text: collect(false), reasoning: collect(true) }
+/** The reply with one part replaced. A part arriving means the turn has left the queue. */
+function setPart(reply: ReplyParts, index: number, part: Part): ReplyParts {
+  const parts = [...reply.parts]
+  parts[index] = part
+  return { ...reply, parts, queued: false }
 }

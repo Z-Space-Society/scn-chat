@@ -55,8 +55,12 @@
   --color-raised-hover: light-dark(oklch(0.993 0 0), oklch(0.254 0 0));
   /* Every floating menu, a step lighter than the panel. */
   --color-lifted: light-dark(oklch(1 0 0), oklch(0.254 0 0));
-  /* Your message's bubble, the panel with a faint tint of the accent. */
+  /* Your message's bubble, the panel with a faint tint of the accent, and a quote inside it, a
+     step deeper. */
   --color-bubble: color-mix(in srgb, var(--color-accent) 12%, var(--color-panel));
+  --color-bubble-quote: color-mix(in srgb, var(--color-accent) 26%, var(--color-panel));
+  /* The quiet dot before a reply's model name. */
+  --color-author-dot: color-mix(in srgb, var(--color-faint) 55%, var(--color-panel));
   --color-hover: light-dark(oklch(0.918 0 0), oklch(0.302 0 0));
   /* The sidebar's rows: a faint tint when hovered, and a firmer one for the search field and a
      row's menu button. The open row's tint is fainter still, so it never reads as New chat's. */
@@ -172,8 +176,9 @@
   --text-title: 1.5rem;
   /* The app's name on the login page. */
   --text-display: 1.75rem;
-  /* Code inside text, against the text around it. */
+  /* Code inside text, against the text around it, and a block of code a step smaller. */
   --text-code: 0.85em;
+  --text-code-block: 0.8em;
 
   /* Big titles draw in a touch, and small labels in capitals' weight open up. */
   --tracking-title: -0.02em;
@@ -232,6 +237,8 @@
   --spacing-gutter: 1.5rem;
   /* The space inside a settings card, the same on every side, around each of its rows. */
   --spacing-card-pad: 1rem;
+  /* A message's icon actions, square and as tall as the worded ones beside them. */
+  --spacing-action: calc(0.8rem * 1.55 + 0.36rem + 2px);
   /* The gap inside a turn, between your message and its reply, and the much larger one between
      turns, so each exchange reads as one unit. Each message's footer row adds about 1.85rem to
      both, which puts the gaps you see at about 2.5 to 1. */
@@ -256,6 +263,8 @@
   --animate-breathe: breathe var(--slow) ease-in-out infinite;
   /* A panel rising from the control below it, such as the account menu. */
   --animate-panel-up: panel-up var(--dur-panel) var(--ease-out);
+  /* What arrives only after a quiet wait, such as a reply's waiting header. */
+  --animate-fade-in-late: fade-in var(--dur-enter) var(--ease-out) var(--wait-quiet) backwards;
 
   @keyframes fade-in {
     from {
