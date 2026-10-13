@@ -1,7 +1,8 @@
 /*
- * The model's text as react-markdown builds it, under `.markdown`. The elements come from the
+ * The model's text as Streamdown builds it, under `.markdown`. The elements come from the
  * Markdown, so they are styled here rather than with utilities, and the flow spacing Preflight
- * removes is set back deliberately.
+ * removes is set back deliberately. Streamdown wraps the blocks in a root of its own, so the rules
+ * about the first and last block look inside it.
  */
 
 @layer components {
@@ -11,7 +12,7 @@
     line-height: 1.65;
     color: var(--color-prose);
 
-    & > :first-child {
+    & > * > :first-child {
       margin-top: 0.25rem;
     }
 
@@ -108,10 +109,23 @@
       white-space: pre;
       font-size: var(--text-code-block);
       line-height: 1.5;
-      color: var(--color-ink);
-      background: var(--color-raised);
+      color: var(--color-code-foreground);
+      background: var(--color-code-background);
       border: 1px solid var(--color-line);
       border-radius: var(--radius-card);
+    }
+
+    /* A formula holds the hidden MathML that screen readers read, which is placed absolutely, so it
+       stays beside the formula rather than stretching the page to wherever the formula sits. */
+    & .katex {
+      position: relative;
+    }
+
+    /* A formula on its own line scrolls when it is wider than the column. */
+    & .katex-display {
+      margin-block: 1em;
+      overflow-x: auto;
+      overflow-y: hidden;
     }
 
     & table {

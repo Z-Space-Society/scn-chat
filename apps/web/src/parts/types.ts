@@ -20,6 +20,8 @@ export interface PartViewProps {
   /** The message record the part belongs to. */
   record: Record<string, unknown>
   blobUrl: BlobUrl
+  /** Whether the part is still being written, as the newest part of a reply that streams. */
+  live?: boolean
 }
 
 export type PartView = ComponentType<PartViewProps>

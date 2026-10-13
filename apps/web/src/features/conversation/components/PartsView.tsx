@@ -44,7 +44,13 @@ export function PartsView(props: Props) {
         const View = viewFor(block.part)
         if (!View) return null
         return (
-          <View key={block.key} part={block.part} record={props.record} blobUrl={props.blobUrl} />
+          <View
+            key={block.key}
+            part={block.part}
+            record={props.record}
+            blobUrl={props.blobUrl}
+            live={props.live && i === blocks.length - 1}
+          />
         )
       })}
       {sources.length > 0 && (

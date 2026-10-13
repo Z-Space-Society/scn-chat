@@ -22,7 +22,7 @@ Tailwind keeps a component's styles in its markup, so a forker changes a compone
 - Tailwind CSS v4 through `@tailwindcss/vite`, in `apps/web/vite.config.ts`. The dev server builds Vite from that config, so it needs no change.
 - `class-variance-authority` for components with variants, and `cn()` in `src/shared/cn.ts`, which is `clsx` with `tailwind-merge` configured to know the theme's custom size, radius, and shadow names.
 - `lucide-react` for the icons the app doesn't draw itself, through `src/shared/icons.tsx`.
-- `shiki` for code highlighting, with a CSS variables theme.
+- `streamdown` for replies' Markdown, with `@streamdown/code` for Shiki highlighting through a CSS variables theme, `@streamdown/math` for KaTeX, and `@streamdown/cjk`, as ADR 0005 explains.
 
 ### Stylesheets
 
@@ -34,7 +34,7 @@ Tailwind keeps a component's styles in its markup, so a forker changes a compone
 
 A few styles can't be written as utilities, and live in a sheet beside the component they serve, imported from `app.css`:
 
-- `src/parts/markdown.css` styles the HTML react-markdown builds, under `.markdown`, and the highlighted code inside it.
+- `src/parts/markdown.css` styles the HTML Streamdown builds, under `.markdown`, and the highlighted code inside it. KaTeX's own sheet is imported after it, in the components layer, so Preflight doesn't reset it.
 - `src/shared/ui/scroll-fade.css`, the `scroll-fade` utility for a list that scrolls between parts that stay put, like the chat list, whose top fade needs `@property` and `animation-timeline`.
 - A `@utility` for animating a `<details>` open through `::details-content`.
 
@@ -54,6 +54,7 @@ Every color is `light-dark(<light>, <dark>)` in oklch, so dark mode needs no `da
 | Accent | `accent`, `accent-strong`, `accent-soft`, `accent-soft-hover`, `accent-border`, `accent-mark`, `on-accent`, `focus` (was `--focus-ring`) | any color utility |
 | Danger | `danger`, `danger-soft`, `danger-soft-hover`, `danger-border`, `danger-muted` | any color utility |
 | Highlight | `highlight`, `highlight-ink` | any color utility |
+| Code | `code-background`, `code-foreground`, `code-token-*` | Shiki's CSS variables theme, through `parts/highlight.ts` |
 | Fonts | `--font-ui`, `--font-prose`, `--font-mono`, with `--default-font-family` set to the UI font | `font-*` |
 | Type | `--text-caption`, `small`, `ui`, `body`, `heading`, `title`, `display` | `text-*` |
 | Radius | `--radius-panel` (was `--radius`), `card`, `small`, `badge`, `row`, `menu`, `bubble`, `composer`, with Tailwind's own `rounded-full` for pills | `rounded-*` |
@@ -108,7 +109,7 @@ The form kit in `src/shared/form.tsx` gives its text, textarea, and select field
 
 ### Code highlighting
 
-Fenced code in replies is highlighted by Shiki, loaded lazily by `parts/markdown.tsx` the first time a code block renders, with only the languages a block names. It uses Shiki's CSS variables theme, so the colors are `--color-code-*` tokens in `theme.css`, light and dark like every other color. Until it loads, and for a language it doesn't know, a block shows as plain monospace.
+Fenced code in replies is highlighted by Shiki through `@streamdown/code`, loaded from `parts/highlight.ts` the first time a code block renders, with only the grammars the blocks name. It uses Shiki's CSS variables theme with the `--color-code-` prefix, so the colors are tokens in `theme.css`: a background and foreground, and a color for each kind of token, such as `--color-code-token-keyword`, light and dark like every other color, each clearing 4.5:1 on the block. Terminal colors map onto the same tokens. Until it loads, and for a language it doesn't know, a block shows as plain monospace, and a block still streaming highlights as it grows.
 
 ### Porting design-reference
 

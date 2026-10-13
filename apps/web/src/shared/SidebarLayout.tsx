@@ -45,7 +45,7 @@ export function SidebarLayout(props: Props) {
       // so the nav stays put from section to section. The nav sits as far from the window's edge
       // as the chat list does, with the chat's gutter on the other side.
       <div data-drawer-open={sidebar.drawerOpen || undefined} className="settings flex h-dvh">
-        <main className="min-w-0 flex-1 overflow-y-auto bg-panel ps-sidebar-pad pe-gutter pb-16 has-[[data-ported]]:pb-0 max-wide:px-gutter max-wide:pt-[calc(var(--spacing-toggle)-(--spacing(1)))]">
+        <main className="relative min-w-0 flex-1 overflow-y-auto bg-panel ps-sidebar-pad pe-gutter pb-16 has-[[data-ported]]:pb-0 max-wide:px-gutter max-wide:pt-[calc(var(--spacing-toggle)-(--spacing(1)))]">
           <MainBar />
           <div className="flex gap-12">
             <nav
@@ -93,8 +93,10 @@ export function SidebarLayout(props: Props) {
         {props.nav}
       </nav>
       {backdrop}
-      {/* A size container, so the conversation's header can reach the panel's edges. */}
-      <main className="@container flex min-w-0 flex-1 flex-col overflow-y-auto border-divider in-data-sidebar-collapsed:border-transparent border-s-2 bg-panel transition-[border-color] duration-(--dur-layout) ease-out max-wide:border-none">
+      {/* A size container, so the conversation's header can reach the panel's edges, and the block
+          its absolutely placed parts are placed in, so none of them can stretch the page past the
+          panel's scroll. */}
+      <main className="@container relative flex min-w-0 flex-1 flex-col overflow-y-auto border-divider in-data-sidebar-collapsed:border-transparent border-s-2 bg-panel transition-[border-color] duration-(--dur-layout) ease-out max-wide:border-none">
         <MainBar />
         {props.children}
       </main>

@@ -17,7 +17,7 @@ import { RolePicker } from '../components/RolePicker.tsx'
 import { useModelsChanged } from '../hooks/changes.ts'
 import { type AdminModel, storedModel } from '../lib/models.ts'
 import { rolesWithUser } from '../lib/roles.ts'
-import { type AdminModelEntry, adminModelsQuery, adminRolesQuery } from '../queries.ts'
+import { adminModelsQuery, adminRolesQuery } from '../queries.ts'
 
 interface ModelAdminProps {
   pluginId: string

@@ -13,6 +13,8 @@
 @import "../shared/ui/scroll-fade.css";
 @import "../shared/ui/details.css";
 @import "../parts/markdown.css";
+/* KaTeX draws math in replies. Its sheet sits over Preflight, which would otherwise reset it. */
+@import "katex/dist/katex.min.css" layer(components);
 
 /* Devices that can't hover, where what hover reveals shows from the start. */
 @custom-variant touch (@media (hover: none));

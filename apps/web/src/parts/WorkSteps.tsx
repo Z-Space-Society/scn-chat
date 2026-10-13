@@ -324,7 +324,8 @@ function Thought(props: ThoughtProps) {
       >
         <Markdown
           text={props.text}
-          className="text-inherit leading-[inherit] [font-size:inherit] [&>:first-child]:mt-0 [&_strong]:text-ink"
+          streaming={props.current}
+          className="text-inherit leading-[inherit] [font-size:inherit] [&>*>:first-child]:mt-0 [&_strong]:text-ink"
         />
       </div>
       {openable && (

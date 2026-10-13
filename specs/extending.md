@@ -111,13 +111,13 @@ Copy is new. It is on every message that is not pending, copies the message's te
 
 `parts/markdown.tsx` holds the Markdown renderer and its configuration as the seam for changing it:
 
-- `remarkPlugins` and `rehypePlugins` are exported arrays, starting with `remark-gfm` only.
-- `markdownComponents` maps Markdown node names to components:
-  - Links open in a new tab.
-  - Images load only on click, as now.
-  - Code blocks render as before, with a Copy button that copies the block's text.
+- Streamdown renders it, as ADR 0005 explains, with its CJK and math plugins and the default rehype plugins less rehype-raw.
+- `markdownComponents` maps Markdown node names to components, every one of ours:
+  - Links open in a new tab, and a link still being written reads as its text.
+  - Images load only on click.
+  - Code blocks are highlighted, with a Copy button that copies the block's text.
 
-Adding code highlighting, math, or diagrams is a plugin and possibly a component in this one file. The guide shows the recipe. Highlighting itself belongs to the styling phase, which comes before this one, since its colors belong to the theme.
+Adding diagrams is a Streamdown plugin, such as `@streamdown/mermaid`, and possibly a component in this one file. The guide shows the recipe. Highlighting and math came with the styling phase, since their colors belong to the theme.
 
 ### Component boundaries
 
@@ -137,7 +137,7 @@ Then it gives one recipe per common change, each naming the files to touch with 
 
 - **Show a tool's output differently:** add a folder under `parts/tools/` and a line in `toolViews`, reading the call's status.
 - **Add an action to messages:** add a component and an entry in `messageActions`.
-- **Render more in Markdown**, such as code highlighting or math: add a plugin to the lists in `parts/markdown.tsx`.
+- **Render more in Markdown**, such as diagrams: add a Streamdown plugin to the plugins in `parts/markdown.tsx`, loading it the first time a text needs it, as math does.
 - **Add a page:** add a route file under `src/routes/`.
 - **Add a control to the composer.**
 - **Add a settings section:** a route file, a section component in `features/settings/pages/`, a query in `features/settings/queries.ts`, and an entry in `sections` in `features/settings/pages/SettingsLayout.tsx` for the sidebar link.

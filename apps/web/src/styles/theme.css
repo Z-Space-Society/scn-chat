@@ -151,6 +151,23 @@
     var(--color-highlight)
   );
 
+  /* Code in replies, which Shiki colors through these names. Each hue is calm enough to read in a
+     long block, and every one clears 4.5:1 on the block's card in its mode. Comments sit back in
+     grey, keywords are violet, strings green, functions and links blue, constants amber. */
+  --color-code-background: var(--color-raised);
+  --color-code-foreground: var(--color-ink);
+  --color-code-token-comment: light-dark(oklch(0.53 0 0), oklch(0.66 0 0));
+  --color-code-token-punctuation: light-dark(oklch(0.5 0 0), oklch(0.72 0 0));
+  --color-code-token-keyword: light-dark(oklch(0.5 0.17 300), oklch(0.78 0.12 300));
+  --color-code-token-string: light-dark(oklch(0.5 0.13 145), oklch(0.8 0.13 145));
+  --color-code-token-string-expression: var(--color-code-token-string);
+  --color-code-token-function: light-dark(oklch(0.5 0.15 255), oklch(0.78 0.11 250));
+  --color-code-token-link: var(--color-code-token-function);
+  --color-code-token-constant: light-dark(oklch(0.53 0.13 55), oklch(0.8 0.12 65));
+  --color-code-token-parameter: light-dark(oklch(0.52 0.13 25), oklch(0.78 0.1 30));
+  --color-code-token-inserted: var(--color-code-token-string);
+  --color-code-token-deleted: light-dark(oklch(0.52 0.19 25), oklch(0.72 0.15 25));
+
   --font-ui:
     ui-sans-serif, system-ui, -apple-system, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue",
     sans-serif;
