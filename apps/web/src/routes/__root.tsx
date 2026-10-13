@@ -7,6 +7,7 @@ import { appName } from '../shared/app-name.ts'
 import { ErrorPage } from '../shared/ErrorPage.tsx'
 import { themeScript } from '../shared/theme.ts'
 import { useInstantThemeSwitch } from '../shared/useInstantThemeSwitch.ts'
+import { sidebarScript } from '../shared/useSidebar.ts'
 import styles from '../styles/app.css?url'
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
@@ -26,8 +27,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: 'icon', type: 'image/svg+xml', href: logo },
     ],
     scripts: [
-      // Applies the light or dark chosen on this device before the first paint.
-      { children: themeScript },
+      // Applies the light or dark, and the sidebar's collapse, chosen on this device before the
+      // first paint.
+      { children: themeScript + sidebarScript },
       // In development, React Scan outlines components as they render. It hooks into React
       // through the devtools global before React loads, so it runs as a plain script ahead of
       // the app.
@@ -46,7 +48,8 @@ interface Props {
 function Shell(props: Props) {
   useInstantThemeSwitch()
   return (
-    // The theme script sets data-theme on the root before React hydrates it.
+    // The head's script sets data-theme and data-sidebar-collapsed on the root before React
+    // hydrates it.
     <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />

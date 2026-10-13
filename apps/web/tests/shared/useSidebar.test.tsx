@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SidebarToggle } from '../../src/shared/ui/SidebarToggle.tsx'
-import { useSidebar } from '../../src/shared/useSidebar.ts'
+import { sidebarScript, useSidebar } from '../../src/shared/useSidebar.ts'
 
 function Probe() {
   const sidebar = useSidebar()
@@ -29,8 +29,20 @@ describe('useSidebar', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Toggle sidebar' }))
     expect(probe).toHaveAttribute('data-collapsed', 'true')
     expect(localStorage.getItem('scn-chat:sidebar-collapsed')).toBe('1')
+    expect(document.documentElement).toHaveAttribute('data-sidebar-collapsed')
     await userEvent.click(screen.getByRole('button', { name: 'Toggle sidebar' }))
     expect(probe).toHaveAttribute('data-collapsed', 'false')
+    expect(document.documentElement).not.toHaveAttribute('data-sidebar-collapsed')
+  })
+
+  it('marks the root collapsed from the stored choice before the page renders', () => {
+    localStorage.setItem('scn-chat:sidebar-collapsed', '1')
+    new Function(sidebarScript)()
+    expect(document.documentElement).toHaveAttribute('data-sidebar-collapsed')
+    document.documentElement.removeAttribute('data-sidebar-collapsed')
+    localStorage.setItem('scn-chat:sidebar-collapsed', '0')
+    new Function(sidebarScript)()
+    expect(document.documentElement).not.toHaveAttribute('data-sidebar-collapsed')
   })
 
   it('opens and closes the drawer on a narrow screen, leaving the column alone', async () => {

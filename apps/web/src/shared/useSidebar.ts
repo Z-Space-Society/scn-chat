@@ -4,6 +4,14 @@ import { useSyncExternalStore } from 'react'
 export const NARROW = '(width < 45rem)'
 
 const KEY = 'scn-chat:sidebar-collapsed'
+
+/**
+ * Runs in the page's head before the first paint, so a collapsed sidebar never shows open first.
+ * The collapsed state is an attribute on the root, which the layout's styles follow and the hook
+ * keeps current, so the server's page, which can't know the choice, needs no change on hydrating.
+ */
+export const sidebarScript = `try{if(localStorage.getItem('${KEY}')==='1')document.documentElement.dataset.sidebarCollapsed=''}catch(e){}`
+
 const listeners = new Set<() => void>()
 
 /**
@@ -33,12 +41,14 @@ function current(): SidebarState {
 
 function set(next: Partial<SidebarState>) {
   state = { ...current(), ...next }
-  if (next.collapsed !== undefined)
+  if (next.collapsed !== undefined) {
+    document.documentElement.toggleAttribute('data-sidebar-collapsed', next.collapsed)
     try {
       localStorage.setItem(KEY, next.collapsed ? '1' : '0')
     } catch {
       // Without storage the choice lasts until the page reloads.
     }
+  }
   for (const listener of listeners) listener()
 }
 

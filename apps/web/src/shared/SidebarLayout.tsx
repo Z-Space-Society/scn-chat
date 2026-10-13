@@ -13,7 +13,7 @@ interface Props {
   kind: 'chats' | 'settings'
   /** What the sidebar holds, such as the chat list or links to each section. */
   nav?: ReactNode
-  /** The page's frame while its code loads: no head, and no slide as it takes the stored state. */
+  /** The page's frame while its code loads, with no head. */
   frame?: boolean
   children?: ReactNode
 }
@@ -66,8 +66,8 @@ export function SidebarLayout(props: Props) {
       </div>
     )
   return (
+    // Whether the sidebar is collapsed is an attribute on the root, set before the first paint.
     <div
-      data-sidebar-collapsed={sidebar.collapsed || undefined}
       data-drawer-open={sidebar.drawerOpen || undefined}
       aria-busy={props.frame || undefined}
       className="flex h-dvh min-h-0 overflow-x-clip"
@@ -77,10 +77,8 @@ export function SidebarLayout(props: Props) {
           sidebarClass,
           'wide:in-data-sidebar-collapsed:invisible wide:in-data-sidebar-collapsed:-ms-sidebar wide:w-sidebar wide:flex-none overflow-hidden wide:in-data-sidebar-collapsed:opacity-0',
           // Collapsing slides the sidebar off the window's edge, fading as it goes, while the panel
-          // widens into its room. The frame takes the stored choice just after it first renders,
-          // so it never slides, or the collapse would replay on every reload.
-          !props.frame &&
-            'wide:transition-[margin-inline-start,opacity,visibility] wide:duration-(--dur-slide) wide:ease-slide',
+          // widens into its room.
+          'wide:transition-[margin-inline-start,opacity,visibility] wide:duration-(--dur-slide) wide:ease-slide',
         )}
       >
         {!props.frame && (
