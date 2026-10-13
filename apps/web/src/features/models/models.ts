@@ -1,4 +1,4 @@
-import type { Effort, ModelRef } from '@scn-chat/lexicons'
+import type { ModelRef } from '@scn-chat/lexicons'
 import type { dataTagSymbol } from '@tanstack/react-query'
 import type { modelsQuery } from './queries.ts'
 
@@ -6,8 +6,6 @@ import type { modelsQuery } from './queries.ts'
 export type ModelCatalog = (typeof modelsQuery.queryKey)[typeof dataTagSymbol]
 
 export type ModelOption = ModelCatalog['models'][number]
-
-export const effortLevels = ['none', 'low', 'medium', 'high', 'max'] satisfies Effort[]
 
 /** A model's reference, without the catalog's name and capabilities. */
 export const modelRef = ({ provider, id }: ModelRef): ModelRef => ({ provider, id })

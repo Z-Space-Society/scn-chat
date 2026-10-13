@@ -1,7 +1,5 @@
-import { useMutation } from '@tanstack/react-query'
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useContext, useEffect, useRef, useState } from 'react'
-import { api, read } from '../../../shared/api.ts'
 import { cn } from '../../../shared/cn.ts'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
 import { lastError } from '../../../shared/errors.ts'
@@ -78,13 +76,9 @@ export function ChatList() {
     setSearchOpen(false)
   }
 
-  const create = useMutation({
-    mutationFn: () => read(api.chats.conversations.$post()),
-    onSuccess: (created) => navigate({ to: '/chat/$skey', params: { skey: created.skey } }),
-  })
   const signOut = useSignOut()
   const syncing = useSyncNow()
-  const error = lastError(create, signOut) ?? loadError ?? (searching ? found.error : null)
+  const error = lastError(signOut) ?? loadError ?? (searching ? found.error : null)
 
   return (
     <>
@@ -92,8 +86,8 @@ export function ChatList() {
       <div className="mb-1.5 flex items-center gap-1.5">
         <button
           type="button"
-          disabled={create.isPending}
-          onClick={() => create.mutate()}
+          // The chat is created by its first message, on the page without an open chat.
+          onClick={() => void navigate({ to: '/' })}
           className={cn(tool, 'min-w-0 flex-1 gap-2.25 px-row-inset font-semibold text-ink-strong')}
         >
           <NewChatIcon /> New chat

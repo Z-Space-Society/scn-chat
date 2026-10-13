@@ -34,6 +34,8 @@ interface Props {
   title?: string
   /** Classes for the button, such as its width. */
   className?: string
+  /** Whether the button is quiet text rather than a field, as in the composer's toolbar. */
+  quiet?: boolean
   disabled?: boolean
   /** A quiet title at the top of the open list, saying what the options choose. */
   heading?: string
@@ -274,9 +276,13 @@ export function Select(props: Props) {
         aria-activedescendant={open ? activeId : undefined}
         title={props.title}
         disabled={props.disabled}
+        data-quiet={props.quiet || undefined}
         className={cn(
           field,
           'inline-flex max-w-full cursor-pointer items-center justify-between gap-1.5 pe-2.25 text-start disabled:cursor-default aria-expanded:border-focus aria-expanded:ring-3 aria-expanded:ring-accent-soft',
+          // Quiet, it reads as the toolbar's text until hovered or open.
+          props.quiet &&
+            'min-w-0 border-transparent bg-transparent px-2 py-1 font-medium text-muted-quiet hover:not-disabled:bg-hover hover:not-disabled:text-ink aria-expanded:border-transparent aria-expanded:text-ink aria-expanded:ring-0',
           props.className,
         )}
         // A click from the keyboard is handled by onKeyDown, which opens on Enter and Space.
@@ -288,7 +294,9 @@ export function Select(props: Props) {
           <>
             {props.options[chosen]?.icon}
             <span className={cn('flex-1 truncate', chosen < 0 && 'text-muted')}>{label}</span>
-            <ChevronDownIcon className="size-3.25 text-muted" />
+            <ChevronDownIcon
+              className={cn('size-3.25 text-muted', props.quiet && 'text-muted-quiet')}
+            />
           </>
         )}
       </button>

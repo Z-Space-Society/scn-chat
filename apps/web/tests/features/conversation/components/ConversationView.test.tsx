@@ -199,7 +199,7 @@ describe('ConversationView', () => {
     const store = fakeStore([user('u', 'original'), reply('u.r0', 'answer', 'u')])
     await renderWith(store, <ConversationView skey="s1" />)
     await userEvent.click(await screen.findByRole('button', { name: 'Edit message' }))
-    const boxes = screen.getAllByPlaceholderText('Message')
+    const boxes = screen.getAllByLabelText('Message')
     expect(boxes[0]).toHaveValue('original')
     await userEvent.clear(boxes[0] as HTMLElement)
     await userEvent.type(boxes[0] as HTMLElement, 'edited{Enter}')
@@ -229,10 +229,10 @@ describe('ConversationView', () => {
     await screen.findByText('another answer')
     const [editFirst, editSecond] = screen.getAllByRole('button', { name: 'Edit message' })
     await userEvent.click(editFirst as HTMLElement)
-    expect(screen.getByPlaceholderText('Message')).toHaveValue('first')
+    expect(screen.getByLabelText('Message')).toHaveValue('first')
     await userEvent.click(editSecond as HTMLElement)
-    expect(screen.getByPlaceholderText('Message')).toHaveValue('second')
-    await userEvent.type(screen.getByPlaceholderText('Message'), '!{Enter}')
+    expect(screen.getByLabelText('Message')).toHaveValue('second')
+    await userEvent.type(screen.getByLabelText('Message'), '!{Enter}')
     await vi.waitFor(() => expect(fetch).toHaveBeenCalled())
     const init = (writes(fetch)[0] as [string, RequestInit])[1]
     expect(JSON.parse(String(init.body))).toMatchObject({
@@ -291,7 +291,7 @@ describe('ConversationView', () => {
     Object.defineProperty(scroller, 'clientHeight', { configurable: true, get: () => 400 })
     scroller.scrollTop = 200
     act(() => void scroller.dispatchEvent(new Event('scroll')))
-    await userEvent.type(screen.getByPlaceholderText('Message'), 'more{Enter}')
+    await userEvent.type(screen.getByLabelText('Message'), 'more{Enter}')
     await vi.waitFor(() => expect(fetch).toHaveBeenCalled())
     // It glides there, to where the last screen of the conversation shows.
     await vi.waitFor(() => expect(scroller.scrollTop).toBe(600))
@@ -348,7 +348,10 @@ describe('ConversationView fallback model', () => {
     answered.record.model = { provider: 'p', id: 'smart' }
     const store = fakeStore([user('u', 'question'), answered])
     await renderWith(store, <ConversationView skey="s1" />)
-    expect(await screen.findByRole('option', { name: 'Default model' })).toBeInTheDocument()
+    await vi.waitFor(() =>
+      expect(screen.getByLabelText('Model')).toHaveTextContent('Default · Smart'),
+    )
+    await userEvent.type(screen.getByLabelText('Message'), 'Hello')
     expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled()
   })
 })
@@ -364,9 +367,9 @@ describe('ConversationView errors', () => {
     stubFetch(fetch, { '/api/models': { models, defaultModel: null } })
     const store = fakeStore([user('u', 'question'), reply('u.r0', 'answer', 'u')])
     await renderWith(store, <ConversationView skey="s1" />)
-    await screen.findAllByRole('option', { name: 'Claude' })
-    await userEvent.click(screen.getByRole('button', { name: 'More actions' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Regenerate with' }))
+    // Regenerate with shows once the models have loaded.
+    await userEvent.click(await screen.findByRole('button', { name: 'More actions' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Regenerate with' }))
     await userEvent.click(screen.getByRole('button', { name: 'Claude' }))
     const init = (writes(fetch)[0] as [string, RequestInit])[1]
     expect(JSON.parse(String(init.body))).toEqual({
@@ -384,10 +387,10 @@ describe('ConversationView errors', () => {
       reply('v.r0', 'two', 'v'),
     ])
     await renderWith(store, <ConversationView skey="s1" />)
-    await screen.findAllByRole('option', { name: 'M' })
-    const [, second] = screen.getAllByRole('button', { name: 'More actions' })
+    const [, second] = await screen.findAllByRole('button', { name: 'More actions' })
     await userEvent.click(second as HTMLElement)
-    await userEvent.click(screen.getByRole('button', { name: 'Regenerate with' }))
+    // Regenerate with shows once the models have loaded.
+    await userEvent.click(await screen.findByRole('button', { name: 'Regenerate with' }))
     await userEvent.click(screen.getByRole('button', { name: 'M' }))
     expect(String((writes(fetch)[0] as [string])[0])).toBe(
       '/api/conversations/s1/messages/v/regenerate',

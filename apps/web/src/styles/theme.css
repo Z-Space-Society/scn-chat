@@ -202,8 +202,10 @@
   --radius-editor: calc(var(--radius-small) + 0.6rem + 1px);
   /* A search match's tint. */
   --radius-mark: 2px;
-  /* The composer, nesting its round Send button in its corner. */
+  /* The composer, nesting its round Send button in its corner, and a quote held in it, nesting in
+     the composer's corner. */
   --radius-composer: calc(var(--spacing-composer-button) / 2 + 0.55rem + 1px);
+  --radius-quote: calc(var(--radius-composer) - 0.6rem - 1px);
 
   /* A floating menu: a bevel under it and a soft shadow. */
   --shadow-float: 0 1px 0 var(--color-bevel), 0 10px 30px -14px light-dark(#0000002e, #000a);
@@ -231,8 +233,9 @@
   --spacing-bar: 3.5rem;
   /* The square icon button that shows or hides the sidebar. */
   --spacing-toggle: 2rem;
-  /* The composer's round buttons. */
+  /* The composer's round buttons, and how tall its box grows before it scrolls. */
   --spacing-composer-button: 2rem;
+  --spacing-composer-max: 40vh;
   /* The space beside the conversation and the settings, narrower on a phone. */
   --spacing-gutter: 1.5rem;
   /* The space inside a settings card, the same on every side, around each of its rows. */

@@ -21,8 +21,10 @@ export interface ConversationOperations {
   models: ModelOption[]
   /** Where the conversation's records live, for their details. */
   storedIn: string
-  /** Quote text into the composer, once the composer takes quotes. */
+  /** Quote text into the composer. */
   quote?: (text: string) => void
+  /** The reply running at the end of the branch, which the composer offers to stop instead. */
+  running?: string | null
 }
 
 export interface MessageActionProps {
@@ -84,6 +86,7 @@ function RegenerateAction(props: MessageActionProps) {
 
 function StopAction(props: MessageActionProps) {
   if (isUser(props.message) || !isPending(props.message)) return null
+  if (props.message.rkey === props.operations.running) return null
   return (
     <button
       type="button"

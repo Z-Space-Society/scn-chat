@@ -1,0 +1,24 @@
+import { useNavigate } from '@tanstack/react-router'
+import { useRef } from 'react'
+import { useFileDrop } from '../hooks/useFileDrop.ts'
+import { Composer, type ComposerHandle } from './Composer.tsx'
+import { EmptyConversation } from './EmptyConversation.tsx'
+
+/**
+ * The page without an open chat: an empty conversation whose first message creates the chat,
+ * then opens it.
+ */
+export function NewConversation() {
+  const navigate = useNavigate()
+  const composer = useRef<ComposerHandle>(null)
+  const drop = useFileDrop(composer)
+  return (
+    <section {...drop} className="mx-auto flex w-full max-w-column flex-1 flex-col px-gutter">
+      <EmptyConversation onStart={(text) => composer.current?.fill(text)} />
+      <Composer
+        ref={composer}
+        onSent={(sent) => navigate({ to: '/chat/$skey', params: { skey: sent.skey } })}
+      />
+    </section>
+  )
+}

@@ -1,6 +1,7 @@
+import type { ReactNode, Ref } from 'react'
 import { messageText } from '../../../store/core.ts'
 import { type BranchMessage, type BranchStep, inheritedModel } from '../lib/branch.ts'
-import { Composer, type ComposerProps } from './Composer.tsx'
+import { Composer, type ComposerHandle, type ComposerProps } from './Composer.tsx'
 
 type Sent = Parameters<ComposerProps['onSent']>[0]
 
@@ -14,16 +15,24 @@ interface Props {
   /** An edit was sent, as a new sibling of the edited message. */
   onEdited: (sent: Sent) => void
   onCancelEdit: () => void
+  /** Stop the reply running at the end of the branch, offered in place of Send. */
+  onStop?: () => void
+  /** What floats just above the composer, such as a button that jumps to the latest message. */
+  above?: ReactNode
+  ref?: Ref<ComposerHandle>
 }
 
 /** The composer: replying at the end of the branch, or editing one of its messages. */
-export function BranchComposer(props: Props) {
+// The ref is kept out of `props`, as in the composer, so React Compiler still memoizes this.
+export function BranchComposer({ ref, ...props }: Props) {
   if (props.editing) {
     const parent = props.editing.record.parent as string | undefined
     return (
       <Composer
         // Editing another message starts the composer over from that message.
         key={`edit-${props.editing.rkey}`}
+        ref={ref}
+        above={props.above}
         skey={props.skey}
         parent={parent}
         inherited={inheritedModel(props.branch, parent)}
@@ -37,6 +46,9 @@ export function BranchComposer(props: Props) {
   return (
     <Composer
       key="reply"
+      ref={ref}
+      above={props.above}
+      onStop={props.onStop}
       skey={props.skey}
       parent={leaf}
       inherited={inheritedModel(props.branch, leaf)}

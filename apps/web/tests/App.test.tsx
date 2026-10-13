@@ -123,7 +123,7 @@ describe('App', () => {
     signedIn()
     const router = renderApp('/login')
     expect(
-      await screen.findByText('Start a new chat, or pick one from the list.'),
+      await screen.findByRole('heading', { name: 'What can I help with?' }),
     ).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/')
   })
@@ -176,7 +176,7 @@ describe('App', () => {
     vi.stubGlobal('location', { ...window.location, assign })
     renderApp('/')
     expect(
-      await screen.findByText('Start a new chat, or pick one from the list.'),
+      await screen.findByRole('heading', { name: 'What can I help with?' }),
     ).toBeInTheDocument()
     const listener = store.onChange.mock.calls.at(-1)?.[0]
     listener?.({ type: 'unauthorized' })
@@ -188,7 +188,7 @@ describe('App', () => {
     signedIn()
     const router = renderApp('/admin/roles')
     expect(
-      await screen.findByText('Start a new chat, or pick one from the list.'),
+      await screen.findByRole('heading', { name: 'What can I help with?' }),
     ).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/')
   })

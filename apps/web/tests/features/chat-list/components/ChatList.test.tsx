@@ -152,20 +152,19 @@ describe('ChatList', () => {
     expect(await screen.findByText('Tiles')).toBeInTheDocument()
   })
 
-  it('creates a chat and opens it', async () => {
-    const fetch = vi.fn(async () => Response.json({ skey: 'new1' }, { status: 201 }))
+  it('opens a new chat without creating one until its first message', async () => {
+    const fetch = vi.fn(async () => Response.json({}))
     vi.stubGlobal('fetch', fetch)
     const store = fakeStore()
     const { router } = await renderAt(
       <StoreProvider store={store as unknown as StoreClient}>
         <ChatList />
       </StoreProvider>,
+      '/chat/s1',
     )
     await userEvent.click(screen.getByRole('button', { name: 'New chat' }))
-    await vi.waitFor(() => expect(router.state.location.pathname).toBe('/chat/new1'))
-    const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
-    expect(String(url)).toBe('/api/conversations')
-    expect(init.method).toBe('POST')
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe('/'))
+    expect(fetch).not.toHaveBeenCalled()
   })
 
   it('signs out and deletes the local copy', async () => {

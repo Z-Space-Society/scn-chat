@@ -22,3 +22,8 @@ globalThis.ResizeObserver ??= class {
 
 // jsdom has no scrolling. The router restores scroll positions on navigation.
 window.scrollTo = () => {}
+
+// Node's object URLs take only Node's blobs, not jsdom's files. The composer previews attached
+// images with them.
+URL.createObjectURL = () => 'blob:preview'
+URL.revokeObjectURL = () => {}

@@ -59,7 +59,7 @@ function Conversation({ startPinned }: { startPinned?: boolean }) {
   atBottom = useAtBottom(stick)
   return (
     <main data-testid="scroller" style={{ overflowY: 'auto' }}>
-      <section ref={stick.ref} />
+      <section ref={stick.content} />
     </main>
   )
 }

@@ -20,6 +20,7 @@ export const themeNames = {
     'editor',
     'mark',
     'composer',
+    'quote',
   ],
   shadow: ['float', 'lift'],
   spacing: [
@@ -33,6 +34,7 @@ export const themeNames = {
     'bar',
     'toggle',
     'composer-button',
+    'composer-max',
     'gutter',
     'card-pad',
     'action',

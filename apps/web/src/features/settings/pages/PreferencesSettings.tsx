@@ -2,7 +2,8 @@ import type { ModelRef } from '@scn-chat/lexicons'
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
 import { useAppForm } from '../../../shared/form.tsx'
-import { EffortSelect, ModelSelect } from '../../models/components/ModelSelect.tsx'
+import { EffortSelect } from '../../models/components/EffortSelect.tsx'
+import { ModelSelect } from '../../models/components/ModelSelect.tsx'
 import { useModels } from '../../models/hooks/useModels.ts'
 import { type ModelOption, modelRef } from '../../models/models.ts'
 import { savePreferences } from '../lib/preferences.ts'
@@ -63,9 +64,8 @@ function PreferencesForm(props: PreferencesFormProps) {
                 models={props.models}
                 value={field.state.value}
                 onChange={field.handleChange}
-              >
-                <option value="">App default</option>
-              </ModelSelect>
+                none={{ label: 'App default', selectable: true }}
+              />
             </label>
           )}
         </form.Field>
@@ -73,9 +73,12 @@ function PreferencesForm(props: PreferencesFormProps) {
           {(field) => (
             <label htmlFor={field.name}>
               Default effort
-              <EffortSelect id={field.name} value={field.state.value} onChange={field.handleChange}>
-                <option value="">Provider default</option>
-              </EffortSelect>
+              <EffortSelect
+                id={field.name}
+                value={field.state.value}
+                onChange={field.handleChange}
+                auto={{ label: 'Auto', detail: 'Each model decides' }}
+              />
             </label>
           )}
         </form.Field>

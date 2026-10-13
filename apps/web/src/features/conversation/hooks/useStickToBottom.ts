@@ -38,8 +38,11 @@ function flag(initial: boolean) {
 }
 
 export interface StickToBottom {
-  /** Goes on the content, and follows its scrolling parent while it is mounted. */
-  ref: (content: HTMLElement | null) => (() => void) | undefined
+  /**
+   * The callback ref for the content, which follows its scrolling parent while it is mounted. It
+   * isn't named `ref`, since React Compiler takes an object with a `ref` for a ref itself.
+   */
+  content: (content: HTMLElement | null) => (() => void) | undefined
   /** Glide to the bottom and follow the content again. */
   pin: () => void
   /** Whether it is following, which `useAtBottom` reads. */
@@ -96,7 +99,7 @@ export function useStickToBottom(startPinned = true): StickToBottom {
     frame.current = requestAnimationFrame(step)
   }
 
-  const ref = (content: HTMLElement | null) => {
+  const follow = (content: HTMLElement | null) => {
     if (!content) return
     const parent = scrollParent(content)
     scroller.current = parent
@@ -148,10 +151,13 @@ export function useStickToBottom(startPinned = true): StickToBottom {
     toBottom()
   }
 
-  return { ref, pin, atBottom: atBottom.get, subscribe: atBottom.subscribe }
+  return { content: follow, pin, atBottom: atBottom.get, subscribe: atBottom.subscribe }
 }
 
+/** Following the content, apart from the callback ref that goes on it. */
+export type Following = Omit<StickToBottom, 'content'>
+
 /** Whether the reader is at the bottom, as for a button that jumps back down. */
-export function useAtBottom(stick: StickToBottom): boolean {
+export function useAtBottom(stick: Following): boolean {
   return useSyncExternalStore(stick.subscribe, stick.atBottom, stick.atBottom)
 }

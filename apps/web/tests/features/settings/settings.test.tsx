@@ -11,6 +11,7 @@ import { SyncSettings } from '../../../src/features/settings/pages/SyncSettings.
 import type { StoreClient } from '../../../src/store/client.ts'
 import { StoreProvider } from '../../../src/store/react.tsx'
 import { renderAt } from '../../helpers/router.tsx'
+import { choose } from '../../helpers/select.ts'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -100,11 +101,7 @@ describe('Settings preferences', () => {
   it('saves a default model whose ID contains a slash', async () => {
     const fetch = stubServer({ '/api/preferences': () => Response.json({ preferences: null }) })
     await renderPage()
-    await screen.findByRole('heading', { name: 'Preferences' })
-    await vi.waitFor(() =>
-      expect(screen.getByRole('option', { name: 'Claude' })).toBeInTheDocument(),
-    )
-    await userEvent.selectOptions(screen.getByLabelText('Default model'), 'router/anthropic/claude')
+    await choose(await screen.findByLabelText('Default model'), 'Claude')
     await userEvent.click(screen.getAllByRole('button', { name: 'Save' })[0] as HTMLElement)
     const put = fetch.mock.calls.find(
       ([url, init]) => url === '/api/preferences' && init?.method === 'PUT',
@@ -142,9 +139,7 @@ describe('Settings preferences fields', () => {
         Response.json({ preferences: { defaultModel: { provider: 'gone', id: 'old' } } }),
     })
     await renderPage()
-    expect(await screen.findByLabelText('Default model')).toHaveDisplayValue(
-      'Unavailable: gone/old',
-    )
+    expect(await screen.findByLabelText('Default model')).toHaveTextContent('Unavailable: gone/old')
     await userEvent.type(screen.getByLabelText('Custom instructions'), 'Metric units')
     await userEvent.click(screen.getAllByRole('button', { name: 'Save' })[0] as HTMLElement)
     await vi.waitFor(() => expect(screen.getByText('Saved.')).toBeInTheDocument())
