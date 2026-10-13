@@ -69,7 +69,9 @@ function fakeStore(messages: ReturnType<typeof msg>[], state: HandoverState = 'a
       })),
       refreshConversation: vi.fn(async () => {}),
       reconcileConversation: vi.fn(async () => {}),
-      listConversations: vi.fn(async () => []),
+      listConversations: vi.fn(async () => ({ chats: [], next: null })),
+      listTags: vi.fn(async () => []),
+      latestReplies: vi.fn(async () => []),
     },
     state: () => current,
     onState: (listener: (s: HandoverState) => void) => {

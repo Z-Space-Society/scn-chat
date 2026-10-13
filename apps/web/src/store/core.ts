@@ -18,6 +18,12 @@ export type ChatListItem = ConversationSummary & {
   /** The key of the newest finished assistant reply, to tell when a new one has arrived. */
   latestReply: string | null
 }
+/** Where a page of the chat list ends, the next page starting after it. */
+export type ChatCursor = { updatedAt: string; skey: string }
+/** A page of the chat list, newest first, and where the next one starts, or null after the last. */
+export type ChatPage = { chats: ChatListItem[]; next: ChatCursor | null }
+/** A tag across the user's chats, and how many carry it. */
+export type TagCount = { tag: string; count: number }
 /** How current the local copy is: when the chat index last synced, and chats left to download. */
 export type SyncStatus = { syncedAt: string | null; remaining: number }
 export type StoredMessage = { rkey: string; author: string; record: Json; cid: string }
@@ -98,8 +104,26 @@ export class StoreCore {
       )
   }
 
-  listConversations(): ChatListItem[] {
-    return this.db
+  /**
+   * A page of the chats, newest first, after `after`, and only those tagged `tag` when given. It
+   * pages by when each chat was updated and its key, so a chat moving to the top between pages is
+   * never shown twice or skipped.
+   */
+  listConversations(
+    options: { limit?: number; after?: ChatCursor | null; tag?: string | null } = {},
+  ): ChatPage {
+    const limit = options.limit ?? 50
+    const where: string[] = []
+    const params: (string | number)[] = []
+    if (options.after) {
+      where.push('(c.updated_at, c.skey) < (?, ?)')
+      params.push(options.after.updatedAt, options.after.skey)
+    }
+    if (options.tag) {
+      where.push('exists (select 1 from json_each(c.tags_json) where value = ?)')
+      params.push(options.tag)
+    }
+    const chats = this.db
       .all<{
         skey: string
         uri: string
@@ -115,7 +139,9 @@ export class StoreCore {
           (select m.rkey from message m where m.conversation_skey = c.skey
             and m.role = 'assistant' and m.status = 'complete'
             order by m.created_at desc, m.rkey desc limit 1) as latest_reply
-        from conversation c order by c.updated_at desc`,
+        from conversation c ${where.length ? `where ${where.join(' and ')}` : ''}
+        order by c.updated_at desc, c.skey desc limit ?`,
+        [...params, limit],
       )
       .map((row) => ({
         skey: row.skey,
@@ -126,6 +152,31 @@ export class StoreCore {
         pending: Boolean(row.pending),
         latestReply: row.latest_reply,
       }))
+    const last = chats.at(-1)
+    return {
+      chats,
+      next: last && chats.length === limit ? { updatedAt: last.updatedAt, skey: last.skey } : null,
+    }
+  }
+
+  /** Every tag on the chats, newest use first, with how many chats carry it. */
+  listTags(): TagCount[] {
+    return this.db.all<TagCount>(
+      `select j.value as tag, count(*) as count
+       from conversation c, json_each(c.tags_json) j
+       group by j.value order by max(c.updated_at) desc`,
+    )
+  }
+
+  /** Every chat's newest finished reply, to tell which chats have one not yet seen. */
+  latestReplies(): { skey: string; latestReply: string | null }[] {
+    return this.db.all<{ skey: string; latestReply: string | null }>(
+      `select c.skey,
+        (select m.rkey from message m where m.conversation_skey = c.skey
+          and m.role = 'assistant' and m.status = 'complete'
+          order by m.created_at desc, m.rkey desc limit 1) as latestReply
+       from conversation c`,
+    )
   }
 
   syncStatus(): SyncStatus {

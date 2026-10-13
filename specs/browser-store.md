@@ -50,7 +50,9 @@ Streaming replies are shown from the turn's stream, as the chat-turns spec descr
 ### Worker API
 
 ```ts
-listConversations(): Promise<ChatListItem[]>     // each with `pending` and `latestReply`, below
+listConversations({ limit, after, tag }): Promise<{ chats: ChatListItem[]; next }> // a page, below
+listTags(): Promise<{ tag; count }[]>           // every tag across the chats, newest use first
+latestReplies(): Promise<{ skey; latestReply }[]> // every chat's newest finished reply
 getConversation(skey): Promise<{ info; messages }>
 refreshConversation(skey): Promise<void>
 syncIndex(): Promise<void>
@@ -61,6 +63,8 @@ reset(): Promise<void>                          // delete and rebuild the databa
 ```
 
 Each chat-list item adds two things its messages say, read from the `message` table: `pending`, whether an assistant reply is still pending, and `latestReply`, the key of the newest complete assistant reply. The sidebar shows the first as a replying dot and compares the second with what this device has seen. A change to a conversation therefore also refreshes the chat list. Each index sync stores its time under `index_synced_at`, even when nothing changed, for the sidebar's sync status.
+
+The chat list reads a page at a time, 50 by default, newest first. It pages by `(updated_at, skey)`, so `next` is the last chat's pair, or null after the last page, and a chat that moves to the top between pages is neither shown twice nor skipped. Given a tag, it pages through only the chats carrying it. An index on `(updated_at desc, skey desc)` serves it, created on every open when missing, so adding it needed no new schema version. The tags and their counts, and every chat's newest reply for the seen marks, cover all chats, not only the pages read.
 
 Changes are announced to the UI through a subscription, so screens rerender when the data under them changes.
 

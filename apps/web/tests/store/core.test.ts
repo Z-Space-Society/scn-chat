@@ -32,6 +32,20 @@ describe('ensureSchema', () => {
     ensureSchema(db)
     expect(db.all('select skey from conversation')).toEqual([{ skey: 'a' }])
   })
+
+  it("adds the chat list's index to a database that lacks it, keeping its data", () => {
+    const db = memoryDb()
+    ensureSchema(db)
+    db.run('drop index conversation_by_updated')
+    db.run("insert into conversation (skey, uri, updated_at) values ('a', 'u', 't')")
+    ensureSchema(db)
+    expect(
+      db.all(
+        "select name from sqlite_master where type = 'index' and name = 'conversation_by_updated'",
+      ),
+    ).toHaveLength(1)
+    expect(db.all('select skey from conversation')).toEqual([{ skey: 'a' }])
+  })
 })
 
 describe('StoreCore index sync', () => {
@@ -45,7 +59,7 @@ describe('StoreCore index sync', () => {
     }
     await store.syncIndex()
     expect(api.fetchIndex).toHaveBeenCalledWith(null)
-    expect(store.listConversations().map((c) => c.skey)).toEqual(['b', 'a'])
+    expect(store.listConversations().chats.map((c) => c.skey)).toEqual(['b', 'a'])
   })
 
   it('then fetches only changes since the stored revision, including deletions', async () => {
@@ -58,7 +72,7 @@ describe('StoreCore index sync', () => {
     expect(
       store
         .listConversations()
-        .map((c) => c.skey)
+        .chats.map((c) => c.skey)
         .sort(),
     ).toEqual(['b', 'c'])
   })
@@ -105,9 +119,74 @@ describe('StoreCore chat list', () => {
       full: true,
     })
     await store.refreshConversation('a')
-    const chats = Object.fromEntries(store.listConversations().map((c) => [c.skey, c]))
+    const chats = Object.fromEntries(store.listConversations().chats.map((c) => [c.skey, c]))
     expect(chats.a).toMatchObject({ pending: true, latestReply: 'u1.r1' })
     expect(chats.b).toMatchObject({ pending: false, latestReply: null })
+    expect(store.latestReplies()).toEqual(
+      expect.arrayContaining([
+        { skey: 'a', latestReply: 'u1.r1' },
+        { skey: 'b', latestReply: null },
+      ]),
+    )
+  })
+
+  /** Chats a, b, c, … updated a minute apart, the last newest, with the tags given per chat. */
+  async function chatsWith(store: StoreCore, api: ReturnType<typeof fakeApi>, tags: string[][]) {
+    api.index = {
+      conversations: tags.map((chatTags, n) => ({
+        ...summary(String.fromCharCode(97 + n), `2026-09-26T00:${String(n).padStart(2, '0')}:00Z`),
+        tags: chatTags,
+      })),
+      deleted: [],
+      rev: 'r1',
+      full: true,
+    }
+    await store.syncIndex()
+  }
+
+  it('lists the chats a page at a time, newest first, saying where the next page starts', async () => {
+    const { api, store } = setup()
+    await chatsWith(store, api, [[], [], [], [], []])
+    const first = store.listConversations({ limit: 2 })
+    expect(first.chats.map((c) => c.skey)).toEqual(['e', 'd'])
+    const second = store.listConversations({ limit: 2, after: first.next })
+    expect(second.chats.map((c) => c.skey)).toEqual(['c', 'b'])
+    const last = store.listConversations({ limit: 2, after: second.next })
+    expect(last.chats.map((c) => c.skey)).toEqual(['a'])
+    expect(last.next).toBeNull()
+  })
+
+  it('neither repeats nor skips a chat when one moves to the top between pages', async () => {
+    const { api, store } = setup()
+    await chatsWith(store, api, [[], [], [], []])
+    const first = store.listConversations({ limit: 2 })
+    expect(first.chats.map((c) => c.skey)).toEqual(['d', 'c'])
+    // Chat a is updated, moving to the top, before the next page is read.
+    api.index = {
+      conversations: [summary('a', '2026-09-26T01:00:00Z')],
+      deleted: [],
+      rev: 'r2',
+      full: false,
+    }
+    await store.syncIndex()
+    const second = store.listConversations({ limit: 2, after: first.next })
+    expect(second.chats.map((c) => c.skey)).toEqual(['b'])
+  })
+
+  it('pages through only the chats with a tag, and counts every tag across all chats', async () => {
+    const { api, store } = setup()
+    await chatsWith(store, api, [['home'], ['travel'], ['home'], ['home', 'travel']])
+    const first = store.listConversations({ limit: 2, tag: 'home' })
+    expect(first.chats.map((c) => c.skey)).toEqual(['d', 'c'])
+    const second = store.listConversations({ limit: 2, tag: 'home', after: first.next })
+    expect(second.chats.map((c) => c.skey)).toEqual(['a'])
+    // The counts cover every chat, not only the pages read.
+    expect(store.listTags()).toEqual(
+      expect.arrayContaining([
+        { tag: 'home', count: 3 },
+        { tag: 'travel', count: 2 },
+      ]),
+    )
   })
 
   it('records when the index last synced', async () => {
@@ -307,7 +386,7 @@ describe('StoreCore reconciling', () => {
     ])
     api.index = { conversations: [summary('b')], deleted: [], rev: 'r9', full: true }
     await store.reconcileIndex()
-    expect(store.listConversations().map((c) => c.skey)).toEqual(['b'])
+    expect(store.listConversations().chats.map((c) => c.skey)).toEqual(['b'])
   })
 })
 
@@ -328,7 +407,7 @@ describe('StoreCore events', () => {
     await store.handleEvent({ type: 'index-changed' })
     expect(api.fetchIndex).toHaveBeenCalledTimes(2)
     await store.handleEvent({ type: 'conversation-deleted', skey: 'a' })
-    expect(store.listConversations()).toEqual([])
+    expect(store.listConversations().chats).toEqual([])
   })
 
   it('throws on a conversation event without a conversation key', async () => {

@@ -114,7 +114,10 @@ const api = {
     listeners.add(listener)
   },
 
-  listConversations: () => guard((store) => store.listConversations()),
+  listConversations: (options?: Parameters<StoreCore['listConversations']>[0]) =>
+    guard((store) => store.listConversations(options)),
+  listTags: () => guard((store) => store.listTags()),
+  latestReplies: () => guard((store) => store.latestReplies()),
   getConversation: (skey: string) => guard((store) => store.getConversation(skey)),
   syncIndex: () => guard((store) => store.syncIndex()),
   refreshConversation: (skey: string) => guard((store) => store.refreshConversation(skey)),

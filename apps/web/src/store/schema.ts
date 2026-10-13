@@ -11,7 +11,12 @@ export function ensureSchema(db: SqlDb): void {
   const version = hasTable(db, 'meta')
     ? db.all<{ value: string }>("select value from meta where key = 'schema_version'")[0]?.value
     : undefined
-  if (version === String(SCHEMA_VERSION)) return
+  if (version !== String(SCHEMA_VERSION)) rebuild(db)
+  ensureIndexes(db)
+}
+
+/** Drop every table and create them afresh, for a database from another schema version. */
+function rebuild(db: SqlDb): void {
   db.transaction(() => {
     for (const table of TABLES) db.run(`drop table if exists ${table}`)
     db.run(`create table conversation (
@@ -28,6 +33,17 @@ export function ensureSchema(db: SqlDb): void {
     createSearchIndex(db)
     db.run("insert into meta (key, value) values ('schema_version', ?)", [String(SCHEMA_VERSION)])
   })
+}
+
+/**
+ * Indexes that only speed up reads, created on every open if missing, so adding one needs no new
+ * schema version and no download of every chat again.
+ */
+function ensureIndexes(db: SqlDb): void {
+  // The chat list, a page at a time, newest first.
+  db.run(
+    'create index if not exists conversation_by_updated on conversation (updated_at desc, skey desc)',
+  )
 }
 
 /** Full-text tables for search, kept in step with `message` and `conversation` by triggers. */

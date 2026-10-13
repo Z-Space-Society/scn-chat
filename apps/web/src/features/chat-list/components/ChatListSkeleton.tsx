@@ -11,6 +11,8 @@ interface RowsProps {
   label: string
   /** Whether they show at once, as in the page's frame. */
   immediate?: boolean
+  /** How many rows, fewer for the next page at the end of a list than for a whole list. */
+  rows?: number
 }
 
 /** Chats on their way, in the shape of the sidebar's rows: one-line titles of differing lengths. */
@@ -23,7 +25,7 @@ export function ChatRowsSkeleton(props: RowsProps) {
         </div>
       )}
       <div className="flex flex-col gap-0.5">
-        {titles.map((width, index) => (
+        {titles.slice(0, props.rows).map((width, index) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: the rows are a fixed set, in order.
           <div key={index} className={cn(sidebarRow, 'hover:bg-transparent')}>
             <SkeletonText className={width} />

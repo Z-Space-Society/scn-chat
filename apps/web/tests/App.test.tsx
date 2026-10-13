@@ -21,7 +21,9 @@ const { openStore, question, store } = vi.hoisted(() => {
   }
   const store = {
     worker: {
-      listConversations: async () => [],
+      listConversations: async () => ({ chats: [], next: null }),
+      listTags: async () => [],
+      latestReplies: async () => [],
       getConversation: async (skey: string) => ({ skey, info: {}, messages: [question] }),
       refreshConversation: async () => {},
       reconcileConversation: async () => {},

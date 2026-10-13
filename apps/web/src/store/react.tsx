@@ -1,10 +1,10 @@
-import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createContext, type ReactNode, useContext, useEffect, useSyncExternalStore } from 'react'
 import { MeContext } from '../features/auth/session.ts'
 import { reportUnauthorized } from '../shared/api.ts'
 import { messageOf } from '../shared/errors.ts'
 import { openStore, type StoreClient } from './client.ts'
-import type { ChatListItem, Conversation, SyncStatus } from './core.ts'
+import type { ChatCursor, ChatListItem, Conversation, SyncStatus, TagCount } from './core.ts'
 import { isStoreClosed } from './errors.ts'
 import type { HandoverState } from './handover.ts'
 import type { SearchResult } from './search.ts'
@@ -83,19 +83,63 @@ function useActiveStore() {
 /** A store failure's message, except for the store moving to another tab. */
 const storeError = (err: unknown) => (!err || isStoreClosed(err) ? null : messageOf(err))
 
-export function useConversations(): {
+/**
+ * The chats, newest first, a page at a time, and only those tagged `tag` when given. A change in
+ * the store refetches the pages already loaded, so the list keeps its length as it updates.
+ */
+export function useConversations(tag: string | null = null): {
   conversations: ChatListItem[]
   /** Whether the list is on its way from the local copy for the first time. */
   isLoading: boolean
+  hasNextPage: boolean
+  isFetchingNextPage: boolean
+  fetchNextPage: () => void
   error: string | null
 } {
   const { store, active, opening } = useActiveStore()
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['conversations'],
-    queryFn: () => store.worker.listConversations(),
+  const query = useInfiniteQuery({
+    queryKey: ['conversations', 'list', tag],
+    queryFn: ({ pageParam }) => store.worker.listConversations({ after: pageParam, tag }),
+    initialPageParam: null as ChatCursor | null,
+    getNextPageParam: (page) => page.next ?? undefined,
     enabled: active,
   })
-  return { conversations: data ?? [], isLoading: opening || isLoading, error: storeError(error) }
+  return {
+    conversations: query.data?.pages.flatMap((page) => page.chats) ?? [],
+    isLoading: opening || query.isLoading,
+    hasNextPage: query.hasNextPage,
+    isFetchingNextPage: query.isFetchingNextPage,
+    fetchNextPage: () => void query.fetchNextPage(),
+    error: storeError(query.error),
+  }
+}
+
+/** Every tag across the chats, newest use first, with how many chats carry it. */
+export function useTags(): TagCount[] {
+  const { store, active } = useActiveStore()
+  const { data } = useQuery({
+    queryKey: ['conversations', 'tags'],
+    queryFn: () => store.worker.listTags(),
+    enabled: active,
+  })
+  return data ?? []
+}
+
+/**
+ * Every chat's newest finished reply, by chat key, including chats on pages not loaded yet, or
+ * null until the local copy answers.
+ */
+export function useLatestReplies(): Record<string, string | null> | null {
+  const { store, active } = useActiveStore()
+  const { data } = useQuery({
+    queryKey: ['conversations', 'replies'],
+    queryFn: async () =>
+      Object.fromEntries(
+        (await store.worker.latestReplies()).map((chat) => [chat.skey, chat.latestReply]),
+      ),
+    enabled: active,
+  })
+  return data ?? null
 }
 
 /** The query that refreshes a conversation from the PDS. Invalidating it refreshes again. */

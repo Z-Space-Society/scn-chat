@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { act, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MeContext } from '../../../../src/features/auth/session.ts'
@@ -17,12 +17,48 @@ async function openSearch() {
   return screen.getByRole('searchbox', { name: 'Search chats' })
 }
 
-function fakeStore() {
+type Chat = { skey: string; tags: string[]; latestReply?: string | null }
+
+/**
+ * The store's list, tags, and newest replies over `chats`, read each time they're asked for, as
+ * one page, or one page of a tag.
+ */
+function listing(chats: () => Chat[]) {
   return {
+    listConversations: vi.fn(
+      async (options?: {
+        tag?: string | null
+        after?: unknown
+      }): Promise<{
+        chats: Chat[]
+        next: { updatedAt: string; skey: string } | null
+      }> => ({
+        chats: chats().filter((chat) => !options?.tag || chat.tags.includes(options.tag)),
+        next: null,
+      }),
+    ),
+    listTags: vi.fn(async () => {
+      const counts = new Map<string, number>()
+      for (const tag of chats().flatMap((chat) => chat.tags))
+        counts.set(tag, (counts.get(tag) ?? 0) + 1)
+      return [...counts].map(([tag, count]) => ({ tag, count }))
+    }),
+    latestReplies: vi.fn(async () =>
+      chats().map((chat) => ({ skey: chat.skey, latestReply: chat.latestReply ?? null })),
+    ),
+  }
+}
+
+function fakeStore(
+  chats: Chat[] = [{ skey: 'a', uri: 'u', title: 'Tiles', tags: [], updatedAt: 't' } as Chat],
+) {
+  let current = chats
+  return {
+    setChats: (next: Chat[]) => {
+      current = next
+    },
     worker: {
-      listConversations: vi.fn(async () => [
-        { skey: 'a', uri: 'u', title: 'Tiles', tags: [], updatedAt: 't' },
-      ]),
+      ...listing(() => current),
       search: vi.fn(async () => [
         { skey: 'b', title: 'Paint', rkey: 'm1', role: 'user', snippet: 'blue', time: 't' },
       ]),
@@ -39,7 +75,7 @@ describe('ChatList', () => {
   it('shows skeleton rows until the chat index first syncs, then the chats', async () => {
     const store = fakeStore()
     const status = { syncedAt: null as string | null, remaining: 0 }
-    store.worker.listConversations.mockResolvedValue([])
+    store.setChats([])
     Object.assign(store.worker, { syncStatus: vi.fn(async () => status) })
     await renderAt(
       <StoreProvider store={store as unknown as StoreClient}>
@@ -74,9 +110,7 @@ describe('ChatList', () => {
       </StoreProvider>,
     )
     expect(await screen.findByText('Tiles')).toBeInTheDocument()
-    store.worker.listConversations.mockResolvedValue([
-      { skey: 'c', uri: 'u', title: 'Grout', tags: [], updatedAt: 't' },
-    ])
+    store.setChats([{ skey: 'c', uri: 'u', title: 'Grout', tags: [], updatedAt: 't' } as Chat])
     for (const listener of listeners) listener({ type: 'index' })
     expect(await screen.findByText('Grout')).toBeInTheDocument()
   })
@@ -287,11 +321,11 @@ describe('ChatList sidebar', () => {
   }
 
   function sidebarStore() {
+    const store = fakeStore(chats)
     return {
-      ...fakeStore(),
+      ...store,
       worker: {
-        ...fakeStore().worker,
-        listConversations: vi.fn(async () => chats),
+        ...store.worker,
         syncIndex: vi.fn(async () => {}),
         syncStatus: vi.fn(async () => ({ syncedAt: new Date().toISOString(), remaining: 0 })),
       },
@@ -327,11 +361,15 @@ describe('ChatList sidebar', () => {
 
   it('lists each tag with its count, filters by one, and clears the filter', async () => {
     stubFetch()
-    await renderSidebar()
+    const store = await renderSidebar()
     const filter = screen.getByRole('list', { name: 'Filter by tag' })
     expect(within(filter).getByRole('button', { name: 'home, 2 chats' })).toBeInTheDocument()
     await userEvent.click(within(filter).getByRole('button', { name: 'diy, 1 chat' }))
-    expect(screen.queryByText('Tiles')).toBeNull()
+    // The store pages through only the tag's chats.
+    expect(store.worker.listConversations).toHaveBeenLastCalledWith(
+      expect.objectContaining({ tag: 'diy' }),
+    )
+    await vi.waitFor(() => expect(screen.queryByText('Tiles')).toBeNull())
     expect(screen.getByText('Paint')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Clear the tag filter' }))
     expect(screen.getByText('Tiles')).toBeInTheDocument()
@@ -405,6 +443,58 @@ describe('ChatList sidebar', () => {
     expect(screen.getByText('Replying')).toBeInTheDocument()
     expect(screen.getByText('Paint').closest('li')).toHaveAttribute('data-unseen')
     expect(screen.getByText('Taxes').closest('li')).not.toHaveAttribute('data-unseen')
+  })
+
+  it('seeds the seen replies from every chat, including those on pages not loaded yet', async () => {
+    stubFetch()
+    const store = sidebarStore()
+    store.worker.latestReplies.mockResolvedValue([
+      { skey: 'b', latestReply: 'b.r1' },
+      { skey: 'z', latestReply: 'z.r4' },
+    ])
+    await renderSidebar(store)
+    await vi.waitFor(() =>
+      expect(JSON.parse(localStorage.getItem('scn-chat:seen:did:plc:alice') ?? '{}')).toEqual({
+        b: 'b.r1',
+        z: 'z.r4',
+      }),
+    )
+  })
+
+  it('loads the next page of chats as the end of the list comes into view', async () => {
+    stubFetch()
+    const reach: (() => void)[] = []
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        constructor(callback: (entries: { isIntersecting: boolean }[]) => void) {
+          reach.push(() => callback([{ isIntersecting: true }]))
+        }
+        observe() {}
+        disconnect() {}
+      },
+    )
+    const store = sidebarStore()
+    const [first, second, third] = chats
+    store.worker.listConversations.mockImplementation(async (options?: { after?: unknown }) =>
+      options?.after
+        ? { chats: [third as Chat], next: null }
+        : { chats: [first, second] as Chat[], next: { updatedAt: 't', skey: 'b' } },
+    )
+    await renderAt(
+      <MeContext.Provider value={me}>
+        <StoreProvider store={store as unknown as StoreClient}>
+          <ChatList />
+        </StoreProvider>
+      </MeContext.Provider>,
+    )
+    expect(await screen.findByText('Paint')).toBeInTheDocument()
+    expect(screen.queryByText('Taxes')).toBeNull()
+    await act(async () => reach.at(-1)?.())
+    expect(await screen.findByText('Taxes')).toBeInTheDocument()
+    expect(store.worker.listConversations).toHaveBeenLastCalledWith(
+      expect.objectContaining({ after: { updatedAt: 't', skey: 'b' } }),
+    )
   })
 
   it('treats replies from before this device kept track as seen', async () => {
