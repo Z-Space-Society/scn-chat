@@ -4,7 +4,7 @@ import { CheckIcon, CopyIcon } from '../icons.tsx'
 import { Button, IconButton } from './Button.tsx'
 
 const swap =
-  'col-start-1 row-start-1 transition-[opacity,scale,filter] duration-(--dur-swap) ease-swap'
+  'col-start-1 row-start-1 transition-[opacity,scale,filter] duration-(--dur-swap) ease-swap motion-reduce:transition-opacity'
 
 interface Props {
   text: string

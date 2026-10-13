@@ -43,9 +43,7 @@ export function ConversationHeader(props: Props) {
   useDismiss(panel !== null, [header], close, { outside: light.includes(panel) })
 
   return (
-    // data-ported keeps main's stand-in look out until the styling port is done.
     <header
-      data-ported
       ref={header}
       className={cn(
         // Out of the centered column to the panel's edges.
@@ -87,7 +85,7 @@ export function ConversationHeader(props: Props) {
           onClick={() => toggle('jump')}
           // Jump to's stack fades out on its own, so its button lets go the moment a message is
           // picked, rather than once the stack has faded.
-          className="transition-[scale] group-has-[[data-leaving]]/header:bg-transparent group-has-[[data-leaving]]/header:text-muted"
+          className="transition-[scale] group-has-[[data-leaving]]/header:bg-transparent group-has-[[data-leaving]]/header:text-muted motion-reduce:transition-none"
         >
           <ListIcon />
         </ToolButton>

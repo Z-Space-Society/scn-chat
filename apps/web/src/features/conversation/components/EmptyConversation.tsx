@@ -22,7 +22,7 @@ interface Props {
 export function EmptyConversation(props: Props) {
   const me = useMe()
   return (
-    <div data-ported className="my-auto flex flex-col items-center py-8 text-center text-muted">
+    <div className="my-auto flex flex-col items-center py-8 text-center text-muted">
       <ChatsIllustration />
       <h2 className="font-semibold text-heading text-ink-strong leading-tight">
         What can I help with?

@@ -62,9 +62,7 @@ export function MessageView(props: MessageViewProps) {
   const workId = useId()
   const [workOpen, setWorkOpen] = useState(false)
   return (
-    // data-ported keeps main's stand-in look out until the styling port is done.
     <article
-      data-ported
       id={props.id}
       data-role={user ? 'user' : 'assistant'}
       data-status={(record.status as string | undefined) ?? undefined}

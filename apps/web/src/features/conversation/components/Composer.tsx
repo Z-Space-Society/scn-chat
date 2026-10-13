@@ -209,11 +209,7 @@ export function Composer({ ref, ...props }: ComposerProps) {
 
   return (
     <form.AppForm>
-      {/* data-ported keeps main's stand-in look out until the styling port is done. */}
-      <form.Form
-        data-ported
-        className="group/composer sticky bottom-0 isolate mt-auto pt-6 pb-4.5 before:absolute before:-inset-x-gutter before:inset-y-0 before:-z-1 before:bg-panel before:[mask-image:linear-gradient(transparent,black_--spacing(6))]"
-      >
+      <form.Form className="group/composer sticky bottom-0 isolate mt-auto pt-6 pb-4.5 before:absolute before:-inset-x-gutter before:inset-y-0 before:-z-1 before:bg-panel before:[mask-image:linear-gradient(transparent,black_--spacing(6))]">
         {props.above}
         {props.onCancel && (
           // Editing an earlier message says so above the box, with a way back.

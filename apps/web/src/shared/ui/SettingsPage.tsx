@@ -27,11 +27,7 @@ interface PageProps {
  */
 export function SettingsPage(props: PageProps) {
   return (
-    // data-ported keeps main's stand-in look out until the styling port is done.
-    <section
-      data-ported
-      className="@container mx-auto w-full max-w-settings pt-9.5 pb-12 max-wide:pt-5 [&>[role=alert]]:mb-4"
-    >
+    <section className="@container mx-auto w-full max-w-settings pt-9.5 pb-12 max-wide:pt-5 [&>[role=alert]]:mb-4">
       {props.back && <div className="mb-2.5 text-small">{props.back}</div>}
       <header className="mb-9 flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="min-w-0 shrink grow basis-80">

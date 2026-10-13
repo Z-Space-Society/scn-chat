@@ -21,9 +21,6 @@ interface Props {
 /**
  * The sidebar, after Linear's: dense one-line rows of small text on the frame. On a narrow screen it
  * is a drawer over the page, closed until opened, which closes again once a link in it is followed.
- *
- * The settings class is a hook for main's stand-in look of the sections, kept until they are
- * ported.
  */
 export function SidebarLayout(props: Props) {
   const sidebar = useSidebar()
@@ -44,12 +41,11 @@ export function SidebarLayout(props: Props) {
       // The panel fills the window, with the nav at its start and the section centered in the rest,
       // so the nav stays put from section to section. The nav sits as far from the window's edge
       // as the chat list does, with the chat's gutter on the other side.
-      <div data-drawer-open={sidebar.drawerOpen || undefined} className="settings flex h-dvh">
-        <main className="relative min-w-0 flex-1 overflow-y-auto bg-panel ps-sidebar-pad pe-gutter pb-16 has-[[data-ported]]:pb-0 max-wide:px-gutter max-wide:pt-[calc(var(--spacing-toggle)-(--spacing(1)))]">
+      <div data-drawer-open={sidebar.drawerOpen || undefined} className="flex h-dvh">
+        <main className="relative min-w-0 flex-1 overflow-y-auto bg-panel ps-sidebar-pad pe-gutter max-wide:px-gutter max-wide:pt-[calc(var(--spacing-toggle)-(--spacing(1)))]">
           <MainBar />
           <div className="flex gap-12">
             <nav
-              data-ported
               className={cn(
                 sidebarClass,
                 'wide:sticky wide:top-0 wide:max-h-dvh wide:w-settings-nav wide:flex-none wide:self-start overflow-y-auto wide:bg-transparent wide:px-0 wide:pt-2.5 wide:pb-4',
@@ -72,7 +68,6 @@ export function SidebarLayout(props: Props) {
       className="flex h-dvh min-h-0 overflow-x-clip"
     >
       <nav
-        data-ported
         className={cn(
           sidebarClass,
           'wide:in-data-sidebar-collapsed:invisible wide:in-data-sidebar-collapsed:-ms-sidebar wide:w-sidebar wide:flex-none overflow-hidden',

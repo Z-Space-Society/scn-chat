@@ -2,11 +2,11 @@
 
 ## Summary
 
-The web UI is a deliberately plain React app built on TanStack Start. It exposes every feature with plain HTML elements and almost no styling, so its look can come entirely from a theme later without fighting existing design decisions. It covers signing in, the chat list, a conversation with branch navigation, the composer with model and effort choice and attachments, streaming replies, sharing, settings for preferences, API keys, and plugin settings, and the admin area from the admin specs. The Hono server owns the process and runs Start inside it, and the app talks to the server only through Hono's typed client, so API changes surface as type errors.
+The web UI is a React app built on TanStack Start, styled with Tailwind over a theme of design tokens, as the styling spec lays out. It covers signing in, the chat list, a conversation with branch navigation, the composer with model and effort choice and attachments, streaming replies, sharing, settings for preferences, API keys, and plugin settings, and the admin area from the admin specs. The Hono server owns the process and runs Start inside it, and the app talks to the server only through Hono's typed client, so API changes surface as type errors.
 
 ## Motivation
 
-The project is meant to be forked and changed in code, and a designer will build the production look. Making the code easy to extend and the styling are later phases, not this spec. This UI exists to prove the features work end to end, and to give forkers and the designer working components and data flow to restyle, extend, or override. Every visual choice made here is one a theme might have to undo, so this UI makes as few as possible.
+The project is meant to be forked and changed in code. Its look is the styling spec's, and making the code easy to extend is the extending spec's. This UI exists to prove the features work end to end, and to give forkers working components and data flow to restyle, extend, or override. Its visual choices live in the theme's tokens, so a fork restyles it there rather than in each component.
 
 The first build used Vite and React with `wouter` and hand-written data hooks. It was rebuilt on TanStack Start, Router, Query, and Form to give forkers a conventional, type-safe base, with the same behavior and acceptance criteria. See ADR 0001 for how Start sits inside Hono, and ADR 0003 for why no chat client library holds messages.
 
@@ -22,7 +22,7 @@ The first build used Vite and React with `wouter` and hand-written data hooks. I
 - TanStack Query for all data, both server calls and chats read from the browser store through its worker API.
 - TanStack Form for the settings, admin, and sharing forms, including the forms built from schemas.
 - `EventSource` for reply streams, read through Query's `streamedQuery`, which Query still exports as `experimental_streamedQuery`.
-- Tailwind over a theme of design tokens, as the styling spec lays out. Areas not yet ported keep the stand-in look from the first build.
+- Tailwind over a theme of design tokens, as the styling spec lays out.
 
 ### Serving
 

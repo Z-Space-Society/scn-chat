@@ -29,10 +29,7 @@ export function LoginPage(props: Props) {
   }, [])
 
   return (
-    <main
-      data-ported
-      className="flex min-h-dvh flex-col items-center justify-center bg-panel px-4 py-12"
-    >
+    <main className="flex min-h-dvh flex-col items-center justify-center bg-panel px-4 py-12">
       <section className="w-full max-w-96 text-center">
         <Logo className="mx-auto mb-3 block h-10" />
         <h1 className="text-balance font-semibold text-display text-ink-strong leading-tight tracking-title">

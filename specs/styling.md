@@ -115,7 +115,7 @@ Fenced code in replies is highlighted by Shiki through `@streamdown/code`, loade
 
 The port re-applies `design-reference` area by area onto main's refactored components, not as a merge, since nearly every web file changed on both sides. Its behavior comes along, refactored to main's conventions: forms on the form kit, data through loaders, and no React Compiler bailouts. Its specs come into the feature specs, corrected where they had fallen behind its code. The plan lists each feature in the order it is ported.
 
-Until the port is done, main's stand-in sheets load from `src/styles/legacy.css` in a `legacy` layer, ordered after `base` and before `utilities`, with the browser's own defaults for headings, margins, and lists restored over Preflight, so pages not yet ported keep their look. The sheet is wrapped in `@scope (:root) to ([data-ported])`, so the root element of each ported area carries `data-ported` and shows only its own styles. The sheet, its import, and every `data-ported` are deleted once every area is ported.
+The port is done. Main's stand-in sheets, the `legacy` layer they loaded in, and the `data-ported` markers that kept them out of ported areas are gone, so every element's look is its own utilities over the theme.
 
 ## Scope Boundaries
 
@@ -135,15 +135,15 @@ Until the port is done, main's stand-in sheets load from `src/styles/legacy.css`
 
 ## Acceptance Criteria
 
-- [ ] `pnpm dev` and a production build serve the styled app from `src/styles/app.css`.
-- [ ] Tailwind's default palette, type scale, radii, shadows, and breakpoints produce no utilities.
-- [ ] Changing a color token in `theme.css` changes it everywhere it is used, in light and dark.
+- [x] `pnpm dev` and a production build serve the styled app from `src/styles/app.css`.
+- [x] Tailwind's default palette, type scale, radii, shadows, and breakpoints produce no utilities.
+- [x] Changing a color token in `theme.css` changes it everywhere it is used, in light and dark.
 - [ ] Appearance in Preferences switches between System, Light, and Dark at once, and the choice survives a reload with no flash, on server-rendered and client-only routes.
 - [x] The guard test fails on a raw color or arbitrary length in a component.
 - [ ] Every area matches `design-reference` in light and dark, at desktop width and at 390px.
-- [ ] Animations stop under reduced motion.
-- [ ] A fenced code block in a reply is highlighted in theme colors in both modes, and a block in an unknown language shows as plain monospace.
-- [ ] No legacy layer or stand-in sheet remains.
+- [x] Animations stop under reduced motion.
+- [x] A fenced code block in a reply is highlighted in theme colors in both modes, and a block in an unknown language shows as plain monospace.
+- [x] No legacy layer or stand-in sheet remains.
 
 ## Files
 

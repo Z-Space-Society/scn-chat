@@ -12,7 +12,7 @@ const files = readdirSync(src, { recursive: true, encoding: 'utf8' }).map((path)
 const theme = readFileSync(join(src, 'styles/theme.css'), 'utf8')
 const sources = files.filter((file) => /\.tsx?$/.test(file.path))
 const sheets = files.filter(
-  (file) => file.path.endsWith('.css') && !/^styles\/(theme|legacy)\.css$/.test(file.path),
+  (file) => file.path.endsWith('.css') && !/^styles\/theme\.css$/.test(file.path),
 )
 
 /** The names the theme defines in one Tailwind namespace, such as ui in --text-ui. */

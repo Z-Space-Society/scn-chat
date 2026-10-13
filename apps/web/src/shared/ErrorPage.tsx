@@ -16,10 +16,7 @@ export function ErrorPage(props: Props) {
   const router = useRouter()
   const message = messageOf(props.error)
   return (
-    <main
-      data-ported
-      className="flex min-h-dvh flex-col items-center justify-center bg-panel px-4 py-12 text-center"
-    >
+    <main className="flex min-h-dvh flex-col items-center justify-center bg-panel px-4 py-12 text-center">
       <span className="mb-4.5 grid size-11 place-items-center rounded-full bg-danger-soft text-danger">
         <AlertIcon className="stroke-(length:--icon-stroke-control) size-5.25" />
       </span>

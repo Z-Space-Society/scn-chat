@@ -14,6 +14,8 @@ Code is grouped by feature in `src/features/`, and `src/routes/` maps each URL t
 
 Each route's loader fetches the server data its page needs, and the page reads it with `useSuspenseQuery`, so a page renders with its data and a failed load shows inside the page's layout with a Retry. Chats are the exception: they come from the browser's local copy in `src/store/`, not from loaders. Message parts are drawn by the views in `src/parts/`, looked up by part type, and `src/shared/` holds what features share, like the form kit in `form.tsx` that every form is built with.
 
+The look comes from one file of design tokens, `src/styles/theme.css`, and each component styles itself with Tailwind utilities that can only name those tokens, since the theme clears Tailwind's own palette and scales. A look used in more than one place is a component in `src/shared/ui/`, such as `Button` or the settings page kit. Light and dark follow the system, or a choice kept on the device in Preferences. Replies render through Streamdown, with code highlighted in the theme's colors. The styling spec has the rules.
+
 ## Chat history storage
 
 The goal is to keep users in control of their own chat data. The server should not keep a copy of the chat records. The records are stored in the browser in a wasm sqlite db to allow easy listing and search without having to perform intensive operations on the PDS.
@@ -71,6 +73,8 @@ The [ADRs](adr/) record the choices a reader might otherwise undo:
 - [0001](adr/0001-tanstack-start-inside-hono.md): TanStack Start runs inside the Hono server.
 - [0002](adr/0002-web-app-extended-in-code.md): The web app is extended in code, not through plugins.
 - [0003](adr/0003-no-chat-library-owns-messages.md): No AI chat library owns message state in the browser.
+- [0004](adr/0004-tailwind-with-token-theme.md): Components style themselves with Tailwind, over a theme of tokens.
+- [0005](adr/0005-streamdown-with-our-own-elements.md): Replies render through Streamdown, with every element our own.
 
 ## Plugins
 

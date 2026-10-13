@@ -12,6 +12,8 @@ SCN Chat is extended by forking it and changing its code. This spec makes the we
 
 Server plugins are unchanged.
 
+Porting `design-reference` in the styling phase brought part of this in already: the `partViews` table, the steps group as `StepsView`, the keyed `messageActions` list with Copy, Copy on code blocks, the Markdown seam, now on Streamdown as ADR 0005 records, and the settings sections split one file each. What remains is tool views with their derived status, the web search view, saying why a copy failed, splitting `ConversationView` the rest of the way, and the forker guide.
+
 ## Motivation
 
 The people extending this project are programmers in their own fork, as ADR 0002 records. They need code they can find their way around and change safely, not a plugin API. Most of the web app is already plain components and hooks, but a few places make common changes harder than they should be:
@@ -158,7 +160,7 @@ It ends with the rules a fork should keep, linking the ADRs:
 ## Scope Boundaries
 
 - No plugin API for the web app, no registration from packages, and no slots. Forkers change the code.
-- No new look. Styling, the theme's tokens, code highlighting colors, and dark mode are the styling spec.
+- No new look. Styling, the theme's tokens, code highlighting colors, and dark mode are the styling spec, which is done.
 - No changes to the server, the lexicons, or server plugins.
 - No views for other tools. `web_fetch` keeps the default view.
 - No artifacts panel, tool approval, inline citation markers, or responses from several models side by side. The server supports none of them yet, and sources carry no position in the text.
@@ -176,10 +178,10 @@ It ends with the rules a fork should keep, linking the ADRs:
 
 ## Acceptance Criteria
 
-- [ ] Each existing part type renders as before, through `partViews`.
+- [x] Each existing part type renders as before, through `partViews`.
 - [ ] A tool call and its result render once, together, through the tool's view, or the default tool view when the tool has none.
 - [ ] A result with no matching call renders alone with the default tool view.
-- [ ] A part kind with no view renders nothing.
+- [x] A part kind with no view renders nothing.
 - [ ] `toolStatus` is `running`, `done`, `error`, or `incomplete` as the table above says, and the default view shows it.
 - [ ] Two or more consecutive steps render inside one collapsed group that counts them and says when a tool is running. A single step renders alone.
 - [ ] `web_search` results show as linked titles with plain-text snippets under the query, opening in a new tab.
@@ -187,8 +189,8 @@ It ends with the rules a fork should keep, linking the ADRs:
 - [ ] Adding a tool view takes one new folder and one line in `toolViews`.
 - [x] Message actions render from `messageActions` in order, and edit, regenerate, and stop behave as before.
 - [ ] Copy on a finished message puts its text on the clipboard and confirms it, or shows why it failed.
-- [ ] Code blocks in replies have a Copy button that copies the block's text.
-- [ ] The Markdown plugin lists and components are exported from `parts/markdown.tsx`, and rendering is unchanged apart from the code block button.
+- [x] Code blocks in replies have a Copy button that copies the block's text.
+- [x] The Markdown components are exported from `parts/markdown.tsx`, which holds the renderer's plugins, every element our own.
 - [ ] `ConversationView` and the settings sections are split as described, and the existing tests pass with only their imports changed.
 - [ ] `docs/extending.md` has the map and every recipe above, and every file it names exists.
 

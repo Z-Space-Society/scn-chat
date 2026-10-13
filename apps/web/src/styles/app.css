@@ -3,13 +3,11 @@
  * theme, the document's base, and the few styles utilities can't express.
  */
 
-/* Main's stand-in look sits between the base and the utilities until the styling port is done. */
-@layer theme, base, legacy, components, utilities;
+@layer theme, base, components, utilities;
 
 @import "tailwindcss";
 @import "./theme.css";
 @import "./base.css";
-@import "./legacy.css" layer(legacy);
 @import "../shared/ui/scroll-fade.css";
 @import "../shared/ui/details.css";
 @import "../parts/markdown.css";
