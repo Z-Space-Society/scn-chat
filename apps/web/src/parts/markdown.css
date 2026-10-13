@@ -128,15 +128,20 @@
       overflow-y: hidden;
     }
 
-    & table {
-      display: block;
+    /* A table fills the column, so its rows run to its edge, in a frame that scrolls when the
+       table is wider than the column, while its actions stay in the frame's corner. */
+    & .table-scroll {
       overflow-x: auto;
-      border-collapse: separate;
-      border-spacing: 0;
-      font-size: var(--text-ui);
       background: var(--color-raised);
       border: 1px solid var(--color-line);
       border-radius: var(--radius-card);
+    }
+
+    & table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: var(--text-ui);
     }
 
     & :is(th, td) {
@@ -149,9 +154,17 @@
       border-bottom: none;
     }
 
+    /* Headings stay on one line, so a table too wide for the column scrolls rather than stacking
+       them word by word. */
     & th {
       color: var(--color-muted);
       font-weight: 500;
+      white-space: nowrap;
+    }
+
+    /* The last heading leaves room for the table's actions, which sit over the header's end. */
+    & th:last-child {
+      padding-inline-end: 4.5rem;
     }
 
     & blockquote {

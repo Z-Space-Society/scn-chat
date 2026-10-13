@@ -3,6 +3,7 @@ import {
   ArrowUp,
   Box,
   createLucideIcon,
+  Download,
   KeyRound,
   type LucideIcon,
   Puzzle,
@@ -510,6 +511,7 @@ export const ArrowRightIcon = icon(SoftArrowRight, { directional: true })
 export const ArrowLeftIcon = icon(SoftArrowLeft, { directional: true })
 export const CheckIcon = icon(SoftCheck)
 export const CopyIcon = icon(PuffyCopy)
+export const DownloadIcon = icon(Download)
 export const InfoIcon = icon(SoftInfo)
 export const QuoteIcon = icon(RoundQuote)
 export const SlidersIcon = icon(SoftSliders)

@@ -6,6 +6,30 @@ import { Button, IconButton } from './Button.tsx'
 const swap =
   'col-start-1 row-start-1 transition-[opacity,scale,filter] duration-(--dur-swap) ease-swap motion-reduce:transition-opacity'
 
+interface CopyIconSwapProps {
+  copied: boolean
+}
+
+/** The copy icon, which gives way to a check once copied, shrinking and blurring as it fades where motion is welcome. */
+export function CopyIconSwap(props: CopyIconSwapProps) {
+  return (
+    <span className="group inline-grid place-items-center" data-swapped={props.copied || undefined}>
+      <CopyIcon
+        className={cn(
+          swap,
+          'group-data-swapped:opacity-0 motion-safe:group-data-swapped:scale-25 motion-safe:group-data-swapped:blur-xs',
+        )}
+      />
+      <CheckIcon
+        className={cn(
+          swap,
+          'opacity-0 group-data-swapped:opacity-100 motion-safe:scale-25 motion-safe:blur-xs motion-safe:group-data-swapped:scale-100 motion-safe:group-data-swapped:blur-none',
+        )}
+      />
+    </span>
+  )
+}
+
 interface Props {
   text: string
   /** Show an icon in place of the words, as among a message's actions. */
@@ -31,21 +55,7 @@ export function CopyButton(props: Props) {
     )
   return (
     <IconButton aria-label={label} onClick={copy} className={props.className}>
-      {/* Copy gives way to the check, shrinking and blurring as it fades where motion is welcome. */}
-      <span className="group inline-grid place-items-center" data-swapped={copied || undefined}>
-        <CopyIcon
-          className={cn(
-            swap,
-            'group-data-swapped:opacity-0 motion-safe:group-data-swapped:scale-25 motion-safe:group-data-swapped:blur-xs',
-          )}
-        />
-        <CheckIcon
-          className={cn(
-            swap,
-            'opacity-0 group-data-swapped:opacity-100 motion-safe:scale-25 motion-safe:blur-xs motion-safe:group-data-swapped:scale-100 motion-safe:group-data-swapped:blur-none',
-          )}
-        />
-      </span>
+      <CopyIconSwap copied={copied} />
     </IconButton>
   )
 }

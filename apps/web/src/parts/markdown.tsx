@@ -1,16 +1,30 @@
 import { cjk } from '@streamdown/cjk'
-import { type ReactNode, useEffect, useLayoutEffect, useState } from 'react'
+import {
+  type ComponentProps,
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 import type { ThemedToken, TokensResult } from 'shiki'
 import {
   type Components,
   defaultRehypePlugins,
+  extractTableDataFromElement,
   type MathPlugin,
   Streamdown,
+  tableDataToCSV,
+  tableDataToMarkdown,
+  tableDataToTSV,
   useIsCodeFenceIncomplete,
 } from 'streamdown'
 import { cn } from '../shared/cn.ts'
-import { Button } from '../shared/ui/Button.tsx'
-import { CopyButton } from '../shared/ui/CopyButton.tsx'
+import { DownloadIcon } from '../shared/icons.tsx'
+import { Button, IconButton } from '../shared/ui/Button.tsx'
+import { CopyButton, CopyIconSwap } from '../shared/ui/CopyButton.tsx'
+import { ActionMenu, blockAction, blockActions } from './BlockActions.tsx'
+import { codeFilename, downloadText } from './download.ts'
 
 /*
  * The model's text, rendered by Streamdown, which completes the Markdown a stream leaves half
@@ -144,9 +158,9 @@ interface CodeBlockProps {
 }
 
 /**
- * A fenced code block, highlighted once its language loads, with a button in its corner that
- * copies its code, shown on hover like the message actions, and always on a touch screen. While its
- * fence is still streaming it highlights as it grows, and has nothing to copy yet.
+ * A fenced code block, highlighted once its language loads, with buttons in its corner that copy
+ * its code and download it as a file named for its language. While its fence is still streaming it
+ * highlights as it grows, and has nothing to copy or download yet.
  */
 function CodeBlock(props: CodeBlockProps) {
   const incomplete = useIsCodeFenceIncomplete()
@@ -156,7 +170,7 @@ function CodeBlock(props: CodeBlockProps) {
   const result = useHighlight(code, language, incomplete)
   const lines = code.split('\n')
   return (
-    <div className="code-block group/code relative" data-language={language || undefined}>
+    <div className="code-block group/block relative" data-language={language || undefined}>
       {/* Code reads left to right whatever the text around it. */}
       <pre dir="ltr">
         <code>
@@ -170,10 +184,62 @@ function CodeBlock(props: CodeBlockProps) {
         </code>
       </pre>
       {!incomplete && (
-        <div className="absolute end-1.5 top-1.5 opacity-0 touch:opacity-100 transition-opacity duration-(--dur-feedback) focus-within:opacity-100 group-hover/code:opacity-100">
-          <CopyButton text={code} className="rounded-badge px-2 py-0.5 text-caption" />
+        <div className={blockActions}>
+          <CopyButton icon text={code} className={blockAction} />
+          <IconButton
+            aria-label="Download"
+            onClick={() => downloadText(code, codeFilename(language), 'text/plain')}
+            className={blockAction}
+          >
+            <DownloadIcon />
+          </IconButton>
         </div>
       )}
+    </div>
+  )
+}
+
+/** Copy text, to be told once it is copied. */
+const copyText = (text: string) => navigator.clipboard.writeText(text)
+
+/**
+ * A table across the column, with menus in its corner that copy it as Markdown, CSV, or TSV, or download it as CSV or
+ * Markdown, read from the table as it shows when chosen.
+ */
+function TableBlock(props: ComponentProps<'table'>) {
+  const table = useRef<HTMLTableElement>(null)
+  const data = () => extractTableDataFromElement(table.current as HTMLTableElement)
+  return (
+    <div className="table-block group/block relative">
+      <div className="table-scroll">
+        <table ref={table} {...props} />
+      </div>
+      <div className={blockActions}>
+        <ActionMenu
+          label="Copy table"
+          done="Copied"
+          icon={(copied) => <CopyIconSwap copied={copied} />}
+          items={[
+            { label: 'Markdown', run: () => copyText(tableDataToMarkdown(data())) },
+            { label: 'CSV', run: () => copyText(tableDataToCSV(data())) },
+            { label: 'TSV', run: () => copyText(tableDataToTSV(data())) },
+          ]}
+        />
+        <ActionMenu
+          label="Download table"
+          icon={() => <DownloadIcon />}
+          items={[
+            {
+              label: 'CSV',
+              run: () => downloadText(tableDataToCSV(data()), 'table.csv', 'text/csv'),
+            },
+            {
+              label: 'Markdown',
+              run: () => downloadText(tableDataToMarkdown(data()), 'table.md', 'text/markdown'),
+            },
+          ]}
+        />
+      </div>
     </div>
   )
 }
@@ -199,7 +265,7 @@ export const markdownComponents: Components = {
   sup: ({ node: _node, ...props }) => <sup {...props} />,
   sub: ({ node: _node, ...props }) => <sub {...props} />,
   section: ({ node: _node, ...props }) => <section {...props} />,
-  table: ({ node: _node, ...props }) => <table {...props} />,
+  table: ({ node: _node, ...props }) => <TableBlock {...props} />,
   thead: ({ node: _node, ...props }) => <thead {...props} />,
   tbody: ({ node: _node, ...props }) => <tbody {...props} />,
   tr: ({ node: _node, ...props }) => <tr {...props} />,
