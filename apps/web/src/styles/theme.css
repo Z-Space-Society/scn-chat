@@ -37,6 +37,7 @@
   --animate-*: initial;
   --container-*: initial;
   --breakpoint-*: initial;
+  --tracking-*: initial;
 
   /* The window frame, the panel inside it, and the cards on the panel. */
   --color-chrome: light-dark(oklch(0.982 0 0), oklch(0.162 0 0));
@@ -164,6 +165,12 @@
   /* The app's name on the login page. */
   --text-display: 1.75rem;
 
+  /* Big titles draw in a touch, and small labels in capitals' weight open up. */
+  --tracking-title: -0.02em;
+  --tracking-heading: -0.01em;
+  --tracking-label: 0.02em;
+  --tracking-key: 0.04em;
+
   /* Where a surface holds rounded things at an even inset, its corner is theirs plus the inset
      and its border, so the curves nest. */
   --radius-panel: 0.9rem;
@@ -222,6 +229,8 @@
 
   /* Motion eases out and never overshoots. */
   --ease-out: cubic-bezier(0.25, 0.8, 0.25, 1);
+  /* Two icons in one place, such as Copy and Copied, cross-fade as one gives way to the other. */
+  --ease-swap: cubic-bezier(0.2, 0, 0, 1);
   /* What arrives fades in; live work breathes at the slow pace. */
   --animate-fade-in: fade-in var(--dur-enter) var(--ease-out) backwards;
   --animate-breathe: breathe var(--slow) ease-in-out infinite;
@@ -277,6 +286,7 @@
     --dur-layout: 220ms;
     --dur-enter: 240ms;
     --dur-layer: 300ms;
+    --dur-swap: 300ms;
     /* How far a panel rises toward its place as it opens. */
     --rise: 4px;
     /* How long a reply waits quietly before it shows that it is waiting, so a quick one never
@@ -290,6 +300,8 @@
        beside them: regular text, or the medium text of a control. */
     --icon-stroke: 1.25;
     --icon-stroke-control: 1.75;
+    /* A radio's ring, which needs 3:1 against the card it sits on. */
+    --control-edge: 1.5px;
     /* iOS zooms the page into a field whose text is under 16px, so on a touch screen fields never
        go below it. */
     --input-floor: 0px;

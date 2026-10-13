@@ -1,5 +1,8 @@
 import { createFormHook, createFormHookContexts } from '@tanstack/react-form'
 import { type ComponentProps, type ReactNode, useId } from 'react'
+import { cn } from './cn.ts'
+import { Button } from './ui/Button.tsx'
+import { field as fieldClass, Switch } from './ui/controls.tsx'
 
 const { fieldContext, formContext, useFieldContext, useFormContext } = createFormHookContexts()
 
@@ -25,6 +28,7 @@ function TextField(props: TextFieldProps) {
     <input
       {...input}
       id={id}
+      className={cn(fieldClass, input.className)}
       name={field.name}
       value={field.state.value}
       onChange={(e) => field.handleChange(e.target.value)}
@@ -52,6 +56,7 @@ function TextAreaField(props: TextAreaFieldProps) {
     <textarea
       {...textarea}
       id={id}
+      className={cn(fieldClass, textarea.className)}
       name={field.name}
       value={field.state.value}
       onChange={(e) => field.handleChange(e.target.value)}
@@ -91,6 +96,22 @@ function CheckboxField(props: CheckboxFieldProps) {
   )
 }
 
+interface SwitchFieldProps extends Omit<Controlled<'input'>, 'type'> {}
+
+/** A switch bound to a boolean field, labelled by its setting row or an aria-label. */
+function SwitchField(props: SwitchFieldProps) {
+  const field = useFieldContext<boolean>()
+  return (
+    <Switch
+      {...props}
+      name={field.name}
+      checked={field.state.value}
+      onChange={(e) => field.handleChange(e.target.checked)}
+      onBlur={field.handleBlur}
+    />
+  )
+}
+
 interface SelectFieldProps extends Controlled<'select'>, LabelProps {
   /** The options. */
   children: ReactNode
@@ -106,6 +127,7 @@ function SelectField(props: SelectFieldProps) {
     <select
       {...select}
       id={id}
+      className={cn(fieldClass, select.className)}
       name={field.name}
       value={field.state.value}
       onChange={(e) => field.handleChange(e.target.value)}
@@ -147,9 +169,9 @@ function SubmitButton(props: SubmitButtonProps) {
   return (
     <form.Subscribe selector={(state) => state.isSubmitting}>
       {(isSubmitting) => (
-        <button type="submit" disabled={isSubmitting}>
+        <Button type="submit" disabled={isSubmitting}>
           {props.children}
-        </button>
+        </Button>
       )}
     </form.Subscribe>
   )
@@ -166,7 +188,7 @@ function SubmitButton(props: SubmitButtonProps) {
 export const { useAppForm } = createFormHook({
   fieldContext,
   formContext,
-  fieldComponents: { TextField, TextAreaField, CheckboxField, SelectField },
+  fieldComponents: { TextField, TextAreaField, CheckboxField, SwitchField, SelectField },
   formComponents: { Form, SubmitButton },
 })
 

@@ -23,7 +23,9 @@ function namesIn(namespace: string) {
 
 // A color, or a length or duration, written into a utility instead of taken from the theme.
 const rawColor = /#[0-9a-f]{3,8}\b|\b(?:oklch|oklab|rgba?|hsla?|lab|lch)\(/i
-const rawLength = /\d(?:px|rem|em|vh|vw|dvh|svh|ch|ms|s|%)(?![a-z])/i
+// A whole extent, such as 100vw in calc(100vw - …), is not a design value.
+const rawLength =
+  /(?<![\d.])(?!100(?:vw|vh|dvh|svh|%))[\d.]+(?:px|rem|em|vh|vw|dvh|svh|ch|ms|s|%)(?![a-z])/i
 // An arbitrary value such as p-[13px], or an arbitrary property such as [width:2rem].
 const arbitrary = /(?:-|^|[\s'"`:])\[([^\]\s'"`]+)\]/g
 
@@ -31,6 +33,7 @@ describe('the theme', () => {
   it('lists every name tailwind-merge needs in cn', () => {
     expect(themeNames.text).toEqual(namesIn('text'))
     expect(themeNames.font).toEqual(namesIn('font'))
+    expect(themeNames.tracking).toEqual(namesIn('tracking'))
     expect(themeNames.radius).toEqual(namesIn('radius'))
     expect(themeNames.shadow).toEqual(namesIn('shadow'))
     expect(themeNames.spacing).toEqual(namesIn('spacing'))

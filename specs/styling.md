@@ -83,9 +83,19 @@ Spacing literals from `design-reference` snap to the nearest quarter step of the
 
 ### Shared UI
 
-`src/shared/ui/` holds the components the design reuses: `Button` with its default, primary, danger, and quiet variants, `IconButton`, `Badge`, `Chip`, `Switch`, `Menu`, `Select`, `CopyButton`, and `VisuallyHidden`, and the settings kit of page, group, row, field, `SaveBar`, `ConfirmButton`, and item and link lists. The form kit in `src/shared/form.tsx` renders its fields styled. Floating menus and the select's list open in the top layer through the Popover API, and `usePlacement` positions them.
+`src/shared/ui/` holds the components the design reuses:
 
-The primary button is green, since green marks both what is live and the main action.
+- `Button.tsx`: `Button`, whose tone is default, primary, danger, or quiet, and which is primary when it submits a form, since green marks both what is live and the main action. `IconButton` is a quiet button with only an icon, red for something that can't be undone. The `button` variants also style a link that acts as a button.
+- `Badge.tsx`: `Badge` for status, green, red, or grey, and `Chip` and `Chips` for short values.
+- `controls.tsx`: the `field` look of text fields, selects, and textareas, `Switch`, and `Radio`. The switch stays a checkbox to the browser and screen readers, and the switch and radio draw their knob and dot as elements beside the input, so every browser can show them.
+- `Select.tsx`: the select-only combobox from `design-reference`, its list rendered into the body and placed by `usePlacement` in `src/shared/`. A portal rather than the Popover API keeps it testable in jsdom.
+- `menu.ts`: the look of floating menus and panels and of the rows in them, shared by the select's list and the app's menus.
+- `CopyButton.tsx`: Copy, as words or as an icon that cross-fades to a check.
+- `ItemList.tsx`: lists in a card, each `Item` with an `ItemMark`, its `ItemNames` over a line of details, and its actions, and `LinkItem`, a row that opens a page.
+- `SettingsPage.tsx`: the settings and admin kit of `SettingsPage`, `SettingsGroup`, `SettingRow`, `Field` and the `fields` grid, `Choices` and `Choice`, `SaveBar`, `ConfirmButton`, `SettingsEmpty`, and `Callout`. A settings page is a size container, so its rows stack when its column is narrow, beside the nav as well as on a phone.
+- `Logo.tsx`: the logo.
+
+The form kit in `src/shared/form.tsx` gives its text, textarea, and select fields the `field` look, binds a boolean to a `SwitchField`, and submits with `Button`. `ErrorAlert` is red, and the router's `RouteError` and `RoutePending` use the kit.
 
 ### Light and dark
 

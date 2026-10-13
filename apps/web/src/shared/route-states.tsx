@@ -2,6 +2,7 @@ import { useQueryErrorResetBoundary } from '@tanstack/react-query'
 import { type ErrorComponentProps, useRouter } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { ErrorAlert } from './ErrorAlert.tsx'
+import { Button } from './ui/Button.tsx'
 
 /**
  * What a route shows when its loader or a query it suspends on fails, in place of the route, so
@@ -13,16 +14,14 @@ export function RouteError(props: ErrorComponentProps) {
   // A failed suspense query throws again when the route renders unless its boundary is reset.
   useEffect(() => queryErrorResetBoundary.reset(), [queryErrorResetBoundary])
   return (
-    <section>
+    <section className="flex flex-col items-start gap-3 py-8">
       <ErrorAlert error={props.error} />
-      <button type="button" onClick={() => void router.invalidate()}>
-        Retry
-      </button>
+      <Button onClick={() => void router.invalidate()}>Retry</Button>
     </section>
   )
 }
 
 /** What a route shows while it loads, once loading takes long enough to notice. */
 export function RoutePending() {
-  return <p>Loading…</p>
+  return <p className="py-8 text-muted">Loading…</p>
 }

@@ -1,0 +1,386 @@
+import { type ReactNode, useEffect, useId, useRef, useState } from 'react'
+import { cn } from '../cn.ts'
+import { CheckIcon } from '../icons.tsx'
+import { Button } from './Button.tsx'
+import { Radio } from './controls.tsx'
+
+/*
+ * The pieces settings and admin pages are built from: a page of cards, each holding rows of
+ * settings or a form, with Save in a bar at the foot of the panel.
+ */
+
+interface PageProps {
+  title: ReactNode
+  /** One line under the title saying what the section is for. */
+  description?: ReactNode
+  /** A link above the title back to where this page was opened from, styled with backLink. */
+  back?: ReactNode
+  /** Buttons or links beside the title that act on the whole page, such as adding an item. */
+  actions?: ReactNode
+  children?: ReactNode
+}
+
+/**
+ * A settings section: its title and what it is for, over its groups, in a column that reads at a
+ * glance. Its rows lay themselves out for its width, so they stack beside the nav just past the
+ * phone breakpoint as well as on a phone.
+ */
+export function SettingsPage(props: PageProps) {
+  return (
+    // data-ported keeps main's stand-in look out until the styling port is done.
+    <section
+      data-ported
+      className="@container mx-auto w-full max-w-settings pt-9.5 pb-12 max-wide:pt-5 [&>[role=alert]]:mb-4"
+    >
+      {props.back && <div className="mb-2.5 text-small">{props.back}</div>}
+      <header className="mb-9 flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+        <div className="min-w-0 shrink grow basis-80">
+          <h2 className="text-balance font-semibold text-ink-strong text-title leading-tight tracking-title">
+            {props.title}
+          </h2>
+          {props.description && <p className="mt-0.75 text-muted text-ui">{props.description}</p>}
+        </div>
+        {props.actions && <div className="flex items-center gap-2">{props.actions}</div>}
+      </header>
+      {props.children}
+    </section>
+  )
+}
+
+/** The way back to the page this one was opened from, quiet above the title. */
+export const backLink = 'inline-flex items-center gap-1.5 text-muted no-underline hover:text-ink'
+
+interface GroupProps {
+  title?: string
+  description?: ReactNode
+  /** Whether the card holds actions that can't be undone, which edges it in red. */
+  danger?: boolean
+  /** A note under the card, such as who its settings don't apply to. */
+  note?: ReactNode
+  children: ReactNode
+}
+
+const heading = 'ms-card-pad font-semibold text-muted text-small leading-tight'
+
+/**
+ * A card of related settings under a quiet heading in line with the text of its rows. The card
+ * holds settings rather than being one to press, so it lies flat: a tint with no edge of its own,
+ * its rows divided by lines inset to their text, as in a system settings list.
+ */
+export function SettingsGroup(props: GroupProps) {
+  return (
+    <div className="mb-8 min-w-0">
+      {props.title && <h3 className={cn(heading, 'mb-2.25')}>{props.title}</h3>}
+      {props.description && (
+        <p className={cn(heading, '-mt-1 mb-2.5 font-normal')}>{props.description}</p>
+      )}
+      <SettingsCard danger={props.danger}>{props.children}</SettingsCard>
+      {props.note && <p className="mx-card-pad mt-2.5 text-muted text-small">{props.note}</p>}
+    </div>
+  )
+}
+
+interface CardProps {
+  danger?: boolean
+  children: ReactNode
+}
+
+function SettingsCard(props: CardProps) {
+  return (
+    <div
+      className={cn(
+        'overflow-clip rounded-panel border border-transparent bg-card [&>*+*]:relative [&>*+*]:before:absolute [&>*+*]:before:inset-x-card-pad [&>*+*]:before:top-0 [&>*+*]:before:border-line [&>*+*]:before:border-t',
+        props.danger && 'border-danger-border',
+      )}
+    >
+      {props.children}
+    </div>
+  )
+}
+
+interface ChoicesProps {
+  /** What the choice is about, read as the group's name and shown as its heading. */
+  title: string
+  description?: ReactNode
+  children: ReactNode
+}
+
+/** A choice among a few modes, as a card whose rows each hold one with what it means. */
+export function Choices(props: ChoicesProps) {
+  return (
+    <fieldset className="mb-8 min-w-0">
+      <legend className={cn(heading, 'float-start mb-2.25 w-full')}>{props.title}</legend>
+      {props.description && (
+        <p className={cn(heading, '-mt-1 mb-2.5 font-normal')}>{props.description}</p>
+      )}
+      <div className="clear-both">
+        <SettingsCard>{props.children}</SettingsCard>
+      </div>
+    </fieldset>
+  )
+}
+
+interface ChoiceProps {
+  name: string
+  value: string
+  checked: boolean
+  onChange: (value: string) => void
+  label: ReactNode
+  description?: ReactNode
+  disabled?: boolean
+}
+
+/** One mode, with what it means and a radio at its end. The whole row picks it. */
+export function Choice(props: ChoiceProps) {
+  const id = useId()
+  return (
+    <label
+      htmlFor={id}
+      className="flex cursor-pointer items-center justify-between gap-4 p-card-pad hover:bg-row-hover"
+    >
+      <span className="flex flex-col">
+        <strong className="font-medium text-ink-strong">{props.label}</strong>
+        {props.description && <small className={description}>{props.description}</small>}
+      </span>
+      <Radio
+        id={id}
+        name={props.name}
+        value={props.value}
+        checked={props.checked}
+        disabled={props.disabled}
+        onChange={() => props.onChange(props.value)}
+      />
+    </label>
+  )
+}
+
+const description = 'mt-0.5 text-muted text-small leading-[1.45]'
+
+interface RowProps {
+  label: ReactNode
+  /** The control the label names. */
+  htmlFor?: string
+  description?: ReactNode
+  /** Problems with the value, such as ones the server found, under the description. */
+  issues?: ReactNode
+  /** Whether the control takes the row's whole width under its label, as a textarea does. */
+  wide?: boolean
+  children?: ReactNode
+}
+
+/**
+ * One setting: what it is on the left, its control on the right, or under it when the row is wide
+ * or the column narrow. A switch stays beside its words, since it fits.
+ */
+export function SettingRow(props: RowProps) {
+  return (
+    <div
+      data-wide={props.wide || undefined}
+      className="flex @max-narrow:not-has-[[data-switch]]:flex-col items-center @max-narrow:not-has-[[data-switch]]:items-stretch justify-between gap-x-8 gap-y-3 p-card-pad data-wide:flex-col data-wide:items-stretch"
+    >
+      <div className="min-w-0 flex-1">
+        <SettingLabel htmlFor={props.htmlFor}>{props.label}</SettingLabel>
+        {props.description && <p className={description}>{props.description}</p>}
+        {props.issues}
+      </div>
+      {props.children && (
+        <div
+          className={cn(
+            'flex @max-narrow:max-w-none in-data-wide:max-w-none max-w-11/20 flex-none items-center gap-2',
+            // A text field keeps a steady width beside its label and takes the row under it.
+            '@max-narrow:[&>input:not([type=checkbox])]:w-full [&>input:not([type=checkbox])]:w-64 in-data-wide:[&>input:not([type=checkbox])]:w-full',
+            '@max-narrow:[&>[role=combobox]]:w-full [&>[role=combobox]]:min-w-52',
+            // A textarea starts at a few lines and grows with what is typed in it.
+            '[&>textarea]:field-sizing-content [&>textarea]:max-h-96 [&>textarea]:min-h-24 [&>textarea]:w-full [&>textarea]:resize-y',
+          )}
+        >
+          {props.children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+interface LabelProps {
+  htmlFor?: string
+  children: ReactNode
+}
+
+/** A label for a control, or plain text over an action, which a click on its name should not run. */
+function SettingLabel(props: LabelProps) {
+  const className = 'block font-medium text-ink-strong'
+  if (!props.htmlFor) return <span className={className}>{props.children}</span>
+  return (
+    <label className={className} htmlFor={props.htmlFor}>
+      {props.children}
+    </label>
+  )
+}
+
+interface FieldProps {
+  label: string
+  htmlFor: string
+  /** A quiet note under the control, such as what to type in it. */
+  hint?: ReactNode
+  optional?: boolean
+  /** Whether the field spans the form's columns. */
+  wide?: boolean
+  children: ReactNode
+}
+
+/** A field in a form that stacks its label over its control, as for adding a key. */
+export function Field(props: FieldProps) {
+  return (
+    <div
+      className={cn(
+        'flex min-w-0 flex-col gap-1.5 [&>:is(input,select,[role=combobox])]:h-9.25 [&>:is(input,select,[role=combobox])]:w-full',
+        props.wide && 'col-span-full',
+      )}
+    >
+      <label htmlFor={props.htmlFor} className="font-medium text-ink-strong text-ui">
+        {props.label}{' '}
+        {props.optional && (
+          <span className="ms-1 font-normal text-caption text-muted">Optional</span>
+        )}
+      </label>
+      {props.children}
+      {props.hint && <p className="text-muted text-small">{props.hint}</p>}
+    </div>
+  )
+}
+
+/** A form's fields, labels over their controls, two to a row where there is room. */
+export const fields = 'grid grid-cols-2 gap-4 @max-narrow:grid-cols-1'
+
+interface SaveBarProps {
+  /** What the button says, Save unless it does something else, such as Add. */
+  label?: string
+  /** What it says while it works. */
+  pendingLabel?: string
+  pending: boolean
+  /** Whether there is nothing to save yet, such as before a required choice. */
+  disabled?: boolean
+  /** Whether the last save succeeded and nothing has changed since. */
+  saved: boolean
+  error?: string | null
+}
+
+/**
+ * The form's Save, kept in view at the foot of the panel over the settings fading under it, with
+ * how the last save went.
+ */
+export function SaveBar(props: SaveBarProps) {
+  return (
+    <div className="before:mask-t-from-[calc(100%-(--spacing(4)))] sticky bottom-0 isolate -mt-2 flex flex-wrap items-center justify-end gap-x-3 gap-y-2 pt-4 pb-5 before:absolute before:-inset-x-gutter before:inset-y-0 before:-z-1 before:bg-panel">
+      {props.error && (
+        <p role="alert" className="me-auto text-danger text-small">
+          {props.error}
+        </p>
+      )}
+      {/* The status is always there, so screen readers announce it when it fills. */}
+      <span
+        role="status"
+        className="inline-flex items-center gap-1.25 font-medium text-accent-strong text-small empty:hidden"
+      >
+        {props.saved && (
+          <>
+            <CheckIcon /> Saved
+          </>
+        )}
+      </span>
+      <Button type="submit" className="px-5 py-1.5" disabled={props.pending || props.disabled}>
+        {props.pending ? (props.pendingLabel ?? 'Saving…') : (props.label ?? 'Save')}
+      </Button>
+    </div>
+  )
+}
+
+interface ConfirmProps {
+  /** What the button does, such as "Delete role". The confirming button says it again. */
+  label: string
+  /** The question asked before it happens, such as "Delete this role?" */
+  question: string
+  onConfirm: () => void
+  disabled?: boolean
+  /** Whether it stays quiet until asked, as in a row of a list, and turns red only to confirm. */
+  quiet?: boolean
+}
+
+/** A button for something that can't be undone, which asks in place before doing it. */
+export function ConfirmButton(props: ConfirmProps) {
+  const [asking, setAsking] = useState(false)
+  const cancel = useRef<HTMLButtonElement>(null)
+  // The button that was clicked is gone, so focus moves to the safe answer.
+  useEffect(() => {
+    if (asking) cancel.current?.focus()
+  }, [asking])
+  if (!asking)
+    return (
+      <Button
+        tone={props.quiet ? 'quiet' : 'danger'}
+        disabled={props.disabled}
+        onClick={() => setAsking(true)}
+      >
+        {props.label}
+      </Button>
+    )
+  return (
+    <span className="ms-auto inline-flex flex-wrap items-center justify-end gap-1.5 text-ink-strong text-small">
+      <span className="me-1">{props.question}</span>
+      <Button ref={cancel} size="small" onClick={() => setAsking(false)}>
+        Cancel
+      </Button>
+      <Button
+        tone="danger"
+        size="small"
+        onClick={() => {
+          setAsking(false)
+          props.onConfirm()
+        }}
+      >
+        {props.label}
+      </Button>
+    </span>
+  )
+}
+
+interface EmptyProps {
+  /** Whether it stands in for the cards themselves, as a dashed outline of where they would be. */
+  outlined?: boolean
+  children: ReactNode
+}
+
+/** What a card or a section says when it has nothing to show. */
+export function SettingsEmpty(props: EmptyProps) {
+  return (
+    <p
+      className={cn(
+        'px-card-pad py-6.5 text-center text-muted text-ui',
+        props.outlined && 'rounded-panel border border-line border-dashed',
+      )}
+    >
+      {props.children}
+    </p>
+  )
+}
+
+interface CalloutProps {
+  /** Green for good news, red for a problem, grey otherwise. */
+  tone?: 'good' | 'danger'
+  children: ReactNode
+}
+
+/** A note in the flow of the page. */
+export function Callout(props: CalloutProps) {
+  return (
+    <div
+      className={cn(
+        'mb-7 rounded-panel bg-surface p-card-pad text-ink text-ui',
+        props.tone === 'good' && 'bg-accent-soft text-accent-strong',
+        props.tone === 'danger' && 'bg-danger-soft text-danger',
+      )}
+    >
+      {props.children}
+    </div>
+  )
+}

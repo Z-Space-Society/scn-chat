@@ -7,6 +7,7 @@ import { extendTailwindMerge } from 'tailwind-merge'
  */
 export const themeNames = {
   text: ['caption', 'small', 'ui', 'body', 'heading', 'title', 'display'],
+  tracking: ['title', 'heading', 'label', 'key'],
   font: ['ui', 'prose', 'mono'],
   radius: ['panel', 'card', 'small', 'badge', 'row', 'menu', 'bubble', 'composer'],
   shadow: ['float', 'lift'],
@@ -24,7 +25,7 @@ export const themeNames = {
     'turn',
   ],
   container: ['column', 'settings', 'narrow'],
-  ease: ['out'],
+  ease: ['out', 'swap'],
   animate: ['fade-in', 'breathe'],
   breakpoint: ['wide'],
 }
@@ -33,6 +34,7 @@ const merge = extendTailwindMerge({
   extend: {
     theme: {
       text: themeNames.text,
+      tracking: themeNames.tracking,
       font: themeNames.font,
       radius: themeNames.radius,
       shadow: themeNames.shadow,
