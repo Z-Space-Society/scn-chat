@@ -34,17 +34,3 @@ export function groupByDate<T extends { updatedAt: string }>(
   }
   return groups
 }
-
-/** Relative times in the interface's language, which a translation changes along with the copy. */
-const relative = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
-
-/** How long ago a time was, such as "just now", "5 minutes ago", or "1 hour ago". */
-export function timeAgo(then: Date, now = new Date()): string {
-  const seconds = Math.max(0, Math.round((now.getTime() - then.getTime()) / 1000))
-  if (seconds < 45) return 'just now'
-  const minutes = Math.round(seconds / 60)
-  if (minutes < 60) return relative.format(-minutes, 'minute')
-  const hours = Math.round(minutes / 60)
-  if (hours < 24) return relative.format(-hours, 'hour')
-  return then.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-}

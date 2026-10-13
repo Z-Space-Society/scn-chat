@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseDate, shortTime } from '../../src/shared/time.ts'
+import { parseDate, shortTime, timeAgo } from '../../src/shared/time.ts'
 
 const now = new Date(2026, 9, 7, 15, 0)
 const clock = (date: Date) =>
@@ -20,5 +20,13 @@ describe('parseDate', () => {
     expect(parseDate('2026-10-07T12:00:00Z')?.toISOString()).toBe('2026-10-07T12:00:00.000Z')
     expect(parseDate('t')).toBeNull()
     expect(parseDate(undefined)).toBeNull()
+  })
+})
+
+describe('timeAgo', () => {
+  it('says how long ago, briefly', () => {
+    expect(timeAgo(new Date(now.getTime() - 10_000), now)).toBe('just now')
+    expect(timeAgo(new Date(now.getTime() - 5 * 60_000), now)).toBe('5 minutes ago')
+    expect(timeAgo(new Date(now.getTime() - 3 * 3_600_000), now)).toBe('3 hours ago')
   })
 })

@@ -18,6 +18,7 @@ export const themeNames = {
     'menu',
     'bubble',
     'editor',
+    'secret',
     'mark',
     'composer',
     'quote',

@@ -1,8 +1,15 @@
 import { useStore as useFormStore } from '@tanstack/react-form'
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { api, json, read } from '../../../shared/api.ts'
-import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
+import { messageOf } from '../../../shared/errors.ts'
 import { formKey, useAppForm } from '../../../shared/form.tsx'
+import {
+  Choice,
+  Choices,
+  SaveBar,
+  SettingsGroup,
+  SettingsPage,
+} from '../../../shared/ui/SettingsPage.tsx'
 import { RolePicker } from '../components/RolePicker.tsx'
 import { roleNames } from '../lib/roles.ts'
 import { adminAccessQuery, adminRolesQuery } from '../queries.ts'
@@ -14,13 +21,14 @@ interface Access {
   inviteRoles: string[]
 }
 
-const modes: { mode: Registration; label: string }[] = [
-  { mode: 'open', label: 'Open: anyone with an atproto account can create an account.' },
+const modes: { mode: Registration; label: string; detail: string }[] = [
+  { mode: 'open', label: 'Open', detail: 'Anyone with an atproto account can create an account.' },
   {
     mode: 'invite',
-    label: 'Invite: members of the roles below, and people added on the Users page.',
+    label: 'Invite',
+    detail: 'Members of the roles below, and people added on the Users page.',
   },
-  { mode: 'closed', label: 'Closed: only people added on the Users page.' },
+  { mode: 'closed', label: 'Closed', detail: 'Only people added on the Users page.' },
 ]
 
 /** Who can create an account. */
@@ -33,60 +41,71 @@ export function AccessAdmin() {
     onSuccess: (saved) => queryClient.setQueryData(adminAccessQuery.queryKey, saved),
   })
   return (
-    <section>
-      <h2>Access</h2>
+    <SettingsPage
+      title="Access"
+      description="Who can create an account. People who already have one keep it, until you suspend them on the Users page."
+    >
       <AccessForm
         // Start over from the stored setting whenever it changes.
         key={formKey(access)}
         stored={access}
         roleNames={roleNames(roles.roles)}
+        pending={save.isPending}
         saved={save.isSuccess}
+        error={save.error && messageOf(save.error)}
         onSave={save.mutate}
+        onEdit={save.reset}
       />
-      <ErrorAlert error={save.error} />
-    </section>
+    </SettingsPage>
   )
 }
 
 interface AccessFormProps {
   stored: Access
   roleNames: string[]
+  pending: boolean
   saved: boolean
+  error?: string | null
   onSave: (access: Access) => void
+  /** Called on any change, since what is shown is no longer what was saved. */
+  onEdit: () => void
 }
 
 function AccessForm(props: AccessFormProps) {
   const form = useAppForm({
     defaultValues: props.stored,
+    listeners: { onChange: () => props.onEdit() },
     onSubmit: ({ value }) => props.onSave(value),
   })
   const registration = useFormStore(form.store, (state) => state.values.registration)
   return (
     <form.AppForm>
       <form.Form>
-        <p>
-          Who can create an account. People who already have one keep it, until you suspend them on
-          the Users page. Admins can always sign in, and anyone can sign in from a share link to
-          view a chat shared with them.
-        </p>
         <form.Field name="registration">
-          {(field) =>
-            modes.map(({ mode, label }) => (
-              <label key={mode}>
-                <input
-                  type="radio"
+          {(field) => (
+            <Choices
+              title="Registration"
+              note="Admins can always sign in, and anyone can sign in from a share link to view a chat shared with them."
+            >
+              {modes.map((mode) => (
+                <Choice
+                  key={mode.mode}
                   name={field.name}
-                  checked={field.state.value === mode}
-                  onChange={() => field.handleChange(mode)}
-                />{' '}
-                {label}
-              </label>
-            ))
-          }
+                  value={mode.mode}
+                  checked={field.state.value === mode.mode}
+                  onChange={() => field.handleChange(mode.mode)}
+                  label={mode.label}
+                  description={mode.detail}
+                />
+              ))}
+            </Choices>
+          )}
         </form.Field>
         {registration === 'invite' && (
-          <fieldset>
-            <legend>Invite roles</legend>
+          <SettingsGroup
+            title="Invite roles"
+            description="Members of these roles can create an account."
+          >
             <form.Field name="inviteRoles">
               {(field) => (
                 <RolePicker
@@ -96,10 +115,9 @@ function AccessForm(props: AccessFormProps) {
                 />
               )}
             </form.Field>
-          </fieldset>
+          </SettingsGroup>
         )}
-        <form.SubmitButton>Save</form.SubmitButton>
-        {props.saved && <span>Saved.</span>}
+        <SaveBar pending={props.pending} saved={props.saved} error={props.error} />
       </form.Form>
     </form.AppForm>
   )

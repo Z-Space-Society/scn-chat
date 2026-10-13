@@ -60,7 +60,12 @@ interface GroupProps {
   children: ReactNode
 }
 
+const note = 'mx-card-pad mt-2.5 text-muted text-small'
+
 const heading = 'ms-card-pad font-semibold text-muted text-small leading-tight'
+
+/** What a card is for, under its heading, in its words' own line height since it may wrap. */
+const groupDescription = cn(heading, '-mt-1 mb-2.5 font-normal leading-[1.45]')
 
 /**
  * A card of related settings under a quiet heading in line with the text of its rows. The card
@@ -77,11 +82,9 @@ export function SettingsGroup(props: GroupProps) {
           {props.title}
         </h3>
       )}
-      {props.description && (
-        <p className={cn(heading, '-mt-1 mb-2.5 font-normal')}>{props.description}</p>
-      )}
+      {props.description && <p className={groupDescription}>{props.description}</p>}
       <SettingsCard danger={props.danger}>{props.children}</SettingsCard>
-      {props.note && <p className="mx-card-pad mt-2.5 text-muted text-small">{props.note}</p>}
+      {props.note && <p className={note}>{props.note}</p>}
     </fieldset>
   )
 }
@@ -90,6 +93,15 @@ interface CardProps {
   danger?: boolean
   children: ReactNode
 }
+
+/** What a card holds after something it continues, such as a search's results, with no line between. */
+export const undivided = 'before:hidden'
+
+/** A form of one field and its button across a card, such as a search or adding a person. */
+export const inlineForm = 'flex gap-2 p-card-pad [&>input]:min-w-0 [&>input]:flex-1'
+
+/** An error at the foot of a card, across it. */
+export const cardAlert = 'bg-danger-soft p-card-pad text-small'
 
 /** Rows divided by lines inset to their text, for a card's rows or a set of rows within one. */
 export const dividedRows =
@@ -114,6 +126,8 @@ interface ChoicesProps {
   /** What the choice is about, read as the group's name and shown as its heading. */
   title: string
   description?: ReactNode
+  /** A note under the card, such as who the choice doesn't apply to. */
+  note?: ReactNode
   children: ReactNode
 }
 
@@ -122,12 +136,11 @@ export function Choices(props: ChoicesProps) {
   return (
     <fieldset className="mb-8 min-w-0">
       <legend className={cn(heading, 'float-start mb-2.25 w-full')}>{props.title}</legend>
-      {props.description && (
-        <p className={cn(heading, '-mt-1 mb-2.5 font-normal')}>{props.description}</p>
-      )}
+      {props.description && <p className={groupDescription}>{props.description}</p>}
       <div className="clear-both">
         <SettingsCard>{props.children}</SettingsCard>
       </div>
+      {props.note && <p className={note}>{props.note}</p>}
     </fieldset>
   )
 }

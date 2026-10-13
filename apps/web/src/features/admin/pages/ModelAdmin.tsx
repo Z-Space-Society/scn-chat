@@ -1,12 +1,21 @@
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { api, json, read } from '../../../shared/api.ts'
-import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
-import { lastError } from '../../../shared/errors.ts'
+import { messageOf } from '../../../shared/errors.ts'
 import { formKey, useAppForm } from '../../../shared/form.tsx'
+import { ArrowLeftIcon } from '../../../shared/icons.tsx'
+import {
+  backLink,
+  Callout,
+  ConfirmButton,
+  SaveBar,
+  SettingRow,
+  SettingsGroup,
+  SettingsPage,
+} from '../../../shared/ui/SettingsPage.tsx'
 import { RolePicker } from '../components/RolePicker.tsx'
 import { useModelsChanged } from '../hooks/changes.ts'
-import { type AdminModel, capabilityNames, storedModel } from '../lib/models.ts'
+import { type AdminModel, storedModel } from '../lib/models.ts'
 import { rolesWithUser } from '../lib/roles.ts'
 import { type AdminModelEntry, adminModelsQuery, adminRolesQuery } from '../queries.ts'
 
@@ -35,86 +44,135 @@ export function ModelAdmin(props: ModelAdminProps) {
       await modelsChanged()
     },
   })
-  return (
-    <>
-      <Link to="/admin/plugins/$id" params={{ id: props.pluginId }}>
-        Back to plugin
-      </Link>
-      <ModelDetails
-        model={models.find(
-          (candidate) => candidate.provider === props.provider && candidate.id === props.modelId,
-        )}
-        roleNames={rolesWithUser(roles.roles)}
-        saved={save.isSuccess}
-        onSave={save.mutate}
-        onRemove={() => remove.mutate()}
-      />
-      <ErrorAlert error={lastError(save, remove)} />
-    </>
+  const model = models.find(
+    (candidate) => candidate.provider === props.provider && candidate.id === props.modelId,
   )
-}
-
-interface ModelDetailsProps {
-  model: AdminModelEntry | undefined
-  roleNames: string[]
-  saved: boolean
-  onSave: (model: AdminModel) => void
-  onRemove: () => void
-}
-
-/** The model's form, or that it isn't offered. */
-function ModelDetails(props: ModelDetailsProps) {
-  if (!props.model) return <p role="alert">This model isn't offered.</p>
+  const back = (
+    <Link to="/admin/plugins/$id" params={{ id: props.pluginId }} className={backLink}>
+      <ArrowLeftIcon /> Plugin
+    </Link>
+  )
+  if (!model)
+    return (
+      <SettingsPage title="Model" back={back}>
+        <p role="alert">This model isn't offered.</p>
+      </SettingsPage>
+    )
   return (
-    <section>
-      <h2>{props.model.name}</h2>
-      <p>
+    <SettingsPage
+      title={model.name}
+      description={
         <code>
-          {props.model.provider}/{props.model.id}
+          {model.provider}/{model.id}
         </code>
-      </p>
-      {props.model.warning && <p role="alert">{props.model.warning}</p>}
+      }
+      back={back}
+    >
+      {model.warning && (
+        <Callout tone="danger">
+          <p role="alert">{model.warning}</p>
+        </Callout>
+      )}
       <ModelForm
         // Start over from the stored model whenever it changes.
-        key={formKey(props.model)}
-        model={storedModel(props.model)}
-        roleNames={props.roleNames}
-        saved={props.saved}
-        onSave={props.onSave}
-        onRemove={props.onRemove}
+        key={formKey(model)}
+        model={storedModel(model)}
+        roleNames={rolesWithUser(roles.roles)}
+        pending={save.isPending}
+        saved={save.isSuccess}
+        error={save.error && messageOf(save.error)}
+        onSave={save.mutate}
+        onEdit={save.reset}
       />
-    </section>
+      <SettingsGroup danger>
+        <SettingRow
+          label="Remove this model"
+          description="People stop being offered it. Chats that used it keep their replies."
+          issues={
+            remove.error && (
+              <p role="alert" className="mt-0.75 text-danger text-small">
+                {messageOf(remove.error)}
+              </p>
+            )
+          }
+        >
+          <ConfirmButton
+            label="Remove model"
+            question="Remove this model?"
+            onConfirm={() => remove.mutate()}
+          />
+        </SettingRow>
+      </SettingsGroup>
+    </SettingsPage>
   )
 }
 
 interface ModelFormProps {
   model: AdminModel
   roleNames: string[]
+  pending: boolean
   saved: boolean
+  error?: string | null
   onSave: (model: AdminModel) => void
-  onRemove: () => void
+  /** Called on any change, since what is shown is no longer what was saved. */
+  onEdit: () => void
 }
+
+const capabilities = [
+  { key: 'vision', label: 'Vision', description: 'Reads images people attach.' },
+  {
+    key: 'reasoning',
+    label: 'Thinking',
+    description: 'Thinks before it answers, at the effort people pick.',
+  },
+  { key: 'tools', label: 'Tools', description: 'Calls the tools plugins offer.' },
+] as const
 
 /** One admin model's name, capabilities, and roles. */
 function ModelForm(props: ModelFormProps) {
   const form = useAppForm({
     defaultValues: props.model,
+    listeners: { onChange: () => props.onEdit() },
     onSubmit: ({ value }) => props.onSave(value),
   })
   return (
     <form.AppForm>
       <form.Form>
-        <form.AppField name="name">{(field) => <field.TextField label="Name" />}</form.AppField>
-        <fieldset>
-          <legend>Capabilities</legend>
-          {capabilityNames.map((capability) => (
-            <form.AppField key={capability} name={`capabilities.${capability}`}>
-              {(field) => <field.CheckboxField label={capability} />}
+        <SettingsGroup title="Details">
+          <form.AppField name="name">
+            {(field) => (
+              <SettingRow
+                label="Name"
+                htmlFor="model-name"
+                description="What people see in the model picker."
+              >
+                <field.TextField id="model-name" />
+              </SettingRow>
+            )}
+          </form.AppField>
+        </SettingsGroup>
+        <SettingsGroup
+          title="Capabilities"
+          description="What the model can do, which decides what the app offers with it."
+        >
+          {capabilities.map((capability) => (
+            <form.AppField key={capability.key} name={`capabilities.${capability.key}`}>
+              {(field) => (
+                <SettingRow
+                  label={capability.label}
+                  htmlFor={`model-${capability.key}`}
+                  description={capability.description}
+                >
+                  <field.SwitchField id={`model-${capability.key}`} />
+                </SettingRow>
+              )}
             </form.AppField>
           ))}
-        </fieldset>
-        <fieldset>
-          <legend>Roles</legend>
+        </SettingsGroup>
+        <SettingsGroup
+          title="Roles"
+          description="Only people with one of these roles are offered the model."
+        >
           <form.Field name="roles">
             {(field) => (
               <RolePicker
@@ -124,12 +182,8 @@ function ModelForm(props: ModelFormProps) {
               />
             )}
           </form.Field>
-        </fieldset>
-        <form.SubmitButton>Save</form.SubmitButton>{' '}
-        <button type="button" onClick={props.onRemove}>
-          Remove model
-        </button>
-        {props.saved && <span>Saved.</span>}
+        </SettingsGroup>
+        <SaveBar pending={props.pending} saved={props.saved} error={props.error} />
       </form.Form>
     </form.AppForm>
   )

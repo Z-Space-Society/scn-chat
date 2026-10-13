@@ -1,10 +1,12 @@
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { api, json, read } from '../../../shared/api.ts'
-import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
-import { issuesOf, lastError } from '../../../shared/errors.ts'
+import { issuesOf, messageOf } from '../../../shared/errors.ts'
 import { formKey } from '../../../shared/form.tsx'
+import { ArrowLeftIcon } from '../../../shared/icons.tsx'
+import { backLink, Callout, SettingsPage } from '../../../shared/ui/SettingsPage.tsx'
 import { type PluginChange, PluginForm } from '../components/PluginForm.tsx'
+import { PluginStatus } from '../components/PluginStatus.tsx'
 import { usePluginsChanged } from '../hooks/changes.ts'
 import { storedModel } from '../lib/models.ts'
 import { type AdminPlugin, adminModelsQuery, adminPluginsQuery } from '../queries.ts'
@@ -32,50 +34,69 @@ export function PluginAdmin(props: PluginAdminProps) {
     },
   })
   const instance = plugins.find((candidate) => candidate.id === props.id)
+  const back = (
+    <Link to="/admin/plugins" className={backLink}>
+      <ArrowLeftIcon /> Plugins
+    </Link>
+  )
+  if (!instance)
+    return (
+      <SettingsPage title="Plugin" back={back}>
+        <p role="alert">This plugin isn't configured.</p>
+      </SettingsPage>
+    )
   return (
-    <>
-      <Link to="/admin/plugins">Back to plugins</Link>
+    <SettingsPage
+      title={instance.name ?? instance.package}
+      description={
+        <>
+          <code>{instance.package}</code> <PluginStatus status={instance.status} />
+        </>
+      }
+      back={back}
+    >
+      {instance.error && (
+        <Callout tone="danger">
+          <p role="alert">{instance.error}</p>
+        </Callout>
+      )}
       <PluginDetails
         instance={instance}
-        issues={save.error ? issuesOf(save.error) : (instance?.issues ?? [])}
+        issues={save.error ? issuesOf(save.error) : instance.issues}
+        pending={save.isPending}
         saved={save.isSuccess}
+        error={save.error && messageOf(save.error)}
+        removeError={remove.error && messageOf(remove.error)}
         onSave={save.mutate}
+        onEdit={save.reset}
         onRemove={() => remove.mutate()}
       />
-      <ErrorAlert error={lastError(save, remove)} />
-    </>
+    </SettingsPage>
   )
 }
 
 interface PluginDetailsProps {
-  instance: AdminPlugin | undefined
+  instance: AdminPlugin
   issues: AdminPlugin['issues']
+  pending: boolean
   saved: boolean
+  error?: string | null
+  removeError?: string | null
   onSave: (change: PluginChange) => void
+  /** Called on any change, since what is shown is no longer what was saved. */
+  onEdit: () => void
   onRemove: () => void
 }
 
-/** The plugin's status and form, or that it isn't configured. */
+/** The plugin's form, with its provider models from the models list. */
 function PluginDetails(props: PluginDetailsProps) {
   const { data: models } = useSuspenseQuery(adminModelsQuery)
-  if (!props.instance) return <p role="alert">This plugin isn't configured.</p>
   return (
-    <section>
-      <h2>{props.instance.name ?? props.instance.package}</h2>
-      <p>
-        <code>{props.instance.package}</code>: {props.instance.status}
-      </p>
-      {props.instance.error && <p role="alert">{props.instance.error}</p>}
-      <PluginForm
-        // Start over from the stored plugin whenever it changes.
-        key={formKey(props.instance)}
-        instance={props.instance}
-        models={models.map(storedModel)}
-        issues={props.issues}
-        saved={props.saved}
-        onSave={props.onSave}
-        onRemove={props.onRemove}
-      />
-    </section>
+    <PluginForm
+      // Start over from the stored plugin whenever it changes.
+      key={formKey(props.instance)}
+      {...props}
+      models={models.map(storedModel)}
+    />
   )
 }

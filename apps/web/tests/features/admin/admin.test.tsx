@@ -17,6 +17,7 @@ import { RolesAdmin } from '../../../src/features/admin/pages/RolesAdmin.tsx'
 import { SettingsAdmin } from '../../../src/features/admin/pages/SettingsAdmin.tsx'
 import { UsersAdmin } from '../../../src/features/admin/pages/UsersAdmin.tsx'
 import { renderAt } from '../../helpers/router.tsx'
+import { choose, optionsOf } from '../../helpers/select.ts'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -273,8 +274,8 @@ describe('Admin users', () => {
         { identifier: 'did:plc:bob' },
       ]),
     )
-    const row = screen.getByRole('row', { name: /did:plc:bob/ })
-    await userEvent.click(within(row).getAllByRole('button', { name: 'Remove' })[0] as HTMLElement)
+    const row = screen.getByText('did:plc:bob').closest('li') as HTMLElement
+    await userEvent.click(within(row).getByRole('button', { name: 'Remove bob.test from member' }))
     await waitFor(() =>
       expect(callsTo(fetch, 'DELETE', '/api/admin/roles/member/members/did:plc:bob')).toHaveLength(
         1,
@@ -348,6 +349,8 @@ describe('Admin roles', () => {
     const fetch = stubServer()
     const { router } = await renderPage(<RoleAdmin name="member" />, '/admin/roles/member')
     await userEvent.click(await screen.findByRole('button', { name: 'Delete role' }))
+    expect(screen.getByText('Delete this role?')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Delete role' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/admin/roles'))
     expect(callsTo(fetch, 'DELETE', '/api/admin/roles/member')).toHaveLength(1)
   })
@@ -378,7 +381,7 @@ describe('Admin added users and suspension', () => {
     const fetch = stubServer()
     await renderPage(<Users />, '/admin/users')
     expect(await screen.findByText(/did:plc:dana/)).toBeInTheDocument()
-    await userEvent.type(screen.getByLabelText('Add a user'), 'erin.test')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Add a user' }), 'erin.test')
     await userEvent.click(screen.getByRole('button', { name: 'Add user' }))
     await waitFor(() =>
       expect(callsTo(fetch, 'POST', '/api/admin/users')).toEqual([{ identifier: 'erin.test' }]),
@@ -393,7 +396,8 @@ describe('Admin added users and suspension', () => {
   it('suspends an account with a reason', async () => {
     const fetch = stubServer()
     await renderPage(<Users />, '/admin/users')
-    await userEvent.type(await screen.findByLabelText('Reason for suspending bob.test'), 'Spam')
+    await userEvent.click(await screen.findByRole('button', { name: 'Suspend' }))
+    await userEvent.type(screen.getByLabelText('Reason for suspending bob.test'), 'Spam')
     await userEvent.click(screen.getByRole('button', { name: 'Suspend' }))
     await waitFor(() =>
       expect(callsTo(fetch, 'POST', '/api/admin/users/did:plc:bob/suspend')).toEqual([
@@ -433,7 +437,7 @@ describe('Admin plugin list', () => {
     const fetch = stubServer()
     await renderPage(<PluginsAdmin />, '/admin/plugins')
     await screen.findByRole('link', { name: 'SCN' })
-    await userEvent.click(screen.getAllByRole('button', { name: 'Down' })[0] as HTMLElement)
+    await userEvent.click(screen.getAllByRole('button', { name: 'Move down' })[0] as HTMLElement)
     await waitFor(() =>
       expect(callsTo(fetch, 'PUT', '/api/admin/plugins/order')).toEqual([{ ids: ['i2', 'i1'] }]),
     )
@@ -510,7 +514,7 @@ describe('Admin plugin page', () => {
         options: { id: 'scn', name: 'SCN' },
       },
     ])
-    await userEvent.click(await screen.findByRole('checkbox', { name: 'Gemma (gemma)' }))
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Gemma gemma' }))
     await waitFor(() =>
       expect(callsTo(fetch, 'POST', '/api/admin/models')).toEqual([
         {
@@ -529,6 +533,7 @@ describe('Admin plugin page', () => {
     const fetch = stubServer()
     const { router } = await renderPage(<PluginAdmin id="i1" />, '/admin/plugins/i1')
     await userEvent.click(await screen.findByRole('button', { name: 'Remove plugin' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Remove plugin' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/admin/plugins'))
     expect(callsTo(fetch, 'DELETE', '/api/admin/plugins/i1')).toHaveLength(1)
   })
@@ -563,7 +568,7 @@ describe('Admin model page', () => {
   it('saves a model', async () => {
     const fetch = serveLlama()
     await renderModel()
-    await userEvent.click(await screen.findByRole('checkbox', { name: 'tools' }))
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Tools' }))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() =>
       expect(callsTo(fetch, 'PUT', '/api/admin/models')).toEqual([
@@ -576,6 +581,7 @@ describe('Admin model page', () => {
     const fetch = serveLlama()
     const { router } = await renderModel()
     await userEvent.click(await screen.findByRole('button', { name: 'Remove model' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Remove model' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/admin/plugins/i1'))
     expect(callsTo(fetch, 'DELETE', '/api/admin/models')).toEqual([
       { provider: 'scn', id: 'meta/llama3:8b' },
@@ -587,15 +593,11 @@ describe('Admin adding a plugin', () => {
   it('offers only packages that are not added yet, or can be added more than once', async () => {
     stubServer()
     await renderPage(<NewPluginAdmin />, '/admin/plugins/new')
-    const picker = await screen.findByLabelText('Plugin package')
-    await waitFor(() =>
-      expect(
-        within(picker)
-          .getAllByRole('option')
-          .map((o) => o.getAttribute('value'))
-          .filter(Boolean),
-      ).toEqual(['@scn-chat/plugin-titles', '@scn-chat/plugin-openai-compatible']),
-    )
+    const picker = await screen.findByRole('combobox', { name: 'Plugin package' })
+    expect(await optionsOf(picker)).toEqual([
+      '@scn-chat/plugin-titles',
+      '@scn-chat/plugin-openai-compatible',
+    ])
   })
 
   it('adds a plugin with its options and opens its page', async () => {
@@ -603,13 +605,12 @@ describe('Admin adding a plugin', () => {
       'POST /api/admin/plugins': () => Response.json({ id: 'new1' }, { status: 201 }),
     })
     const { router } = await renderPage(<NewPluginAdmin />, '/admin/plugins/new')
-    await waitFor(() => expect(screen.getAllByRole('option')).toHaveLength(3))
-    await userEvent.selectOptions(
-      screen.getByLabelText('Plugin package'),
+    await choose(
+      await screen.findByRole('combobox', { name: 'Plugin package' }),
       '@scn-chat/plugin-titles',
     )
     await userEvent.type(screen.getByLabelText('Most words'), '6')
-    await userEvent.click(screen.getByRole('button', { name: 'Add' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Add plugin' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/admin/plugins/new1'))
     expect(callsTo(fetch, 'POST', '/api/admin/plugins')).toEqual([
       { package: '@scn-chat/plugin-titles', options: { maxWords: 6 } },
@@ -621,7 +622,7 @@ describe('Admin models', () => {
   it('marks a new default and reorders', async () => {
     const fetch = stubServer()
     await renderPage(<ModelsAdmin />, '/admin/models')
-    await userEvent.click(await screen.findByRole('radio', { name: 'Llama (scn/llama)' }))
+    await userEvent.click(await screen.findByRole('radio', { name: 'Llama scn/llama' }))
     await waitFor(() =>
       expect(callsTo(fetch, 'PUT', '/api/admin/models')).toEqual([
         {
@@ -634,7 +635,7 @@ describe('Admin models', () => {
         },
       ]),
     )
-    await userEvent.click(screen.getAllByRole('button', { name: 'Up' })[1] as HTMLElement)
+    await userEvent.click(screen.getAllByRole('button', { name: 'Move up' })[1] as HTMLElement)
     await waitFor(() =>
       expect(callsTo(fetch, 'PUT', '/api/admin/models/order')).toEqual([
         {
@@ -655,13 +656,14 @@ describe('Admin API keys', () => {
         Response.json({ id: 'k2', key: 'scn_secret' }, { status: 201 }),
     })
     await renderPage(<ApiKeysAdmin />, '/admin/api-keys')
-    await userEvent.type(await screen.findByLabelText('Key label'), 'crontab')
+    await userEvent.type(await screen.findByLabelText('Label'), 'crontab')
     await userEvent.click(await screen.findByRole('checkbox', { name: 'admin' }))
     await userEvent.click(screen.getByRole('button', { name: 'Issue key' }))
     expect(await screen.findByText('scn_secret')).toBeInTheDocument()
     expect(callsTo(fetch, 'POST', '/api/admin/api-keys')).toEqual([
       { label: 'crontab', roles: ['admin'] },
     ])
+    await userEvent.click(screen.getByRole('button', { name: 'Revoke' }))
     await userEvent.click(screen.getByRole('button', { name: 'Revoke' }))
     await waitFor(() => expect(callsTo(fetch, 'DELETE', '/api/admin/api-keys/k1')).toHaveLength(1))
   })
@@ -679,7 +681,11 @@ describe('Admin settings', () => {
   it('saves the general settings, each group on its own', async () => {
     const fetch = stubServer()
     await renderPage(
-      <SettingsAdmin title="General" keys={['general', 'sessions']} />,
+      <SettingsAdmin
+        title="General"
+        description="General settings."
+        sections={[{ key: 'general' }, { key: 'sessions' }]}
+      />,
       '/admin/general',
     )
     await userEvent.clear(await screen.findByLabelText('App name'))
@@ -712,12 +718,19 @@ describe('Admin settings', () => {
         return Response.json({ ok: true })
       },
     })
-    await renderPage(<SettingsAdmin title="General" keys={['general']} />, '/admin/general')
+    await renderPage(
+      <SettingsAdmin
+        title="General"
+        description="General settings."
+        sections={[{ key: 'general' }]}
+      />,
+      '/admin/general',
+    )
     await userEvent.clear(await screen.findByLabelText('App name'))
     await userEvent.type(screen.getByLabelText('App name'), '  My Chat  ')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(screen.getByLabelText('App name')).toHaveValue('My Chat'))
-    expect(screen.getByText('Saved.')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Saved')
   })
 
   it("shows a failed group's issues next to its fields, and edits the system prompt as text", async () => {
@@ -732,11 +745,14 @@ describe('Admin settings', () => {
           { status: 400 },
         ),
     })
-    await renderPage(<SettingsAdmin title="Turns" keys={['turns']} />, '/admin/turns')
+    await renderPage(
+      <SettingsAdmin title="Turns" description="Turn settings." sections={[{ key: 'turns' }]} />,
+      '/admin/turns',
+    )
     const prompt = await screen.findByLabelText('System prompt')
     expect(prompt.tagName).toBe('TEXTAREA')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(await screen.findByText('Too long')).toBeInTheDocument()
-    expect(screen.queryByText('Saved.')).toBeNull()
+    expect(screen.getByRole('status')).not.toHaveTextContent('Saved')
   })
 })

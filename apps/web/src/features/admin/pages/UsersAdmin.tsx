@@ -1,6 +1,15 @@
 import { useSuspenseInfiniteQuery, useSuspenseQuery } from '@tanstack/react-query'
 import { Suspense } from 'react'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
+import { Button } from '../../../shared/ui/Button.tsx'
+import { ItemList } from '../../../shared/ui/ItemList.tsx'
+import {
+  cardAlert,
+  SettingsEmpty,
+  SettingsGroup,
+  SettingsPage,
+  undivided,
+} from '../../../shared/ui/SettingsPage.tsx'
 import { Invites } from '../components/Invites.tsx'
 import { UserRow } from '../components/UserRow.tsx'
 import { UserSearch } from '../components/UserSearch.tsx'
@@ -15,57 +24,53 @@ interface UsersAdminProps {
 /** Accounts, with their roles and suspensions, and the people added who haven't signed in yet. */
 export function UsersAdmin(props: UsersAdminProps) {
   return (
-    <section>
-      <h2>Users</h2>
+    <SettingsPage
+      title="Users"
+      description="Everyone with an account, and the people you've added who haven't signed in yet."
+    >
       <Invites />
-      <h3>Accounts</h3>
-      <UserSearch q={props.q} />
-      {/* Only the results wait for a new search, so the search box keeps its focus. */}
-      <Suspense fallback={<p>Loading…</p>}>
-        <UserTable q={props.q} />
-      </Suspense>
-    </section>
+      <SettingsGroup title="Accounts">
+        <UserSearch q={props.q} />
+        {/* Only the results wait for a new search, so the search box keeps its focus. */}
+        <Suspense fallback={<SettingsEmpty>Loading…</SettingsEmpty>}>
+          <UserList q={props.q} />
+        </Suspense>
+      </SettingsGroup>
+    </SettingsPage>
   )
 }
 
-interface UserTableProps {
+interface UserListProps {
   q: string
 }
 
-/** The accounts matching the search, a page at a time. */
-function UserTable(props: UserTableProps) {
+/** The accounts matching the search, a page at a time, read as the search's results. */
+function UserList(props: UserListProps) {
   const users = useSuspenseInfiniteQuery(adminUsersQuery(props.q))
   const { data: roles } = useSuspenseQuery(adminRolesQuery)
   const actions = useUserActions()
   const assignable = roleNames(roles.roles)
+  const accounts = users.data.pages.flatMap((page) => page.users)
   return (
     <>
-      <table>
-        <thead>
-          <tr>
-            <th>Handle</th>
-            <th>DID</th>
-            <th>Storage</th>
-            <th>Roles</th>
-            <th>Last active</th>
-            <th>Add to role</th>
-            <th>Access</th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.data.pages
-            .flatMap((page) => page.users)
-            .map((user) => (
-              <UserRow key={user.did} user={user} assignable={assignable} actions={actions} />
-            ))}
-        </tbody>
-      </table>
-      {users.hasNextPage && (
-        <button type="button" onClick={() => void users.fetchNextPage()}>
-          Load more
-        </button>
+      {accounts.length === 0 && (
+        <SettingsEmpty>
+          {props.q ? `No one matches "${props.q}".` : 'No accounts yet.'}
+        </SettingsEmpty>
       )}
-      <ErrorAlert error={actions.error} />
+      <ItemList aria-label="Accounts" className={undivided}>
+        {accounts.map((user) => (
+          <UserRow key={user.did} user={user} assignable={assignable} actions={actions} />
+        ))}
+      </ItemList>
+      {users.hasNextPage && (
+        <div className={`flex justify-center p-card-pad ${undivided}`}>
+          <Button disabled={users.isFetchingNextPage} onClick={() => void users.fetchNextPage()}>
+            Load more
+          </Button>
+        </div>
+      )}
+      <ErrorAlert error={actions.error} className={cardAlert} />
     </>
   )
 }

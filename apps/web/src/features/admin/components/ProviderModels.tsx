@@ -1,9 +1,20 @@
 import { useMutation } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { api, json, read } from '../../../shared/api.ts'
+import { cn } from '../../../shared/cn.ts'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
 import { lastError } from '../../../shared/errors.ts'
 import { useAppForm } from '../../../shared/form.tsx'
+import { Badge } from '../../../shared/ui/Badge.tsx'
+import { Button } from '../../../shared/ui/Button.tsx'
+import { ItemList, LinkItem } from '../../../shared/ui/ItemList.tsx'
+import {
+  cardAlert,
+  inlineForm,
+  SettingsEmpty,
+  SettingsGroup,
+  undivided,
+} from '../../../shared/ui/SettingsPage.tsx'
 import { useModelsChanged } from '../hooks/changes.ts'
 import {
   type AdminModel,
@@ -23,7 +34,7 @@ interface Props {
   models: AdminModel[]
 }
 
-/** A summary of a provider's admin models, each linking to its page, and the ways to add more. */
+/** A provider's admin models, each opening its page, and the ways to add more. */
 export function ProviderModels(props: Props) {
   const modelsChanged = useModelsChanged()
   const add = useMutation({
@@ -58,94 +69,109 @@ export function ProviderModels(props: Props) {
       offer({ id, name: id, capabilities: noCapabilities }, { onSuccess: () => formApi.reset() })
     },
   })
+  const name = props.provider.name
   return (
-    <div>
-      <h3>Models for {props.provider.name}</h3>
-      {!props.provider.hasAdminKey && <p>Add an admin key to offer this provider's models.</p>}
-      <ModelTable pluginId={props.instance.id} models={props.models} />
-      {props.provider.listsModels && (
-        <button type="button" onClick={() => list.mutate()}>
-          Refresh model list
-        </button>
-      )}
-      {listed.length > 0 && (
-        <ul>
-          {listed.map((model) => (
-            <li key={model.id}>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={offered.has(model.id)}
-                  disabled={offered.has(model.id) || !props.provider.hasAdminKey}
-                  onChange={() =>
-                    offer({ id: model.id, name: model.name, capabilities: model.capabilities })
-                  }
-                />{' '}
-                {model.name} ({model.id})
-              </label>
-            </li>
-          ))}
-        </ul>
-      )}
-      <form.AppForm>
-        <form.Form>
-          <form.AppField name="id">
-            {(field) => (
-              <field.TextField
-                aria-label={`Model ID for ${props.provider.name}`}
-                placeholder="Model ID"
-                required
-              />
+    <>
+      <SettingsGroup
+        title={`Models for ${name}`}
+        description="Each opens its page, where you set its name, capabilities, and roles."
+      >
+        <ModelList pluginId={props.instance.id} models={props.models} />
+      </SettingsGroup>
+      <SettingsGroup title={`Add ${name} models`} description={addHint(props.provider)}>
+        {listed.length > 0 && (
+          // Models the provider lists, to tick the ones to offer, over the field to type one.
+          <ul className="grid max-h-72 grid-cols-[repeat(auto-fill,minmax(--spacing(56),1fr))] gap-x-4 gap-y-1.5 overflow-y-auto px-card-pad pt-card-pad text-small">
+            {listed.map((model) => (
+              <li key={model.id}>
+                <label className="flex items-baseline gap-1.5">
+                  <input
+                    type="checkbox"
+                    className="m-0 flex-none self-center accent-accent"
+                    checked={offered.has(model.id)}
+                    disabled={offered.has(model.id) || !props.provider.hasAdminKey}
+                    onChange={() =>
+                      offer({ id: model.id, name: model.name, capabilities: model.capabilities })
+                    }
+                  />
+                  {model.name} <code className="text-caption text-muted">{model.id}</code>
+                </label>
+              </li>
+            ))}
+          </ul>
+        )}
+        <form.AppForm>
+          <form.Form className={cn(inlineForm, listed.length > 0 && undivided)}>
+            <form.AppField name="id">
+              {(field) => (
+                <field.TextField
+                  aria-label={`Model ID for ${name}`}
+                  placeholder="Model ID"
+                  required
+                />
+              )}
+            </form.AppField>
+            <Button type="submit" disabled={!props.provider.hasAdminKey}>
+              Add model
+            </Button>
+            {props.provider.listsModels && (
+              <Button tone="quiet" disabled={list.isPending} onClick={() => list.mutate()}>
+                {list.isPending ? 'Loading…' : 'Refresh model list'}
+              </Button>
             )}
-          </form.AppField>
-          <button type="submit" disabled={!props.provider.hasAdminKey}>
-            Add model
-          </button>
-        </form.Form>
-      </form.AppForm>
-      <ErrorAlert error={lastError(add, list)} />
-    </div>
+          </form.Form>
+        </form.AppForm>
+        <ErrorAlert error={lastError(add, list)} className={cardAlert} />
+      </SettingsGroup>
+    </>
   )
 }
 
-interface ModelTableProps {
+/** What adding a provider's models takes, which depends on its key and whether it lists them. */
+function addHint(provider: Provider) {
+  if (!provider.hasAdminKey) return "Add an admin key to offer this provider's models."
+  if (provider.listsModels)
+    return 'Pick from the models the provider lists, using the settings above as they are now, or type a model ID.'
+  return 'Type the ID of a model to offer.'
+}
+
+interface ModelListProps {
   pluginId: string
   models: AdminModel[]
 }
 
-/** The provider's admin models, each linking to its page. */
-function ModelTable(props: ModelTableProps) {
-  if (props.models.length === 0) return null
+/** The provider's admin models, each opening its page, with what it can do and who gets it. */
+function ModelList(props: ModelListProps) {
+  if (props.models.length === 0) return <SettingsEmpty>No models yet.</SettingsEmpty>
   return (
-    <table>
-      <thead>
-        <tr>
-          <th>Model</th>
-          <th>ID</th>
-          <th>Capabilities</th>
-          <th>Roles</th>
-          <th>Default</th>
-        </tr>
-      </thead>
-      <tbody>
-        {props.models.map((model) => (
-          <tr key={model.id}>
-            <td>
-              <Link
-                to="/admin/plugins/$id/model"
-                params={{ id: props.pluginId }}
-                search={{ provider: model.provider, id: model.id }}
-              >
-                {model.name}
-              </Link>
-            </td>
-            <td>{model.id}</td>
-            <td>{capabilityNames.filter((c) => model.capabilities[c]).join(', ')}</td>
-            <td>{model.roles.join(', ')}</td>
-            <td>{model.default ? 'Yes' : ''}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <ItemList>
+      {props.models.map((model) => {
+        const capabilities = capabilityNames.filter((c) => model.capabilities[c])
+        return (
+          <LinkItem
+            key={model.id}
+            link={
+              <>
+                <Link
+                  to="/admin/plugins/$id/model"
+                  params={{ id: props.pluginId }}
+                  search={{ provider: model.provider, id: model.id }}
+                >
+                  {model.name}
+                </Link>{' '}
+                {model.default && <Badge tone="good">Default</Badge>}
+              </>
+            }
+            details={[
+              <code key="id" className="text-caption">
+                {model.id}
+              </code>,
+              capabilities.length > 0 && capabilities.join(', '),
+              model.roles.length ? `For ${model.roles.join(', ')}` : 'No roles',
+            ]}
+          />
+        )
+      })}
+    </ItemList>
   )
 }

@@ -78,14 +78,24 @@ export const adminSettingsQuery = queryOptions({
   queryFn: async () => (await read(api.admin.settings.$get())).settings,
 })
 
+const fetchApiKeys = async () => (await read(api.admin['api-keys'].$get())).keys
+
+/** An issued key, without the key itself. */
+export type AdminApiKey = Awaited<ReturnType<typeof fetchApiKeys>>[number]
+
 export const adminApiKeysQuery = queryOptions({
   queryKey: ['admin', 'api-keys'],
   staleTime,
-  queryFn: async () => (await read(api.admin['api-keys'].$get())).keys,
+  queryFn: fetchApiKeys,
 })
+
+const fetchCron = async () => (await read(api.admin.cron.$get())).lastRun
+
+/** Cron's last run, or null when it has never run. */
+export type CronRun = NonNullable<Awaited<ReturnType<typeof fetchCron>>>
 
 export const adminCronQuery = queryOptions({
   queryKey: ['admin', 'cron'],
   staleTime,
-  queryFn: async () => (await read(api.admin.cron.$get())).lastRun,
+  queryFn: fetchCron,
 })

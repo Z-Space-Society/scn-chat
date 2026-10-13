@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dateLabel, groupByDate, timeAgo } from '../../../../src/features/chat-list/lib/groups.ts'
+import { dateLabel, groupByDate } from '../../../../src/features/chat-list/lib/groups.ts'
 
 const now = new Date(2026, 9, 7, 15, 0)
 const at = (month: number, day: number, hour = 12) => new Date(2026, month, day, hour)
@@ -28,13 +28,5 @@ describe('groupByDate', () => {
       ['Yesterday', ['c']],
       ['Older', ['d']],
     ])
-  })
-})
-
-describe('timeAgo', () => {
-  it('says how long ago, briefly', () => {
-    expect(timeAgo(new Date(now.getTime() - 10_000), now)).toBe('just now')
-    expect(timeAgo(new Date(now.getTime() - 5 * 60_000), now)).toBe('5 minutes ago')
-    expect(timeAgo(new Date(now.getTime() - 3 * 3_600_000), now)).toBe('3 hours ago')
   })
 })

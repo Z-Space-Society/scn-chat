@@ -1,20 +1,54 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { ClientOnly } from '@tanstack/react-router'
 import { api, json, read } from '../../../shared/api.ts'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
+import { messageOf } from '../../../shared/errors.ts'
 import { useAppForm } from '../../../shared/form.tsx'
-import { LocalTime } from '../../../shared/LocalTime.tsx'
+import { timeAgo } from '../../../shared/time.ts'
+import { Item, ItemList, ItemNames } from '../../../shared/ui/ItemList.tsx'
+import { Secret } from '../../../shared/ui/Secret.tsx'
+import {
+  Callout,
+  ConfirmButton,
+  cardAlert,
+  SaveBar,
+  SettingRow,
+  SettingsEmpty,
+  SettingsGroup,
+  SettingsPage,
+} from '../../../shared/ui/SettingsPage.tsx'
 import { RolePicker } from '../components/RolePicker.tsx'
 import { rolesWithUser } from '../lib/roles.ts'
-import { adminApiKeysQuery, adminRolesQuery } from '../queries.ts'
+import { type AdminApiKey, adminApiKeysQuery, adminRolesQuery } from '../queries.ts'
 
 /** Issue and revoke the keys that scripts, such as a crontab, send as a Bearer token. */
 export function ApiKeysAdmin() {
+  const keysChanged = useKeysChanged()
+  const issue = useMutation({
+    mutationFn: (draft: { label: string; roles: string[] }) =>
+      read(api.admin['api-keys'].$post({}, json(draft))),
+    onSuccess: keysChanged,
+  })
   return (
-    <section>
-      <h2>API keys</h2>
-      <ApiKeyTable />
-      <IssueKeyForm />
-    </section>
+    <SettingsPage
+      title="API keys"
+      description="Keys that scripts, such as a crontab, send as a Bearer token. A key acts with the roles you give it."
+    >
+      {issue.data && (
+        <Callout tone="good">
+          <strong className="font-semibold">Copy this key now. It can't be shown again.</strong>
+          <Secret text={issue.data.key} />
+        </Callout>
+      )}
+      <SettingsGroup title="Keys">
+        <ApiKeyList />
+      </SettingsGroup>
+      <IssueKeyForm
+        pending={issue.isPending}
+        error={issue.error && messageOf(issue.error)}
+        onIssue={(draft, issued) => issue.mutate(draft, { onSuccess: issued })}
+      />
+    </SettingsPage>
   )
 }
 
@@ -23,102 +57,135 @@ function useKeysChanged() {
   return () => queryClient.invalidateQueries({ queryKey: adminApiKeysQuery.queryKey })
 }
 
-function ApiKeyTable() {
+/** The issued keys with their roles and use, each with a way to revoke it. */
+function ApiKeyList() {
   const { data: keys } = useSuspenseQuery(adminApiKeysQuery)
   const keysChanged = useKeysChanged()
   const revoke = useMutation({
     mutationFn: (id: string) => read(api.admin['api-keys'][':id'].$delete({ param: { id } })),
     onSuccess: keysChanged,
   })
+  if (!keys.length) return <SettingsEmpty>No keys yet.</SettingsEmpty>
   return (
     <>
-      <table>
-        <thead>
-          <tr>
-            <th>Label</th>
-            <th>Roles</th>
-            <th>Created</th>
-            <th>Last used</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {keys.map((key) => (
-            <ApiKeyRow key={key.id} apiKey={key} onRevoke={() => revoke.mutate(key.id)} />
-          ))}
-        </tbody>
-      </table>
-      <ErrorAlert error={revoke.error} />
+      <ItemList>
+        {keys.map((key) => (
+          <ApiKeyRow key={key.id} apiKey={key} onRevoke={() => revoke.mutate(key.id)} />
+        ))}
+      </ItemList>
+      <ErrorAlert error={revoke.error} className={cardAlert} />
     </>
   )
 }
 
 interface ApiKeyRowProps {
-  apiKey: { label: string; roles: string[]; createdAt: string; lastUsedAt: string | null }
+  apiKey: AdminApiKey
   onRevoke: () => void
 }
 
 function ApiKeyRow(props: ApiKeyRowProps) {
+  const key = props.apiKey
   return (
-    <tr>
-      <td>{props.apiKey.label}</td>
-      <td>{props.apiKey.roles.join(', ')}</td>
-      <td>
-        <LocalTime date={props.apiKey.createdAt} />
-      </td>
-      <td>
-        <LocalTime date={props.apiKey.lastUsedAt} fallback="Never" />
-      </td>
-      <td>
-        <button type="button" onClick={props.onRevoke}>
-          Revoke
-        </button>
-      </td>
-    </tr>
+    <Item>
+      <ItemNames
+        title={key.label}
+        details={[
+          key.roles.length ? `For ${key.roles.join(', ')}` : 'No roles',
+          // In the browser's locale and time zone, which the server rendering the page lacks.
+          <ClientOnly key="created">
+            <time dateTime={key.createdAt} title={new Date(key.createdAt).toLocaleString()}>
+              Created{' '}
+              {new Date(key.createdAt).toLocaleDateString(undefined, {
+                month: 'short',
+                day: 'numeric',
+              })}
+            </time>
+          </ClientOnly>,
+          <ClientOnly key="used">
+            <LastUsed date={key.lastUsedAt} />
+          </ClientOnly>,
+        ]}
+      />
+      <ConfirmButton
+        label="Revoke"
+        question={`Revoke ${key.label}? Scripts using it stop working.`}
+        onConfirm={props.onRevoke}
+        quiet
+      />
+    </Item>
   )
 }
 
-function IssueKeyForm() {
+interface LastUsedProps {
+  date: string | null
+}
+
+function LastUsed(props: LastUsedProps) {
+  if (!props.date) return 'Never used'
+  return (
+    <time dateTime={props.date} title={new Date(props.date).toLocaleString()}>
+      Last used {timeAgo(new Date(props.date))}
+    </time>
+  )
+}
+
+interface IssueKeyFormProps {
+  pending: boolean
+  error?: string | null
+  /** Issue a key, calling `issued` once it is, so the form can start over. */
+  onIssue: (draft: { label: string; roles: string[] }, issued: () => void) => void
+}
+
+function IssueKeyForm(props: IssueKeyFormProps) {
   const { data: roles } = useSuspenseQuery(adminRolesQuery)
-  const keysChanged = useKeysChanged()
-  const issue = useMutation({
-    mutationFn: (draft: { label: string; roles: string[] }) =>
-      read(api.admin['api-keys'].$post({}, json(draft))),
-    onSuccess: keysChanged,
-  })
   const form = useAppForm({
     defaultValues: { label: '', roles: [] as string[] },
-    onSubmit: ({ value, formApi }) => issue.mutate(value, { onSuccess: () => formApi.reset() }),
+    onSubmit: ({ value, formApi }) => props.onIssue(value, () => formApi.reset()),
   })
   return (
-    <>
-      <form.AppForm>
-        <form.Form>
-          <h3>New key</h3>
+    <form.AppForm>
+      <form.Form>
+        <SettingsGroup title="New key">
           <form.AppField name="label">
-            {(field) => <field.TextField aria-label="Key label" placeholder="Label" required />}
+            {(field) => (
+              <SettingRow
+                label="Label"
+                htmlFor="key-label"
+                description="What will use the key, so you know which to revoke."
+              >
+                <field.TextField id="key-label" placeholder="crontab" required />
+              </SettingRow>
+            )}
           </form.AppField>
-          <fieldset>
-            <legend>Roles</legend>
+          <SettingRow
+            label="Roles"
+            description={
+              <>
+                What the key may do. Cron needs <code>admin</code>.
+              </>
+            }
+            wide
+          >
             <form.Field name="roles">
               {(field) => (
                 <RolePicker
                   names={rolesWithUser(roles.roles)}
                   picked={field.state.value}
                   onChange={field.handleChange}
+                  className="p-0"
                 />
               )}
             </form.Field>
-          </fieldset>
-          <form.SubmitButton>Issue key</form.SubmitButton>
-        </form.Form>
-      </form.AppForm>
-      {issue.data && (
-        <p>
-          Copy this key now. It can't be shown again: <code>{issue.data.key}</code>
-        </p>
-      )}
-      <ErrorAlert error={issue.error} />
-    </>
+          </SettingRow>
+        </SettingsGroup>
+        <SaveBar
+          label="Issue key"
+          pendingLabel="Issuing…"
+          pending={props.pending}
+          saved={false}
+          error={props.error}
+        />
+      </form.Form>
+    </form.AppForm>
   )
 }

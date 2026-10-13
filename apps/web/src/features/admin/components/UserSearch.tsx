@@ -1,5 +1,9 @@
 import { useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
+import { cn } from '../../../shared/cn.ts'
+import { Button } from '../../../shared/ui/Button.tsx'
+import { field } from '../../../shared/ui/controls.tsx'
+import { inlineForm } from '../../../shared/ui/SettingsPage.tsx'
 
 interface Props {
   q: string
@@ -17,6 +21,8 @@ export function UserSearch(props: Props) {
   }
   return (
     <form
+      // The results follow with no line between, so they read as the search's.
+      className={cn(inlineForm, 'pb-0')}
       onSubmit={(e) => {
         e.preventDefault()
         const trimmed = search.trim()
@@ -28,12 +34,14 @@ export function UserSearch(props: Props) {
       }}
     >
       <input
+        type="search"
         aria-label="Search users"
-        placeholder="Handle or DID"
+        placeholder="Search by handle or DID"
+        className={field}
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
-      <button type="submit">Search</button>
+      <Button type="submit">Search</Button>
     </form>
   )
 }

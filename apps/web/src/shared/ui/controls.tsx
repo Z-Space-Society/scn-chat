@@ -8,6 +8,12 @@ import { cn } from '../cn.ts'
 export const field =
   'rounded-small border border-line bg-raised px-2.75 py-1.5 text-ink transition-[border-color,box-shadow] duration-(--dur-feedback) placeholder:text-faint focus-visible:border-focus focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-accent-soft disabled:opacity-50'
 
+/**
+ * A field for code-like text, such as hosts one per line, in the mono font a step smaller, but
+ * never under the size that keeps phones from zooming in on it.
+ */
+export const monoField = 'font-mono text-[length:max(var(--input-floor),var(--text-small))]'
+
 type InputProps = Omit<ComponentProps<'input'>, 'type'>
 
 /**

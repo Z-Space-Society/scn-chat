@@ -9,11 +9,29 @@ import { ChevronRightIcon } from '../icons.tsx'
 
 interface ListProps {
   'aria-label'?: string
+  className?: string
   children: ReactNode
 }
 
 export function ItemList(props: ListProps) {
-  return <ul aria-label={props['aria-label']}>{props.children}</ul>
+  return (
+    <ul aria-label={props['aria-label']} className={props.className}>
+      {props.children}
+    </ul>
+  )
+}
+
+interface LabelProps {
+  children: ReactNode
+}
+
+/** A quiet label over a list in a card, such as who is waiting to sign in. */
+export function ListLabel(props: LabelProps) {
+  return (
+    <p className="px-card-pad pt-card-pad pb-0.5 font-semibold text-caption text-muted [&+ul>li:first-child]:pt-2">
+      {props.children}
+    </p>
+  )
 }
 
 const row =
@@ -109,6 +127,10 @@ interface LinkItemProps {
   details?: ReactNode[]
   /** Buttons on the row, which still act on their own above the link. */
   actions?: ReactNode
+  /** A small square before the names, such as the item's place in an order. */
+  mark?: ReactNode
+  /** More lines under the names, such as an error. */
+  children?: ReactNode
 }
 
 /**
@@ -123,12 +145,15 @@ export function LinkItem(props: LinkItemProps) {
         'relative flex-nowrap has-[strong_a:focus-visible]:outline-2 has-[strong_a:focus-visible]:outline-focus has-[strong_a:focus-visible]:-outline-offset-2 hover:has-[strong_a:hover]:bg-row-hover [&_button]:relative [&_button]:z-1',
       )}
     >
+      {props.mark !== undefined && <ItemMark>{props.mark}</ItemMark>}
       <ItemNames
         title={props.link}
         description={props.description}
         details={props.details}
         className="gap-0.5 [&_strong_a]:no-underline [&_strong_a]:after:absolute [&_strong_a]:after:inset-0 [&_strong_a]:focus-visible:outline-none"
-      />
+      >
+        {props.children}
+      </ItemNames>
       {props.actions}
       <ChevronRightIcon className="text-icon-quiet" />
     </li>

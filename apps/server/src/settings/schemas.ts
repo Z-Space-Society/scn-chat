@@ -6,7 +6,7 @@ export const DEFAULT_SYSTEM_PROMPT =
   'Replies are rendered as Markdown. Raw HTML is not rendered, and images load only when the user clicks them.'
 
 const minutes = (title: string, fallback: number) =>
-  z.number().positive().default(fallback).meta({ title })
+  z.number().positive().default(fallback).meta({ title, unit: 'minutes' })
 
 /** Admin settings kept in the app_setting table, one schema per key. */
 export const settingSchemas = {
@@ -15,22 +15,41 @@ export const settingSchemas = {
     inviteRoles: z.array(z.string()).default([]),
   }),
   general: z.object({
-    appName: z.string().trim().min(1).default('SCN Chat').meta({ title: 'App name' }),
+    appName: z.string().trim().min(1).default('SCN Chat').meta({
+      title: 'App name',
+      description: 'Shown on the login page, in the sidebar, and in the browser tab.',
+    }),
   }),
   sessions: z.object({
-    ttlDays: z.number().int().min(1).default(30).meta({ title: 'Days a web session lasts' }),
+    ttlDays: z.number().int().min(1).default(30).meta({
+      title: 'Session length',
+      description: 'How long people stay signed in on the web before they have to sign in again.',
+      unit: 'days',
+    }),
   }),
   turns: z.object({
-    ratePerMinute: z.number().int().min(1).default(10).meta({ title: 'Turns per user per minute' }),
-    maxSteps: z.number().int().min(1).default(8).meta({ title: 'Model steps per turn' }),
-    timeoutSeconds: z.number().int().min(1).default(600).meta({ title: 'Turn timeout in seconds' }),
+    ratePerMinute: z.number().int().min(1).default(10).meta({
+      title: 'Turns per minute',
+      description: 'How many replies each person can start in a minute. More wait their turn.',
+    }),
+    maxSteps: z.number().int().min(1).default(8).meta({
+      title: 'Steps per turn',
+      description: 'How many times a model can call tools and go on before it has to answer.',
+    }),
+    timeoutSeconds: z.number().int().min(1).default(600).meta({
+      title: 'Turn timeout',
+      description: 'A reply still running after this long is stopped.',
+      unit: 'seconds',
+    }),
     backfillMinutes: z.number().int().min(0).default(60).meta({
-      title: 'Backfill window in minutes',
+      title: 'Backfill window',
       description: 'How old a synced message asking for a reply can be and still get one.',
+      unit: 'minutes',
     }),
     systemPrompt: z.string().default(DEFAULT_SYSTEM_PROMPT).meta({
       title: 'System prompt',
-      description: 'Placeholders: {{appName}}, {{date}}, {{time}}, {{timezone}}.',
+      description:
+        'Sent with every turn. Placeholders: {{appName}}, {{date}}, {{time}}, {{timezone}}.',
       multiline: true,
     }),
   }),
@@ -38,30 +57,39 @@ export const settingSchemas = {
     safetyNet: z
       .object({
         enabled: z.boolean().default(true).meta({ title: 'Enabled' }),
-        intervalMinutes: minutes('Every this many minutes', 15),
+        intervalMinutes: minutes('Runs every', 15),
         activeWithinHours: z
           .number()
           .positive()
           .default(24)
-          .meta({ title: 'For users active within this many hours' }),
+          .meta({ title: 'For people active in the last', unit: 'hours' }),
       })
       .prefault({})
-      .meta({ title: 'Safety net' }),
+      .meta({
+        title: 'Safety net',
+        description:
+          'Syncs the chats of recently active people now and then, in case a change notice from their PDS was missed.',
+      }),
     discovery: z
       .object({
-        intervalMinutes: minutes('Every this many minutes', 60),
+        intervalMinutes: minutes('Runs every', 60),
         activeWithinDays: z
           .number()
           .positive()
           .default(30)
-          .meta({ title: 'For users active within this many days' }),
+          .meta({ title: 'For people active in the last', unit: 'days' }),
       })
       .prefault({})
-      .meta({ title: 'Discovery' }),
-    allowUserOptOut: z
-      .boolean()
-      .default(true)
-      .meta({ title: 'Users can turn off background sync' }),
+      .meta({
+        title: 'Discovery',
+        description:
+          "Looks for chats missing from people's chat index, such as ones another app made, and adds them.",
+      }),
+    allowUserOptOut: z.boolean().default(true).meta({
+      title: 'People can turn off background sync',
+      description:
+        'Each person can turn it off in their own Sync settings. When this is off, it runs for everyone.',
+    }),
   }),
 }
 

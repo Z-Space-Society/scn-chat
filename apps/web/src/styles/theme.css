@@ -200,6 +200,8 @@
   --radius-bubble: 1.5rem;
   /* A card holding controls at an even inset, such as renaming a chat in the list. */
   --radius-editor: calc(var(--radius-small) + 0.6rem + 1px);
+  /* A secret to copy, nesting its Copy button at an even inset. */
+  --radius-secret: calc(var(--radius-small) + 0.35rem + 1px);
   /* A search match's tint. */
   --radius-mark: 2px;
   /* The composer, nesting its round Send button in its corner, and a quote held in it, nesting in

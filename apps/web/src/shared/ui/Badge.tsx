@@ -5,6 +5,7 @@ interface BadgeProps {
   /** Green for what is live or good, red for what failed, grey otherwise. */
   tone?: 'good' | 'danger'
   title?: string
+  className?: string
   children: ReactNode
 }
 
@@ -17,6 +18,7 @@ export function Badge(props: BadgeProps) {
         'inline-flex items-center whitespace-nowrap rounded-badge bg-hover px-1.75 py-px font-semibold text-caption text-muted',
         props.tone === 'good' && 'bg-accent-soft text-accent-strong',
         props.tone === 'danger' && 'bg-danger-soft text-danger',
+        props.className,
       )}
     >
       {props.children}
@@ -25,13 +27,17 @@ export function Badge(props: BadgeProps) {
 }
 
 interface ChipProps {
+  title?: string
   children: ReactNode
 }
 
 /** A short value, such as a role or a domain, as a grey chip. */
 export function Chip(props: ChipProps) {
   return (
-    <span className="inline-flex items-center gap-1.25 whitespace-nowrap rounded-badge bg-surface px-1.75 py-px font-medium text-caption text-ink">
+    <span
+      title={props.title}
+      className="inline-flex items-center gap-1.25 whitespace-nowrap rounded-badge bg-surface px-1.75 py-px font-medium text-caption text-ink"
+    >
       {props.children}
     </span>
   )

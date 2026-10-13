@@ -2,6 +2,12 @@ import { useStore as useFormStore } from '@tanstack/react-form'
 import { useAppForm } from '../../../shared/form.tsx'
 import type { Issue } from '../../../shared/response.ts'
 import { type Schema, SchemaFields } from '../../../shared/schema-fields/SchemaFields.tsx'
+import {
+  ConfirmButton,
+  SaveBar,
+  SettingRow,
+  SettingsGroup,
+} from '../../../shared/ui/SettingsPage.tsx'
 import type { AdminModel } from '../lib/models.ts'
 import type { AdminPlugin } from '../queries.ts'
 import { ProviderModels } from './ProviderModels.tsx'
@@ -24,12 +30,17 @@ interface Props {
   instance: AdminPlugin
   models: AdminModel[]
   issues: Issue[]
+  pending: boolean
   saved: boolean
+  error?: string | null
+  removeError?: string | null
   onSave: (change: PluginChange) => void
+  /** Called on any change, since what is shown is no longer what was saved. */
+  onEdit: () => void
   onRemove: () => void
 }
 
-/** A plugin's switch and options, then each of its providers' models. */
+/** A plugin's switch and options, then each of its providers' models, then its removal. */
 export function PluginForm(props: Props) {
   const form = useAppForm({
     defaultValues: {
@@ -37,6 +48,7 @@ export function PluginForm(props: Props) {
       enabled: props.instance.enabled,
       clearSecrets: [],
     } as PluginChange,
+    listeners: { onChange: () => props.onEdit() },
     onSubmit: ({ value }) =>
       props.onSave({ ...value, options: knownOptions(props.instance.schema, value.options) }),
   })
@@ -46,43 +58,49 @@ export function PluginForm(props: Props) {
     <>
       <form.AppForm>
         <form.Form>
-          <form.AppField name="enabled">
-            {(field) => <field.CheckboxField label="Enabled" />}
-          </form.AppField>
-          {props.instance.schema && (
-            <form.Field name="clearSecrets">
-              {(cleared) => (
-                <form.Field name="options">
-                  {(field) => (
-                    <SchemaFields
-                      schema={props.instance.schema as Schema}
-                      values={field.state.value}
-                      secrets={{
-                        fields: props.instance.secretFields,
-                        stored: props.instance.secretsSet,
-                        clearing: {
-                          cleared: cleared.state.value,
-                          onClear: (key, clear) =>
-                            cleared.handleChange((current) =>
-                              clear ? [...current, key] : current.filter((name) => name !== key),
-                            ),
-                        },
-                      }}
-                      issues={props.issues}
-                      onChange={(key, value) =>
-                        field.handleChange((current) => ({ ...current, [key]: value }))
-                      }
-                    />
-                  )}
-                </form.Field>
+          <SettingsGroup title="Settings">
+            <form.AppField name="enabled">
+              {(field) => (
+                <SettingRow
+                  label="Enabled"
+                  htmlFor="plugin-enabled"
+                  description="When off, the plugin doesn't load, and nothing it adds is offered."
+                >
+                  <field.SwitchField id="plugin-enabled" />
+                </SettingRow>
               )}
-            </form.Field>
-          )}
-          <form.SubmitButton>Save</form.SubmitButton>{' '}
-          <button type="button" onClick={props.onRemove}>
-            Remove plugin
-          </button>
-          {props.saved && <span>Saved.</span>}
+            </form.AppField>
+            {props.instance.schema && (
+              <form.Field name="clearSecrets">
+                {(cleared) => (
+                  <form.Field name="options">
+                    {(field) => (
+                      <SchemaFields
+                        schema={props.instance.schema as Schema}
+                        values={field.state.value}
+                        secrets={{
+                          fields: props.instance.secretFields,
+                          stored: props.instance.secretsSet,
+                          clearing: {
+                            cleared: cleared.state.value,
+                            onClear: (key, clear) =>
+                              cleared.handleChange((current) =>
+                                clear ? [...current, key] : current.filter((name) => name !== key),
+                              ),
+                          },
+                        }}
+                        issues={props.issues}
+                        onChange={(key, value) =>
+                          field.handleChange((current) => ({ ...current, [key]: value }))
+                        }
+                      />
+                    )}
+                  </form.Field>
+                )}
+              </form.Field>
+            )}
+          </SettingsGroup>
+          <SaveBar pending={props.pending} saved={props.saved} error={props.error} />
         </form.Form>
       </form.AppForm>
       {props.instance.providers.map((provider) => (
@@ -94,6 +112,25 @@ export function PluginForm(props: Props) {
           models={props.models.filter((model) => model.provider === provider.id)}
         />
       ))}
+      <SettingsGroup danger>
+        <SettingRow
+          label="Remove this plugin"
+          description="Its options are deleted. The package stays installed, so you can add it again."
+          issues={
+            props.removeError && (
+              <p role="alert" className="mt-0.75 text-danger text-small">
+                {props.removeError}
+              </p>
+            )
+          }
+        >
+          <ConfirmButton
+            label="Remove plugin"
+            question="Remove this plugin?"
+            onConfirm={props.onRemove}
+          />
+        </SettingRow>
+      </SettingsGroup>
     </>
   )
 }

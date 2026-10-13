@@ -1,32 +1,39 @@
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { api, json, read } from '../../../shared/api.ts'
+import { cn } from '../../../shared/cn.ts'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
 import { useAppForm } from '../../../shared/form.tsx'
+import { plural } from '../../../shared/plural.ts'
+import { Badge } from '../../../shared/ui/Badge.tsx'
+import { ItemList, LinkItem } from '../../../shared/ui/ItemList.tsx'
+import {
+  cardAlert,
+  inlineForm,
+  SettingsGroup,
+  SettingsPage,
+} from '../../../shared/ui/SettingsPage.tsx'
 import { useRolesChanged } from '../hooks/changes.ts'
-import { adminRolesQuery } from '../queries.ts'
+import { type AdminRole, adminRolesQuery } from '../queries.ts'
 
 /** A summary of every role, each linking to its page, and a form to create one. */
 export function RolesAdmin() {
   const { data } = useSuspenseQuery(adminRolesQuery)
   return (
-    <section>
-      <h2>Roles</h2>
-      <p>
-        Everyone who has signed in holds the <code>user</code> role. A role's members are the people
-        added to it, plus everyone whose PDS host or handle domain matches.
-      </p>
-      <table>
-        <thead>
-          <tr>
-            <th>Role</th>
-            <th>Description</th>
-            <th>Members</th>
-            <th>PDS hosts</th>
-            <th>Handle domains</th>
-          </tr>
-        </thead>
-        <tbody>
+    <SettingsPage
+      title="Roles"
+      description="Roles decide who may sign up in invite mode, and which models and paid tools people get."
+    >
+      <SettingsGroup
+        title="All roles"
+        description={
+          <>
+            Everyone who has signed in holds <code>user</code>. A role's members are the people
+            added to it, plus everyone whose PDS host or handle domain matches.
+          </>
+        }
+      >
+        <ItemList>
           {data.roles.map((role) => (
             <RoleRow
               key={role.name}
@@ -34,39 +41,40 @@ export function RolesAdmin() {
               environmentAdmins={data.environmentAdmins.length}
             />
           ))}
-        </tbody>
-      </table>
+        </ItemList>
+      </SettingsGroup>
       <NewRoleForm />
-    </section>
+    </SettingsPage>
   )
 }
 
 interface RoleRowProps {
-  role: {
-    name: string
-    description: string
-    members: unknown[]
-    pdsHosts: string[]
-    handleDomains: string[]
-  }
+  role: AdminRole
   /** How many admins the environment names, who count as members of the admin role. */
   environmentAdmins: number
 }
 
+/** A role's name, which opens its page, over its description, member count, and rules. */
 function RoleRow(props: RoleRowProps) {
   const role = props.role
+  const members = role.members.length + (role.name === 'admin' ? props.environmentAdmins : 0)
   return (
-    <tr>
-      <td>
-        <Link to="/admin/roles/$name" params={{ name: role.name }}>
-          {role.name}
-        </Link>
-      </td>
-      <td>{role.description}</td>
-      <td>{role.members.length + (role.name === 'admin' ? props.environmentAdmins : 0)}</td>
-      <td>{role.pdsHosts.join(', ')}</td>
-      <td>{role.handleDomains.join(', ')}</td>
-    </tr>
+    <LinkItem
+      link={
+        <>
+          <Link to="/admin/roles/$name" params={{ name: role.name }}>
+            {role.name}
+          </Link>{' '}
+          {role.builtIn && <Badge>Built in</Badge>}
+        </>
+      }
+      description={role.description || undefined}
+      details={[
+        plural(members, { one: '# member', other: '# members' }),
+        role.pdsHosts.length > 0 && `PDS on ${role.pdsHosts.join(', ')}`,
+        role.handleDomains.length > 0 && `Handles ending in ${role.handleDomains.join(', ')}`,
+      ]}
+    />
   )
 }
 
@@ -86,20 +94,27 @@ function NewRoleForm() {
     onSubmit: ({ value }) => create.mutate(value),
   })
   return (
-    <>
+    <SettingsGroup
+      title="New role"
+      description="Name it, then add its members and matching rules on its page."
+    >
       <form.AppForm>
-        <form.Form>
-          <h3>New role</h3>
+        {/* The name is short, so the description takes the rest of the line. */}
+        <form.Form className={cn(inlineForm, '[&>input:first-child]:max-w-48')}>
           <form.AppField name="name">
-            {(field) => <field.TextField aria-label="Role name" placeholder="name" required />}
+            {(field) => (
+              <field.TextField aria-label="Role name" placeholder="Name, such as member" required />
+            )}
           </form.AppField>
           <form.AppField name="description">
-            {(field) => <field.TextField aria-label="Role description" placeholder="Description" />}
+            {(field) => (
+              <field.TextField aria-label="Role description" placeholder="Description (optional)" />
+            )}
           </form.AppField>
           <form.SubmitButton>Create role</form.SubmitButton>
         </form.Form>
       </form.AppForm>
-      <ErrorAlert error={create.error} />
-    </>
+      <ErrorAlert error={create.error} className={cardAlert} />
+    </SettingsGroup>
   )
 }

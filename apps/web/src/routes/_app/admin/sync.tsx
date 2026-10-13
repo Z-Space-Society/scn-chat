@@ -1,10 +1,20 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { SettingsAdmin } from '../../../features/admin/pages/SettingsAdmin.tsx'
+import { type Section, SettingsAdmin } from '../../../features/admin/pages/SettingsAdmin.tsx'
 import { adminSettingsQuery } from '../../../features/admin/queries.ts'
 
-const keys = ['sync']
+const sections: Section[] = [
+  { key: 'sync', fields: ['safetyNet'] },
+  { key: 'sync', fields: ['discovery'] },
+  { key: 'sync', title: 'Opting out', fields: ['allowUserOptOut'] },
+]
 
 export const Route = createFileRoute('/_app/admin/sync')({
   loader: ({ context }) => context.queryClient.query(adminSettingsQuery),
-  component: () => <SettingsAdmin title="Sync" keys={keys} />,
+  component: () => (
+    <SettingsAdmin
+      title="Sync"
+      description="How the server keeps up with chats changed outside the app."
+      sections={sections}
+    />
+  ),
 })

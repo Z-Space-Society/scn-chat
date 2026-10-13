@@ -3,9 +3,12 @@ import { api, json, read } from '../../../shared/api.ts'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
 import { lastError } from '../../../shared/errors.ts'
 import { useAppForm } from '../../../shared/form.tsx'
+import { Button } from '../../../shared/ui/Button.tsx'
+import { Item, ItemList, ItemNames, ListLabel } from '../../../shared/ui/ItemList.tsx'
+import { cardAlert, inlineForm, SettingsGroup } from '../../../shared/ui/SettingsPage.tsx'
 import { adminInvitesQuery } from '../queries.ts'
 
-/** People an admin added who haven't signed in yet, and a form to add more. */
+/** People an admin added who haven't signed in yet, under a form to add more. */
 export function Invites() {
   const { data: invites } = useSuspenseQuery(adminInvitesQuery)
   const queryClient = useQueryClient()
@@ -24,11 +27,12 @@ export function Invites() {
       add.mutate(value.identifier, { onSuccess: () => formApi.reset() }),
   })
   return (
-    <div>
+    <SettingsGroup
+      title="Add a user"
+      description="They can create an account whatever the registration mode is."
+    >
       <form.AppForm>
-        <form.Form>
-          <h3>Add user</h3>
-          <p>They can create an account whatever the registration mode is.</p>
+        <form.Form className={inlineForm}>
           <form.AppField name="identifier">
             {(field) => (
               <field.TextField aria-label="Add a user" placeholder="Handle or DID" required />
@@ -38,22 +42,22 @@ export function Invites() {
         </form.Form>
       </form.AppForm>
       {invites.length > 0 && (
-        <>
-          <h3>Added, not signed in yet</h3>
-          <ul>
+        <div>
+          <ListLabel>Added, not signed in yet</ListLabel>
+          <ItemList>
             {invites.map((invite) => (
-              <li key={invite.did}>
-                {invite.handle ? `${invite.handle} ` : ''}
-                {invite.did}{' '}
-                <button type="button" onClick={() => remove.mutate(invite.did)}>
-                  Remove
-                </button>
-              </li>
+              <Item key={invite.did}>
+                <ItemNames
+                  title={invite.handle ?? invite.did}
+                  description={invite.handle && invite.did}
+                />
+                <Button onClick={() => remove.mutate(invite.did)}>Remove</Button>
+              </Item>
             ))}
-          </ul>
-        </>
+          </ItemList>
+        </div>
       )}
-      <ErrorAlert error={lastError(add, remove)} />
-    </div>
+      <ErrorAlert error={lastError(add, remove)} className={cardAlert} />
+    </SettingsGroup>
   )
 }

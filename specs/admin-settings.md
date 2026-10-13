@@ -34,7 +34,7 @@ The environment variables that used to override admin settings, `APP_NAME`, `SES
 
 ### Setting groups
 
-Each group is a key in the settings store, with a zod schema in `apps/server/src/settings/schemas.ts`. Fields carry `.meta({ title, description })` for the generated form, and the defaults match today's.
+Each group is a key in the settings store, with a zod schema in `apps/server/src/settings/schemas.ts`. Fields carry `.meta({ title, description })` for the generated form, and a number's `.meta({ unit })` names what it counts, such as `minutes`, shown after its field. The defaults match today's.
 
 | Key | Fields |
 |---|---|
@@ -80,7 +80,7 @@ After this spec, `.env` holds everything outside the database:
 | `GET /api/admin/settings` | Every group, with its JSON schema and current value. |
 | `PUT /api/admin/settings/:key` | Save one group. Failures return 400 with `{ error: 'InvalidRequest', issues }`. |
 
-Three sections join the admin sidebar: **General**, with the app name and session lifetime, **Turns**, and **Sync**. Each renders its groups with `SchemaFields` and has one Save. The system prompt is a textarea, which `SchemaFields` renders for string fields marked `.meta({ multiline: true })`.
+Three sections join the admin sidebar: **General**, with the app name and session lifetime, **Turns**, and **Sync**. Each renders its groups with `SchemaFields` and has one Save. Each route picks its cards: a whole group, some of a group's fields under a title of its own, such as Turns' Limits and Instructions, or one nested object, such as Sync's safety net, under its own title and description. The system prompt is a textarea, which `SchemaFields` renders for string fields marked `.meta({ multiline: true })`.
 
 ### Removing `config.yml`
 
