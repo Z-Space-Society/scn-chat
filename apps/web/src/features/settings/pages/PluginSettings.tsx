@@ -1,9 +1,17 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { api, read } from '../../../shared/api.ts'
-import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
-import { lastError } from '../../../shared/errors.ts'
+import { lastError, messageOf } from '../../../shared/errors.ts'
 import { useAppForm } from '../../../shared/form.tsx'
 import { type Schema, SchemaFields } from '../../../shared/schema-fields/SchemaFields.tsx'
+import { Button } from '../../../shared/ui/Button.tsx'
+import { Switch } from '../../../shared/ui/controls.tsx'
+import {
+  SaveBar,
+  SettingRow,
+  SettingsEmpty,
+  SettingsGroup,
+  SettingsPage,
+} from '../../../shared/ui/SettingsPage.tsx'
 import { type PluginValues, pluginValues, savePluginSettings } from '../lib/plugin-settings.ts'
 import { type PluginSettingsEntry, pluginSettingsQuery } from '../queries.ts'
 
@@ -21,35 +29,39 @@ export function PluginSettings() {
     mutationFn: (id: string) => read(api.plugins[':id'].settings.$delete({ param: { id } })),
     onSuccess: reload,
   })
-  if (!plugins.length)
-    return (
-      <section>
-        <h2>Plugins</h2>
-        <p>No plugins have settings for you yet.</p>
-      </section>
-    )
+  const error = lastError(save, reset)
   return (
-    <section>
-      <h2>Plugins</h2>
-      <PluginsForm
-        // Start over from the stored values whenever they change.
-        key={query.dataUpdatedAt}
-        plugins={plugins}
-        saved={save.isSuccess}
-        onSave={save.mutate}
-        onReset={reset.mutate}
-      />
-      <ErrorAlert error={lastError(save, reset)} />
-    </section>
+    <SettingsPage
+      title="Plugins"
+      description="Turn on the tools you want models to use, and set up the plugins that offer them."
+    >
+      {plugins.length ? (
+        <PluginsForm
+          // Start over from the stored values whenever they change.
+          key={query.dataUpdatedAt}
+          plugins={plugins}
+          pending={save.isPending}
+          saved={save.isSuccess}
+          error={error && messageOf(error)}
+          onSave={save.mutate}
+          onEdit={save.reset}
+          onReset={reset.mutate}
+        />
+      ) : (
+        <SettingsEmpty outlined>No plugins have settings for you yet.</SettingsEmpty>
+      )}
+    </SettingsPage>
   )
 }
 
 /** The plugin form, starting from the stored settings. */
-function usePluginsForm(plugins: PluginSettingsEntry[], onSave: (values: PluginValues) => void) {
+function usePluginsForm(props: PluginsFormProps) {
   // Fields are addressed by position, since tool names and setting keys may contain dots.
   return useAppForm({
-    defaultValues: pluginValues(plugins),
-    onSubmit: ({ value }) => onSave(value),
+    defaultValues: pluginValues(props.plugins),
+    // An edit after a save means the page no longer holds what was saved.
+    listeners: { onChange: () => props.onEdit() },
+    onSubmit: ({ value }) => props.onSave(value),
   })
 }
 
@@ -57,13 +69,17 @@ type PluginsFormApi = ReturnType<typeof usePluginsForm>
 
 interface PluginsFormProps {
   plugins: PluginSettingsEntry[]
+  pending: boolean
   saved: boolean
+  error?: string | null
   onSave: (values: PluginValues) => void
+  /** Called on any change, since what is shown is no longer what was saved. */
+  onEdit: () => void
   onReset: (id: string) => void
 }
 
 function PluginsForm(props: PluginsFormProps) {
-  const form = usePluginsForm(props.plugins, props.onSave)
+  const form = usePluginsForm(props)
   return (
     <form.AppForm>
       <form.Form>
@@ -76,8 +92,7 @@ function PluginsForm(props: PluginsFormProps) {
             onReset={() => props.onReset(plugin.id)}
           />
         ))}
-        <form.SubmitButton>Save</form.SubmitButton>
-        {props.saved && <span>Saved.</span>}
+        <SaveBar pending={props.pending} saved={props.saved} error={props.error} />
       </form.Form>
     </form.AppForm>
   )
@@ -91,29 +106,31 @@ interface PluginFieldsetProps {
   onReset: () => void
 }
 
-/** One plugin's tool switches, then its settings. */
+/** One plugin's card: its tool switches, then its settings. */
 function PluginFieldset(props: PluginFieldsetProps) {
   const i = props.index
   const switchable = props.plugin.tools.flatMap((tool, j) => (tool.userToggle ? [{ tool, j }] : []))
   return (
-    <fieldset>
-      <legend>{props.plugin.name}</legend>
+    <SettingsGroup title={props.plugin.name}>
       {switchable.map(({ tool, j }) => (
         <props.form.Field key={tool.name} name={`plugins[${i}].tools[${j}]`}>
           {(field) => (
-            <label title={tool.description}>
-              <input
-                type="checkbox"
+            <SettingRow
+              label={switchable.length === 1 ? 'Enabled' : tool.name}
+              htmlFor={`plugin-${i}-tool-${j}`}
+              description={tool.description}
+            >
+              <Switch
+                id={`plugin-${i}-tool-${j}`}
                 checked={field.state.value}
                 onChange={(e) => field.handleChange(e.target.checked)}
               />
-              {switchable.length === 1 ? 'Enabled' : tool.name}
-            </label>
+            </SettingRow>
           )}
         </props.form.Field>
       ))}
       <PluginSchema form={props.form} plugin={props.plugin} index={i} onReset={props.onReset} />
-    </fieldset>
+    </SettingsGroup>
   )
 }
 
@@ -121,12 +138,14 @@ function PluginFieldset(props: PluginFieldsetProps) {
 function PluginSchema(props: PluginFieldsetProps) {
   if (props.plugin.error)
     return (
-      <p role="alert">
-        {props.plugin.error}{' '}
-        <button type="button" onClick={props.onReset}>
+      <div className="flex items-center gap-3 bg-danger-soft p-card-pad">
+        <p role="alert" className="flex-1 text-small">
+          {props.plugin.error}
+        </p>
+        <Button size="small" onClick={props.onReset}>
           Reset
-        </button>
-      </p>
+        </Button>
+      </div>
     )
   const schema = props.plugin.schema
   if (!schema) return null

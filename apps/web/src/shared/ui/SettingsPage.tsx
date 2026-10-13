@@ -1,7 +1,7 @@
 import { type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { cn } from '../cn.ts'
 import { CheckIcon } from '../icons.tsx'
-import { Button } from './Button.tsx'
+import { Button, IconButton } from './Button.tsx'
 import { Radio } from './controls.tsx'
 
 /*
@@ -68,15 +68,21 @@ const heading = 'ms-card-pad font-semibold text-muted text-small leading-tight'
  * its rows divided by lines inset to their text, as in a system settings list.
  */
 export function SettingsGroup(props: GroupProps) {
+  const id = useId()
   return (
-    <div className="mb-8 min-w-0">
-      {props.title && <h3 className={cn(heading, 'mb-2.25')}>{props.title}</h3>}
+    // A group named by its heading when it has one, as one plugin's settings are.
+    <fieldset aria-labelledby={props.title ? id : undefined} className="mb-8 min-w-0">
+      {props.title && (
+        <h3 id={id} className={cn(heading, 'mb-2.25')}>
+          {props.title}
+        </h3>
+      )}
       {props.description && (
         <p className={cn(heading, '-mt-1 mb-2.5 font-normal')}>{props.description}</p>
       )}
       <SettingsCard danger={props.danger}>{props.children}</SettingsCard>
       {props.note && <p className="mx-card-pad mt-2.5 text-muted text-small">{props.note}</p>}
-    </div>
+    </fieldset>
   )
 }
 
@@ -85,11 +91,17 @@ interface CardProps {
   children: ReactNode
 }
 
+/** Rows divided by lines inset to their text, for a card's rows or a set of rows within one. */
+export const dividedRows =
+  '[&>*+*]:relative [&>*+*]:before:absolute [&>*+*]:before:inset-x-card-pad [&>*+*]:before:top-0 [&>*+*]:before:border-line [&>*+*]:before:border-t'
+
+/** group/card lets what a card holds line up with the rest of it, as number fields do by their units. */
 function SettingsCard(props: CardProps) {
   return (
     <div
       className={cn(
-        'overflow-clip rounded-panel border border-transparent bg-card [&>*+*]:relative [&>*+*]:before:absolute [&>*+*]:before:inset-x-card-pad [&>*+*]:before:top-0 [&>*+*]:before:border-line [&>*+*]:before:border-t',
+        'group/card overflow-clip rounded-panel border border-transparent bg-card',
+        dividedRows,
         props.danger && 'border-danger-border',
       )}
     >
@@ -304,6 +316,8 @@ interface ConfirmProps {
   disabled?: boolean
   /** Whether it stays quiet until asked, as in a row of a list, and turns red only to confirm. */
   quiet?: boolean
+  /** An icon to show in place of the label until asked, with what it is read out as. */
+  icon?: { icon: ReactNode; label: string }
 }
 
 /** A button for something that can't be undone, which asks in place before doing it. */
@@ -314,6 +328,17 @@ export function ConfirmButton(props: ConfirmProps) {
   useEffect(() => {
     if (asking) cancel.current?.focus()
   }, [asking])
+  if (!asking && props.icon)
+    return (
+      <IconButton
+        tone="danger"
+        aria-label={props.icon.label}
+        disabled={props.disabled}
+        onClick={() => setAsking(true)}
+      >
+        {props.icon.icon}
+      </IconButton>
+    )
   if (!asking)
     return (
       <Button
@@ -367,6 +392,8 @@ export function SettingsEmpty(props: EmptyProps) {
 interface CalloutProps {
   /** Green for good news, red for a problem, grey otherwise. */
   tone?: 'good' | 'danger'
+  /** An icon before the note, such as where something is kept. */
+  icon?: ReactNode
   children: ReactNode
 }
 
@@ -375,12 +402,13 @@ export function Callout(props: CalloutProps) {
   return (
     <div
       className={cn(
-        'mb-7 rounded-panel bg-surface p-card-pad text-ink text-ui',
+        'mb-7 flex items-start gap-3.5 rounded-panel bg-surface p-card-pad text-ink text-ui [&>svg]:mt-0.5 [&>svg]:size-5',
         props.tone === 'good' && 'bg-accent-soft text-accent-strong',
         props.tone === 'danger' && 'bg-danger-soft text-danger',
       )}
     >
-      {props.children}
+      {props.icon}
+      <div className="min-w-0 flex-1">{props.children}</div>
     </div>
   )
 }

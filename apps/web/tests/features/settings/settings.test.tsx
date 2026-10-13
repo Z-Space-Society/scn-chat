@@ -142,7 +142,7 @@ describe('Settings preferences fields', () => {
     expect(await screen.findByLabelText('Default model')).toHaveTextContent('Unavailable: gone/old')
     await userEvent.type(screen.getByLabelText('Custom instructions'), 'Metric units')
     await userEvent.click(screen.getAllByRole('button', { name: 'Save' })[0] as HTMLElement)
-    await vi.waitFor(() => expect(screen.getByText('Saved.')).toBeInTheDocument())
+    await vi.waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Saved'))
     const put = fetch.mock.calls.find(
       ([url, init]) => url === '/api/preferences' && init?.method === 'PUT',
     )
@@ -167,7 +167,7 @@ describe('Settings preferences fields', () => {
     await renderPage()
     expect(await screen.findByLabelText('Custom instructions')).toHaveValue('Metric units')
     await userEvent.click(screen.getAllByRole('button', { name: 'Save' })[0] as HTMLElement)
-    await vi.waitFor(() => expect(screen.getByText('Saved.')).toBeInTheDocument())
+    await vi.waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Saved'))
     const put = fetch.mock.calls.find(
       ([url, init]) => url === '/api/preferences' && init?.method === 'PUT',
     )
@@ -175,6 +175,21 @@ describe('Settings preferences fields', () => {
     expect(body).toMatchObject({ customInstructions: 'Metric units', somethingNewer: 'kept' })
     expect(body).not.toHaveProperty('$type')
     expect(body).not.toHaveProperty('updatedAt')
+  })
+
+  it('shows the theme picked for this device at once and keeps it here, without saving', async () => {
+    const fetch = stubServer({})
+    await renderPage()
+    const theme = await screen.findByRole('combobox', { name: 'Theme' })
+    expect(theme).toHaveTextContent('System')
+    await choose(theme, 'Dark')
+    expect(theme).toHaveTextContent('Dark')
+    expect(document.documentElement.dataset.theme).toBe('dark')
+    expect(localStorage.getItem('scn-chat:theme')).toBe('dark')
+    await choose(theme, 'System')
+    expect(document.documentElement.dataset.theme).toBeUndefined()
+    expect(localStorage.getItem('scn-chat:theme')).toBeNull()
+    expect(fetch.mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(false)
   })
 })
 
@@ -219,9 +234,9 @@ describe('Settings API keys', () => {
     await userEvent.selectOptions(screen.getByLabelText('Provider'), 'openai')
     await userEvent.type(screen.getByLabelText('API key'), 'sk-test')
     await userEvent.click(screen.getByRole('button', { name: 'Load models' }))
-    expect(await screen.findByText('1 models loaded')).toBeInTheDocument()
+    expect(await screen.findByText('1 model loaded')).toBeInTheDocument()
     await userEvent.selectOptions(screen.getByLabelText('Provider'), 'mistral')
-    expect(screen.queryByText('1 models loaded')).not.toBeInTheDocument()
+    expect(screen.queryByText('1 model loaded')).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Add key' }))
     await vi.waitFor(() => expect(screen.getByLabelText('API key')).toHaveValue(''))
     const post = fetch.mock.calls.find(
@@ -242,9 +257,12 @@ describe('Settings API keys', () => {
       },
     })
     await renderPage('/api-keys')
-    expect(await screen.findByText(/Work ending abcd/)).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
-    await vi.waitFor(() => expect(screen.queryByText(/Work ending abcd/)).toBeNull())
+    expect(await screen.findByText('Work')).toBeInTheDocument()
+    expect(screen.getByTitle("The key's last four characters")).toHaveTextContent('ending abcd')
+    await userEvent.click(screen.getByRole('button', { name: 'Delete Work' }))
+    expect(screen.getByText('Delete this key?')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Delete key' }))
+    await vi.waitFor(() => expect(screen.queryByText('Work')).toBeNull())
     expect(
       fetch.mock.calls.filter(([, init]) => init?.method === 'DELETE').map(([url]) => url),
     ).toEqual(['/api/credentials/k1'])
@@ -367,7 +385,7 @@ describe('Settings sync', () => {
   const account = (allowUserOptOut: boolean) => ({
     '/api/account': () => Response.json({ backgroundSync: true, allowUserOptOut }),
   })
-  const syncSwitch = { name: 'Keep my chats in sync in the background' }
+  const syncSwitch = { name: 'Keep chats in sync in the background' }
 
   it('hides the background sync switch when the admin does not allow opting out', async () => {
     const fetch = stubServer(account(false))

@@ -1,6 +1,9 @@
-import { useState } from 'react'
+import { type ReactNode, useId, useState } from 'react'
+import { cn } from '../cn.ts'
 import { splitLines } from '../lines.ts'
 import type { Issue } from '../response.ts'
+import { field, Switch } from '../ui/controls.tsx'
+import { dividedRows, SettingRow } from '../ui/SettingsPage.tsx'
 import { applyRule, type FieldRule } from './field-rules.ts'
 
 export type Property = {
@@ -11,6 +14,8 @@ export type Property = {
   rule?: FieldRule
   default?: unknown
   multiline?: boolean
+  /** What a number counts, such as "seconds", shown after its field. */
+  unit?: string
   items?: Property
   properties?: Record<string, Property>
 }
@@ -34,7 +39,11 @@ export interface SchemaFieldsProps {
   onChange: (key: string, value: unknown) => void
 }
 
-/** Inputs for a settings form, generated from its JSON schema. */
+/**
+ * Inputs for a settings form, generated from its JSON schema, as rows of a settings card: an on/off
+ * setting as a switch beside its label, a choice, number, or short text beside it, and a secret,
+ * list, or long text under it.
+ */
 export function SchemaFields(props: SchemaFieldsProps) {
   return (
     <>
@@ -56,7 +65,7 @@ export function SchemaFields(props: SchemaFieldsProps) {
 /** The input a property's schema calls for, or none for a type these fields don't support. */
 function inputKind(property: Property) {
   if (property.enum) return 'select'
-  if (property.type === 'boolean') return 'checkbox'
+  if (property.type === 'boolean') return 'switch'
   if (property.type === 'number' || property.type === 'integer') return 'number'
   if (property.type === 'array' && property.items?.type === 'string') return 'lines'
   if (property.type === 'string' && property.multiline) return 'textarea'
@@ -69,8 +78,9 @@ interface SchemaFieldProps extends Omit<SchemaFieldsProps, 'schema'> {
   property: Property
 }
 
-/** One property's input, label, description, and issues, or a nested group for an object. */
+/** One property as a row, with its description and issues, or a nested object as a titled set of rows. */
 function SchemaField(props: SchemaFieldProps) {
+  const id = useId()
   const property = props.property
   const { visible, enabled } = applyRule(property.rule, props.values)
   if (!visible) return null
@@ -80,52 +90,68 @@ function SchemaField(props: SchemaFieldProps) {
   if (property.type === 'object' && property.properties) {
     const values = (value ?? {}) as Record<string, unknown>
     return (
-      <fieldset>
-        <legend>{label}</legend>
-        {property.description && <small>{property.description}</small>}
-        <SchemaFields
-          schema={property}
-          values={values}
-          issues={own.map((issue) => ({ ...issue, path: issue.path.slice(1) }))}
-          onChange={(field, next) => props.onChange(props.name, { ...values, [field]: next })}
-        />
+      <fieldset className="min-w-0">
+        {/* The legend floats, so it lays out as the group's first row rather than in its edge. */}
+        <legend className="float-start w-full px-card-pad pt-card-pad">
+          <span className="block font-medium text-ink-strong">{label}</span>
+          {property.description && (
+            <small className="mt-0.5 block text-muted text-small leading-[1.45]">
+              {property.description}
+            </small>
+          )}
+        </legend>
+        <div className={cn('clear-both', dividedRows)}>
+          <SchemaFields
+            schema={property}
+            values={values}
+            issues={own.map((issue) => ({ ...issue, path: issue.path.slice(1) }))}
+            onChange={(field, next) => props.onChange(props.name, { ...values, [field]: next })}
+          />
+        </div>
       </fieldset>
     )
   }
   const kind = inputKind(property)
-  if (!kind)
-    return (
-      <p>
-        {label}: <em>Unsupported setting type</em>
-      </p>
-    )
+  if (!kind) return <SettingRow label={label} description="Unsupported setting type" />
+  const secret = kind === 'text' && (props.secrets?.fields ?? []).includes(props.name)
+  const stored = secret && (props.secrets?.stored ?? []).includes(props.name)
+  const note = stored ? 'Leave blank to keep the saved value.' : undefined
   return (
-    <div>
-      {/* biome-ignore lint/a11y/noLabelWithoutControl: SchemaInput renders a control for every kind */}
-      <label>
-        {label}{' '}
-        <SchemaInput
-          kind={kind}
-          name={props.name}
-          property={property}
-          value={value}
-          disabled={!enabled}
-          values={props.values}
-          secrets={props.secrets}
-          onChange={props.onChange}
-        />
-      </label>
-      {property.description && <small>{property.description}</small>}
-      {own.map((issue) => (
-        <small key={`${issue.path.join('.')}:${issue.message}`} role="alert">
+    <SettingRow
+      label={label}
+      htmlFor={id}
+      description={
+        (property.description || note) && [property.description, note].filter(Boolean).join(' ')
+      }
+      issues={own.map((issue) => (
+        <small
+          key={`${issue.path.join('.')}:${issue.message}`}
+          role="alert"
+          className="mt-0.75 block text-danger text-small"
+        >
           {issue.message}
         </small>
       ))}
-    </div>
+      // A list, long text, or secret takes the row under its label, with room for a secret's Clear.
+      wide={kind === 'lines' || kind === 'textarea' || secret}
+    >
+      <SchemaInput
+        id={id}
+        kind={kind}
+        name={props.name}
+        property={property}
+        value={value}
+        disabled={!enabled}
+        values={props.values}
+        secrets={props.secrets}
+        onChange={props.onChange}
+      />
+    </SettingRow>
   )
 }
 
 interface SchemaInputProps extends Pick<SchemaFieldsProps, 'values' | 'secrets' | 'onChange'> {
+  id: string
   kind: NonNullable<ReturnType<typeof inputKind>>
   name: string
   property: Property
@@ -134,12 +160,14 @@ interface SchemaInputProps extends Pick<SchemaFieldsProps, 'values' | 'secrets' 
   disabled: boolean
 }
 
-function SchemaInput(props: SchemaInputProps) {
+function SchemaInput(props: SchemaInputProps): ReactNode {
   const change = (next: unknown) => props.onChange(props.name, next)
   switch (props.kind) {
     case 'select':
       return (
         <select
+          id={props.id}
+          className={cn(field, 'min-w-52')}
           disabled={props.disabled}
           value={String(props.value ?? '')}
           onChange={(e) => change(e.target.value)}
@@ -151,10 +179,10 @@ function SchemaInput(props: SchemaInputProps) {
           ))}
         </select>
       )
-    case 'checkbox':
+    case 'switch':
       return (
-        <input
-          type="checkbox"
+        <Switch
+          id={props.id}
           disabled={props.disabled}
           checked={Boolean(props.value)}
           onChange={(e) => change(e.target.checked)}
@@ -162,18 +190,30 @@ function SchemaInput(props: SchemaInputProps) {
       )
     case 'number':
       return (
-        <input
-          type="number"
-          disabled={props.disabled}
-          value={props.value === undefined ? '' : String(props.value)}
-          onChange={(e) =>
-            change(Number.isNaN(e.target.valueAsNumber) ? undefined : e.target.valueAsNumber)
-          }
-        />
+        <span className="inline-flex items-center gap-2">
+          <input
+            id={props.id}
+            type="number"
+            className={cn(field, 'w-28')}
+            disabled={props.disabled}
+            value={props.value === undefined ? '' : String(props.value)}
+            onChange={(e) =>
+              change(Number.isNaN(e.target.valueAsNumber) ? undefined : e.target.valueAsNumber)
+            }
+          />
+          {/* Always there, so a card's number fields line up once any of them has a unit. */}
+          <span
+            data-unit
+            className="text-muted text-small empty:hidden group-has-[[data-unit]:not(:empty)]/card:inline group-has-[[data-unit]:not(:empty)]/card:min-w-14.5"
+          >
+            {props.property.unit}
+          </span>
+        </span>
       )
     case 'lines':
       return (
         <LinesInput
+          id={props.id}
           disabled={props.disabled}
           value={Array.isArray(props.value) ? (props.value as string[]) : []}
           onChange={change}
@@ -182,6 +222,8 @@ function SchemaInput(props: SchemaInputProps) {
     case 'textarea':
       return (
         <textarea
+          id={props.id}
+          className={field}
           disabled={props.disabled}
           value={String(props.value ?? '')}
           onChange={(e) => change(e.target.value)}
@@ -198,30 +240,38 @@ function TextInput(props: SchemaInputProps) {
   const cleared = (clearing?.cleared ?? []).includes(props.name)
   const secret = (props.secrets?.fields ?? []).includes(props.name)
   const stored = secret && (props.secrets?.stored ?? []).includes(props.name)
+  const input = (
+    <input
+      id={props.id}
+      type={secret ? 'password' : 'text'}
+      className={cn(field, secret && 'min-w-0 flex-1')}
+      disabled={props.disabled || cleared}
+      value={String((secret ? props.values[props.name] : props.value) ?? '')}
+      placeholder={stored ? 'Saved' : ''}
+      onChange={(e) => props.onChange(props.name, e.target.value)}
+    />
+  )
+  if (!secret) return input
   return (
-    <>
-      <input
-        type={secret ? 'password' : 'text'}
-        disabled={props.disabled || cleared}
-        value={String((secret ? props.values[props.name] : props.value) ?? '')}
-        placeholder={stored ? 'Saved. Leave blank to keep.' : ''}
-        onChange={(e) => props.onChange(props.name, e.target.value)}
-      />
+    <span className="flex w-full items-center gap-3">
+      {input}
       {stored && clearing && (
-        <label>
+        <label className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap text-muted text-small">
           <input
             type="checkbox"
+            className="m-0 accent-accent"
             checked={cleared}
             onChange={(e) => clearing.onClear(props.name, e.target.checked)}
-          />{' '}
+          />
           Clear
         </label>
       )}
-    </>
+    </span>
   )
 }
 
 interface LinesInputProps {
+  id: string
   value: string[]
   disabled: boolean
   onChange: (value: string[]) => void
@@ -235,6 +285,8 @@ function LinesInput(props: LinesInputProps) {
   const [text, setText] = useState(props.value.join('\n'))
   return (
     <textarea
+      id={props.id}
+      className={field}
       disabled={props.disabled}
       value={text}
       onChange={(e) => {

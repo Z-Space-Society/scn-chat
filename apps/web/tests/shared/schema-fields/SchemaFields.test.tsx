@@ -28,10 +28,9 @@ describe('SchemaFields', () => {
       />,
     )
     expect(screen.getByRole('combobox')).toHaveValue('kagi')
-    expect(screen.getByPlaceholderText('Saved. Leave blank to keep.')).toHaveAttribute(
-      'type',
-      'password',
-    )
+    expect(screen.getByLabelText('apiKey')).toHaveAttribute('type', 'password')
+    expect(screen.getByLabelText('apiKey')).toHaveAttribute('placeholder', 'Saved')
+    expect(screen.getByText('Leave blank to keep the saved value.')).toBeInTheDocument()
     expect(screen.getByRole('spinbutton')).toBeInTheDocument()
     expect(screen.getByRole('checkbox')).toBeInTheDocument()
     expect(screen.getByText('Unsupported setting type')).toBeInTheDocument()
@@ -129,7 +128,7 @@ describe('SchemaFields', () => {
         onChange={() => {}}
       />,
     )
-    expect(screen.getByPlaceholderText('Saved. Leave blank to keep.')).toBeDisabled()
+    expect(screen.getByLabelText('apiKey')).toBeDisabled()
     await userEvent.click(screen.getByRole('checkbox', { name: 'Clear' }))
     expect(onClear).toHaveBeenCalledWith('apiKey', false)
   })

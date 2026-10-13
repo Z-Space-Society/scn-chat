@@ -1,3 +1,5 @@
+import { useSyncExternalStore } from 'react'
+
 /** The scheme a device shows: the system's light or dark, or one fixed in Preferences. */
 export type ThemeChoice = 'system' | 'light' | 'dark'
 
@@ -22,6 +24,10 @@ export function storedTheme(): ThemeChoice {
   }
 }
 
+// What this page shows, which stands in for the store when it can't be kept.
+let shown: ThemeChoice | null = null
+const listeners = new Set<() => void>()
+
 /** Stores the choice on this device and shows it at once. */
 export function chooseTheme(choice: ThemeChoice) {
   try {
@@ -33,8 +39,23 @@ export function chooseTheme(choice: ThemeChoice) {
   showTheme(choice)
 }
 
+/** The choice this device shows, kept in step as it changes here or in another tab. */
+export function useThemeChoice(): ThemeChoice {
+  return useSyncExternalStore(
+    (listener) => {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
+    () => shown ?? storedTheme(),
+    // The server can't know the device's choice, so the page starts from the system's.
+    () => 'system',
+  )
+}
+
 /** Sets the scheme the page's colors follow, through the data-theme attribute on the root. */
 export function showTheme(choice: ThemeChoice) {
+  shown = choice
+  for (const listener of listeners) listener()
   switchInstantly(() => {
     const root = document.documentElement
     if (choice === 'system') delete root.dataset.theme
