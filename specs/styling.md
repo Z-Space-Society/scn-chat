@@ -30,7 +30,7 @@ Tailwind keeps a component's styles in its markup, so a forker changes a compone
 
 - `app.css` sets the layer order, then imports Tailwind, the theme, the base layer, and the scoped sheets.
 - `theme.css` is the theme: every token, in `@theme`, plus the few plain custom properties that have no Tailwind namespace. It is the only file a forker or designer edits to change the look.
-- `base.css` styles the document in `@layer base`: the root font size of 96.875%, line height, font smoothing, body colors, `::selection`, the scrollbar, the `:focus-visible` ring, links, a search field's clear button, and the `data-theme` rules.
+- `base.css` styles the document in `@layer base`: the root font size of 96.875%, line height, font smoothing, body colors, `::selection`, controls whose words never select, the scrollbar, the `:focus-visible` ring, links, a search field's clear button, and the `data-theme` rules.
 
 A few styles can't be written as utilities, and live in a sheet beside the component they serve, imported from `app.css`:
 

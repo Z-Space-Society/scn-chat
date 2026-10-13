@@ -41,6 +41,13 @@
     scrollbar-color: var(--color-line) transparent;
   }
 
+  /* A control's words are its name, not text to copy, so a press or a drag across it never
+     selects them, as with a tag filter's heading or a menu's options. */
+  :is(button, summary, [role="button"], [role="combobox"], [role="option"]) {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
   :focus-visible {
     outline: 2px solid var(--color-focus);
     outline-offset: 2px;
