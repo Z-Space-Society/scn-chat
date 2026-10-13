@@ -47,7 +47,7 @@ export function ConversationHeader(props: Props) {
       ref={header}
       className={cn(
         // Out of the centered column to the panel's edges.
-        'group/header sticky top-0 isolate z-1 mx-[calc((100%-100cqi)/2)] flex min-h-bar items-center gap-4 px-2.75 transition-[padding-inline-start] duration-(--dur-layout) ease-out before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:-bottom-6 before:-z-1 before:bg-panel motion-reduce:transition-none before:[mask-image:linear-gradient(black_calc(100%-(--spacing(10))),transparent)]',
+        'group/header sticky top-0 isolate z-1 mx-[calc((100%-100cqi)/2)] flex min-h-bar items-center gap-4 px-2.75 transition-[padding-inline-start] duration-(--dur-slide) ease-slide before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:-bottom-6 before:-z-1 before:bg-panel motion-reduce:transition-none before:[mask-image:linear-gradient(black_calc(100%-(--spacing(10))),transparent)]',
         // The title moves aside for the sidebar's toggle as the sidebar slides away, and back, and
         // stays clear of it on a narrow screen, where the sidebar is a drawer.
         'in-data-sidebar-collapsed:ps-[calc(--spacing(2.75)+var(--spacing-toggle)+--spacing(1.5))] max-wide:ps-[calc(--spacing(2.75)+var(--spacing-toggle)+--spacing(1.5))]',

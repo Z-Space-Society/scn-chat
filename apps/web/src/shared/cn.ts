@@ -43,7 +43,7 @@ export const themeNames = {
     'turn',
   ],
   container: ['column', 'settings', 'narrow'],
-  ease: ['out', 'swap'],
+  ease: ['out', 'slide', 'swap'],
   animate: [
     'fade-in',
     'breathe',

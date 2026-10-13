@@ -59,7 +59,7 @@ Every color is `light-dark(<light>, <dark>)` in oklch, so dark mode needs no `da
 | Type | `--text-caption`, `small`, `ui`, `body`, `heading`, `title`, `display` | `text-*` |
 | Radius | `--radius-panel` (was `--radius`), `card`, `small`, `badge`, `row`, `menu`, `bubble`, `composer`, with Tailwind's own `rounded-full` for pills | `rounded-*` |
 | Shadows | `--shadow-float`, `--shadow-lift` | `shadow-*` |
-| Motion | `--ease-out`, and `--animate-*` with their `@keyframes`: fade-in, fade-out, panel-in, panel-up, landed, breathe | `ease-*`, `animate-*` |
+| Motion | `--ease-out`, `--ease-slide` for the sidebar, and `--animate-*` with their `@keyframes`: fade-in, fade-out, panel-in, panel-up, landed, breathe | `ease-*`, `animate-*` |
 | Named sizes | `--spacing-icon`, `sidebar`, `sidebar-pad`, `row`, `bar`, `toggle`, `composer-button`, `gutter`, `card-pad`, `within`, `turn` | `size-*`, `w-*`, `h-*`, `p-*`, `gap-*`, … |
 | Widths | `--container-column`, `--container-settings`, `--container-narrow` (34rem) | `max-w-*`, `@max-narrow:` |
 | Breakpoint | `--breakpoint-wide: 45rem`, where the sidebar becomes a drawer below | `wide:`, `max-wide:` |

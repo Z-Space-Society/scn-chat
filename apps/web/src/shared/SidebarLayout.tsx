@@ -75,12 +75,12 @@ export function SidebarLayout(props: Props) {
       <nav
         className={cn(
           sidebarClass,
-          'wide:in-data-sidebar-collapsed:invisible wide:in-data-sidebar-collapsed:-ms-sidebar wide:w-sidebar wide:flex-none overflow-hidden',
-          // Collapsing slides the sidebar off the window's edge as the panel widens into its room.
-          // The frame takes the stored choice just after it first renders, so it never slides, or
-          // the collapse would replay on every reload.
+          'wide:in-data-sidebar-collapsed:invisible wide:in-data-sidebar-collapsed:-ms-sidebar wide:w-sidebar wide:flex-none overflow-hidden wide:in-data-sidebar-collapsed:opacity-0',
+          // Collapsing slides the sidebar off the window's edge, fading as it goes, while the panel
+          // widens into its room. The frame takes the stored choice just after it first renders,
+          // so it never slides, or the collapse would replay on every reload.
           !props.frame &&
-            'wide:transition-[margin-inline-start,visibility] wide:duration-(--dur-layout) wide:ease-out',
+            'wide:transition-[margin-inline-start,opacity,visibility] wide:duration-(--dur-slide) wide:ease-slide',
         )}
       >
         {!props.frame && (
@@ -96,7 +96,7 @@ export function SidebarLayout(props: Props) {
       {/* A size container, so the conversation's header can reach the panel's edges, and the block
           its absolutely placed parts are placed in, so none of them can stretch the page past the
           panel's scroll. */}
-      <main className="@container relative flex min-w-0 flex-1 flex-col overflow-y-auto border-divider in-data-sidebar-collapsed:border-transparent border-s-2 bg-panel transition-[border-color] duration-(--dur-layout) ease-out max-wide:border-none">
+      <main className="@container relative flex min-w-0 flex-1 flex-col overflow-y-auto border-divider in-data-sidebar-collapsed:border-transparent border-s-2 bg-panel transition-[border-color] duration-(--dur-slide) ease-slide max-wide:border-none">
         <MainBar />
         {props.children}
       </main>
@@ -107,17 +107,18 @@ export function SidebarLayout(props: Props) {
 const sidebarClass = cn(
   'flex flex-col gap-0.5 overscroll-contain bg-sidebar px-sidebar-pad pt-sidebar-pad pb-3 text-ui',
   // On a narrow screen, a drawer over the page that stays visible until it has slid away.
-  'motion-reduce:transition-none max-wide:in-data-drawer-open:visible max-wide:invisible max-wide:fixed max-wide:inset-y-0 max-wide:start-0 max-wide:z-20 max-wide:w-drawer max-wide:-translate-x-full max-wide:in-data-drawer-open:translate-x-0 max-wide:shadow-float max-wide:transition-[translate,visibility] max-wide:duration-(--dur-layout) max-wide:ease-out rtl:max-wide:in-data-drawer-open:translate-x-0 rtl:max-wide:translate-x-full',
+  'motion-reduce:transition-none max-wide:in-data-drawer-open:visible max-wide:invisible max-wide:fixed max-wide:inset-y-0 max-wide:start-0 max-wide:z-20 max-wide:w-drawer max-wide:-translate-x-full max-wide:in-data-drawer-open:translate-x-0 max-wide:shadow-float max-wide:transition-[translate,visibility] max-wide:duration-(--dur-slide) max-wide:ease-slide rtl:max-wide:in-data-drawer-open:translate-x-0 rtl:max-wide:translate-x-full',
 )
 
 /**
  * The toggle in the panel, for when the sidebar is hidden: collapsed on a wide screen, or a closed
- * drawer on a narrow one.
+ * drawer on a narrow one. On a wide screen it fades in once the sidebar, with its own toggle, has
+ * mostly slid away, and fades out at once as the sidebar comes back.
  */
 function MainBar() {
   return (
     <div className="sticky top-0 z-3 h-0">
-      <SidebarToggle className="absolute start-2.75 top-[calc((var(--spacing-bar)-var(--spacing-toggle))/2)] wide:not-in-data-sidebar-collapsed:hidden border border-line bg-raised" />
+      <SidebarToggle className="wide:not-in-data-sidebar-collapsed:invisible absolute start-2.75 top-[calc((var(--spacing-bar)-var(--spacing-toggle))/2)] border border-line bg-raised wide:not-in-data-sidebar-collapsed:opacity-0 transition-[opacity,visibility] wide:in-data-sidebar-collapsed:delay-[calc(var(--dur-slide)/2)] duration-(--dur-feedback) motion-reduce:transition-none" />
     </div>
   )
 }

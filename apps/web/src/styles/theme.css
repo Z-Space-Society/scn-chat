@@ -278,6 +278,8 @@
 
   /* Motion eases out and never overshoots. */
   --ease-out: cubic-bezier(0.25, 0.8, 0.25, 1);
+  /* The sidebar sliding away or back starts quickly and settles slowly, so it glides to a stop. */
+  --ease-slide: cubic-bezier(0.32, 0.72, 0, 1);
   /* Two icons in one place, such as Copy and Copied, cross-fade as one gives way to the other. */
   --ease-swap: cubic-bezier(0.2, 0, 0, 1);
   /* What arrives fades in; live work breathes at the slow pace. */
@@ -348,6 +350,8 @@
     --dur-layout: 220ms;
     --dur-enter: 240ms;
     --dur-layer: 300ms;
+    /* The sidebar, a whole column on the move, takes a little longer than a control does. */
+    --dur-slide: 300ms;
     --dur-swap: 300ms;
     /* How far a panel rises toward its place as it opens. */
     --rise: 4px;
