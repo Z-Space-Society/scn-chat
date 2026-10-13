@@ -1,6 +1,7 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { brotliCompressSync, brotliDecompressSync } from 'node:zlib'
 import SqliteDatabase from 'better-sqlite3'
 import { Hono } from 'hono'
 import { Kysely, SqliteDialect } from 'kysely'
@@ -46,6 +47,9 @@ describe('GET /api/health', () => {
 describe('web app serving', () => {
   const assets = mkdtempSync(join(tmpdir(), 'scn-web-'))
   writeFileSync(join(assets, 'app.js'), 'console.log(1)')
+  mkdirSync(join(assets, 'assets'))
+  writeFileSync(join(assets, 'assets', 'index-abc123.js'), 'console.log(2)')
+  writeFileSync(join(assets, 'assets', 'index-abc123.js.br'), brotliCompressSync('console.log(2)'))
   afterAll(() => rmSync(assets, { recursive: true, force: true }))
   const db = createSqliteDb()
   const rendered: { path: string; context: WebContext }[] = []
@@ -62,6 +66,28 @@ describe('web app serving', () => {
     const res = await app.request('/app.js')
     expect(res.status).toBe(200)
     expect(await res.text()).toBe('console.log(1)')
+  })
+
+  it("sends a build's hashed files compressed when accepted, for the browser to keep for good", async () => {
+    const res = await app.request('/assets/index-abc123.js', {
+      headers: { 'accept-encoding': 'gzip, br' },
+    })
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-encoding')).toBe('br')
+    expect(res.headers.get('vary')).toBe('Accept-Encoding')
+    expect(res.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
+    expect(brotliDecompressSync(Buffer.from(await res.arrayBuffer())).toString()).toBe(
+      'console.log(2)',
+    )
+    // A browser that doesn't accept brotli gets the file as it is.
+    const plain = await app.request('/assets/index-abc123.js')
+    expect(plain.headers.get('content-encoding')).toBeNull()
+    expect(await plain.text()).toBe('console.log(2)')
+  })
+
+  it('leaves files outside the hashed build to be checked again', async () => {
+    const res = await app.request('/app.js')
+    expect(res.headers.get('cache-control')).toBeNull()
   })
 
   it('hands other paths to the web app with the app name', async () => {

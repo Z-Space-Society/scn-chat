@@ -1,9 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
-import {
-  SharedError,
-  SharedPage,
-  SharedPageSkeleton,
-} from '../../../features/sharing/pages/SharedPage.tsx'
+import { SharedPage } from '../../../features/sharing/pages/SharedPage.tsx'
+import { SharedError, SharedPageSkeleton } from '../../../features/sharing/pages/SharedStates.tsx'
 import { sharedQuery } from '../../../features/sharing/queries.ts'
 import { validateBranchSearch } from '../../../shared/search-params.ts'
 

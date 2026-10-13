@@ -130,6 +130,21 @@ describe('App', () => {
     expect(router.state.location.pathname).toBe('/')
   })
 
+  it("preloads the chat store's worker and SQLite on the chat pages", async () => {
+    signedIn()
+    renderApp('/')
+    await screen.findByRole('heading', { name: 'What can I help with?' })
+    const preloads = [...document.querySelectorAll('link[rel="preload"]')].map((link) =>
+      link.getAttribute('href'),
+    )
+    expect(preloads).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('worker'),
+        expect.stringContaining('sqlite3'),
+      ]),
+    )
+  })
+
   it("sends a viewer to the login page with the server's access message, and signs them out", async () => {
     signedIn({ access: 'viewer', accessMessage: 'This server is invite-only.' })
     const assign = vi.fn()

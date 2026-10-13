@@ -171,7 +171,17 @@ export function createApp(deps: AppDeps) {
 
   const web = deps.web
   if (web) {
-    if (web.assets) app.use('*', serveStatic({ root: web.assets }))
+    if (web.assets) {
+      // The build's files under /assets are named by a hash of their content, so a browser keeps
+      // them for good, and a new build brings new names.
+      app.use('/assets/*', async (c, next) => {
+        await next()
+        if (c.res.ok) c.header('Cache-Control', 'public, max-age=31536000, immutable')
+      })
+      // The build writes brotli and gzip copies beside each file, sent to a browser that accepts
+      // them, so nothing is compressed per request.
+      app.use('*', serveStatic({ root: web.assets, precompressed: true }))
+    }
     app.get('*', (c) =>
       web.fetch(c.req.raw, { appName: appName(), fetch: inProcessFetch(app, c.req.raw) }),
     )
