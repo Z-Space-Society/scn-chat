@@ -114,6 +114,12 @@ function renderWith(store: ReturnType<typeof fakeStore>, children: ReactNode, pa
   )
 }
 
+/** Pick an item from the conversation header's More menu. */
+async function fromMenu(name: string) {
+  await userEvent.click(await screen.findByRole('button', { name: 'More' }))
+  await userEvent.click(screen.getByRole('button', { name }))
+}
+
 beforeEach(() => {
   stubFetch()
   FakeEventSource.instances = []
@@ -192,7 +198,7 @@ describe('ConversationView', () => {
     stubFetch(fetch)
     const store = fakeStore([user('u', 'original'), reply('u.r0', 'answer', 'u')])
     await renderWith(store, <ConversationView skey="s1" />)
-    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit message' }))
     const boxes = screen.getAllByPlaceholderText('Message')
     expect(boxes[0]).toHaveValue('original')
     await userEvent.clear(boxes[0] as HTMLElement)
@@ -221,7 +227,7 @@ describe('ConversationView', () => {
     ])
     await renderWith(store, <ConversationView skey="s1" />)
     await screen.findByText('another answer')
-    const [editFirst, editSecond] = screen.getAllByRole('button', { name: 'Edit' })
+    const [editFirst, editSecond] = screen.getAllByRole('button', { name: 'Edit message' })
     await userEvent.click(editFirst as HTMLElement)
     expect(screen.getByPlaceholderText('Message')).toHaveValue('first')
     await userEvent.click(editSecond as HTMLElement)
@@ -287,7 +293,8 @@ describe('ConversationView', () => {
     act(() => void scroller.dispatchEvent(new Event('scroll')))
     await userEvent.type(screen.getByPlaceholderText('Message'), 'more{Enter}')
     await vi.waitFor(() => expect(fetch).toHaveBeenCalled())
-    await vi.waitFor(() => expect(scroller.scrollTop).toBe(1000))
+    // It glides there, to where the last screen of the conversation shows.
+    await vi.waitFor(() => expect(scroller.scrollTop).toBe(600))
   })
 
   it('syncs and shows a message written from another client', async () => {
@@ -308,7 +315,7 @@ describe('ConversationView', () => {
       ),
     )
     expect(screen.queryByText('from my phone')).toBeNull()
-    await userEvent.click(screen.getByRole('button', { name: 'Sync' }))
+    await fromMenu('Sync this chat')
     expect(await screen.findByText('from my phone')).toBeInTheDocument()
     expect(String((writes(fetch)[0] as [string])[0])).toBe('/api/conversations/s1/sync')
     expect(store.worker.refreshConversation).toHaveBeenCalledWith('s1')
@@ -358,18 +365,15 @@ describe('ConversationView errors', () => {
     const store = fakeStore([user('u', 'question'), reply('u.r0', 'answer', 'u')])
     await renderWith(store, <ConversationView skey="s1" />)
     await screen.findAllByRole('option', { name: 'Claude' })
-    await userEvent.selectOptions(
-      await screen.findByRole('combobox', { name: 'Regenerate with' }),
-      'router/anthropic/claude',
-    )
-    await userEvent.click(screen.getByRole('button', { name: 'Regenerate' }))
+    await userEvent.click(screen.getByRole('button', { name: 'More actions' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Regenerate with' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Claude' }))
     const init = (writes(fetch)[0] as [string, RequestInit])[1]
     expect(JSON.parse(String(init.body))).toEqual({
       model: { provider: 'router', id: 'anthropic/claude' },
     })
   })
-
-  it("keeps each reply's regenerate model to that reply", async () => {
+  it('regenerates the reply whose menu was used', async () => {
     const fetch = vi.fn(async () => Response.json({ replyRkey: 'v.r1', status: 'claimed' }))
     const models = [{ provider: 'p', id: 'm', name: 'M', capabilities: caps }]
     stubFetch(fetch, { '/api/models': { models, defaultModel: null } })
@@ -381,15 +385,14 @@ describe('ConversationView errors', () => {
     ])
     await renderWith(store, <ConversationView skey="s1" />)
     await screen.findAllByRole('option', { name: 'M' })
-    const [first, second] = screen.getAllByRole('combobox', { name: 'Regenerate with' })
-    await userEvent.selectOptions(first as HTMLElement, 'p/m')
-    expect(second).toHaveValue('')
-    await userEvent.click(screen.getAllByRole('button', { name: 'Regenerate' })[1] as HTMLElement)
-    const [url, init] = writes(fetch)[0] as [string, RequestInit]
-    expect(String(url)).toBe('/api/conversations/s1/messages/v/regenerate')
-    expect(JSON.parse(String(init.body))).toEqual({})
+    const [, second] = screen.getAllByRole('button', { name: 'More actions' })
+    await userEvent.click(second as HTMLElement)
+    await userEvent.click(screen.getByRole('button', { name: 'Regenerate with' }))
+    await userEvent.click(screen.getByRole('button', { name: 'M' }))
+    expect(String((writes(fetch)[0] as [string])[0])).toBe(
+      '/api/conversations/s1/messages/v/regenerate',
+    )
   })
-
   it('shows why a rename failed', async () => {
     stubFetch(
       vi.fn(async () =>
@@ -401,7 +404,7 @@ describe('ConversationView errors', () => {
     )
     const store = fakeStore([user('u', 'question')])
     await renderWith(store, <ConversationView skey="s1" />)
-    await userEvent.click(await screen.findByRole('button', { name: 'Rename' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Tiles' }))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('The title is too long')
   })
@@ -411,11 +414,11 @@ describe('ConversationView errors', () => {
     stubFetch(fetch)
     const store = fakeStore([user('u', 'question')])
     await renderWith(store, <ConversationView skey="s1" />)
-    await userEvent.click(await screen.findByRole('button', { name: 'Rename' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Tiles' }))
     await userEvent.clear(screen.getByRole('textbox', { name: 'Title' }))
     await userEvent.type(screen.getByRole('textbox', { name: 'Title' }), 'Floors')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
-    await screen.findByRole('button', { name: 'Rename' })
+    await screen.findByRole('button', { name: 'Tiles' })
     const init = (writes(fetch)[0] as [string, RequestInit])[1]
     expect(JSON.parse(String(init.body))).toEqual({ title: 'Floors' })
   })
@@ -433,7 +436,7 @@ describe('ConversationView errors', () => {
     )
     const store = fakeStore([user('u', 'q'), reply('u.r0', '', 'u', 'pending')])
     await renderWith(store, <ConversationView skey="s1" />)
-    await userEvent.click(await screen.findByRole('button', { name: 'Sync' }))
+    await fromMenu('Sync this chat')
     expect(await screen.findByRole('alert')).toHaveTextContent('The PDS is unreachable')
     await userEvent.click(screen.getByRole('button', { name: 'Stop' }))
     await vi.waitFor(() => expect(screen.queryByRole('alert')).toBeNull())

@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useLocation } from '@tanstack/react-router'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
 import { BranchView } from '../../conversation/components/BranchView.tsx'
+import { DetailsButton, recordRows } from '../../conversation/components/RecordDetails.tsx'
 import { useBranch } from '../../conversation/hooks/useBranch.ts'
 import { blobUrlFor } from '../../conversation/lib/blob-url.ts'
 import { sharedQuery } from '../queries.ts'
@@ -47,6 +48,8 @@ export function SharedPage(props: Props) {
         branch={branch}
         blobUrl={blobUrlFor(`/api/shared/${props.ownerDid}/${props.skey}`)}
         onPick={pick}
+        // Reading a message's details is its only action here.
+        actions={(message) => <DetailsButton rows={recordRows({ record: message.record })} />}
       />
     </main>
   )

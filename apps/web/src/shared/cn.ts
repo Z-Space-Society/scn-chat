@@ -41,7 +41,17 @@ export const themeNames = {
   ],
   container: ['column', 'settings', 'narrow'],
   ease: ['out', 'swap'],
-  animate: ['fade-in', 'breathe', 'panel-up', 'fade-in-late'],
+  animate: [
+    'fade-in',
+    'breathe',
+    'panel-up',
+    'fade-in-late',
+    'panel-in',
+    'layer-in',
+    'layer-out',
+    'layer-settle',
+    'landed',
+  ],
   breakpoint: ['wide'],
 }
 

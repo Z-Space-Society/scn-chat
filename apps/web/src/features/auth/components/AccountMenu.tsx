@@ -1,9 +1,10 @@
 import { Link } from '@tanstack/react-router'
-import { type ReactNode, useContext, useEffect, useRef, useState } from 'react'
+import { type ReactNode, useContext, useRef, useState } from 'react'
 import { cn } from '../../../shared/cn.ts'
 import { MoreVerticalIcon, SettingsIcon, ShieldIcon, SignOutIcon } from '../../../shared/icons.tsx'
 import { floating } from '../../../shared/ui/menu.ts'
 import { sidebarRow } from '../../../shared/ui/sidebar.ts'
+import { useDismiss } from '../../../shared/useDismiss.ts'
 import { MeContext } from '../session.ts'
 import { AccountCard } from './AccountCard.tsx'
 
@@ -26,20 +27,7 @@ export function AccountMenu(props: Props) {
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
 
-  // Escape or a click outside the menu closes it.
-  useEffect(() => {
-    if (!open) return
-    const onKeyDown = (event: KeyboardEvent) => event.key === 'Escape' && setOpen(false)
-    const onPointerDown = (event: PointerEvent) => {
-      if (!root.current?.contains(event.target as Node)) setOpen(false)
-    }
-    document.addEventListener('keydown', onKeyDown)
-    document.addEventListener('pointerdown', onPointerDown)
-    return () => {
-      document.removeEventListener('keydown', onKeyDown)
-      document.removeEventListener('pointerdown', onPointerDown)
-    }
-  }, [open])
+  useDismiss(open, [root], () => setOpen(false))
 
   return (
     <div ref={root} className="min-w-0 flex-1">

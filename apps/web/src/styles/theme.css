@@ -265,6 +265,15 @@
   --animate-panel-up: panel-up var(--dur-panel) var(--ease-out);
   /* What arrives only after a quiet wait, such as a reply's waiting header. */
   --animate-fade-in-late: fade-in var(--dur-enter) var(--ease-out) var(--wait-quiet) backwards;
+  /* A panel settling down from the control above it, such as the chat header's menu. */
+  --animate-panel-in: panel-in var(--dur-panel) var(--ease-out);
+  /* A layer over the whole chat, like Jump to's, coming and going at a calmer pace, with what it
+     holds settling into place. */
+  --animate-layer-in: fade-in var(--dur-layer) var(--ease-out);
+  --animate-layer-out: fade-out var(--dur-layer) var(--ease-out) forwards;
+  --animate-layer-settle: panel-in var(--dur-layer) var(--ease-out);
+  /* The message landed on glows a moment, so the eye finds it. */
+  --animate-landed: landed 2s var(--ease-out);
 
   @keyframes fade-in {
     from {

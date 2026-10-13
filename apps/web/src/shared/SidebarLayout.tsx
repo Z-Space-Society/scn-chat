@@ -93,7 +93,8 @@ export function SidebarLayout(props: Props) {
         {props.nav}
       </nav>
       {backdrop}
-      <main className="flex min-w-0 flex-1 flex-col overflow-y-auto border-divider in-data-sidebar-collapsed:border-transparent border-s-2 bg-panel transition-[border-color] duration-(--dur-layout) ease-out max-wide:border-none">
+      {/* A size container, so the conversation's header can reach the panel's edges. */}
+      <main className="@container flex min-w-0 flex-1 flex-col overflow-y-auto border-divider in-data-sidebar-collapsed:border-transparent border-s-2 bg-panel transition-[border-color] duration-(--dur-layout) ease-out max-wide:border-none">
         <MainBar />
         {props.children}
       </main>

@@ -21,7 +21,7 @@ interface UserTextProps {
 function UserText(props: UserTextProps) {
   const blocks = splitQuotes(props.text)
   const bubble =
-    'whitespace-pre-wrap rounded-bubble bg-bubble px-5 py-2.5 font-medium text-accent-strong [overflow-wrap:anywhere]'
+    'whitespace-pre-wrap rounded-bubble bg-bubble px-5 py-2.5 font-medium text-accent-strong [overflow-wrap:anywhere] in-data-landed:animate-landed motion-reduce:animate-none'
   if (!blocks.some((block) => block.quote))
     return (
       <p dir="auto" className={bubble}>

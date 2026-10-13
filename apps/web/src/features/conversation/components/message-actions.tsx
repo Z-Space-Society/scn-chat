@@ -1,8 +1,13 @@
 import type { ModelRef } from '@scn-chat/lexicons'
-import { type ComponentType, useState } from 'react'
-import { ModelSelect } from '../../models/components/ModelSelect.tsx'
-import { useModels } from '../../models/hooks/useModels.ts'
+import type { ComponentType } from 'react'
+import { PencilIcon, RetryIcon } from '../../../shared/icons.tsx'
+import { action, iconAction } from '../../../shared/ui/actions.ts'
+import { CopyButton } from '../../../shared/ui/CopyButton.tsx'
+import { messageText } from '../../../store/core.ts'
+import type { ModelOption } from '../../models/models.ts'
 import type { BranchMessage } from '../lib/branch.ts'
+import { MoreActions } from './MoreActions.tsx'
+import { DetailsButton, recordRows } from './RecordDetails.tsx'
 
 /** What the conversation lets an action do. */
 export interface ConversationOperations {
@@ -12,6 +17,12 @@ export interface ConversationOperations {
   regenerate: (parent: string | null, model: ModelRef | null) => void
   /** Stop a pending reply, by its rkey. */
   stop: (rkey: string) => void
+  /** The models a reply can be regenerated with. */
+  models: ModelOption[]
+  /** Where the conversation's records live, for their details. */
+  storedIn: string
+  /** Quote text into the composer, once the composer takes quotes. */
+  quote?: (text: string) => void
 }
 
 export interface MessageActionProps {
@@ -25,57 +36,98 @@ export interface MessageAction {
   Action: ComponentType<MessageActionProps>
 }
 
+const isUser = (message: BranchMessage) => message.record.role === 'user'
+const isPending = (message: BranchMessage) => message.record.status === 'pending'
+const parentOf = (message: BranchMessage) => (message.record.parent as string | undefined) ?? null
+const rowsOf = (props: MessageActionProps) =>
+  recordRows({
+    rkey: props.message.rkey,
+    record: props.message.record,
+    storedIn: props.operations.storedIn,
+  })
+
 function EditAction(props: MessageActionProps) {
-  if (props.message.record.role !== 'user') return null
+  if (!isUser(props.message)) return null
   return (
-    <button type="button" onClick={() => props.operations.edit(props.message.rkey)}>
-      Edit
+    <button
+      type="button"
+      aria-label="Edit message"
+      title="Edit message"
+      onClick={() => props.operations.edit(props.message.rkey)}
+      className={iconAction}
+    >
+      <PencilIcon />
+    </button>
+  )
+}
+
+function CopyAction(props: MessageActionProps) {
+  if (isPending(props.message)) return null
+  return <CopyButton text={messageText(props.message.record)} icon className={iconAction} />
+}
+
+/** Regenerate a finished reply with the same model. */
+function RegenerateAction(props: MessageActionProps) {
+  if (isUser(props.message) || isPending(props.message)) return null
+  return (
+    <button
+      type="button"
+      aria-label="Regenerate"
+      title="Regenerate"
+      onClick={() => props.operations.regenerate(parentOf(props.message), null)}
+      className={iconAction}
+    >
+      <RetryIcon />
     </button>
   )
 }
 
 function StopAction(props: MessageActionProps) {
-  if (props.message.record.role === 'user' || props.message.record.status !== 'pending') return null
+  if (isUser(props.message) || !isPending(props.message)) return null
   return (
-    <button type="button" onClick={() => props.operations.stop(props.message.rkey)}>
+    <button
+      type="button"
+      onClick={() => props.operations.stop(props.message.rkey)}
+      className={action}
+    >
       Stop
     </button>
   )
 }
 
-/** Regenerate a finished reply. */
-function RegenerateAction(props: MessageActionProps) {
-  const record = props.message.record
-  if (record.role === 'user' || record.status === 'pending') return null
-  const parent = (record.parent as string | undefined) ?? null
-  return <RegenerateControl onRegenerate={(model) => props.operations.regenerate(parent, model)} />
+/** A user message's details, as a card by the button. */
+function DetailsAction(props: MessageActionProps) {
+  if (!isUser(props.message)) return null
+  return <DetailsButton rows={rowsOf(props)} />
 }
 
-interface RegenerateControlProps {
-  onRegenerate: (model: ModelRef | null) => void
-}
-
-/** Regenerate with the same model, or with a model chosen for this reply. */
-function RegenerateControl(props: RegenerateControlProps) {
-  const { models } = useModels()
-  const [model, setModel] = useState<ModelRef | null>(null)
+/** A finished reply's quote, regenerate with another model, and details. */
+function MoreAction(props: MessageActionProps) {
+  if (isUser(props.message) || isPending(props.message)) return null
   return (
-    <>
-      <ModelSelect aria-label="Regenerate with" models={models} value={model} onChange={setModel}>
-        <option value="">Same model</option>
-      </ModelSelect>
-      <button type="button" onClick={() => props.onRegenerate(model)}>
-        Regenerate
-      </button>
-    </>
+    <MoreActions
+      elementId={`m-${props.message.rkey}`}
+      text={messageText(props.message.record)}
+      onQuote={props.operations.quote}
+      models={props.operations.models}
+      onRegenerate={(model) => props.operations.regenerate(parentOf(props.message), model)}
+      rows={rowsOf(props)}
+    />
   )
 }
 
-/** The actions under each message, in order. */
+/**
+ * The actions under each message, in order: icons named by their labels, sitting at the message's
+ * edge with the most used nearest it. A user message gets edit, copy, and details, a finished reply
+ * copy, regenerate, and More, and a pending reply Stop.
+ */
 export const messageActions: MessageAction[] = [
   { id: 'edit', Action: EditAction },
+  { id: 'copy', Action: CopyAction },
   { id: 'regenerate', Action: RegenerateAction },
   { id: 'stop', Action: StopAction },
+  { id: 'details', Action: DetailsAction },
+  { id: 'more', Action: MoreAction },
 ]
 
 /** Every action that applies to a message. */

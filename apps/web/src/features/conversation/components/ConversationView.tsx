@@ -3,12 +3,15 @@ import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
 import { RetryIcon } from '../../../shared/icons.tsx'
 import { Button } from '../../../shared/ui/Button.tsx'
 import { useConversation } from '../../../store/react.tsx'
+import { useMe } from '../../auth/session.ts'
+import { useModels } from '../../models/hooks/useModels.ts'
 import { useBranch } from '../hooks/useBranch.ts'
 import { useConversationActions } from '../hooks/useConversationActions.ts'
 import { useReplyStream } from '../hooks/useReplyStream.ts'
 import { useScrollToFocus } from '../hooks/useScrollToFocus.ts'
 import { useStickToBottom } from '../hooks/useStickToBottom.ts'
 import { blobUrlFor } from '../lib/blob-url.ts'
+import { outlineOf } from '../lib/outline.ts'
 import { BranchComposer } from './BranchComposer.tsx'
 import { BranchView } from './BranchView.tsx'
 import { ConversationHeader } from './ConversationHeader.tsx'
@@ -23,6 +26,8 @@ interface Props {
 /** A conversation: its header, the branch on screen with replies streaming in, and the composer. */
 export function ConversationView(props: Props) {
   const { conversation, error: loadError } = useConversation(props.skey)
+  const me = useMe()
+  const { models } = useModels()
   // The user message being edited, by rkey, so the composer reads it from the conversation.
   const [editingRkey, setEditingRkey] = useState<string | null>(null)
   const messages = conversation?.messages ?? []
@@ -52,6 +57,11 @@ export function ConversationView(props: Props) {
     edit: setEditingRkey,
     regenerate: actions.regenerate,
     stop: actions.stop,
+    models,
+    storedIn:
+      me.storageMode === 'space'
+        ? "This chat's space on your PDS"
+        : "This server's local storage, since your PDS doesn't support spaces yet",
   }
   const sent = (message: { replyRkey: string | null }) => {
     pin()
@@ -61,7 +71,7 @@ export function ConversationView(props: Props) {
   const blobUrl = blobUrlFor(`/api/conversations/${props.skey}`)
 
   return (
-    // The conversation keeps main's stand-in class until its header and composer are ported.
+    // The conversation keeps main's stand-in class until its composer is ported.
     <section
       ref={stickToBottom}
       className="conversation mx-auto flex w-full max-w-column flex-1 flex-col px-gutter"
@@ -69,6 +79,7 @@ export function ConversationView(props: Props) {
       <ConversationHeader
         skey={props.skey}
         title={(conversation?.info?.title as string | undefined) ?? 'New chat'}
+        outline={outlineOf(branch)}
         onRename={actions.rename}
         onSync={actions.sync}
       />

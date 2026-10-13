@@ -1,0 +1,159 @@
+import { useStore as useFormStore } from '@tanstack/react-form'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { ReactNode } from 'react'
+import { api, json, read } from '../../../shared/api.ts'
+import { cn } from '../../../shared/cn.ts'
+import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
+import { useAppForm } from '../../../shared/form.tsx'
+import { Button } from '../../../shared/ui/Button.tsx'
+import { field } from '../../../shared/ui/controls.tsx'
+import { floating } from '../../../shared/ui/menu.ts'
+import { Select } from '../../../shared/ui/Select.tsx'
+import { formatMembers, type Members, parseMembers } from '../lib/members.ts'
+import { sharingQuery } from '../queries.ts'
+
+type Mode = 'private' | 'people' | 'public'
+
+const modes: { value: Mode; label: string }[] = [
+  { value: 'private', label: 'Private' },
+  { value: 'people', label: 'Specific people' },
+  { value: 'public', label: 'Anyone with an atproto account' },
+]
+
+interface Settings {
+  mode: Mode
+  members: Members
+}
+
+interface Props {
+  skey: string
+  ownerDid: string
+  onClose: () => void
+  /** Classes that place the panel, such as under the control that opened it. */
+  className?: string
+}
+
+/** Who can read this conversation, and its link, once the stored settings load. */
+export function SharePanel(props: Props) {
+  const settings = useQuery(sharingQuery(props.skey))
+  if (settings.error)
+    return (
+      <Card className={props.className}>
+        <ErrorAlert error={settings.error} className="w-full text-small" />
+        <CloseButton onClose={props.onClose} />
+      </Card>
+    )
+  if (!settings.data)
+    return (
+      <Card className={props.className}>
+        <p className="text-muted text-small">Loading…</p>
+      </Card>
+    )
+  return (
+    <SharingForm
+      skey={props.skey}
+      // The chat routes render only in the browser, so the page's origin is known.
+      link={`${location.origin}/shared/${props.ownerDid}/${props.skey}`}
+      settings={settings.data}
+      onClose={props.onClose}
+      className={props.className}
+    />
+  )
+}
+
+interface CardProps {
+  className?: string
+  children: ReactNode
+}
+
+/** The panel: a floating card whose corner nests around its controls'. */
+function Card(props: CardProps) {
+  return (
+    <fieldset
+      className={cn(
+        floating,
+        'flex w-[min(--spacing(104),calc(100%-(--spacing(5.5))))] flex-wrap gap-2 rounded-[calc(var(--radius-small)+--spacing(3.5)+var(--menu-edge))] p-3.5',
+        props.className,
+      )}
+    >
+      <legend className="float-start w-full font-semibold text-ink-strong text-ui">Sharing</legend>
+      {props.children}
+    </fieldset>
+  )
+}
+
+interface SharingFormProps {
+  skey: string
+  link: string
+  settings: Settings
+  onClose: () => void
+  className?: string
+}
+
+function SharingForm(props: SharingFormProps) {
+  const queryClient = useQueryClient()
+  const save = useMutation({
+    mutationFn: (draft: { mode: Mode; members: string }) =>
+      read(
+        api.sharing.conversations[':skey'].sharing.$put(
+          { param: { skey: props.skey } },
+          json({ mode: draft.mode, members: parseMembers(draft.members) }),
+        ),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: sharingQuery(props.skey).queryKey }),
+  })
+  const form = useAppForm({
+    defaultValues: { mode: props.settings.mode, members: formatMembers(props.settings.members) },
+    onSubmit: ({ value }) => save.mutate(value),
+  })
+  const mode = useFormStore(form.store, (state) => state.values.mode)
+  return (
+    <form.AppForm>
+      <form.Form>
+        <Card className={props.className}>
+          <form.AppField name="mode">
+            {(modeField) => (
+              <Select
+                aria-label="Sharing mode"
+                options={modes}
+                value={modeField.state.value}
+                onChange={(value) => modeField.handleChange(value as Mode)}
+                className="min-w-48 flex-1"
+              />
+            )}
+          </form.AppField>
+          {mode === 'people' && (
+            <form.AppField name="members">
+              {(membersField) => (
+                <membersField.TextField
+                  aria-label="Handles of the people to share with, separated by commas"
+                  placeholder="alice.bsky.social, bob.example.com"
+                  className="min-w-48 flex-1"
+                />
+              )}
+            </form.AppField>
+          )}
+          <form.SubmitButton>Save</form.SubmitButton>
+          {mode !== 'private' && (
+            <input
+              aria-label="Link"
+              readOnly
+              value={props.link}
+              className={cn(field, 'min-w-48 flex-1')}
+            />
+          )}
+          <CloseButton onClose={props.onClose} />
+          <ErrorAlert error={save.error} className="w-full text-small" />
+        </Card>
+      </form.Form>
+    </form.AppForm>
+  )
+}
+
+interface CloseButtonProps {
+  onClose: () => void
+}
+
+function CloseButton(props: CloseButtonProps) {
+  return <Button onClick={props.onClose}>Close</Button>
+}

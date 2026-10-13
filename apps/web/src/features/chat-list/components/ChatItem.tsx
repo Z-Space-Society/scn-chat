@@ -1,6 +1,6 @@
 import { noop, useMutation } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { type ReactNode, useRef, useState } from 'react'
 import { api, json, read } from '../../../shared/api.ts'
 import { cn } from '../../../shared/cn.ts'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
@@ -8,8 +8,10 @@ import { lastError } from '../../../shared/errors.ts'
 import { useAppForm } from '../../../shared/form.tsx'
 import { MoreIcon, PencilIcon, TagIcon, TrashIcon } from '../../../shared/icons.tsx'
 import { Button } from '../../../shared/ui/Button.tsx'
-import { floating, menuRow } from '../../../shared/ui/menu.ts'
+import { MenuItem } from '../../../shared/ui/MenuItem.tsx'
+import { floating } from '../../../shared/ui/menu.ts'
 import { sidebarRow } from '../../../shared/ui/sidebar.ts'
+import { useDismiss } from '../../../shared/useDismiss.ts'
 import { usePlacement } from '../../../shared/usePlacement.ts'
 import type { ChatListItem } from '../../../store/core.ts'
 
@@ -185,22 +187,7 @@ function MoreButton(props: MoreProps) {
   const more = useRef<HTMLButtonElement>(null)
   const menu = useRef<HTMLDivElement>(null)
   const position = usePlacement(props.open, more, menu, 'end')
-  const { open, onClose } = props
-
-  useEffect(() => {
-    if (!open) return
-    const onKeyDown = (event: KeyboardEvent) => event.key === 'Escape' && onClose()
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node
-      if (!menu.current?.contains(target) && !more.current?.contains(target)) onClose()
-    }
-    document.addEventListener('keydown', onKeyDown)
-    document.addEventListener('pointerdown', onPointerDown)
-    return () => {
-      document.removeEventListener('keydown', onKeyDown)
-      document.removeEventListener('pointerdown', onPointerDown)
-    }
-  }, [open, onClose])
+  useDismiss(props.open, [more, menu], props.onClose)
 
   return (
     <>
@@ -232,28 +219,6 @@ function MoreButton(props: MoreProps) {
         </div>
       )}
     </>
-  )
-}
-
-interface MenuItemProps {
-  danger?: boolean
-  onClick: () => void
-  children: ReactNode
-}
-
-function MenuItem(props: MenuItemProps) {
-  return (
-    <button
-      type="button"
-      onClick={props.onClick}
-      className={cn(
-        menuRow,
-        'cursor-pointer hover:bg-row-hover active:bg-row-hover [&_svg]:text-muted hover:[&_svg]:text-ink',
-        props.danger && 'text-danger [&_svg]:text-danger hover:[&_svg]:text-danger',
-      )}
-    >
-      {props.children}
-    </button>
   )
 }
 

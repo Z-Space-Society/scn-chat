@@ -61,11 +61,13 @@ describe('SharedPage', () => {
       <SharedPage ownerDid="did:plc:alice" skey="3abc" signedIn />,
     )
     expect(await screen.findByText('Roughly $450')).toBeInTheDocument()
-    // Switching between replies is the only control: no composer, edit, regenerate, stop, rename,
-    // share, or sync.
+    // Switching between replies and reading each message's details are the only controls: no
+    // composer, edit, regenerate, stop, rename, share, or sync.
     expect(screen.getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual([
+      'Details',
       'Previous version',
       'Next version',
+      'Details',
     ])
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
