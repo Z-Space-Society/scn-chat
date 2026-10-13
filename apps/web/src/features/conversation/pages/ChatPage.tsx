@@ -13,7 +13,7 @@ interface Props {
 export function ChatPage(props: Props) {
   const { error } = useModels()
   return (
-    <SidebarLayout className="chats" nav={<ChatList />}>
+    <SidebarLayout kind="chats" nav={<ChatList />}>
       <BusyBanner />
       <ErrorAlert error={error} />
       {props.skey ? (

@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { checkSession } from '../features/auth/session.ts'
 import logo from '../logo.svg?url'
 import { appName } from '../shared/app-name.ts'
-import { messageOf } from '../shared/errors.ts'
+import { ErrorPage } from '../shared/ErrorPage.tsx'
 import { themeScript } from '../shared/theme.ts'
 import { useInstantThemeSwitch } from '../shared/useInstantThemeSwitch.ts'
 import styles from '../styles/app.css?url'
@@ -35,7 +35,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
   }),
   shellComponent: Shell,
-  errorComponent: ({ error }) => <p role="alert">{messageOf(error)}</p>,
+  errorComponent: ErrorPage,
   notFoundComponent: () => <Navigate to="/" replace />,
 })
 

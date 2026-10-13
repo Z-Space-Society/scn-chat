@@ -1,19 +1,125 @@
-import type { ReactNode } from 'react'
+import { useLoaderData, useLocation } from '@tanstack/react-router'
+import { type ReactNode, useEffect } from 'react'
+import { cn } from './cn.ts'
+import { Logo } from './ui/Logo.tsx'
+import { SidebarToggle } from './ui/SidebarToggle.tsx'
+import { useSidebar } from './useSidebar.ts'
 
 interface Props {
-  /** The kind of page, as a class for the theme, such as `settings` or `chats`. */
-  className: string
-  /** What the sidebar holds, such as links to each section. */
-  nav: ReactNode
-  children: ReactNode
+  /**
+   * The chats, whose sidebar is a column beside the panel that collapses off the window's edge, or
+   * settings and admin, whose nav sits inside the panel beside the section.
+   */
+  kind: 'chats' | 'settings'
+  /** What the sidebar holds, such as the chat list or links to each section. */
+  nav?: ReactNode
+  /** The page's frame while its code loads: no head, and no slide as it takes the stored state. */
+  frame?: boolean
+  children?: ReactNode
 }
 
-/** A page with a sidebar beside its main column. */
+/**
+ * The sidebar, after Linear's: dense one-line rows of small text on the frame. On a narrow screen it
+ * is a drawer over the page, closed until opened, which closes again once a link in it is followed.
+ *
+ * The chats, settings, and sidebar classes are hooks for main's stand-in look, kept until what the
+ * sidebar holds is ported.
+ */
 export function SidebarLayout(props: Props) {
+  const sidebar = useSidebar()
+  const pathname = useLocation({ select: (location) => location.pathname })
+  const { closeDrawer } = sidebar
+  // biome-ignore lint/correctness/useExhaustiveDependencies: closing follows each navigation.
+  useEffect(() => closeDrawer(), [pathname])
+  const backdrop = sidebar.drawerOpen && (
+    <button
+      type="button"
+      aria-label="Close sidebar"
+      onClick={closeDrawer}
+      className="fixed inset-0 z-19 wide:hidden animate-fade-in cursor-default bg-backdrop motion-reduce:animate-none"
+    />
+  )
+  if (props.kind === 'settings')
+    return (
+      // The panel fills the window, with the nav at its start and the section centered in the rest,
+      // so the nav stays put from section to section. The nav sits as far from the window's edge
+      // as the chat list does, with the chat's gutter on the other side.
+      <div data-drawer-open={sidebar.drawerOpen || undefined} className="settings flex h-dvh">
+        <main className="min-w-0 flex-1 overflow-y-auto bg-panel ps-sidebar-pad pe-gutter pb-16 has-[[data-ported]]:pb-0 max-wide:px-gutter max-wide:pt-[calc(var(--spacing-toggle)-(--spacing(1)))]">
+          <MainBar />
+          <div className="flex gap-12">
+            <nav
+              data-ported
+              className={cn(
+                sidebarClass,
+                'wide:sticky wide:top-0 wide:max-h-dvh wide:w-settings-nav wide:flex-none wide:self-start overflow-y-auto wide:bg-transparent wide:px-0 wide:pt-2.5 wide:pb-4',
+              )}
+            >
+              {props.nav}
+            </nav>
+            {backdrop}
+            {/* A section pads its own foot, so its Save bar can stick to the panel's very bottom. */}
+            <div className="min-w-0 flex-1">{props.children}</div>
+          </div>
+        </main>
+      </div>
+    )
   return (
-    <div className={`layout ${props.className}`}>
-      <nav className="sidebar">{props.nav}</nav>
-      <main>{props.children}</main>
+    <div
+      data-sidebar-collapsed={sidebar.collapsed || undefined}
+      data-drawer-open={sidebar.drawerOpen || undefined}
+      aria-busy={props.frame || undefined}
+      className="chats flex h-dvh min-h-0 overflow-x-clip"
+    >
+      <nav
+        className={cn(
+          sidebarClass,
+          'sidebar wide:in-data-sidebar-collapsed:invisible wide:in-data-sidebar-collapsed:-ms-sidebar wide:w-sidebar wide:flex-none overflow-hidden border-0',
+          // Collapsing slides the sidebar off the window's edge as the panel widens into its room.
+          // The frame takes the stored choice just after it first renders, so it never slides, or
+          // the collapse would replay on every reload.
+          !props.frame &&
+            'wide:transition-[margin-inline-start,visibility] wide:duration-(--dur-layout) wide:ease-out',
+        )}
+      >
+        {!props.frame && (
+          // The logo and the toggle, on one row as tall as the chat's header.
+          <header data-ported className="-mt-2.5 flex h-bar flex-none items-center gap-0.5">
+            <AppLogo />
+            <SidebarToggle className="ms-auto" />
+          </header>
+        )}
+        {props.nav}
+      </nav>
+      {backdrop}
+      <main className="flex min-w-0 flex-1 flex-col overflow-y-auto border-divider in-data-sidebar-collapsed:border-transparent border-s-2 bg-panel transition-[border-color] duration-(--dur-layout) ease-out max-wide:border-none">
+        <MainBar />
+        {props.children}
+      </main>
     </div>
   )
+}
+
+const sidebarClass = cn(
+  'flex flex-col gap-0.5 overscroll-contain bg-sidebar px-sidebar-pad pt-sidebar-pad pb-3 text-ui',
+  // On a narrow screen, a drawer over the page that stays visible until it has slid away.
+  'motion-reduce:transition-none max-wide:in-data-drawer-open:visible max-wide:invisible max-wide:fixed max-wide:inset-y-0 max-wide:start-0 max-wide:z-20 max-wide:w-drawer max-wide:-translate-x-full max-wide:in-data-drawer-open:translate-x-0 max-wide:shadow-float max-wide:transition-[translate,visibility] max-wide:duration-(--dur-layout) max-wide:ease-out rtl:max-wide:in-data-drawer-open:translate-x-0 rtl:max-wide:translate-x-full',
+)
+
+/**
+ * The toggle in the panel, for when the sidebar is hidden: collapsed on a wide screen, or a closed
+ * drawer on a narrow one.
+ */
+function MainBar() {
+  return (
+    <div className="sticky top-0 z-3 h-0">
+      <SidebarToggle className="absolute start-2.75 top-[calc((var(--spacing-bar)-var(--spacing-toggle))/2)] wide:not-in-data-sidebar-collapsed:hidden border border-line bg-raised" />
+    </div>
+  )
+}
+
+/** The app's logo, named for screen readers by the app's name. */
+function AppLogo() {
+  const name = useLoaderData({ from: '__root__', select: (data) => data.appName })
+  return <Logo label={name ?? ''} className="h-5" />
 }

@@ -237,10 +237,7 @@ describe('Admin layout', () => {
     await renderPage(<PluginAdmin id="i1" />, '/admin/plugins/i1')
     const nav = screen.getByRole('navigation')
     expect(within(nav).getByRole('link', { name: 'Back to chats' })).toHaveAttribute('href', '/')
-    expect(within(nav).getByRole('link', { name: 'Account settings' })).toHaveAttribute(
-      'href',
-      '/settings',
-    )
+    expect(within(nav).getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
     expect(within(nav).getByRole('link', { name: 'Roles' })).toHaveAttribute('href', '/admin/roles')
     expect(within(nav).getByRole('link', { name: 'Plugins' })).toHaveAttribute(
       'aria-current',

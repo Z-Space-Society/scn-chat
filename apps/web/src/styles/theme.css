@@ -112,6 +112,8 @@
   --color-divider: light-dark(oklch(0.961 0 0), oklch(0.195 0 0));
   /* The darker bottom edge under a floating menu. */
   --color-bevel: light-dark(oklch(0.865 0 0), oklch(0.162 0 0));
+  /* The shade over the page under an open drawer. */
+  --color-backdrop: oklch(0 0 0 / 0.25);
   /* The edge drawn inside a picture: a shade of its own colors rather than a grey frame. */
   --color-image-edge: light-dark(oklch(0 0 0 / 0.1), oklch(1 0 0 / 0.1));
 
@@ -199,6 +201,12 @@
   --spacing-sidebar: 17.75rem;
   /* The space between the window's edge and the sidebar's rows, and the settings nav's. */
   --spacing-sidebar-pad: 0.6rem;
+  /* Where the text in every sidebar row starts, so rows, headings, and the search line up. */
+  --spacing-row-inset: 0.55rem;
+  /* The sidebar as a drawer over the page on a narrow screen. */
+  --spacing-drawer: min(18rem, 85vw);
+  /* The settings and admin nav beside the section on a wide screen. */
+  --spacing-settings-nav: 13.5rem;
   /* The height of a row in the sidebar, and of its search. */
   --spacing-row: 2.2rem;
   /* The sidebar's top row and the chat's header share one height, so the app's name and the

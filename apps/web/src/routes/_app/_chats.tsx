@@ -1,4 +1,5 @@
 import { createFileRoute, Outlet, retainSearchParams } from '@tanstack/react-router'
+import { ChatPageFrame } from '../../features/conversation/pages/ChatPageFrame.tsx'
 import { validateChatListSearch } from '../../shared/search-params.ts'
 import { openStore } from '../../store/client.ts'
 import { StoreProvider } from '../../store/react.tsx'
@@ -12,6 +13,8 @@ export const Route = createFileRoute('/_app/_chats')({
   // Opening the store here starts its worker and database downloading alongside the route's code.
   beforeLoad: ({ context }) => ({ store: openStore(context.me.did) }),
   component: Chats,
+  // The server sends the page's frame in place of the chats, so a reload never starts blank.
+  pendingComponent: ChatPageFrame,
 })
 
 function Chats() {
