@@ -69,23 +69,33 @@ export function useStoreState(): HandoverState {
   return useSyncExternalStore(store.onState, store.state)
 }
 
-/** The store, and whether this tab holds it, which reading it waits for. */
+/**
+ * The store, whether this tab holds it, which reading it waits for, and whether it is still
+ * opening here. A read that waits on the store opening is loading, as a query's first fetch is,
+ * while one that waits on another tab is not.
+ */
 function useActiveStore() {
   const store = useStore()
-  return { store, active: useStoreState() === 'active' }
+  const state = useStoreState()
+  return { store, active: state === 'active', opening: state === 'waiting' }
 }
 
 /** A store failure's message, except for the store moving to another tab. */
 const storeError = (err: unknown) => (!err || isStoreClosed(err) ? null : messageOf(err))
 
-export function useConversations(): { conversations: ChatListItem[]; error: string | null } {
-  const { store, active } = useActiveStore()
-  const { data, error } = useQuery({
+export function useConversations(): {
+  conversations: ChatListItem[]
+  /** Whether the list is on its way from the local copy for the first time. */
+  isLoading: boolean
+  error: string | null
+} {
+  const { store, active, opening } = useActiveStore()
+  const { data, isLoading, error } = useQuery({
     queryKey: ['conversations'],
     queryFn: () => store.worker.listConversations(),
     enabled: active,
   })
-  return { conversations: data ?? [], error: storeError(error) }
+  return { conversations: data ?? [], isLoading: opening || isLoading, error: storeError(error) }
 }
 
 /** The query that refreshes a conversation from the PDS. Invalidating it refreshes again. */
@@ -94,11 +104,15 @@ export const conversationRefreshKey = (skey: string) => ['conversation', skey, '
 /** A conversation from the local copy, shown at once and refreshed from the PDS when opened. */
 export function useConversation(skey: string): {
   conversation: Conversation | null
+  /** Whether the conversation is on its way from the local copy for the first time. */
+  isLoading: boolean
   /** Whether the refresh from the PDS has finished, so a conversation with no messages has none. */
   refreshed: boolean
+  /** Whether the first refresh from the PDS is on its way. */
+  refreshing: boolean
   error: string | null
 } {
-  const { store, active } = useActiveStore()
+  const { store, active, opening } = useActiveStore()
   const local = useQuery({
     queryKey: ['conversation', skey],
     queryFn: () => store.worker.getConversation(skey),
@@ -116,7 +130,9 @@ export function useConversation(skey: string): {
   })
   return {
     conversation: local.data ?? null,
+    isLoading: opening || local.isLoading,
     refreshed: refreshed.isSuccess,
+    refreshing: opening || refreshed.isLoading,
     error: storeError(local.error ?? refreshed.error),
   }
 }
@@ -125,10 +141,12 @@ export function useConversation(skey: string): {
 export function useChatSearch(query: string): {
   results: SearchResult[]
   remaining: number
+  /** Whether the first search is on its way. Later ones keep the last results while they run. */
+  isLoading: boolean
   error: string | null
 } {
-  const { store, active } = useActiveStore()
-  const { data, error } = useQuery({
+  const { store, active, opening } = useActiveStore()
+  const { data, isLoading, error } = useQuery({
     queryKey: ['search', query],
     queryFn: async () => {
       const [results, remaining] = await Promise.all([
@@ -140,7 +158,12 @@ export function useChatSearch(query: string): {
     enabled: active && query.trim() !== '',
     placeholderData: keepPreviousData,
   })
-  return { results: data?.results ?? [], remaining: data?.remaining ?? 0, error: storeError(error) }
+  return {
+    results: data?.results ?? [],
+    remaining: data?.remaining ?? 0,
+    isLoading: opening || isLoading,
+    error: storeError(error),
+  }
 }
 
 /** How current this device's copy is, updated as the store syncs and downloads. */

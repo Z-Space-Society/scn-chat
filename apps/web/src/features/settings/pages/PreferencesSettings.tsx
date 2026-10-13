@@ -23,7 +23,7 @@ import { preferencesQuery } from '../queries.ts'
  * them shows an alert.
  */
 export function PreferencesSettings() {
-  const { models, error } = useModels()
+  const { models, loading, error } = useModels()
   const { data: stored } = useSuspenseQuery(preferencesQuery)
   return (
     <SettingsPage
@@ -32,7 +32,7 @@ export function PreferencesSettings() {
     >
       <ErrorAlert error={error} />
       <Appearance />
-      <PreferencesForm stored={stored ?? {}} models={models} />
+      <PreferencesForm stored={stored ?? {}} models={models} modelsLoading={loading} />
     </SettingsPage>
   )
 }
@@ -68,6 +68,7 @@ interface PreferencesFormProps {
   /** The stored preferences record. */
   stored: Record<string, unknown>
   models: ModelOption[]
+  modelsLoading: boolean
 }
 
 function PreferencesForm(props: PreferencesFormProps) {
@@ -109,6 +110,7 @@ function PreferencesForm(props: PreferencesFormProps) {
               >
                 <ModelSelect
                   id={field.name}
+                  loading={props.modelsLoading}
                   models={props.models}
                   value={field.state.value}
                   onChange={field.handleChange}

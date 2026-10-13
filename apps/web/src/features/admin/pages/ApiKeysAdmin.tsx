@@ -178,13 +178,7 @@ function IssueKeyForm(props: IssueKeyFormProps) {
             </form.Field>
           </SettingRow>
         </SettingsGroup>
-        <SaveBar
-          label="Issue key"
-          pendingLabel="Issuing…"
-          pending={props.pending}
-          saved={false}
-          error={props.error}
-        />
+        <SaveBar label="Issue key" pending={props.pending} saved={false} error={props.error} />
       </form.Form>
     </form.AppForm>
   )

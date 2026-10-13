@@ -2,6 +2,7 @@ import type { ModelRef } from '@scn-chat/lexicons'
 import { cn } from '../../../shared/cn.ts'
 import { ChevronDownIcon } from '../../../shared/icons.tsx'
 import { Select, type SelectOption } from '../../../shared/ui/Select.tsx'
+import { SkeletonText } from '../../../shared/ui/Skeleton.tsx'
 import { type ModelOption, modelRef, sameModel } from '../models.ts'
 import { type AutoEffort, effortOptions } from './EffortSelect.tsx'
 
@@ -35,6 +36,8 @@ interface Props {
   title?: string
   /** How the button looks: a field, or quiet text in a toolbar, as in the composer. */
   quiet?: boolean
+  /** Whether the models are on their way, which holds the button with a line in place of a name. */
+  loading?: boolean
   className?: string
 }
 
@@ -58,6 +61,23 @@ export function ModelSelect(props: Props) {
       ? efforts.find((option) => option.value === effort.value)
       : undefined
   const modelLabel = options.find((option) => option.value === key)?.label
+  if (props.loading)
+    return (
+      <Select
+        id={props.id}
+        aria-label={props['aria-label']}
+        title={props.title}
+        quiet={props.quiet}
+        className={props.className}
+        options={[]}
+        value=""
+        onChange={() => {}}
+        disabled
+      >
+        <SkeletonText className="w-24 min-w-0 flex-1" />
+        <ChevronDownIcon className="size-3.25 in-[[data-quiet]]:text-muted-quiet text-muted" />
+      </Select>
+    )
   return (
     <Select
       id={props.id}

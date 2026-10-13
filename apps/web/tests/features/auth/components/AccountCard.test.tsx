@@ -41,9 +41,10 @@ describe('AccountCard', () => {
 
   it('shows the handle alone and an initial without a profile', async () => {
     const { container } = await renderCard({ displayName: null, avatar: null })
-    expect(await screen.findByText('alice.test')).toBeInTheDocument()
+    // A skeleton stands in until the profile answers.
+    expect(await screen.findByText('A')).toBeInTheDocument()
+    expect(screen.getByText('alice.test')).toBeInTheDocument()
     expect(container.querySelector('img')).toBeNull()
-    expect(screen.getByText('A')).toBeInTheDocument()
   })
 
   it('falls back to the initial when the avatar fails to load', async () => {

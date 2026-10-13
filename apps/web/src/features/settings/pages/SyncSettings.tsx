@@ -8,6 +8,7 @@ import { Switch } from '../../../shared/ui/controls.tsx'
 import {
   Callout,
   SettingRow,
+  SettingRowSkeleton,
   SettingsGroup,
   SettingsPage,
 } from '../../../shared/ui/SettingsPage.tsx'
@@ -51,6 +52,7 @@ export function SyncSettings() {
     >
       <StorageNote local={me.storageMode === 'local'} />
       <SettingsGroup>
+        {account.isPending && <SettingRowSkeleton />}
         {account.data?.allowUserOptOut && (
           <SettingRow
             label="Keep chats in sync in the background"
@@ -71,10 +73,10 @@ export function SyncSettings() {
         >
           <Button
             aria-label="Rebuild this device's copy"
-            disabled={rebuild.isPending}
+            busy={rebuild.isPending}
             onClick={() => rebuild.mutate()}
           >
-            {rebuild.isPending ? 'Rebuilding…' : 'Rebuild'}
+            Rebuild
           </Button>
         </SettingRow>
       </SettingsGroup>

@@ -62,6 +62,9 @@
   /* The quiet dot before a reply's model name. */
   --color-author-dot: color-mix(in srgb, var(--color-faint) 55%, var(--color-panel));
   --color-hover: light-dark(oklch(0.918 0 0), oklch(0.302 0 0));
+  /* The shapes standing in for content on its way, which show on the sidebar, the panel, and a
+     card alike. */
+  --color-skeleton: light-dark(oklch(0.935 0 0), oklch(0.27 0 0));
   /* The sidebar's rows: a faint tint when hovered, and a firmer one for the search field and a
      row's menu button. The open row's tint is fainter still, so it never reads as New chat's. */
   --color-row-hover: light-dark(#0000000a, #ffffff0a);
@@ -298,6 +301,9 @@
   --animate-layer-settle: panel-in var(--dur-layer) var(--ease-out);
   /* The message landed on glows a moment, so the eye finds it. */
   --animate-landed: landed 2s var(--ease-out);
+  /* Content on its way pulses gently in its skeleton, and a busy control's spinner turns. */
+  --animate-skeleton: skeleton var(--slow) ease-in-out infinite;
+  --animate-spin: spin 0.9s linear infinite;
 
   @keyframes fade-in {
     from {
@@ -335,6 +341,18 @@
   @keyframes breathe {
     50% {
       opacity: 0.55;
+    }
+  }
+
+  @keyframes skeleton {
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  @keyframes spin {
+    to {
+      rotate: 1turn;
     }
   }
 }

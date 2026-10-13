@@ -152,6 +152,14 @@ describe('SearchResults', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Still downloading 3 chats.')
   })
 
+  it('shows skeletons until the first search answers, rather than saying nothing matched', async () => {
+    await renderAt(
+      <SearchResults loading query="blue" onClear={() => {}} results={[]} remaining={0} />,
+    )
+    expect(screen.getByRole('status')).toHaveTextContent('Searching')
+    expect(screen.queryByText(/No chats match/)).not.toBeInTheDocument()
+  })
+
   it('names the search when nothing matched, with a button that clears it', async () => {
     const onClear = vi.fn()
     await renderAt(<SearchResults query=" blue " onClear={onClear} results={[]} remaining={0} />)

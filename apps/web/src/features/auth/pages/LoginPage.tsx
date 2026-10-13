@@ -93,26 +93,13 @@ export function LoginPage(props: Props) {
               {props.error}
             </p>
           )}
-          <Button type="submit" disabled={redirecting} className="mt-2.5 h-10.5">
-            <SubmitLabel redirecting={redirecting} />
+          <Button type="submit" busy={redirecting} className="mt-2.5 h-10.5">
+            Continue <ArrowRightIcon />
           </Button>
           {props.next && <input type="hidden" name="next" value={props.next} />}
         </form>
         {props.children}
       </section>
     </main>
-  )
-}
-
-interface SubmitLabelProps {
-  redirecting: boolean
-}
-
-function SubmitLabel(props: SubmitLabelProps) {
-  if (props.redirecting) return <>Redirecting to your PDS…</>
-  return (
-    <>
-      Continue <ArrowRightIcon />
-    </>
   )
 }

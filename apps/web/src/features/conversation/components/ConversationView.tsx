@@ -17,6 +17,7 @@ import { BranchComposer } from './BranchComposer.tsx'
 import { BranchView } from './BranchView.tsx'
 import type { ComposerHandle } from './Composer.tsx'
 import { ConversationHeader } from './ConversationHeader.tsx'
+import { ConversationSkeleton } from './ConversationSkeleton.tsx'
 import { EmptyConversation } from './EmptyConversation.tsx'
 import { LiveAuthor } from './LiveAuthor.tsx'
 import { type ConversationOperations, MessageActions } from './message-actions.tsx'
@@ -28,12 +29,21 @@ interface Props {
 
 /** A conversation: its header, the branch on screen with replies streaming in, and the composer. */
 export function ConversationView(props: Props) {
-  const { conversation, refreshed, error: loadError } = useConversation(props.skey)
+  const {
+    conversation,
+    isLoading,
+    refreshed,
+    refreshing,
+    error: loadError,
+  } = useConversation(props.skey)
   const me = useMe()
   const { models } = useModels()
   // The user message being edited, by rkey, so the composer reads it from the conversation.
   const [editingRkey, setEditingRkey] = useState<string | null>(null)
   const messages = conversation?.messages ?? []
+  // The messages are on their way until the local copy answers, or, when it has none, until the
+  // PDS has. While another tab holds the copy, the banner over the page says why instead.
+  const waiting = isLoading || (messages.length === 0 && refreshing)
   // The messages there when the chat first loaded, which show at once. Only later ones fade in.
   const [opened, setOpened] = useState<Set<string> | null>(null)
   if (opened === null && conversation) setOpened(new Set(messages.map((m) => m.rkey)))
@@ -92,12 +102,17 @@ export function ConversationView(props: Props) {
     >
       <ConversationHeader
         skey={props.skey}
-        title={(conversation?.info?.title as string | undefined) ?? 'New chat'}
+        title={
+          waiting && !conversation
+            ? undefined
+            : ((conversation?.info?.title as string | undefined) ?? 'New chat')
+        }
         outline={outlineOf(branch)}
         onRename={actions.rename}
         onSync={actions.sync}
       />
       <ErrorAlert error={actions.error ?? loadError} />
+      {waiting && <ConversationSkeleton />}
       {refreshed && messages.length === 0 && (
         <EmptyConversation onStart={(text) => composer.current?.fill(text)} />
       )}
@@ -122,7 +137,7 @@ export function ConversationView(props: Props) {
           <Button
             size="small"
             className="mt-2.5"
-            disabled={actions.regenerating}
+            busy={actions.regenerating}
             onClick={() =>
               actions.regenerate((message.record.parent as string | undefined) ?? null, null)
             }

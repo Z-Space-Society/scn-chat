@@ -54,6 +54,8 @@ export const themeNames = {
     'layer-out',
     'layer-settle',
     'landed',
+    'skeleton',
+    'spin',
   ],
   breakpoint: ['wide'],
 }

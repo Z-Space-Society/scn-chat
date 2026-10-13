@@ -13,6 +13,7 @@ import {
   SaveBar,
   SettingRow,
 } from '../../../src/shared/ui/SettingsPage.tsx'
+import { Loading, SkeletonText } from '../../../src/shared/ui/Skeleton.tsx'
 
 describe('Button', () => {
   it('is a plain button unless it submits', () => {
@@ -24,6 +25,26 @@ describe('Button', () => {
     )
     expect(screen.getByRole('button', { name: 'Cancel' })).toHaveAttribute('type', 'button')
     expect(screen.getByRole('button', { name: 'Save' })).toHaveAttribute('type', 'submit')
+  })
+
+  it('keeps its label while busy, disabled and marked busy', () => {
+    render(<Button busy>Load models</Button>)
+    const button = screen.getByRole('button', { name: 'Load models' })
+    expect(button).toBeDisabled()
+    expect(button).toHaveAttribute('aria-busy', 'true')
+  })
+})
+
+describe('Loading', () => {
+  it('reads out what is loading once, with its skeletons hidden', () => {
+    const { container } = render(
+      <Loading label="Loading chats">
+        <SkeletonText className="w-24" />
+      </Loading>,
+    )
+    expect(screen.getByRole('status')).toHaveTextContent('Loading chats')
+    expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true')
+    expect(container.querySelector('[aria-hidden="true"]')).toBeInTheDocument()
   })
 })
 
@@ -87,9 +108,11 @@ describe('SaveBar', () => {
     expect(screen.getByRole('alert')).toHaveTextContent("Couldn't save.")
   })
 
-  it('says it is saving while it saves', () => {
+  it('is busy while it saves, keeping its label', () => {
     render(<SaveBar pending saved={false} />)
-    expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled()
+    const save = screen.getByRole('button', { name: 'Save' })
+    expect(save).toBeDisabled()
+    expect(save).toHaveAttribute('aria-busy', 'true')
     expect(screen.getByRole('status')).toBeEmptyDOMElement()
   })
 })

@@ -165,13 +165,13 @@ interface SubmitButtonProps {
   children: ReactNode
 }
 
-/** The form's submit button, disabled while the form submits. */
+/** The form's submit button, busy while the form submits. */
 function SubmitButton(props: SubmitButtonProps) {
   const form = useFormContext()
   return (
     <form.Subscribe selector={(state) => state.isSubmitting}>
       {(isSubmitting) => (
-        <Button type="submit" size={props.size} className={props.className} disabled={isSubmitting}>
+        <Button type="submit" size={props.size} className={props.className} busy={isSubmitting}>
           {props.children}
         </Button>
       )}

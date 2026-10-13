@@ -128,6 +128,24 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('ConversationView', () => {
+  it('shows skeletons in place of the title and messages until the local copy answers', async () => {
+    const store = fakeStore([user('u', 'question')])
+    let answer = () => {}
+    store.worker.getConversation.mockImplementationOnce(
+      (skey: string) =>
+        new Promise((resolve) => {
+          answer = () => resolve({ skey, info: { title: 'Tiles' }, messages: store.data.messages })
+        }),
+    )
+    await renderWith(store, <ConversationView skey="s1" />)
+    expect(await screen.findByText('Loading messages')).toBeInTheDocument()
+    expect(screen.queryByText('New chat')).toBeNull()
+    await act(async () => answer())
+    expect(await screen.findByText('question')).toBeInTheDocument()
+    expect(screen.getByText('Tiles')).toBeInTheDocument()
+    expect(screen.queryByText('Loading messages')).toBeNull()
+  })
+
   it('opens a linked message on its branch and scrolls to it', async () => {
     const scrolled = vi.fn()
     Element.prototype.scrollIntoView = function (this: Element) {

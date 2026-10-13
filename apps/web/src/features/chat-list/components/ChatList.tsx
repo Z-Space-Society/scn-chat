@@ -7,13 +7,14 @@ import { NewChatIcon, SearchIcon } from '../../../shared/icons.tsx'
 import { sectionHeading, sidebarScroll } from '../../../shared/ui/sidebar.ts'
 import { useDebounced } from '../../../shared/useDebounced.ts'
 import type { ChatListItem } from '../../../store/core.ts'
-import { useChatSearch, useConversations, useStore } from '../../../store/react.tsx'
+import { useChatSearch, useConversations, useStore, useSyncStatus } from '../../../store/react.tsx'
 import { AccountMenu } from '../../auth/components/AccountMenu.tsx'
 import { useSignOut } from '../../auth/hooks/useSignOut.ts'
 import { MeContext } from '../../auth/session.ts'
 import { groupByDate } from '../lib/groups.ts'
 import { markSeen, type Seen, useSeen } from '../lib/seen.ts'
 import { ChatItem } from './ChatItem.tsx'
+import { ChatRowsSkeleton } from './ChatListSkeleton.tsx'
 import { SearchResults } from './SearchResults.tsx'
 import { SyncDot, SyncPanel, useSyncNow } from './SyncStatus.tsx'
 import { TagFilter } from './TagFilter.tsx'
@@ -37,7 +38,11 @@ const isUnseen = (chat: ChatListItem, seen: Seen | null, current: string | undef
  * what the search found, and the account at the foot. Only the chats scroll.
  */
 export function ChatList() {
-  const { conversations, error: loadError } = useConversations()
+  const { conversations, isLoading, error: loadError } = useConversations()
+  const status = useSyncStatus()
+  // The chats are on their way until the local copy answers, or, when it has none yet, until the
+  // chat index first syncs, as on a first sign-in.
+  const loading = isLoading || (conversations.length === 0 && status?.syncedAt === null)
   const store = useStore()
   const navigate = useNavigate()
   const current = useParams({ strict: false, select: (params) => params.skey })
@@ -134,6 +139,7 @@ export function ChatList() {
           query={typed}
           results={found.results}
           remaining={found.remaining}
+          loading={found.isLoading}
           onClear={() => {
             closeSearch()
             searchButton.current?.focus()
@@ -141,6 +147,8 @@ export function ChatList() {
         />
       ) : (
         <div className={sidebarScroll}>
+          {/* At once, as it takes over from the frame's. */}
+          {loading && <ChatRowsSkeleton heading immediate label="Loading chats" />}
           {tags.length > 0 && <TagFilter tags={tags} active={activeTag} onChange={setTag} />}
           {groupByDate(shown).map((group) => (
             <section key={group.label} aria-label={group.label} className="group/section">

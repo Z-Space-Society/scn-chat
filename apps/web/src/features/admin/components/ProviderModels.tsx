@@ -115,8 +115,8 @@ export function ProviderModels(props: Props) {
               Add model
             </Button>
             {props.provider.listsModels && (
-              <Button tone="quiet" disabled={list.isPending} onClick={() => list.mutate()}>
-                {list.isPending ? 'Loading…' : 'Refresh model list'}
+              <Button tone="quiet" busy={list.isPending} onClick={() => list.mutate()}>
+                Refresh model list
               </Button>
             )}
           </form.Form>

@@ -13,11 +13,15 @@ export function createQueryClient() {
 
 /**
  * What every route shows while loading or after failing, unless it says otherwise. Each route
- * gets its own boundaries, so a failed section shows inside its layout.
+ * gets its own boundaries, so a failed section shows inside its layout. A route shows its pending
+ * skeleton only once loading has taken the theme's quiet wait, 400ms, so a quick load never
+ * flashes it, and keeps it long enough to read as a step rather than a flicker.
  */
 export const routerDefaults = {
   defaultErrorComponent: RouteError,
   defaultPendingComponent: RoutePending,
+  defaultPendingMs: 400,
+  defaultPendingMinMs: 300,
 }
 
 /**

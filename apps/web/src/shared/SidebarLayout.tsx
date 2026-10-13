@@ -13,7 +13,7 @@ interface Props {
   kind: 'chats' | 'settings'
   /** What the sidebar holds, such as the chat list or links to each section. */
   nav?: ReactNode
-  /** The page's frame while its code loads, with no head. */
+  /** The page's frame while its code loads, its nav a skeleton of what will fill it. */
   frame?: boolean
   children?: ReactNode
 }
@@ -81,13 +81,11 @@ export function SidebarLayout(props: Props) {
           'wide:transition-[margin-inline-start,opacity,visibility] wide:duration-(--dur-slide) wide:ease-slide',
         )}
       >
-        {!props.frame && (
-          // The logo and the toggle, on one row as tall as the chat's header.
-          <header className="-mt-2.5 flex h-bar flex-none items-center gap-0.5">
-            <AppLogo />
-            <SidebarToggle className="ms-auto" />
-          </header>
-        )}
+        {/* The logo and the toggle, on one row as tall as the chat's header. */}
+        <header className="-mt-2.5 flex h-bar flex-none items-center gap-0.5">
+          <AppLogo />
+          <SidebarToggle className="ms-auto" />
+        </header>
         {props.nav}
       </nav>
       {backdrop}

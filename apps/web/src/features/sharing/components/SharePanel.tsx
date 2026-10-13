@@ -9,6 +9,7 @@ import { Button } from '../../../shared/ui/Button.tsx'
 import { field } from '../../../shared/ui/controls.tsx'
 import { floating } from '../../../shared/ui/menu.ts'
 import { Select } from '../../../shared/ui/Select.tsx'
+import { Loading, Skeleton } from '../../../shared/ui/Skeleton.tsx'
 import { formatMembers, type Members, parseMembers } from '../lib/members.ts'
 import { sharingQuery } from '../queries.ts'
 
@@ -46,7 +47,12 @@ export function SharePanel(props: Props) {
   if (!settings.data)
     return (
       <Card className={props.className}>
-        <p className="text-muted text-small">Loading…</p>
+        {/* The mode's select and Save, on their way. */}
+        <Loading label="Loading sharing" className="flex min-w-48 flex-1 gap-2">
+          <Skeleton className="h-8.5 flex-1" />
+          <Skeleton className="h-8.5 w-14" />
+        </Loading>
+        <CloseButton onClose={props.onClose} />
       </Card>
     )
   return (

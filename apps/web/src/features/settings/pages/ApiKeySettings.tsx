@@ -284,11 +284,12 @@ function AddApiKeyForm() {
                   />
                   {provider?.listsModels && (
                     <Button
-                      disabled={!apiKey || listModels.isPending}
+                      busy={listModels.isPending}
+                      disabled={!apiKey}
                       onClick={() => listModels.mutate(form.state.values)}
                       className="flex-none"
                     >
-                      {listModels.isPending ? 'Loading…' : 'Load models'}
+                      Load models
                     </Button>
                   )}
                 </div>
@@ -303,8 +304,8 @@ function AddApiKeyForm() {
           </span>
           <form.Subscribe selector={(state) => state.isSubmitting}>
             {(submitting) => (
-              <Button type="submit" disabled={submitting || add.isPending}>
-                {add.isPending ? 'Adding…' : 'Add key'}
+              <Button type="submit" busy={submitting || add.isPending}>
+                Add key
               </Button>
             )}
           </form.Subscribe>

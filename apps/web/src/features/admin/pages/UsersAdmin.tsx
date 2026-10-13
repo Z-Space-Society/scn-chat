@@ -2,7 +2,7 @@ import { useSuspenseInfiniteQuery, useSuspenseQuery } from '@tanstack/react-quer
 import { Suspense } from 'react'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
 import { Button } from '../../../shared/ui/Button.tsx'
-import { ItemList } from '../../../shared/ui/ItemList.tsx'
+import { ItemList, ItemRowsSkeleton } from '../../../shared/ui/ItemList.tsx'
 import {
   cardAlert,
   SettingsEmpty,
@@ -32,7 +32,7 @@ export function UsersAdmin(props: UsersAdminProps) {
       <SettingsGroup title="Accounts">
         <UserSearch q={props.q} />
         {/* Only the results wait for a new search, so the search box keeps its focus. */}
-        <Suspense fallback={<SettingsEmpty>Loading…</SettingsEmpty>}>
+        <Suspense fallback={<ItemRowsSkeleton initial className={undivided} />}>
           <UserList q={props.q} />
         </Suspense>
       </SettingsGroup>
@@ -65,7 +65,7 @@ function UserList(props: UserListProps) {
       </ItemList>
       {users.hasNextPage && (
         <div className={`flex justify-center p-card-pad ${undivided}`}>
-          <Button disabled={users.isFetchingNextPage} onClick={() => void users.fetchNextPage()}>
+          <Button busy={users.isFetchingNextPage} onClick={() => void users.fetchNextPage()}>
             Load more
           </Button>
         </div>

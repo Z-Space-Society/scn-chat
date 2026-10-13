@@ -3,6 +3,7 @@ import { type ErrorComponentProps, useRouter } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { ErrorAlert } from './ErrorAlert.tsx'
 import { Button } from './ui/Button.tsx'
+import { SettingsPageSkeleton } from './ui/SettingsPage.tsx'
 
 /**
  * What a route shows when its loader or a query it suspends on fails, in place of the route, so
@@ -21,7 +22,10 @@ export function RouteError(props: ErrorComponentProps) {
   )
 }
 
-/** What a route shows while it loads, once loading takes long enough to notice. */
+/**
+ * What a route shows while it loads, once loading takes long enough to notice. Only settings and
+ * admin pages load before they show, so it is a settings page's skeleton.
+ */
 export function RoutePending() {
-  return <p className="py-8 text-muted">Loading…</p>
+  return <SettingsPageSkeleton />
 }

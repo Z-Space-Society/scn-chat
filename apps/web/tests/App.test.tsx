@@ -170,6 +170,22 @@ describe('App', () => {
     expect(openStore).not.toHaveBeenCalled()
   })
 
+  it("shows why a shared chat couldn't open on the shared page, with a way to retry", async () => {
+    signedIn()
+    const answer = globalThis.fetch
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) =>
+        url.startsWith('/api/shared/')
+          ? Promise.resolve(Response.json({ error: 'NotFound' }, { status: 404 }))
+          : answer(url, init),
+      ),
+    )
+    renderApp('/shared/did:plc:alice/3aaa')
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
+  })
+
   it("signs the device out when the store's sync finds the session has ended", async () => {
     signedIn()
     const assign = vi.fn()

@@ -6,6 +6,7 @@ import { ListIcon, MoreIcon, PencilIcon, ShareIcon, SyncIcon } from '../../../sh
 import { Button } from '../../../shared/ui/Button.tsx'
 import { MenuItem } from '../../../shared/ui/MenuItem.tsx'
 import { floating } from '../../../shared/ui/menu.ts'
+import { SkeletonText } from '../../../shared/ui/Skeleton.tsx'
 import { useDismiss } from '../../../shared/useDismiss.ts'
 import { useMe } from '../../auth/session.ts'
 import { SharePanel } from '../../sharing/components/SharePanel.tsx'
@@ -14,7 +15,8 @@ import { PromptStack } from './PromptStack.tsx'
 
 interface Props {
   skey: string
-  title: string
+  /** The chat's title, or nothing while it is on its way. */
+  title: string | undefined
   /** The user's messages on the branch on screen, to jump between. */
   outline: OutlineEntry[]
   /** Rename the conversation, resolving once the new title is saved. Its caller shows a failure. */
@@ -53,13 +55,20 @@ export function ConversationHeader(props: Props) {
         'in-data-sidebar-collapsed:ps-[calc(--spacing(2.75)+var(--spacing-toggle)+--spacing(1.5))] max-wide:ps-[calc(--spacing(2.75)+var(--spacing-toggle)+--spacing(1.5))]',
       )}
     >
-      {panel === 'rename' ? (
+      {props.title === undefined && (
+        // The title on its way, a line where the title's text will be.
+        <span className="min-w-0 flex-1 px-2.25 py-1.25 text-ui">
+          <SkeletonText className="w-40 max-w-full" />
+        </span>
+      )}
+      {props.title !== undefined && panel === 'rename' && (
         <RenameForm
           title={props.title}
           onRename={(title) => props.onRename(title).then(close, noop)}
           onCancel={close}
         />
-      ) : (
+      )}
+      {props.title !== undefined && panel !== 'rename' && (
         // The title is set a step quieter than a heading, so the messages lead, and reads as plain
         // text until hovered or focused, when a faint pencil shows beside it.
         <h2 className="flex min-w-0 flex-1 font-medium text-ink-strong text-ui">

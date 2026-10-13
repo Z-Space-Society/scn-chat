@@ -5,6 +5,7 @@ import {
   createLucideIcon,
   Download,
   KeyRound,
+  LoaderCircle,
   type LucideIcon,
   Puzzle,
   Users,
@@ -535,3 +536,10 @@ export const BulbIcon = icon(PuffyBulb)
 export const SparkleIcon = icon(PuffySparkles)
 export const AlertIcon = icon(SoftAlert)
 export const RetryIcon = icon(PuffyRetry)
+
+const LoaderIcon = icon(LoaderCircle)
+
+/** A turning arc, for a control busy with what it was asked to do. It holds still for reduced motion. */
+export function SpinnerIcon() {
+  return <LoaderIcon className="animate-spin motion-reduce:animate-none" />
+}

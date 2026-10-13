@@ -8,6 +8,7 @@ import { parseDate, shortTime } from '../../../shared/time.ts'
 import { Button } from '../../../shared/ui/Button.tsx'
 import { sidebarRow, sidebarScroll } from '../../../shared/ui/sidebar.ts'
 import { MATCH_END, MATCH_START, type SearchResult } from '../../../store/search.ts'
+import { ChatRowsSkeleton } from './ChatListSkeleton.tsx'
 
 const MATCH = new RegExp(`(${MATCH_START}[^${MATCH_END}]*${MATCH_END})`)
 
@@ -220,11 +221,19 @@ interface SearchResultsProps {
   query: string
   results: SearchResult[]
   remaining: number
+  /** Whether the first search is on its way, before which there are no results to tell of. */
+  loading?: boolean
   /** Close the search, so the chats show again. */
   onClear: () => void
 }
 
 export function SearchResults(props: SearchResultsProps) {
+  if (props.loading)
+    return (
+      <div className={sidebarScroll}>
+        <ChatRowsSkeleton label="Searching" />
+      </div>
+    )
   return (
     <div className={sidebarScroll}>
       {props.remaining > 0 && (

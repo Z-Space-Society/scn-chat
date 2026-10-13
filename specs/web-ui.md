@@ -89,6 +89,15 @@ The root route's `beforeLoad` asks `/api/me` who is signed in, through the query
   - API keys: a list of the user's keys, each with its name, provider, and last four characters, or a note when there are none. Deleting a key asks to confirm in its row first. Below it, a form to add a key, with its labels over its fields: provider, key, an optional name, and model IDs, with a button to load the provider's models where it lists them. For providers with user endpoints, base URL and slug fields.
   - Plugins: one form with a card per plugin and a single Save, which saves every plugin's settings and any tool switches that changed. A card has a switch for each tool the user may switch, labeled "Enabled" when it is the plugin's only one and by tool name otherwise, with the tool's description, then the fields generated from the plugin's JSON schema. When no plugin has settings or switches for the user, the section says so rather than showing nothing.
   - Sync: a note saying where the user's chats are stored, their PDS or this server, then the background sync switch, shown only when the admin allows users to opt out, and a button that deletes and rebuilds the browser store. The switch moves as soon as it is clicked.
+- **Loading.** Content on its way shows a skeleton in its own shape, which fades in only after a quiet wait, rather than the words "Loading…" or an empty space:
+  - The page's frame, which the server sends for the chat routes, has the sidebar's logo and toggle over skeletons of New chat, the chats, and the account card, and the chat list keeps the rows' skeleton until the local copy answers, or, when it has no chats yet, until the chat index first syncs. While another tab holds the copy, the banner says why instead.
+  - A search shows result rows until it first answers, so it never says that nothing matched before it has looked.
+  - The account card shows its avatar's tile and a line for the name until the profile answers.
+  - A conversation shows a line for its title and the shape of its first turn until the local copy answers, or, when it has no messages, until the PDS has, so a titled chat never flashes "New chat".
+  - The composer's and Preferences' model selects hold a line in place of the name until the models load.
+  - The sharing panel, the shared page, which the server also sends as its skeleton, settings and admin pages, the users list, and the Sync page's background switch each show their own shapes.
+
+  A button busy with what it was asked, such as Save, Load models, or Sign in's Continue, keeps its label with a spinner before it.
 - **Admin.** The admin specs describe each section. `features/admin/pages/` mirrors `features/settings/pages/`: a layout for the sidebar, which groups the sections under People, Features, and App, each with an icon, links back to the chats and to the account settings, marks the current section, a plugin's page counting as Plugins, and one file per section. Sections are built like the settings ones, with tables and lists in cards, in the same column width as every other section. A page opened from another, such as a role's or a plugin's, has a link back above its title. Removing a role, a plugin, or a model, and revoking a key, asks to confirm in place first. Suspending a user first asks for a reason, seen only by admins. Status, such as a plugin's or whether an account is suspended, shows as a badge. A form that edits stored values starts from them, and starts over when they change after a save. A failed save shows its message, and the field issues the server returns show beside their fields.
 
 ### Schema forms
@@ -178,3 +187,4 @@ While the reader is at the bottom of the conversation, it stays scrolled to the 
 - [x] A user who is not an admin requesting an admin route gets a redirect to `/` from the server.
 - [x] `/admin` opens on the users section, and the users search is kept in the URL.
 - [x] The sidebar collapses on a wide screen and is a drawer below 720px.
+- [x] Content on its way shows a skeleton in its shape, no page says "Loading…", and a busy button keeps its label beside a spinner.

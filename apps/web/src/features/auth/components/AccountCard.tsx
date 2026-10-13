@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { type ReactNode, useContext, useState } from 'react'
+import { Skeleton, SkeletonText } from '../../../shared/ui/Skeleton.tsx'
 import { profileQuery } from '../queries.ts'
 import { MeContext } from '../session.ts'
 
@@ -10,13 +11,25 @@ interface Props {
 
 /**
  * Who is signed in: their avatar, display name, and handle, from their public profile. It shows
- * nothing outside a signed-in session, and the handle alone until the profile loads or if it can't.
+ * nothing outside a signed-in session, skeletons while the profile loads, and the handle alone if
+ * it can't.
  * It is phrasing content, so it can sit inside a button.
  */
 export function AccountCard(props: Props) {
   const me = useContext(MeContext)
-  const { data: profile } = useQuery({ ...profileQuery, enabled: me !== null })
+  const { data: profile, isPending } = useQuery({ ...profileQuery, enabled: me !== null })
   if (!me) return null
+  if (isPending)
+    return (
+      <span title={me.did} className="flex min-w-0 flex-1 items-center gap-2.5">
+        <span className="relative inline-flex flex-none">
+          <Skeleton className="size-8" />
+          {props.badge}
+        </span>
+        <span className="sr-only">{me.handle ?? me.did}</span>
+        <SkeletonText className="w-24 text-small leading-[1.2]" />
+      </span>
+    )
   const handle = me.handle ? `@${me.handle}` : me.did
   const name = profile?.displayName ?? me.handle ?? me.did
   return (

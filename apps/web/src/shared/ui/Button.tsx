@@ -1,6 +1,7 @@
 import { cva, type VariantProps } from 'class-variance-authority'
 import type { ComponentProps } from 'react'
 import { cn } from '../cn.ts'
+import { SpinnerIcon } from '../icons.tsx'
 
 /**
  * A control: a small white card with a hairline border that gives a little when pressed. The main
@@ -10,7 +11,7 @@ import { cn } from '../cn.ts'
  * action, such as a viewer's sign out, reads as a link.
  */
 export const button = cva(
-  'inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-small border font-medium no-underline transition-[background-color,color,scale] duration-150 ease-out [-webkit-tap-highlight-color:transparent] disabled:cursor-default disabled:opacity-40 motion-safe:active:not-disabled:scale-96',
+  'inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-small border font-medium no-underline transition-[background-color,color,scale] duration-150 ease-out [-webkit-tap-highlight-color:transparent] disabled:cursor-default disabled:opacity-40 aria-busy:disabled:opacity-75 motion-safe:active:not-disabled:scale-96',
   {
     variants: {
       tone: {
@@ -42,19 +43,26 @@ interface Props extends ComponentProps<'button'> {
   /** Defaults to primary for a form's submit, and to a plain card otherwise. */
   tone?: Variants['tone']
   size?: Variants['size']
+  /** Whether it is doing what it was asked, which disables it and turns a spinner before its label. */
+  busy?: boolean
 }
 
 export function Button(props: Props) {
-  const { tone, size, className, type = 'button', ...rest } = props
+  const { tone, size, busy, disabled, className, type = 'button', children, ...rest } = props
   return (
     <button
       {...rest}
       type={type}
+      disabled={busy || disabled}
+      aria-busy={busy || undefined}
       className={cn(
         button({ tone: tone ?? (type === 'submit' ? 'primary' : 'default'), size }),
         className,
       )}
-    />
+    >
+      {busy && <SpinnerIcon />}
+      {children}
+    </button>
   )
 }
 

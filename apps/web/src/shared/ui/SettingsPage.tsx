@@ -3,6 +3,7 @@ import { cn } from '../cn.ts'
 import { CheckIcon } from '../icons.tsx'
 import { Button, IconButton } from './Button.tsx'
 import { Radio } from './controls.tsx'
+import { Loading, Skeleton, SkeletonText } from './Skeleton.tsx'
 
 /*
  * The pieces settings and admin pages are built from: a page of cards, each holding rows of
@@ -276,8 +277,7 @@ export const fields = 'grid grid-cols-2 gap-4 @max-narrow:grid-cols-1'
 interface SaveBarProps {
   /** What the button says, Save unless it does something else, such as Add. */
   label?: string
-  /** What it says while it works. */
-  pendingLabel?: string
+  /** Whether it is saving, which turns a spinner before its label. */
   pending: boolean
   /** Whether there is nothing to save yet, such as before a required choice. */
   disabled?: boolean
@@ -309,8 +309,8 @@ export function SaveBar(props: SaveBarProps) {
           </>
         )}
       </span>
-      <Button type="submit" className="px-5 py-1.5" disabled={props.pending || props.disabled}>
-        {props.pending ? (props.pendingLabel ?? 'Saving…') : (props.label ?? 'Save')}
+      <Button type="submit" className="px-5 py-1.5" busy={props.pending} disabled={props.disabled}>
+        {props.label ?? 'Save'}
       </Button>
     </div>
   )
@@ -418,6 +418,62 @@ export function Callout(props: CalloutProps) {
     >
       {props.icon}
       <div className="min-w-0 flex-1">{props.children}</div>
+    </div>
+  )
+}
+
+/** The widths of a page skeleton's rows, a setting's name over what it does, so they differ. */
+const skeletonRows = [
+  { name: 'w-1/3', about: 'w-3/5' },
+  { name: 'w-1/4', about: 'w-1/2' },
+  { name: 'w-2/5', about: 'w-2/3' },
+]
+
+/**
+ * A settings page while it loads, in the page's own shape: its title and what it is for, over a
+ * card of rows, each a setting's name and description beside its control. It is a route's pending
+ * page, which the router already holds back until loading takes a while, so it shows at once.
+ */
+export function SettingsPageSkeleton() {
+  return (
+    <Loading immediate className="mx-auto w-full max-w-settings pt-9.5 pb-12 max-wide:pt-0">
+      <div className="mb-9">
+        <SkeletonText className="w-40 text-title leading-tight" />
+        <SkeletonText className="mt-0.75 w-80 max-w-full text-ui" />
+      </div>
+      <SkeletonText className="ms-card-pad mb-2.25 w-24 text-small leading-tight" />
+      <div className={cn('rounded-panel bg-card', dividedRows)}>
+        {skeletonRows.map((row) => (
+          <SettingRowShape key={row.name} name={row.name} about={row.about} />
+        ))}
+      </div>
+    </Loading>
+  )
+}
+
+/** A setting's row on its way, in a card of settings that has loaded, as one waiting on its own data. */
+export function SettingRowSkeleton() {
+  return (
+    <Loading>
+      <SettingRowShape name="w-2/5" about="w-3/5" />
+    </Loading>
+  )
+}
+
+interface ShapeProps {
+  /** The widths of the setting's name and of what it does. */
+  name: string
+  about: string
+}
+
+function SettingRowShape(props: ShapeProps) {
+  return (
+    <div className="flex items-center justify-between gap-8 p-card-pad">
+      <div className="min-w-0 flex-1">
+        <SkeletonText className={props.name} />
+        <SkeletonText className={cn('mt-0.5 text-small leading-[1.45]', props.about)} />
+      </div>
+      <Skeleton className="h-6 w-16 flex-none" />
     </div>
   )
 }

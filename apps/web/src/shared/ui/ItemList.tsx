@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { cn } from '../cn.ts'
 import { ChevronRightIcon } from '../icons.tsx'
+import { Loading, Skeleton, SkeletonText } from './Skeleton.tsx'
 
 /*
  * Lists of things in a card, such as keys, members, or plugins: a row each, with its names and its
@@ -157,5 +158,37 @@ export function LinkItem(props: LinkItemProps) {
       {props.actions}
       <ChevronRightIcon className="text-icon-quiet" />
     </li>
+  )
+}
+
+interface SkeletonProps {
+  /** Whether each row's mark is a person's initial, in a circle. */
+  initial?: boolean
+  className?: string
+}
+
+/** The widths of a list skeleton's rows, a title over a description, so they differ. */
+const skeletonRows = [
+  ['w-1/3', 'w-1/2'],
+  ['w-1/4', 'w-2/5'],
+  ['w-2/5', 'w-3/5'],
+  ['w-1/3', 'w-1/3'],
+  ['w-1/4', 'w-1/2'],
+]
+
+/** A list while it loads, in its rows' own shape: a mark beside a title over a description. */
+export function ItemRowsSkeleton(props: SkeletonProps) {
+  return (
+    <Loading className={props.className}>
+      {skeletonRows.map(([title, description]) => (
+        <div key={`${title}${description}`} className={row}>
+          <Skeleton className={cn('size-8 flex-none', props.initial && 'rounded-full')} />
+          <span className="flex min-w-32 flex-1 flex-col leading-[1.35]">
+            <SkeletonText className={title} />
+            <SkeletonText className={cn('text-small', description)} />
+          </span>
+        </div>
+      ))}
+    </Loading>
   )
 }

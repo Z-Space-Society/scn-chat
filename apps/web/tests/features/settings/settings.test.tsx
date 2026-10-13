@@ -139,7 +139,10 @@ describe('Settings preferences fields', () => {
         Response.json({ preferences: { defaultModel: { provider: 'gone', id: 'old' } } }),
     })
     await renderPage()
-    expect(await screen.findByLabelText('Default model')).toHaveTextContent('Unavailable: gone/old')
+    // The select holds a skeleton until the models load.
+    await vi.waitFor(() =>
+      expect(screen.getByLabelText('Default model')).toHaveTextContent('Unavailable: gone/old'),
+    )
     await userEvent.type(screen.getByLabelText('Custom instructions'), 'Metric units')
     await userEvent.click(screen.getAllByRole('button', { name: 'Save' })[0] as HTMLElement)
     await vi.waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Saved'))

@@ -22,11 +22,12 @@ describe('LoginPage', () => {
     expect(screen.getByRole('textbox')).toHaveAccessibleDescription('invalid_scope')
   })
 
-  it('shows it is redirecting once submitted', () => {
+  it('shows it is busy once submitted', () => {
     const { container } = render(<LoginPage appName="SCN Chat" />)
     // jsdom doesn't navigate, so submitting only runs the handler.
     fireEvent.submit(container.querySelector('form') as HTMLFormElement)
     expect(screen.getByRole('button')).toBeDisabled()
-    expect(screen.getByRole('button')).toHaveTextContent('Redirecting to your PDS')
+    expect(screen.getByRole('button')).toHaveAttribute('aria-busy', 'true')
+    expect(screen.getByRole('button')).toHaveTextContent('Continue')
   })
 })

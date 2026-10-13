@@ -91,7 +91,7 @@ export function Composer({ ref, ...props }: ComposerProps) {
   /** Let go of these quotes, keeping any added while a message was on its way. */
   const dropQuotes = (dropped: Quote[]) =>
     setQuotes((current) => current.filter((quote) => !dropped.includes(quote)))
-  const { models, fallback, noModels } = useModels(props.inherited ?? null)
+  const { models, loading: modelsLoading, fallback, noModels } = useModels(props.inherited ?? null)
   const queryClient = useQueryClient()
   // The chat created by a first message, kept so trying again after a failed send reuses it.
   const created = useRef<string | null>(null)
@@ -349,6 +349,7 @@ export function Composer({ ref, ...props }: ComposerProps) {
             <ModelSelect
               aria-label="Model"
               quiet
+              loading={modelsLoading}
               models={models}
               value={chosenModel}
               onChange={(next) => form.setFieldValue('model', next)}

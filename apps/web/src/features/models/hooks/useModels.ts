@@ -11,6 +11,8 @@ export function useModels(inherited: ModelRef | null = null) {
   const preferences = useQuery(preferencesQuery)
   return {
     models: catalog.data?.models ?? [],
+    /** The catalog, or the preferences that choose among it, are on their way. */
+    loading: catalog.isPending || preferences.isPending,
     /** The catalog loaded and offers the user no models at all. */
     noModels: catalog.data?.models.length === 0,
     fallback: fallbackModel(inherited, preferences.data, catalog.data),

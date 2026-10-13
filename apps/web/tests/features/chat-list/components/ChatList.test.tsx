@@ -36,6 +36,29 @@ function fakeStore() {
 }
 
 describe('ChatList', () => {
+  it('shows skeleton rows until the chat index first syncs, then the chats', async () => {
+    const store = fakeStore()
+    const status = { syncedAt: null as string | null, remaining: 0 }
+    store.worker.listConversations.mockResolvedValue([])
+    Object.assign(store.worker, { syncStatus: vi.fn(async () => status) })
+    await renderAt(
+      <StoreProvider store={store as unknown as StoreClient}>
+        <ChatList />
+      </StoreProvider>,
+    )
+    expect(await screen.findByText('Loading chats')).toBeInTheDocument()
+  })
+
+  it('shows no skeleton once the list has its chats', async () => {
+    await renderAt(
+      <StoreProvider store={fakeStore() as unknown as StoreClient}>
+        <ChatList />
+      </StoreProvider>,
+    )
+    expect(await screen.findByText('Tiles')).toBeInTheDocument()
+    expect(screen.queryByText('Loading chats')).toBeNull()
+  })
+
   it('reloads the list when the store reports a change to the chat index', async () => {
     const listeners = new Set<(change: { type: string }) => void>()
     const store = {

@@ -59,7 +59,7 @@ Every color is `light-dark(<light>, <dark>)` in oklch, so dark mode needs no `da
 | Type | `--text-caption`, `small`, `ui`, `body`, `heading`, `title`, `display` | `text-*` |
 | Radius | `--radius-panel` (was `--radius`), `card`, `small`, `badge`, `row`, `menu`, `bubble`, `composer`, with Tailwind's own `rounded-full` for pills | `rounded-*` |
 | Shadows | `--shadow-float`, `--shadow-lift` | `shadow-*` |
-| Motion | `--ease-out`, `--ease-slide` for the sidebar, and `--animate-*` with their `@keyframes`: fade-in, fade-out, panel-in, panel-up, landed, breathe | `ease-*`, `animate-*` |
+| Motion | `--ease-out`, `--ease-slide` for the sidebar, and `--animate-*` with their `@keyframes`: fade-in, fade-out, panel-in, panel-up, landed, breathe for live work, skeleton for content on its way, and spin for a busy control | `ease-*`, `animate-*` |
 | Named sizes | `--spacing-icon`, `sidebar`, `sidebar-pad`, `row`, `bar`, `toggle`, `composer-button`, `gutter`, `card-pad`, `within`, `turn` | `size-*`, `w-*`, `h-*`, `p-*`, `gap-*`, … |
 | Widths | `--container-column`, `--container-settings`, `--container-narrow` (34rem) | `max-w-*`, `@max-narrow:` |
 | Breakpoint | `--breakpoint-wide: 45rem`, where the sidebar becomes a drawer below | `wide:`, `max-wide:` |
@@ -78,6 +78,7 @@ Spacing literals from `design-reference` snap to the nearest quarter step of the
 - Utilities use only theme tokens. A value with no token is a new token in `theme.css`, used through its utility, or as `utility-(--token)` when its kind has no namespace. Arbitrary values like `p-[13px]` or `bg-[#fff]` are not used. Arbitrary variants and layout values that hold no color or length, like `grid-cols-[auto_1fr]`, are fine.
 - State is in `data-*` and `aria-*` attributes and styled with their variants, such as `data-[state=done]:` and `aria-expanded:`. A child styled from its parent's state uses `group-*`, `peer-*`, or `in-*`. Tests find elements by role, label, or these attributes, never by class.
 - Each animation carries its own `motion-reduce:` override.
+- Content on its way shows a skeleton in its own shape, built from `Skeleton` and `SkeletonText` inside `Loading`, never the words "Loading…". `breathe` stays for live work, such as a reply streaming or a chat syncing. A control busy with what it was asked to do takes `busy`, which keeps its label and turns a spinner before it.
 - `hover:` already applies only where the device can hover, so no `(hover: hover)` query is written by hand. What hover reveals shows from the start under the `touch:` variant, for devices that can't hover.
 - Logical properties (`ps-*`, `me-*`, `start-*`) wherever a side matters, so the layout mirrors for right-to-left text.
 - Variants in a component use `cva`, and a component that takes a `className` merges it with `cn()`.
@@ -86,7 +87,7 @@ Spacing literals from `design-reference` snap to the nearest quarter step of the
 
 `src/shared/ui/` holds the components the design reuses:
 
-- `Button.tsx`: `Button`, whose tone is default, primary, danger, or quiet, and which is primary when it submits a form, since green marks both what is live and the main action. `IconButton` is a quiet button with only an icon, red for something that can't be undone. The `button` variants also style a link that acts as a button.
+- `Button.tsx`: `Button`, whose tone is default, primary, danger, or quiet, and which is primary when it submits a form, since green marks both what is live and the main action. A `busy` button is disabled and turns a spinner before its label, a little stronger than a disabled one. `IconButton` is a quiet button with only an icon, red for something that can't be undone. The `button` variants also style a link that acts as a button.
 - `Badge.tsx`: `Badge` for status, green, red, or grey, and `Chip` and `Chips` for short values.
 - `controls.tsx`: the `field` look of text fields, selects, and textareas, `Switch`, and `Radio`. The switch stays a checkbox to the browser and screen readers, and the switch and radio draw their knob and dot as elements beside the input, so every browser can show them.
 - `Select.tsx`: the select-only combobox from `design-reference`, its list rendered into the body and placed by `usePlacement` in `src/shared/`. A portal rather than the Popover API keeps it testable in jsdom.
@@ -95,8 +96,9 @@ Spacing literals from `design-reference` snap to the nearest quarter step of the
 - `ItemList.tsx`: lists in a card, each `Item` with an `ItemMark`, its `ItemNames` over a line of details, and its actions, and `LinkItem`, a row that opens a page.
 - `SettingsPage.tsx`: the settings and admin kit of `SettingsPage`, `SettingsGroup`, `SettingRow`, `Field` and the `fields` grid, `Choices` and `Choice`, `SaveBar`, `ConfirmButton`, `SettingsEmpty`, and `Callout`. A settings page is a size container, so its rows stack when its column is narrow, beside the nav as well as on a phone.
 - `Logo.tsx`: the logo.
+- `Skeleton.tsx`: `Skeleton`, a pulsing shape in `--color-skeleton`, `SkeletonText`, a line as tall as the text around it, and `Loading`, which reads its skeletons out once as loading and fades them in only after `--wait-quiet`, so a quick load never flashes them. A route's pending page shows its skeletons at once, since the router already holds it back for the same 400ms (`defaultPendingMs`) and keeps it at least 300ms (`defaultPendingMinMs`), and so does a page the server sends. Data a route needs is read with `useSuspenseQuery` after its loader starts it, so the route's pending page and error page cover it. `useQuery` with its `isLoading` or `isPending` is kept for what loads inside a page that has already shown: the browser store's reads, which wait on this tab holding the store, the models, which never hold up sending, and optional data such as the profile. The settings kit has `SettingsPageSkeleton` and `SettingRowSkeleton`, and `ItemList.tsx` has `ItemRowsSkeleton`.
 
-The form kit in `src/shared/form.tsx` gives its text, textarea, and select fields the `field` look, binds a boolean to a `SwitchField`, and submits with `Button`. `ErrorAlert` is red, and the router's `RouteError` and `RoutePending` use the kit.
+The form kit in `src/shared/form.tsx` gives its text, textarea, and select fields the `field` look, binds a boolean to a `SwitchField`, and submits with `Button`. `ErrorAlert` is red, and the router's `RouteError` and `RoutePending` use the kit. `RoutePending` is a settings page's skeleton, since only settings and admin pages load before they show.
 
 ### Light and dark
 

@@ -1,9 +1,11 @@
-import { useQuery } from '@tanstack/react-query'
-import { useLocation } from '@tanstack/react-router'
+import { useSuspenseQuery } from '@tanstack/react-query'
+import { type ErrorComponentProps, useLocation } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
-import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
+import { RouteError } from '../../../shared/route-states.tsx'
 import { button } from '../../../shared/ui/Button.tsx'
+import { Loading, SkeletonText } from '../../../shared/ui/Skeleton.tsx'
 import { BranchView } from '../../conversation/components/BranchView.tsx'
+import { TurnSkeleton } from '../../conversation/components/ConversationSkeleton.tsx'
 import { DetailsButton, recordRows } from '../../conversation/components/RecordDetails.tsx'
 import { useBranch } from '../../conversation/hooks/useBranch.ts'
 import { blobUrlFor } from '../../conversation/lib/blob-url.ts'
@@ -15,19 +17,9 @@ interface Props {
   signedIn: boolean
 }
 
-/** A shared conversation, read-only. */
+/** A shared conversation, read-only, once the viewer has signed in. */
 export function SharedPage(props: Props) {
   const pathname = useLocation({ select: (location) => location.pathname })
-  const { data: shared, error } = useQuery({
-    ...sharedQuery(props.ownerDid, props.skey),
-    enabled: props.signedIn,
-  })
-  const messages = (shared?.messages ?? []).map((m) => ({
-    rkey: m.rkey,
-    record: m.value as Record<string, unknown>,
-  }))
-  const { branch, pick } = useBranch(messages)
-
   if (!props.signedIn)
     return (
       <SharedState>
@@ -40,39 +32,77 @@ export function SharedPage(props: Props) {
         </a>
       </SharedState>
     )
-  if (error)
-    return (
-      <SharedState>
-        <ErrorAlert error={error} />
-      </SharedState>
-    )
-  if (!shared)
-    return (
-      <SharedState>
-        <p>Loading…</p>
-      </SharedState>
-    )
+  return <SharedChat ownerDid={props.ownerDid} skey={props.skey} />
+}
+
+interface ChatProps {
+  ownerDid: string
+  skey: string
+}
+
+/**
+ * The conversation, which the route's loader starts fetching, so the route shows its skeleton
+ * while it loads and its error page if it fails.
+ */
+function SharedChat(props: ChatProps) {
+  const { data: shared } = useSuspenseQuery(sharedQuery(props.ownerDid, props.skey))
+  const messages = shared.messages.map((m) => ({
+    rkey: m.rkey,
+    record: m.value as Record<string, unknown>,
+  }))
+  const { branch, pick } = useBranch(messages)
   return (
-    // The conversation's own column on the panel, read-only, under its title and who shared it.
+    <SharedColumn>
+      <header className="mb-4">
+        <h1 className="text-balance font-semibold text-ink-strong text-title leading-tight tracking-title">
+          {shared.title ?? 'Shared chat'}
+        </h1>
+        <p className="mt-1 text-muted text-ui">
+          Shared by {shared.owner.handle ?? shared.owner.did}
+        </p>
+      </header>
+      <BranchView
+        branch={branch}
+        blobUrl={blobUrlFor(`/api/shared/${props.ownerDid}/${props.skey}`)}
+        onPick={pick}
+        // Reading a message's details is its only action here.
+        actions={(message) => <DetailsButton rows={recordRows({ record: message.record })} />}
+      />
+    </SharedColumn>
+  )
+}
+
+interface ColumnProps {
+  children: ReactNode
+}
+
+/** The conversation's own column on the panel, read-only, under its title and who shared it. */
+function SharedColumn(props: ColumnProps) {
+  return (
     <main className="min-h-dvh bg-panel">
       <div className="mx-auto flex w-full max-w-column flex-col px-gutter pt-8 pb-16">
-        <header className="mb-4">
-          <h1 className="text-balance font-semibold text-ink-strong text-title leading-tight tracking-title">
-            {shared.title ?? 'Shared chat'}
-          </h1>
-          <p className="mt-1 text-muted text-ui">
-            Shared by {shared.owner.handle ?? shared.owner.did}
-          </p>
-        </header>
-        <BranchView
-          branch={branch}
-          blobUrl={blobUrlFor(`/api/shared/${props.ownerDid}/${props.skey}`)}
-          onPick={pick}
-          // Reading a message's details is its only action here.
-          actions={(message) => <DetailsButton rows={recordRows({ record: message.record })} />}
-        />
+        {props.children}
       </div>
     </main>
+  )
+}
+
+/**
+ * The shared chat on its way: its title and who shared it, over its first turn. It is the route's
+ * pending page, which the server sends and the router otherwise holds back until loading takes a
+ * while, so it shows at once.
+ */
+export function SharedPageSkeleton() {
+  return (
+    <SharedColumn>
+      <Loading label="Loading the shared chat" immediate>
+        <div className="mb-4">
+          <SkeletonText className="w-64 max-w-full text-title leading-tight" />
+          <SkeletonText className="mt-1 w-40 text-ui" />
+        </div>
+        <TurnSkeleton />
+      </Loading>
+    </SharedColumn>
   )
 }
 
@@ -86,5 +116,14 @@ function SharedState(props: StateProps) {
     <main className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-panel px-gutter text-center text-body text-muted">
       {props.children}
     </main>
+  )
+}
+
+/** What the page shows when the chat can't be read, centered on the panel, with a way to retry. */
+export function SharedError(props: ErrorComponentProps) {
+  return (
+    <SharedState>
+      <RouteError {...props} />
+    </SharedState>
   )
 }
