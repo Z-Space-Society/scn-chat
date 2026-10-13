@@ -2,10 +2,12 @@ import type { QueryClient } from '@tanstack/react-query'
 import { createRootRouteWithContext, HeadContent, Navigate, Scripts } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { checkSession } from '../features/auth/session.ts'
+import logo from '../logo.svg?url'
 import { appName } from '../shared/app-name.ts'
 import { messageOf } from '../shared/errors.ts'
-import styles from '../styles.css?url'
-import theme from '../theme.css?url'
+import { themeScript } from '../shared/theme.ts'
+import { useInstantThemeSwitch } from '../shared/useInstantThemeSwitch.ts'
+import styles from '../styles/app.css?url'
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   staleTime: Number.POSITIVE_INFINITY,
@@ -21,11 +23,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [
       { rel: 'stylesheet', href: styles },
-      { rel: 'stylesheet', href: theme },
+      { rel: 'icon', type: 'image/svg+xml', href: logo },
     ],
-    // In development, React Scan outlines components as they render. It hooks into React through
-    // the devtools global before React loads, so it runs as a plain script ahead of the app.
-    scripts: import.meta.env.DEV ? [{ src: '/node_modules/react-scan/dist/auto.global.js' }] : [],
+    scripts: [
+      // Applies the light or dark chosen on this device before the first paint.
+      { children: themeScript },
+      // In development, React Scan outlines components as they render. It hooks into React
+      // through the devtools global before React loads, so it runs as a plain script ahead of
+      // the app.
+      ...(import.meta.env.DEV ? [{ src: '/node_modules/react-scan/dist/auto.global.js' }] : []),
+    ],
   }),
   shellComponent: Shell,
   errorComponent: ({ error }) => <p role="alert">{messageOf(error)}</p>,
@@ -37,8 +44,10 @@ interface Props {
 }
 
 function Shell(props: Props) {
+  useInstantThemeSwitch()
   return (
-    <html lang="en">
+    // The theme script sets data-theme on the root before React hydrates it.
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>

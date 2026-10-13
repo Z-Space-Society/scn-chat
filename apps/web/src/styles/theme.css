@@ -1,0 +1,309 @@
+/*
+ * The theme: every value the app's look is made of. Change the look here, and only here.
+ *
+ * A quiet, native-feeling window, after Ryo Lu's "Closer to the Material" and calm technology.
+ *
+ * - A near-white sidebar and a white content panel fill the window side by side, split by a
+ *   faint line, with the sidebar's top row and the chat's header on one line.
+ * - Things you can touch are small white cards with a hairline border, flat on the panel.
+ * - Status is a small badge: pale green with dark green text for what is live or good, grey for
+ *   what is done, pale red for what failed.
+ * - The model's work is a quiet numbered timeline of faintly tinted rows, below the cards, each
+ *   step opening to show exactly what happened. Tool input and output are in mono; everything else
+ *   is the system sans.
+ * - Slow, small motion: new messages fade in, live work breathes. It all stops under
+ *   prefers-reduced-motion.
+ *
+ * Every color is light-dark(<light>, <dark>), so it follows the page's color scheme: the system's,
+ * or the one chosen in Preferences. Every color is a step of the Gray, Green, Red, or Amber palette
+ * from oklch.fyi/color-palettes, the Radix scales in OKLCH, each with a light and a dark scale of
+ * twelve steps. The reds are the Red scale turned to a warmer hue, with its ink retuned to a true
+ * red.
+ *
+ * Tailwind's own palette, type scale, radii, shadows, easings, animations, widths, and breakpoints
+ * are cleared, so a component can only name the values below. specs/styling.md has the rules.
+ */
+
+@theme static {
+  --color-*: initial;
+  --text-*: initial;
+  --font-*: initial;
+  --radius-*: initial;
+  --shadow-*: initial;
+  --inset-shadow-*: initial;
+  --drop-shadow-*: initial;
+  --text-shadow-*: initial;
+  --ease-*: initial;
+  --animate-*: initial;
+  --container-*: initial;
+  --breakpoint-*: initial;
+
+  /* The window frame, the panel inside it, and the cards on the panel. */
+  --color-chrome: light-dark(oklch(0.982 0 0), oklch(0.162 0 0));
+  --color-panel: light-dark(oklch(0.993 0 0), oklch(0.195 0 0));
+  --color-sidebar: light-dark(oklch(0.982 0 0), oklch(0.162 0 0));
+  --color-surface: light-dark(oklch(0.94 0 0), oklch(0.254 0 0));
+  /* A faint tint for asides on the panel, a step below a card. */
+  --color-sunken: light-dark(oklch(0.982 0 0), oklch(0.254 0 0));
+  /* A card of settings: a grey tint with no edge, as in system settings, a touch deeper than the
+     sunken tint in light so it shows on the panel. Muted ink clears 5.5:1 on it. */
+  --color-card: light-dark(oklch(0.975 0 0), oklch(0.225 0 0));
+  /* The well a quote sits in, a step darker than the sunken tint so it shows inside a card too. */
+  --color-well: light-dark(oklch(0.961 0 0), oklch(0.302 0 0));
+  --color-raised: light-dark(oklch(1 0 0), oklch(0.195 0 0));
+  --color-raised-hover: light-dark(oklch(0.993 0 0), oklch(0.254 0 0));
+  /* Every floating menu, a step lighter than the panel. */
+  --color-lifted: light-dark(oklch(1 0 0), oklch(0.254 0 0));
+  /* Your message's bubble, the panel with a faint tint of the accent. */
+  --color-bubble: color-mix(in srgb, var(--color-accent) 12%, var(--color-panel));
+  --color-hover: light-dark(oklch(0.918 0 0), oklch(0.302 0 0));
+  /* The sidebar's rows: a faint tint when hovered, and a firmer one for the search field and a
+     row's menu button. The open row's tint is fainter still, so it never reads as New chat's. */
+  --color-row-hover: light-dark(#0000000a, #ffffff0a);
+  --color-row-active: light-dark(#00000012, #ffffff14);
+  --color-row-current: light-dark(#00000007, #ffffff08);
+  /* The hovered row's tint as a solid color, for an edge that must match it. */
+  --color-row-hover-solid: color-mix(in srgb, var(--color-sidebar), light-dark(#000, #fff) 4%);
+  /* A switch's sliding knob. */
+  --color-knob: light-dark(oklch(1 0 0), oklch(0.933 0 0));
+  /* The empty chat's illustration: a light face inside a slightly darker rim. */
+  --color-illo-face: light-dark(oklch(0.961 0 0), oklch(0.254 0 0));
+  --color-illo-rim: light-dark(oklch(0.918 0 0), oklch(0.302 0 0));
+  --color-illo-back: light-dark(oklch(0.94 0 0), oklch(0.302 0 0));
+  /* The logo's bubble letters: a face inside a rim. */
+  --color-logo-face: light-dark(#ffffff, #111110);
+  --color-logo-rim: light-dark(#b9b8b0, #8c8b85);
+
+  /* Soft grey ink, never black. */
+  --color-ink: light-dark(oklch(0.375 0 0), oklch(0.933 0 0));
+  --color-ink-strong: light-dark(oklch(0.375 0 0), oklch(0.933 0 0));
+  --color-prose: light-dark(oklch(0.375 0 0), oklch(0.863 0 0));
+  /* Muted ink still clears 4.5:1 on the panel, the frame, the sunken tint, and the grey fills of
+     badges and hovered rows. */
+  --color-muted: light-dark(oklch(0.503 0 0), oklch(0.72 0 0));
+  /* Quieter ink for text on the panel or a card alone, such as a reply's model name and the
+     composer's model. It clears 4.5:1 on the panel, 4.56:1 light and 4.63:1 dark, but not on
+     tints or fills. The light step sits between the Gray scale's steps 10 and 11, since step 10
+     falls short. */
+  --color-muted-quiet: light-dark(oklch(0.56 0 0), oklch(0.6 0 0));
+  /* For placeholders, markers, and dots, never for text someone has to read. An icon on a card
+     may take it, since it still clears 3:1 there. */
+  --color-faint: light-dark(oklch(0.649 0 0), oklch(0.549 0 0));
+  /* Icon buttons that stay quiet until hovered, such as a message's actions. A control's icon
+     needs 3:1, not text's 4.5:1, and this still clears 3.2:1 on the panel, the frame, the sunken
+     tint, and a card. Never for text. */
+  --color-icon-quiet: light-dark(oklch(0.606 0 0), oklch(0.549 0 0));
+  /* A chat's title in the list, a touch softer than ink, so the open chat and one with a reply
+     not yet seen stand out in full ink. */
+  --color-row-ink: light-dark(oklch(0.47 0 0), oklch(0.8 0 0));
+  /* The list's section headings, such as Today and Tags, in the quietest grey that still clears
+     4.5:1 on the sidebar once rounded to sRGB: 4.5:1 light and 4.62:1 dark. */
+  --color-section-ink: light-dark(oklch(0.555 0 0), oklch(0.585 0 0));
+  /* The quietest text on the steps' sunken tint, such as a thought's Show more, a visible step
+     under muted ink that still clears 4.5:1 there once rounded to sRGB: 4.5:1 light and 4.61:1
+     dark. The tint is lighter than the sidebar in dark, so section ink falls short on it. */
+  --color-tint-quiet: light-dark(oklch(0.555 0 0), oklch(0.635 0 0));
+
+  --color-line: light-dark(oklch(0.894 0 0), oklch(0.302 0 0));
+  /* A field's border while you type in it. */
+  --color-line-strong: light-dark(oklch(0.865 0 0), oklch(0.348 0 0));
+  /* The line between the sidebar and the panel, wider and quieter than a card's border. */
+  --color-divider: light-dark(oklch(0.961 0 0), oklch(0.195 0 0));
+  /* The darker bottom edge under a floating menu. */
+  --color-bevel: light-dark(oklch(0.865 0 0), oklch(0.162 0 0));
+  /* The edge drawn inside a picture: a shade of its own colors rather than a grey frame. */
+  --color-image-edge: light-dark(oklch(0 0 0 / 0.1), oklch(1 0 0 / 0.1));
+
+  /* Green for what is live or good and for the main action, with dark green ink on its pale
+     badges. */
+  --color-accent: light-dark(oklch(0.762 0.153 145), oklch(0.843 0.107 145));
+  --color-accent-strong: light-dark(oklch(0.464 0.143 145), oklch(0.843 0.107 145));
+  --color-accent-soft: light-dark(oklch(0.931 0.062 145), oklch(0.322 0.103 145));
+  --color-accent-soft-hover: light-dark(oklch(0.902 0.082 145), oklch(0.367 0.125 145));
+  --color-accent-border: light-dark(oklch(0.868 0.102 145), oklch(0.417 0.145 145));
+  /* Green for small marks, such as live dots, dark enough to clear 3:1 on any panel. */
+  --color-accent-mark: light-dark(oklch(0.579 0.179 145), oklch(0.676 0.167 145));
+  /* Dark ink on an accent fill, in both modes. */
+  --color-on-accent: oklch(0.348 0.095 145);
+  --color-focus: var(--color-accent-mark);
+  /* A true red, warmer than the crimson the Red scale leans to, so it never reads as pink or
+     maroon. Its ink clears 4.5:1 on every panel and on its own pale fills, hovered too. */
+  --color-danger: light-dark(oklch(0.52 0.19 25), oklch(0.7 0.16 25));
+  --color-danger-soft: light-dark(oklch(0.946 0.051 25), oklch(0.227 0.041 25));
+  --color-danger-soft-hover: light-dark(oklch(0.924 0.067 25), oklch(0.295 0.082 25));
+  --color-danger-border: light-dark(oklch(0.895 0.083 25), oklch(0.348 0.111 25));
+  /* A softer red for the detail under a red heading, still clearing 4.5:1 on the panel. */
+  --color-danger-muted: color-mix(in srgb, var(--color-danger) 90%, var(--color-panel));
+  /* Pale amber for selected text and search matches, with amber-brown ink. */
+  --color-highlight: light-dark(oklch(0.973 0.052 75), oklch(0.288 0.072 75));
+  --color-highlight-ink: light-dark(oklch(0.534 0.141 75), oklch(0.894 0.11 75));
+
+  --font-ui:
+    ui-sans-serif, system-ui, -apple-system, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue",
+    sans-serif;
+  --font-prose: var(--font-ui);
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --default-font-family: var(--font-ui);
+  --default-mono-font-family: var(--font-mono);
+
+  /* The type scale. Every size in the app is one of these steps, and code inside text sizes
+     itself against them in em. Weights are 400 for reading, 500 for controls and emphasis, and
+     600 for headings and the main action. */
+  /* Badges, timestamps, counts, and small labels, at the 12px floor. */
+  --text-caption: 0.78rem;
+  /* Secondary text: hints, menus, step rows, and details under a name. */
+  --text-small: 0.86rem;
+  /* The sidebar, titles in a bar, and the controls around a chat. */
+  --text-ui: 0.92rem;
+  /* Messages, replies, and the composer. */
+  --text-body: 1rem;
+  /* A section's heading. */
+  --text-heading: 1.25rem;
+  /* The settings title beside its sections, and each section's own title. */
+  --text-title: 1.5rem;
+  /* The app's name on the login page. */
+  --text-display: 1.75rem;
+
+  /* Where a surface holds rounded things at an even inset, its corner is theirs plus the inset
+     and its border, so the curves nest. */
+  --radius-panel: 0.9rem;
+  --radius-card: 0.65rem;
+  --radius-small: 0.55rem;
+  --radius-badge: 0.35rem;
+  --radius-row: 0.4rem;
+  /* A floating menu, around rows at the menu's padding, inside an edge as wide as the line
+     between the sidebar and the panel. */
+  --radius-menu: calc(var(--radius-row) + var(--menu-pad) + var(--menu-edge));
+  /* Your message's bubble. */
+  --radius-bubble: 1.5rem;
+  /* The composer, nesting its round Send button in its corner. */
+  --radius-composer: calc(var(--spacing-composer-button) / 2 + 0.55rem + 1px);
+
+  /* A floating menu: a bevel under it and a soft shadow. */
+  --shadow-float: 0 1px 0 var(--color-bevel), 0 10px 30px -14px light-dark(#0000002e, #000a);
+  /* A part of the sidebar lifted over it, such as the account menu: a soft shadow with no bevel,
+     since its edge is the sidebar's own line. */
+  --shadow-lift: 0 12px 32px -16px light-dark(#0000002e, #000c);
+
+  /* Spacing is Tailwind's scale of quarter rems. These are the sizes the design names. */
+  --spacing: 0.25rem;
+  /* Icons are 16px at the 15px design size, and grow with the text. */
+  --spacing-icon: calc(16rem / 15);
+  --spacing-sidebar: 17.75rem;
+  /* The space between the window's edge and the sidebar's rows, and the settings nav's. */
+  --spacing-sidebar-pad: 0.6rem;
+  /* The height of a row in the sidebar, and of its search. */
+  --spacing-row: 2.2rem;
+  /* The sidebar's top row and the chat's header share one height, so the app's name and the
+     chat's title sit on one line across the window. */
+  --spacing-bar: 3.5rem;
+  /* The square icon button that shows or hides the sidebar. */
+  --spacing-toggle: 2rem;
+  /* The composer's round buttons. */
+  --spacing-composer-button: 2rem;
+  /* The space beside the conversation and the settings, narrower on a phone. */
+  --spacing-gutter: 1.5rem;
+  /* The space inside a settings card, the same on every side, around each of its rows. */
+  --spacing-card-pad: 1rem;
+  /* The gap inside a turn, between your message and its reply, and the much larger one between
+     turns, so each exchange reads as one unit. Each message's footer row adds about 1.85rem to
+     both, which puts the gaps you see at about 2.5 to 1. */
+  --spacing-within: 0.25rem;
+  --spacing-turn: 3.5rem;
+
+  /* The conversation's column, and every settings and admin section, so moving between them
+     doesn't jump. */
+  --container-column: 44rem;
+  --container-settings: 44rem;
+  /* Below this a conversation or settings section lays itself out for a narrow panel. */
+  --container-narrow: 34rem;
+  /* Below this the sidebar becomes a drawer. */
+  --breakpoint-wide: 45rem;
+
+  /* Motion eases out and never overshoots. */
+  --ease-out: cubic-bezier(0.25, 0.8, 0.25, 1);
+  /* What arrives fades in; live work breathes at the slow pace. */
+  --animate-fade-in: fade-in var(--dur-enter) var(--ease-out) backwards;
+  --animate-breathe: breathe var(--slow) ease-in-out infinite;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes fade-out {
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes panel-in {
+    from {
+      opacity: 0;
+      transform: translateY(calc(-1 * var(--rise)));
+    }
+  }
+
+  @keyframes panel-up {
+    from {
+      opacity: 0;
+      transform: translateY(var(--rise));
+    }
+  }
+
+  @keyframes landed {
+    from,
+    15% {
+      box-shadow: 0 0 0 2px var(--color-accent-mark);
+    }
+  }
+
+  @keyframes breathe {
+    50% {
+      opacity: 0.55;
+    }
+  }
+}
+
+/* Values with no Tailwind namespace, used as utility-(--name). */
+@layer theme {
+  :root {
+    /* Feedback answers a touch, layout moves things into place, and enter fades in what arrives.
+       A panel opening from a control arrives a little quicker, and a layer over the whole chat,
+       like Jump to's, comes and goes at a calmer pace. */
+    --dur-feedback: 140ms;
+    --dur-panel: 180ms;
+    --dur-layout: 220ms;
+    --dur-enter: 240ms;
+    --dur-layer: 300ms;
+    /* How far a panel rises toward its place as it opens. */
+    --rise: 4px;
+    /* How long a reply waits quietly before it shows that it is waiting, so a quick one never
+       flashes a waiting state. */
+    --wait-quiet: 400ms;
+    --slow: 2.8s;
+    /* A floating menu's padding, the gap between New chat and the search button, and its edge. */
+    --menu-pad: 0.35rem;
+    --menu-edge: 2px;
+    /* Icon strokes are drawn in screen pixels whatever the icon's size, at the weight of the text
+       beside them: regular text, or the medium text of a control. */
+    --icon-stroke: 1.25;
+    --icon-stroke-control: 1.75;
+    /* iOS zooms the page into a field whose text is under 16px, so on a touch screen fields never
+       go below it. */
+    --input-floor: 0px;
+  }
+
+  @media (pointer: coarse) {
+    :root {
+      --input-floor: 16px;
+    }
+  }
+
+  @media (width < 45rem) {
+    :root {
+      --spacing-gutter: 1rem;
+    }
+  }
+}

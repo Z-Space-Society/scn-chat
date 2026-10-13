@@ -30,7 +30,16 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "preset": "recommended"
+      "preset": "recommended",
+      "nursery": {
+        "useSortedClasses": {
+          "level": "error",
+          "fix": "safe",
+          "options": {
+            "functions": ["cn", "cva", "clsx"]
+          }
+        }
+      }
     }
   },
   "assist": {
@@ -62,7 +71,7 @@
       }
     },
     {
-      "includes": ["apps/web/src/theme.css"],
+      "includes": ["apps/web/src/styles/legacy.css"],
       "linter": {
         "rules": {
           "style": {
@@ -71,5 +80,10 @@
         }
       }
     }
-  ]
+  ],
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  }
 }

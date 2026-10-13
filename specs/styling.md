@@ -48,7 +48,7 @@ Every color is `light-dark(<light>, <dark>)` in oklch, so dark mode needs no `da
 
 | Kind | Tokens | Utilities |
 |---|---|---|
-| Surfaces | `chrome`, `panel` (was `--bg`), `sidebar`, `surface`, `sunken`, `card` (was `--group`), `well` (was `--quote-well`), `raised`, `raised-hover`, `lifted`, `bubble`, `hover`, `row-hover`, `row-active`, `row-current`, `row-hover-solid`, `knob`, `illo-face`, `illo-rim`, `illo-back` | `bg-*` |
+| Surfaces | `chrome`, `panel` (was `--bg`), `sidebar`, `surface`, `sunken`, `card` (was `--group`), `well` (was `--quote-well`), `raised`, `raised-hover`, `lifted`, `bubble`, `hover`, `row-hover`, `row-active`, `row-current`, `row-hover-solid`, `knob`, `illo-face`, `illo-rim`, `illo-back`, `logo-face`, `logo-rim` | `bg-*`, `fill-*` |
 | Ink | `ink` (was `--text`), `ink-strong` (was `--strong`), `prose`, `muted`, `muted-quiet`, `faint`, `icon-quiet`, `row-ink`, `section-ink`, `tint-quiet` | `text-*` |
 | Lines | `line` (was `--border`), `line-strong`, `divider`, `bevel`, `image-edge` | `border-*`, `outline-*` |
 | Accent | `accent`, `accent-strong`, `accent-soft`, `accent-soft-hover`, `accent-border`, `accent-mark`, `on-accent`, `focus` (was `--focus-ring`) | any color utility |
@@ -56,16 +56,16 @@ Every color is `light-dark(<light>, <dark>)` in oklch, so dark mode needs no `da
 | Highlight | `highlight`, `highlight-ink` | any color utility |
 | Fonts | `--font-ui`, `--font-prose`, `--font-mono`, with `--default-font-family` set to the UI font | `font-*` |
 | Type | `--text-caption`, `small`, `ui`, `body`, `heading`, `title`, `display` | `text-*` |
-| Radius | `--radius-panel` (was `--radius`), `card`, `small`, `badge`, `row`, `menu`, `bubble`, `composer`, `pill` | `rounded-*` |
+| Radius | `--radius-panel` (was `--radius`), `card`, `small`, `badge`, `row`, `menu`, `bubble`, `composer`, with Tailwind's own `rounded-full` for pills | `rounded-*` |
 | Shadows | `--shadow-float`, `--shadow-lift` | `shadow-*` |
 | Motion | `--ease-out`, and `--animate-*` with their `@keyframes`: fade-in, fade-out, panel-in, panel-up, landed, breathe | `ease-*`, `animate-*` |
-| Named sizes | `--spacing-sidebar`, `sidebar-pad`, `row`, `bar`, `toggle`, `composer-button`, `gutter`, `card-pad`, `within`, `turn` | `w-*`, `h-*`, `p-*`, `gap-*`, … |
+| Named sizes | `--spacing-icon`, `sidebar`, `sidebar-pad`, `row`, `bar`, `toggle`, `composer-button`, `gutter`, `card-pad`, `within`, `turn` | `size-*`, `w-*`, `h-*`, `p-*`, `gap-*`, … |
 | Widths | `--container-column`, `--container-settings`, `--container-narrow` (34rem) | `max-w-*`, `@max-narrow:` |
 | Breakpoint | `--breakpoint-wide: 45rem`, where the sidebar becomes a drawer below | `wide:`, `max-wide:` |
 
 Ink colors are named `ink` because a color named `text` would make `text-text`, and the type scale already owns `text-*`.
 
-Durations, `--menu-pad`, `--menu-edge`, `--rise`, `--wait-quiet`, and `--slow` have no Tailwind namespace. They are plain custom properties on `:root` in `theme.css`, used as `duration-(--dur-panel)`. A token built from others, like `bubble` or `radius-menu`, refers to them with `var()`, which resolves where it is used.
+Durations, `--menu-pad`, `--menu-edge`, `--rise`, `--wait-quiet`, `--slow`, and the icon strokes `--icon-stroke` and `--icon-stroke-control` have no Tailwind namespace. They are plain custom properties on `:root` in `theme.css`, used as `duration-(--dur-panel)`. A token built from others, like `bubble` or `radius-menu`, refers to them with `var()`, which resolves where it is used.
 
 Two tokens change with the device, in `theme.css` below the tokens: `--spacing-gutter` narrows to 1rem below the `wide` breakpoint, and `--input-floor` is 16px on a coarse pointer, so iOS never zooms into a field.
 
@@ -104,7 +104,7 @@ Fenced code in replies is highlighted by Shiki, loaded lazily by `parts/markdown
 
 The port re-applies `design-reference` area by area onto main's refactored components, not as a merge, since nearly every web file changed on both sides. Its behavior comes along, refactored to main's conventions: forms on the form kit, data through loaders, and no React Compiler bailouts. Its specs come into the feature specs, corrected where they had fallen behind its code. The plan lists each feature in the order it is ported.
 
-Until the port is done, main's stand-in sheets load in a `legacy` layer, ordered after `base` and before `utilities`. Pages not yet ported keep their look over Preflight, and a ported component's utilities win over them. The legacy layer is deleted once every area is ported.
+Until the port is done, main's stand-in sheets load from `src/styles/legacy.css` in a `legacy` layer, ordered after `base` and before `utilities`, with the browser's own defaults for headings, margins, and lists restored over Preflight, so pages not yet ported keep their look. The sheet is wrapped in `@scope (:root) to ([data-ported])`, so the root element of each ported area carries `data-ported` and shows only its own styles. The sheet, its import, and every `data-ported` are deleted once every area is ported.
 
 ## Scope Boundaries
 
@@ -119,7 +119,8 @@ Until the port is done, main's stand-in sheets load in a `legacy` layer, ordered
 - **No `dark:` variant.** With `light-dark()` in every token, a component never needs to know the mode. The picker only sets `color-scheme`.
 - **Picker on the device.** The setting is kept per device rather than in the preferences record, so it applies before the first paint without waiting for the PDS, and it can differ between devices.
 - **Components over `@apply`.** A reused look is a component, so it can take variants and carry its markup and accessibility along with its look.
-- **The guard.** A test fails when a component carries a raw color or a length in an arbitrary value, so values stay in the theme.
+- **The guard.** A test fails when a component carries a raw color or a length in an arbitrary value, or a stylesheet other than the theme carries a raw color, so values stay in the theme. Biome's `noTailwindArbitraryValue` was too broad, since it also rejects layout values like `grid-cols-[auto_1fr]`. Biome's `useSortedClasses` keeps class lists in one order, in `className` and in `cn`, `cva`, and `clsx` calls.
+- **Icons.** `src/shared/icons.tsx` wraps the app's own puffy icons and Lucide's in one component each, sized by `size-icon` and stroked in screen pixels through `vector-effect: non-scaling-stroke`, heavier inside a button or link. An icon takes a `className` for its size or color where it is used.
 
 ## Acceptance Criteria
 
@@ -127,7 +128,7 @@ Until the port is done, main's stand-in sheets load in a `legacy` layer, ordered
 - [ ] Tailwind's default palette, type scale, radii, shadows, and breakpoints produce no utilities.
 - [ ] Changing a color token in `theme.css` changes it everywhere it is used, in light and dark.
 - [ ] Appearance in Preferences switches between System, Light, and Dark at once, and the choice survives a reload with no flash, on server-rendered and client-only routes.
-- [ ] The guard test fails on a raw color or arbitrary length in a component.
+- [x] The guard test fails on a raw color or arbitrary length in a component.
 - [ ] Every area matches `design-reference` in light and dark, at desktop width and at 390px.
 - [ ] Animations stop under reduced motion.
 - [ ] A fenced code block in a reply is highlighted in theme colors in both modes, and a block in an unknown language shows as plain monospace.
@@ -136,7 +137,8 @@ Until the port is done, main's stand-in sheets load in a `legacy` layer, ordered
 ## Files
 
 - `apps/web/src/styles/`
-- `apps/web/src/shared/ui/`, `apps/web/src/shared/cn.ts`, `apps/web/src/shared/icons.tsx`, `apps/web/src/shared/useInstantThemeSwitch.ts`
+- `apps/web/src/shared/ui/`, `apps/web/src/shared/cn.ts`, `apps/web/src/shared/icons.tsx`, `apps/web/src/shared/theme.ts`, `apps/web/src/shared/useInstantThemeSwitch.ts`, `apps/web/src/logo.svg`
+- `apps/web/tests/styles/theme.test.ts`, `apps/web/tests/shared/theme.test.tsx`
 - `apps/web/src/parts/markdown.tsx`, `apps/web/src/parts/markdown.css`
 - `apps/web/src/routes/__root.tsx`
 - `apps/web/src/features/settings/pages/PreferencesSettings.tsx`

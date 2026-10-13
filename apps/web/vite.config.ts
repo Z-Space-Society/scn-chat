@@ -1,4 +1,5 @@
 import babel from '@rolldown/plugin-babel'
+import tailwindcss from '@tailwindcss/vite'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
@@ -6,6 +7,7 @@ import { defineConfig } from 'vite'
 // The server runs this config in middleware mode in development (apps/server/src/web.ts).
 export default defineConfig({
   plugins: [
+    tailwindcss(),
     tanstackStart({ router: { addExtensions: true, quoteStyle: 'single', semicolons: false } }),
     react(),
     // React Compiler memoizes components and hooks, in the browser build only.

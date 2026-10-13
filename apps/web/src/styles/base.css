@@ -1,0 +1,72 @@
+/*
+ * The document itself, over Tailwind's Preflight. No element gets a look here: buttons, fields,
+ * and headings are styled by the components that render them.
+ */
+
+@layer base {
+  :root {
+    color-scheme: light dark;
+    /* 15.5px at the browser's default size, and larger or smaller with the reader's setting. */
+    font-size: 96.875%;
+    line-height: 1.55;
+    color: var(--color-ink);
+    accent-color: var(--color-accent);
+    caret-color: var(--color-accent-strong);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    interpolate-size: allow-keywords;
+  }
+
+  /* Light or Dark chosen in Preferences fixes the scheme every color follows. */
+  :root[data-theme="light"] {
+    color-scheme: light;
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+  }
+
+  body {
+    background: var(--color-chrome);
+  }
+
+  ::selection {
+    background: var(--color-highlight);
+    color: inherit;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line) transparent;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  a {
+    text-decoration-line: underline;
+    text-decoration-color: var(--color-faint);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+    transition: text-decoration-color var(--dur-feedback);
+  }
+
+  @media (hover: hover) {
+    a:hover {
+      text-decoration-color: var(--color-accent);
+    }
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: max(var(--input-floor), 1em);
+  }
+
+  ::placeholder {
+    color: var(--color-faint);
+  }
+}
