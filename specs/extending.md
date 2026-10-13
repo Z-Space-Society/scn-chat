@@ -118,7 +118,7 @@ Copy is new. It is on every message that is not pending, copies the message's te
   - Images load only on click, as now.
   - Code blocks render as before, with a Copy button that copies the block's text.
 
-Adding code highlighting, math, or diagrams is a plugin and possibly a component in this one file. The guide shows the recipe. Highlighting itself waits for the styling phase, since its colors belong to the theme.
+Adding code highlighting, math, or diagrams is a plugin and possibly a component in this one file. The guide shows the recipe. Highlighting itself belongs to the styling phase, which comes before this one, since its colors belong to the theme.
 
 ### Component boundaries
 
@@ -145,7 +145,7 @@ Then it gives one recipe per common change, each naming the files to touch with 
 - **Add an admin section:** the same, under `routes/_app/admin/` and `features/admin/`, with a server route under `/api/admin`.
 - **Read or write new server data:** a Hono route, its type in `api-types.ts`, a query factory in the feature's `queries.ts`, and a mutation.
 - **Add a server tool:** a plugin, as `docs/plugins.md` describes, then its tool view.
-- **Change the look:** `theme.css` for now, until the styling phase replaces it.
+- **Change the look:** the theme's design tokens, as the styling spec lays them out.
 
 It ends with the rules a fork should keep, linking the ADRs:
 
