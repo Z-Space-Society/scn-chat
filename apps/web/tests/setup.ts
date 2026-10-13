@@ -4,6 +4,9 @@ import { afterEach } from 'vitest'
 
 afterEach(cleanup)
 
+// Conveniences kept in the browser, such as the sidebar's state, would carry over between tests.
+afterEach(() => localStorage.clear())
+
 // index.html carries the app name, filled in by the server.
 const appName = document.createElement('meta')
 appName.name = 'application-name'

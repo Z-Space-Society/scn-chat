@@ -11,6 +11,15 @@ export type ConversationSummary = {
   tags: string[]
   updatedAt: string
 }
+/** A chat in the list: its index entry, and what its messages say about its replies. */
+export type ChatListItem = ConversationSummary & {
+  /** Whether an assistant reply is still being written. */
+  pending: boolean
+  /** The key of the newest finished assistant reply, to tell when a new one has arrived. */
+  latestReply: string | null
+}
+/** How current the local copy is: when the chat index last synced, and chats left to download. */
+export type SyncStatus = { syncedAt: string | null; remaining: number }
 export type StoredMessage = { rkey: string; author: string; record: Json; cid: string }
 export type Conversation = { skey: string; info: Json | null; messages: StoredMessage[] }
 
@@ -89,7 +98,7 @@ export class StoreCore {
       )
   }
 
-  listConversations(): ConversationSummary[] {
+  listConversations(): ChatListItem[] {
     return this.db
       .all<{
         skey: string
@@ -97,8 +106,16 @@ export class StoreCore {
         title: string | null
         tags_json: string
         updated_at: string
+        pending: number
+        latest_reply: string | null
       }>(
-        'select skey, uri, title, tags_json, updated_at from conversation order by updated_at desc',
+        `select c.skey, c.uri, c.title, c.tags_json, c.updated_at,
+          exists (select 1 from message m where m.conversation_skey = c.skey
+            and m.role = 'assistant' and m.status = 'pending') as pending,
+          (select m.rkey from message m where m.conversation_skey = c.skey
+            and m.role = 'assistant' and m.status = 'complete'
+            order by m.created_at desc, m.rkey desc limit 1) as latest_reply
+        from conversation c order by c.updated_at desc`,
       )
       .map((row) => ({
         skey: row.skey,
@@ -106,7 +123,13 @@ export class StoreCore {
         title: row.title,
         tags: JSON.parse(row.tags_json) as string[],
         updatedAt: row.updated_at,
+        pending: Boolean(row.pending),
+        latestReply: row.latest_reply,
       }))
+  }
+
+  syncStatus(): SyncStatus {
+    return { syncedAt: this.meta('index_synced_at'), remaining: this.remainingDownloads() }
   }
 
   getConversation(skey: string): Conversation {
@@ -132,6 +155,8 @@ export class StoreCore {
   async syncIndex(): Promise<void> {
     const changes = await this.api.fetchIndex(this.meta('index_rev'))
     this.applyIndex(changes)
+    this.setMeta('index_synced_at', this.now())
+    this.notify({ type: 'index' })
   }
 
   applyIndex(changes: IndexChanges): void {

@@ -78,7 +78,12 @@ Roles, access, and viewers are described in the admin spec. Roles live in the da
 | `GET /oauth/login` | Start login |
 | `GET /oauth/callback` | Finish login |
 | `GET /api/me` | The signed-in user's DID, handle, storage mode, roles, whether they are an admin, and their access level |
+| `GET /api/me/profile` | The user's display name, and their avatar's thumbnail URL, from their public profile |
 | `POST /api/logout` | Sign out |
+
+### Profile
+
+The sidebar shows the user's avatar, display name, and handle. The handle comes from `/api/me`. The display name and avatar come from the user's public `app.bsky.actor.profile` record, key `self`, which most atproto accounts carry. The server reads it from the user's PDS with the public `com.atproto.repo.getRecord` on each request to `/api/me/profile`, keeping nothing, so the PDS stays the only copy. Fetches go through the same private-network guard as other PDS calls. The avatar's blob is the full upload, often far larger than the sidebar needs, so the server answers with its thumbnail on Bluesky's image CDN, `https://cdn.bsky.app/img/avatar_thumbnail/plain/{did}/{cid}@jpeg`, for a PNG or JPEG avatar only. The browser loads it from there without a referrer, and shows the initial when it fails, as for an account Bluesky hasn't indexed. These NSIDs are Bluesky's and public PDS methods, not this app's lexicons, so `auth/profile.ts` names them itself rather than the generated module.
 
 ### Configuration
 
@@ -134,3 +139,4 @@ A `pnpm keys` script prints a fresh `OAUTH_PRIVATE_KEYS` value and a `SECRET_KEY
 - [ ] `getPdsClient` throws `SessionExpired` when the OAuth session cannot be restored.
 - [ ] Logout clears the web session and keeps the OAuth session, and logout everywhere revokes it.
 - [ ] `GET /api/me` includes the user's roles.
+- [x] `GET /api/me/profile` reads the display name and avatar thumbnail from the user's profile record, and answers with nulls when there is none or their PDS can't be reached.

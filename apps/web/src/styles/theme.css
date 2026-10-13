@@ -140,6 +140,12 @@
   /* Pale amber for selected text and search matches, with amber-brown ink. */
   --color-highlight: light-dark(oklch(0.973 0.052 75), oklch(0.288 0.072 75));
   --color-highlight-ink: light-dark(oklch(0.534 0.141 75), oklch(0.894 0.11 75));
+  /* A search match: a faint tint in the text's own ink. In light it is half the highlight, so a
+     list of matches stays quiet. In dark it is the whole highlight, since half all but vanishes. */
+  --color-match: light-dark(
+    color-mix(in oklch, var(--color-highlight) 55%, transparent),
+    var(--color-highlight)
+  );
 
   --font-ui:
     ui-sans-serif, system-ui, -apple-system, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue",
@@ -166,6 +172,8 @@
   --text-title: 1.5rem;
   /* The app's name on the login page. */
   --text-display: 1.75rem;
+  /* Code inside text, against the text around it. */
+  --text-code: 0.85em;
 
   /* Big titles draw in a touch, and small labels in capitals' weight open up. */
   --tracking-title: -0.02em;
@@ -185,6 +193,10 @@
   --radius-menu: calc(var(--radius-row) + var(--menu-pad) + var(--menu-edge));
   /* Your message's bubble. */
   --radius-bubble: 1.5rem;
+  /* A card holding controls at an even inset, such as renaming a chat in the list. */
+  --radius-editor: calc(var(--radius-small) + 0.6rem + 1px);
+  /* A search match's tint. */
+  --radius-mark: 2px;
   /* The composer, nesting its round Send button in its corner. */
   --radius-composer: calc(var(--spacing-composer-button) / 2 + 0.55rem + 1px);
 
@@ -242,6 +254,8 @@
   /* What arrives fades in; live work breathes at the slow pace. */
   --animate-fade-in: fade-in var(--dur-enter) var(--ease-out) backwards;
   --animate-breathe: breathe var(--slow) ease-in-out infinite;
+  /* A panel rising from the control below it, such as the account menu. */
+  --animate-panel-up: panel-up var(--dur-panel) var(--ease-out);
 
   @keyframes fade-in {
     from {

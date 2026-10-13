@@ -124,6 +124,7 @@ const api = {
   search: (query: string, options?: { limit?: number; offset?: number }) =>
     guard((store) => store.search(query, options)),
   remainingDownloads: () => guard((store) => store.remainingDownloads()),
+  syncStatus: () => guard((store) => store.syncStatus()),
 }
 
 export type WorkerApi = typeof api

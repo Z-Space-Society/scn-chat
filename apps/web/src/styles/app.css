@@ -10,3 +10,7 @@
 @import "./theme.css";
 @import "./base.css";
 @import "./legacy.css" layer(legacy);
+@import "../shared/ui/scroll-fade.css";
+
+/* Devices that can't hover, where what hover reveals shows from the start. */
+@custom-variant touch (@media (hover: none));

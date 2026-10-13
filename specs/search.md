@@ -39,7 +39,7 @@ Search covers every conversation the browser store has downloaded. On a new devi
 
 ### Web UI
 
-A search box above the chat list. Searching starts at two characters and waits for a 150 ms pause in typing. Results replace the list while a query is active, and choosing one opens the conversation scrolled to that message. Result links are `/chat/<skey>?m=<rkey>`. When the message is on another branch, the conversation opens on the branch that holds it.
+A search box above the chat list. Searching starts at two characters and waits for a 150 ms pause in typing. Results replace the list while a query is active, grouped by conversation: its title once, after its icon and with when for a title match, over its matching messages indented under it, each with when at its end, the time today, Yesterday, or the date before that. The user's own messages carry a small You badge. A reply's snippet styles its Markdown inline as the reply does, with bold, italics, strikethrough, and code but no blocks, links, or images, while the user's words show as written. Markup the snippet's cut left unpaired, like a `**` whose partner fell outside it or a link missing its end, is dropped. A title match shows its highlighted title. Matches are a faint tint in the text's own ink. When nothing matches, the results say so with a way to clear the search. Choosing a message opens the conversation scrolled to it, and choosing a title opens the conversation. Result links are `/chat/<skey>?m=<rkey>`. When the message is on another branch, the conversation opens on the branch that holds it.
 
 ## Scope Boundaries
 
@@ -67,3 +67,6 @@ A search box above the chat list. Searching starts at two characters and waits f
 - [x] Snippets mark the matched words without inserting HTML.
 - [x] Search makes no server request.
 - [x] While the background download is running, the UI shows how many conversations remain.
+- [x] A reply's snippet shows its Markdown styled, not as raw syntax, even where the snippet cuts through it.
+- [x] Each result shows when its message was written, or its conversation updated for a title match.
+- [x] Results are grouped by conversation, the title once over its matching messages.

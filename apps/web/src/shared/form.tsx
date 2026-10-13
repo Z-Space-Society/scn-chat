@@ -160,6 +160,8 @@ function Form(props: Omit<ComponentProps<'form'>, 'onSubmit'>) {
 }
 
 interface SubmitButtonProps {
+  size?: ComponentProps<typeof Button>['size']
+  className?: string
   children: ReactNode
 }
 
@@ -169,7 +171,7 @@ function SubmitButton(props: SubmitButtonProps) {
   return (
     <form.Subscribe selector={(state) => state.isSubmitting}>
       {(isSubmitting) => (
-        <Button type="submit" disabled={isSubmitting}>
+        <Button type="submit" size={props.size} className={props.className} disabled={isSubmitting}>
           {props.children}
         </Button>
       )}

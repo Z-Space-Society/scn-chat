@@ -1,12 +1,21 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { MeContext } from '../../../../src/features/auth/session.ts'
 import { ChatList } from '../../../../src/features/chat-list/components/ChatList.tsx'
+import { resetSeenCache } from '../../../../src/features/chat-list/lib/seen.ts'
 import type { StoreClient } from '../../../../src/store/client.ts'
 import { StoreProvider } from '../../../../src/store/react.tsx'
+import { stubFetch, writes } from '../../../helpers/fetch.ts'
 import { renderAt } from '../../../helpers/router.tsx'
 
 afterEach(() => vi.unstubAllGlobals())
+
+/** Opens the sidebar's search box with its button, and returns the box. */
+async function openSearch() {
+  await userEvent.click(screen.getByRole('button', { name: 'Search chats' }))
+  return screen.getByRole('searchbox', { name: 'Search chats' })
+}
 
 function fakeStore() {
   return {
@@ -59,10 +68,10 @@ describe('ChatList', () => {
       </StoreProvider>,
     )
     expect(await screen.findByText('Tiles')).toBeInTheDocument()
-    await userEvent.type(screen.getByRole('searchbox', { name: 'Search chats' }), 'blue')
+    await userEvent.type(await openSearch(), 'blue')
     expect(await screen.findByText('Paint')).toBeInTheDocument()
     expect(screen.queryByText('Tiles')).toBeNull()
-    expect(screen.getByRole('status')).toHaveTextContent('Still downloading 2 conversations.')
+    expect(screen.getByRole('status')).toHaveTextContent('Still downloading 2 chats.')
     expect(store.worker.search).toHaveBeenLastCalledWith('blue')
     expect(fetch).not.toHaveBeenCalled()
   })
@@ -74,7 +83,7 @@ describe('ChatList', () => {
         <ChatList />
       </StoreProvider>,
     )
-    await userEvent.type(screen.getByRole('searchbox', { name: 'Search chats' }), 'blue')
+    await userEvent.type(await openSearch(), 'blue')
     await vi.waitFor(() => expect(router.state.location.search).toEqual({ q: 'blue' }))
   })
 
@@ -97,7 +106,7 @@ describe('ChatList', () => {
         <ChatList />
       </StoreProvider>,
     )
-    await userEvent.type(screen.getByRole('searchbox', { name: 'Search chats' }), 'b')
+    await userEvent.type(await openSearch(), 'b')
     await new Promise((resolve) => setTimeout(resolve, 200))
     expect(store.worker.search).not.toHaveBeenCalled()
     expect(screen.getByText('Tiles')).toBeInTheDocument()
@@ -110,7 +119,7 @@ describe('ChatList', () => {
         <ChatList />
       </StoreProvider>,
     )
-    const box = screen.getByRole('searchbox', { name: 'Search chats' })
+    const box = await openSearch()
     await userEvent.type(box, 'bl')
     expect(await screen.findByText('Paint')).toBeInTheDocument()
     await userEvent.type(box, '{Backspace}')
@@ -124,7 +133,7 @@ describe('ChatList', () => {
         <ChatList />
       </StoreProvider>,
     )
-    await userEvent.type(screen.getByRole('searchbox', { name: 'Search chats' }), 'blue')
+    await userEvent.type(await openSearch(), 'blue')
     expect(await screen.findByText('Paint')).toBeInTheDocument()
     expect(store.worker.search.mock.calls).toEqual([['blue']])
   })
@@ -136,7 +145,7 @@ describe('ChatList', () => {
         <ChatList />
       </StoreProvider>,
     )
-    const box = screen.getByRole('searchbox', { name: 'Search chats' })
+    const box = await openSearch()
     await userEvent.type(box, 'blue')
     expect(await screen.findByText('Paint')).toBeInTheDocument()
     await userEvent.clear(box)
@@ -168,6 +177,7 @@ describe('ChatList', () => {
         <ChatList />
       </StoreProvider>,
     )
+    await userEvent.click(screen.getByRole('button', { name: 'Account' }))
     await userEvent.click(screen.getByRole('button', { name: 'Sign out' }))
     await vi.waitFor(() => expect(store.deleteLocalCopy).toHaveBeenCalled())
     expect(String((fetch.mock.calls[0] as unknown as [string])[0])).toBe('/api/logout')
@@ -186,6 +196,7 @@ describe('ChatList', () => {
         <ChatList />
       </StoreProvider>,
     )
+    await userEvent.click(screen.getByRole('button', { name: 'Account' }))
     await userEvent.click(screen.getByRole('button', { name: 'Sign out' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Cross-origin')
     expect(store.deleteLocalCopy).not.toHaveBeenCalled()
@@ -203,7 +214,207 @@ describe('ChatList', () => {
         <ChatList />
       </StoreProvider>,
     )
+    await userEvent.click(screen.getByRole('button', { name: 'Account' }))
     await userEvent.click(screen.getByRole('button', { name: 'Sign out' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Another tab')
+  })
+})
+
+describe('ChatList sidebar', () => {
+  const now = new Date()
+  const hoursAgo = (h: number) => new Date(now.getTime() - h * 3_600_000).toISOString()
+  const daysAgo = (d: number) => new Date(now.getTime() - d * 86_400_000).toISOString()
+  const chats = [
+    {
+      skey: 'a',
+      uri: 'u',
+      title: 'Tiles',
+      tags: ['home'],
+      updatedAt: hoursAgo(0),
+      pending: true,
+      latestReply: null,
+    },
+    {
+      skey: 'b',
+      uri: 'u',
+      title: 'Paint',
+      tags: ['home', 'diy'],
+      updatedAt: hoursAgo(0),
+      pending: false,
+      latestReply: 'b.r1',
+    },
+    {
+      skey: 'c',
+      uri: 'u',
+      title: 'Taxes',
+      tags: [],
+      updatedAt: daysAgo(40),
+      pending: false,
+      latestReply: 'c.r0',
+    },
+  ]
+  const me = {
+    did: 'did:plc:alice',
+    handle: 'alice.test',
+    storageMode: 'space' as const,
+    backgroundSync: true,
+    roles: ['user'],
+    admin: true,
+    access: 'full' as const,
+    accessMessage: null,
+  }
+
+  function sidebarStore() {
+    return {
+      ...fakeStore(),
+      worker: {
+        ...fakeStore().worker,
+        listConversations: vi.fn(async () => chats),
+        syncIndex: vi.fn(async () => {}),
+        syncStatus: vi.fn(async () => ({ syncedAt: new Date().toISOString(), remaining: 0 })),
+      },
+    }
+  }
+
+  async function renderSidebar(store = sidebarStore()) {
+    await renderAt(
+      <MeContext.Provider value={me}>
+        <StoreProvider store={store as unknown as StoreClient}>
+          <ChatList />
+        </StoreProvider>
+      </MeContext.Provider>,
+    )
+    await screen.findByText('Taxes')
+    return store
+  }
+
+  afterEach(() => {
+    localStorage.clear()
+    resetSeenCache()
+  })
+
+  it('groups chats under date headings', async () => {
+    stubFetch()
+    await renderSidebar()
+    const today = screen.getByRole('region', { name: 'Today' })
+    expect(within(today).getByText('Tiles')).toBeInTheDocument()
+    expect(within(today).getByText('Paint')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Yesterday' })).toBeNull()
+    expect(screen.getByText('Taxes').closest('section')).not.toBe(today)
+  })
+
+  it('lists each tag with its count, filters by one, and clears the filter', async () => {
+    stubFetch()
+    await renderSidebar()
+    const filter = screen.getByRole('list', { name: 'Filter by tag' })
+    expect(within(filter).getByRole('button', { name: 'home, 2 chats' })).toBeInTheDocument()
+    await userEvent.click(within(filter).getByRole('button', { name: 'diy, 1 chat' }))
+    expect(screen.queryByText('Tiles')).toBeNull()
+    expect(screen.getByText('Paint')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Clear the tag filter' }))
+    expect(screen.getByText('Tiles')).toBeInTheDocument()
+  })
+
+  it('opens the search box from its button, and clears and closes it on Escape', async () => {
+    stubFetch()
+    await renderSidebar()
+    expect(screen.queryByRole('searchbox', { name: 'Search chats' })).toBeNull()
+    const box = await openSearch()
+    expect(box).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'Search chats' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    await userEvent.type(box, 'tile{Escape}')
+    expect(screen.queryByRole('searchbox', { name: 'Search chats' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Search chats' })).toHaveFocus()
+    expect(await openSearch()).toHaveValue('')
+  })
+
+  it('clears the search when its button closes it', async () => {
+    stubFetch()
+    await renderSidebar()
+    await userEvent.type(await openSearch(), 'tile')
+    await userEvent.click(screen.getByRole('button', { name: 'Search chats' }))
+    expect(screen.queryByRole('searchbox', { name: 'Search chats' })).toBeNull()
+    expect(screen.getByText('Taxes')).toBeInTheDocument()
+  })
+
+  it('renames and tags a chat from its menu, then syncs the index', async () => {
+    const fetch = stubFetch(async () => Response.json({ ok: true }))
+    const store = await renderSidebar()
+    await userEvent.click(screen.getByRole('button', { name: 'More for Taxes' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Rename' }))
+    const title = screen.getByRole('textbox', { name: 'Title' })
+    await userEvent.clear(title)
+    await userEvent.type(title, 'Tax return{Enter}')
+    await vi.waitFor(() => expect(store.worker.syncIndex).toHaveBeenCalled())
+    await userEvent.click(screen.getByRole('button', { name: 'More for Taxes' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Edit tags' }))
+    await userEvent.type(
+      screen.getByRole('textbox', { name: /Tags/ }),
+      ' money, money ,2026{Enter}',
+    )
+    await vi.waitFor(() => expect(writes(fetch)).toHaveLength(2))
+    const [rename, tag] = writes(fetch) as [[string, RequestInit], [string, RequestInit]]
+    expect(rename[0]).toBe('/api/conversations/c')
+    expect(JSON.parse(String(rename[1].body))).toEqual({ title: 'Tax return' })
+    expect(JSON.parse(String(tag[1].body))).toEqual({ tags: ['money', '2026'] })
+  })
+
+  it('deletes a chat after asking', async () => {
+    const fetch = stubFetch(async () => Response.json({ ok: true }))
+    const store = await renderSidebar()
+    await userEvent.click(screen.getByRole('button', { name: 'More for Paint' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(screen.getByText('Delete “Paint” for good?')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Delete chat' }))
+    await vi.waitFor(() => expect(store.worker.syncIndex).toHaveBeenCalled())
+    const [deleted] = writes(fetch) as [[string, RequestInit]]
+    expect(deleted[0]).toBe('/api/conversations/b')
+    expect(deleted[1].method).toBe('DELETE')
+  })
+
+  it('marks a chat that is replying, and one with a reply not yet seen here', async () => {
+    stubFetch()
+    localStorage.setItem('scn-chat:seen:did:plc:alice', JSON.stringify({ b: 'b.r0', c: 'c.r0' }))
+    await renderSidebar()
+    expect(screen.getByText('Tiles').closest('li')).toHaveAttribute('data-replying')
+    expect(screen.getByText('Replying')).toBeInTheDocument()
+    expect(screen.getByText('Paint').closest('li')).toHaveAttribute('data-unseen')
+    expect(screen.getByText('Taxes').closest('li')).not.toHaveAttribute('data-unseen')
+  })
+
+  it('treats replies from before this device kept track as seen', async () => {
+    stubFetch()
+    await renderSidebar()
+    expect(screen.getByText('Paint').closest('li')).not.toHaveAttribute('data-unseen')
+    expect(JSON.parse(localStorage.getItem('scn-chat:seen:did:plc:alice') ?? '{}')).toEqual({
+      b: 'b.r1',
+      c: 'c.r0',
+    })
+  })
+
+  it('shows how current the copy is as a dot on the avatar, and syncs from the menu', async () => {
+    stubFetch()
+    const store = await renderSidebar()
+    const dot = (await screen.findByText('Synced just now')).parentElement
+    expect(dot).toHaveAttribute('data-state', 'synced')
+    await userEvent.click(screen.getByRole('button', { name: 'Account' }))
+    expect(screen.getByText('Stored on your PDS')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Sync chats' }))
+    await vi.waitFor(() => expect(store.worker.syncIndex).toHaveBeenCalled())
+  })
+
+  it('opens Settings, Admin, and Sign out from the account, and closes on Escape', async () => {
+    stubFetch()
+    await renderSidebar()
+    expect(screen.queryByRole('link', { name: 'Settings' })).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Account' }))
+    expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
+    expect(screen.getByRole('link', { name: 'Admin' })).toHaveAttribute('href', '/admin')
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('link', { name: 'Settings' })).toBeNull()
   })
 })

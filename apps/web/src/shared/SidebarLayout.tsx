@@ -22,8 +22,8 @@ interface Props {
  * The sidebar, after Linear's: dense one-line rows of small text on the frame. On a narrow screen it
  * is a drawer over the page, closed until opened, which closes again once a link in it is followed.
  *
- * The chats, settings, and sidebar classes are hooks for main's stand-in look, kept until what the
- * sidebar holds is ported.
+ * The settings class is a hook for main's stand-in look of the sections, kept until they are
+ * ported.
  */
 export function SidebarLayout(props: Props) {
   const sidebar = useSidebar()
@@ -69,12 +69,13 @@ export function SidebarLayout(props: Props) {
       data-sidebar-collapsed={sidebar.collapsed || undefined}
       data-drawer-open={sidebar.drawerOpen || undefined}
       aria-busy={props.frame || undefined}
-      className="chats flex h-dvh min-h-0 overflow-x-clip"
+      className="flex h-dvh min-h-0 overflow-x-clip"
     >
       <nav
+        data-ported
         className={cn(
           sidebarClass,
-          'sidebar wide:in-data-sidebar-collapsed:invisible wide:in-data-sidebar-collapsed:-ms-sidebar wide:w-sidebar wide:flex-none overflow-hidden border-0',
+          'wide:in-data-sidebar-collapsed:invisible wide:in-data-sidebar-collapsed:-ms-sidebar wide:w-sidebar wide:flex-none overflow-hidden',
           // Collapsing slides the sidebar off the window's edge as the panel widens into its room.
           // The frame takes the stored choice just after it first renders, so it never slides, or
           // the collapse would replay on every reload.
@@ -84,7 +85,7 @@ export function SidebarLayout(props: Props) {
       >
         {!props.frame && (
           // The logo and the toggle, on one row as tall as the chat's header.
-          <header data-ported className="-mt-2.5 flex h-bar flex-none items-center gap-0.5">
+          <header className="-mt-2.5 flex h-bar flex-none items-center gap-0.5">
             <AppLogo />
             <SidebarToggle className="ms-auto" />
           </header>

@@ -28,8 +28,7 @@ export function ftsQuery(input: string): string | null {
   return terms.length ? terms.join(' ') : null
 }
 
-const snippet = (table: string) =>
-  `snippet(${table}, 0, '${MATCH_START}', '${MATCH_END}', '...', 30)`
+const snippet = (table: string) => `snippet(${table}, 0, '${MATCH_START}', '${MATCH_END}', '…', 30)`
 
 /** Searches titles and message text. Priority is the title, then relevance and recency. */
 export function search(

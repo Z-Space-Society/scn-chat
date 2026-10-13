@@ -4,6 +4,7 @@ import { type Account, getAccount } from './auth/accounts.ts'
 import { createIdentityResolver, type IdentityResolver } from './auth/identity.ts'
 import { createOAuthClient, type OAuthClientLike } from './auth/oauth-client.ts'
 import { createPdsClientFactory } from './auth/pds.ts'
+import { createProfileReader } from './auth/profile.ts'
 import { addPluginMember, syncMembers } from './auth/role-store.ts'
 import { type RoleIdentity, Roles } from './auth/roles.ts'
 import { buildScope } from './auth/scope.ts'
@@ -230,6 +231,7 @@ export async function createServer(deps: ServerDeps) {
       scope,
       beforeSignIn,
       onLogin,
+      profiles: createProfileReader({ resolvePds, fetch: serviceFetch }),
     },
     plugins: { db, box, host: () => runtime().host },
     storage: {

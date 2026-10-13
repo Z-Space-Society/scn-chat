@@ -81,6 +81,52 @@ describe('StoreCore index sync', () => {
   })
 })
 
+describe('StoreCore chat list', () => {
+  /** An assistant reply with a status, written at a time. */
+  const reply = (rkey: string, status: string, createdAt: string) => {
+    const base = message(rkey, 'answer')
+    return { ...base, value: { ...base.value, role: 'assistant', status, createdAt } }
+  }
+
+  it('says which chats are replying and names their newest finished reply', async () => {
+    const { api, store } = setup()
+    api.index = { conversations: [summary('a'), summary('b')], deleted: [], rev: 'r1', full: true }
+    await store.syncIndex()
+    api.conversations.set('a', {
+      info: null,
+      messages: [
+        message('u1', 'q'),
+        reply('u1.r0', 'complete', '2026-09-26T00:00:01Z'),
+        reply('u1.r1', 'complete', '2026-09-26T00:00:05Z'),
+        reply('u2.r0', 'pending', '2026-09-26T00:00:09Z'),
+      ],
+      deleted: [],
+      rev: 'c1',
+      full: true,
+    })
+    await store.refreshConversation('a')
+    const chats = Object.fromEntries(store.listConversations().map((c) => [c.skey, c]))
+    expect(chats.a).toMatchObject({ pending: true, latestReply: 'u1.r1' })
+    expect(chats.b).toMatchObject({ pending: false, latestReply: null })
+  })
+
+  it('records when the index last synced', async () => {
+    const db = memoryDb()
+    ensureSchema(db)
+    const api = fakeApi()
+    const store = new StoreCore({
+      db,
+      api,
+      did: 'did:plc:alice',
+      now: () => '2026-10-07T10:00:00Z',
+    })
+    expect(store.syncStatus()).toEqual({ syncedAt: null, remaining: 0 })
+    api.index = { conversations: [], deleted: [], rev: 'r1', full: true }
+    await store.syncIndex()
+    expect(store.syncStatus().syncedAt).toBe('2026-10-07T10:00:00Z')
+  })
+})
+
 describe('StoreCore conversations', () => {
   it('fetches a conversation in full the first time, then only its changes', async () => {
     const { api, store } = setup()

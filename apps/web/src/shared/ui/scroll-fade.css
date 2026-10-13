@@ -1,0 +1,35 @@
+/*
+ * A list that scrolls between parts that stay put, such as the sidebar's chats, fading out at
+ * both ends rather than stopping at a line. The top fade grows over the first bit of scrolling, so
+ * the first row is clear at rest.
+ */
+
+@property --fade-top {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@keyframes fade-top {
+  to {
+    --fade-top: 1.5rem;
+  }
+}
+
+@utility scroll-fade {
+  mask-image: linear-gradient(to bottom, black calc(100% - 1.5rem), transparent);
+
+  /* Without scroll timelines the animation would end at once, fading the top before any scroll. */
+  @supports (animation-timeline: scroll()) {
+    mask-image: linear-gradient(
+      to bottom,
+      transparent,
+      black var(--fade-top),
+      black calc(100% - 1.5rem),
+      transparent
+    );
+    animation: fade-top linear both;
+    animation-timeline: scroll(self);
+    animation-range: 0 2rem;
+  }
+}

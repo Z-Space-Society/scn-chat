@@ -31,7 +31,7 @@ The PDS is the source of truth, and the server keeps no copy of chat content. Re
 | `conversation` | `skey` (primary key), `uri`, `title`, `tags_json`, `updated_at`, `rev` (the last conversation revision fetched, null if never fetched) |
 | `message` | `conversation_skey`, `author_did`, `rkey`, `role`, `parent`, `status`, `record_json`, `text`, `created_at`. Primary key is the first three. |
 | `info` | `conversation_skey` (primary key), `record_json` |
-| `meta` | `key` (primary key), `value`. Holds the index revision and the schema version. |
+| `meta` | `key` (primary key), `value`. Holds the index revision, when the index last synced, and the schema version. |
 
 `text` is the concatenated text parts of a message, used by search. The schema version is checked on open. A mismatch deletes and rebuilds the database, since everything in it can be fetched again.
 
@@ -50,14 +50,17 @@ Streaming replies are shown from the turn's stream, as the chat-turns spec descr
 ### Worker API
 
 ```ts
-listConversations(): Promise<ConversationSummary[]>
+listConversations(): Promise<ChatListItem[]>     // each with `pending` and `latestReply`, below
 getConversation(skey): Promise<{ info; messages }>
 refreshConversation(skey): Promise<void>
 syncIndex(): Promise<void>
 search(query, opts): Promise<SearchResult[]>   // see the search spec
 remainingDownloads(): Promise<number>          // conversations not yet fetched
+syncStatus(): Promise<{ syncedAt; remaining }> // when the index last synced, and the download count
 reset(): Promise<void>                          // delete and rebuild the database
 ```
+
+Each chat-list item adds two things its messages say, read from the `message` table: `pending`, whether an assistant reply is still pending, and `latestReply`, the key of the newest complete assistant reply. The sidebar shows the first as a replying dot and compares the second with what this device has seen. A change to a conversation therefore also refreshes the chat list. Each index sync stores its time under `index_synced_at`, even when nothing changed, for the sidebar's sync status.
 
 Changes are announced to the UI through a subscription, so screens rerender when the data under them changes.
 

@@ -30,12 +30,12 @@ Tailwind keeps a component's styles in its markup, so a forker changes a compone
 
 - `app.css` sets the layer order, then imports Tailwind, the theme, the base layer, and the scoped sheets.
 - `theme.css` is the theme: every token, in `@theme`, plus the few plain custom properties that have no Tailwind namespace. It is the only file a forker or designer edits to change the look.
-- `base.css` styles the document in `@layer base`: the root font size of 96.875%, line height, font smoothing, body colors, `::selection`, the scrollbar, the `:focus-visible` ring, links, and the `data-theme` rules.
+- `base.css` styles the document in `@layer base`: the root font size of 96.875%, line height, font smoothing, body colors, `::selection`, the scrollbar, the `:focus-visible` ring, links, a search field's clear button, and the `data-theme` rules.
 
 A few styles can't be written as utilities, and live in a sheet beside the component they serve, imported from `app.css`:
 
 - `src/parts/markdown.css` styles the HTML react-markdown builds, under `.markdown`, and the highlighted code inside it.
-- A `@utility` for the chat list's scroll-driven top fade, which needs `@property` and `animation-timeline`.
+- `src/shared/ui/scroll-fade.css`, the `scroll-fade` utility for a list that scrolls between parts that stay put, like the chat list, whose top fade needs `@property` and `animation-timeline`.
 - A `@utility` for animating a `<details>` open through `::details-content`.
 
 Tailwind's Preflight resets every element. No element gets a look globally: a button looks like a button because it is a `Button`, and a field because it comes from the form kit.
@@ -77,7 +77,7 @@ Spacing literals from `design-reference` snap to the nearest quarter step of the
 - Utilities use only theme tokens. A value with no token is a new token in `theme.css`, used through its utility, or as `utility-(--token)` when its kind has no namespace. Arbitrary values like `p-[13px]` or `bg-[#fff]` are not used. Arbitrary variants and layout values that hold no color or length, like `grid-cols-[auto_1fr]`, are fine.
 - State is in `data-*` and `aria-*` attributes and styled with their variants, such as `data-[state=done]:` and `aria-expanded:`. A child styled from its parent's state uses `group-*`, `peer-*`, or `in-*`. Tests find elements by role, label, or these attributes, never by class.
 - Each animation carries its own `motion-reduce:` override.
-- `hover:` already applies only where the device can hover, so no `(hover: hover)` query is written by hand.
+- `hover:` already applies only where the device can hover, so no `(hover: hover)` query is written by hand. What hover reveals shows from the start under the `touch:` variant, for devices that can't hover.
 - Logical properties (`ps-*`, `me-*`, `start-*`) wherever a side matters, so the layout mirrors for right-to-left text.
 - Variants in a component use `cva`, and a component that takes a `className` merges it with `cn()`.
 

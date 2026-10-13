@@ -4,7 +4,7 @@ import { MeContext } from '../features/auth/session.ts'
 import { reportUnauthorized } from '../shared/api.ts'
 import { messageOf } from '../shared/errors.ts'
 import { openStore, type StoreClient } from './client.ts'
-import type { Conversation, ConversationSummary } from './core.ts'
+import type { ChatListItem, Conversation, SyncStatus } from './core.ts'
 import { isStoreClosed } from './errors.ts'
 import type { HandoverState } from './handover.ts'
 import type { SearchResult } from './search.ts'
@@ -26,13 +26,15 @@ export function StoreProvider(props: Props) {
     () =>
       props.store.onChange((change) => {
         if (change.type === 'unauthorized') return reportUnauthorized()
-        if (change.type === 'index')
+        // A conversation's messages decide whether it shows as replying or new in the list.
+        if (change.type === 'index' || change.type === 'conversation')
           void queryClient.invalidateQueries({ queryKey: ['conversations'] })
         if (change.type === 'conversation')
           void queryClient.invalidateQueries({
             queryKey: ['conversation', change.skey],
             exact: true,
           })
+        void queryClient.invalidateQueries({ queryKey: ['sync-status'] })
         // Any change can add results or finish a download.
         void queryClient.invalidateQueries({ queryKey: ['search'] })
       }),
@@ -76,7 +78,7 @@ function useActiveStore() {
 /** A store failure's message, except for the store moving to another tab. */
 const storeError = (err: unknown) => (!err || isStoreClosed(err) ? null : messageOf(err))
 
-export function useConversations(): { conversations: ConversationSummary[]; error: string | null } {
+export function useConversations(): { conversations: ChatListItem[]; error: string | null } {
   const { store, active } = useActiveStore()
   const { data, error } = useQuery({
     queryKey: ['conversations'],
@@ -92,6 +94,8 @@ export const conversationRefreshKey = (skey: string) => ['conversation', skey, '
 /** A conversation from the local copy, shown at once and refreshed from the PDS when opened. */
 export function useConversation(skey: string): {
   conversation: Conversation | null
+  /** Whether the refresh from the PDS has finished, so a conversation with no messages has none. */
+  refreshed: boolean
   error: string | null
 } {
   const { store, active } = useActiveStore()
@@ -110,7 +114,11 @@ export function useConversation(skey: string): {
     },
     enabled: active,
   })
-  return { conversation: local.data ?? null, error: storeError(local.error ?? refreshed.error) }
+  return {
+    conversation: local.data ?? null,
+    refreshed: refreshed.isSuccess,
+    error: storeError(local.error ?? refreshed.error),
+  }
 }
 
 /** Search the local copy, rerunning as the download and live changes add to it. */
@@ -133,4 +141,15 @@ export function useChatSearch(query: string): {
     placeholderData: keepPreviousData,
   })
   return { results: data?.results ?? [], remaining: data?.remaining ?? 0, error: storeError(error) }
+}
+
+/** How current this device's copy is, updated as the store syncs and downloads. */
+export function useSyncStatus(): SyncStatus | null {
+  const { store, active } = useActiveStore()
+  const { data } = useQuery({
+    queryKey: ['sync-status'],
+    queryFn: () => store.worker.syncStatus(),
+    enabled: active,
+  })
+  return data ?? null
 }

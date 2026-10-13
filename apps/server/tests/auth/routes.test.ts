@@ -239,6 +239,33 @@ describe('API session handling', () => {
   })
 })
 
+describe('GET /api/me/profile', () => {
+  it('serves the display name and avatar thumbnail from the profile reader', async () => {
+    const thumbnail = 'https://cdn.bsky.app/img/avatar_thumbnail/plain/did:plc:alice/bafy@jpeg'
+    const profiles = { read: vi.fn(async () => ({ displayName: 'Alice', avatar: thumbnail })) }
+    const { app } = await setup({ profiles })
+    const cookie = await signIn(app)
+    const profile = await app.request('/api/me/profile', { headers: { cookie } })
+    expect(await profile.json()).toEqual({ displayName: 'Alice', avatar: thumbnail })
+    expect(profiles.read).toHaveBeenCalledWith('did:plc:alice')
+  })
+
+  it('falls back to no profile when the PDS cannot be read', async () => {
+    const fail = async () => {
+      throw new Error('PDS unreachable')
+    }
+    const { app } = await setup({ profiles: { read: fail } })
+    const cookie = await signIn(app)
+    const profile = await app.request('/api/me/profile', { headers: { cookie } })
+    expect(await profile.json()).toEqual({ displayName: null, avatar: null })
+  })
+
+  it('needs a session', async () => {
+    const { app } = await setup()
+    expect((await app.request('/api/me/profile')).status).toBe(401)
+  })
+})
+
 describe('POST /api/logout', () => {
   it('clears the web session and keeps the OAuth session', async () => {
     const { app, auth } = await setup()

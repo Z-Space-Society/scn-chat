@@ -20,6 +20,7 @@ import {
 import type { IdentityResolver } from './identity.ts'
 import { removeInvite } from './invites.ts'
 import type { OAuthClientLike } from './oauth-client.ts'
+import type { ProfileReader } from './profile.ts'
 import { ADMIN_ROLE, type RoleIdentity, type Roles } from './roles.ts'
 import { scopeAllowsSpaces } from './scope.ts'
 import {
@@ -44,6 +45,8 @@ export type AuthDeps = {
   beforeSignIn?: (identity: RoleIdentity) => Promise<void>
   /** Runs after each login to set up the user's storage. */
   onLogin?: (account: Account) => Promise<void>
+  /** Reads the user's public profile from their PDS, for the sidebar. */
+  profiles?: ProfileReader
 }
 
 const loginError = (message: string) => `/login?error=${encodeURIComponent(message)}`
@@ -269,34 +272,48 @@ export function oauthRoutes(deps: AuthDeps) {
 
 /** The signed-in user's details, and logout. */
 export function authApiRoutes(deps: AuthDeps) {
-  return new Hono<AppEnv>()
-    .get('/me', requireUser, async (c) => {
-      const user = signedInUser(c)
-      const { did, account, roles, access, admin } = user
-      return c.json({
-        did,
-        handle: account.handle,
-        storageMode: account.storageMode,
-        backgroundSync: account.backgroundSync,
-        roles,
-        admin,
-        access,
-        accessMessage: access === 'full' ? null : await accessMessage(deps, user),
+  return (
+    new Hono<AppEnv>()
+      .get('/me', requireUser, async (c) => {
+        const user = signedInUser(c)
+        const { did, account, roles, access, admin } = user
+        return c.json({
+          did,
+          handle: account.handle,
+          storageMode: account.storageMode,
+          backgroundSync: account.backgroundSync,
+          roles,
+          admin,
+          access,
+          accessMessage: access === 'full' ? null : await accessMessage(deps, user),
+        })
       })
-    })
-    .post('/logout', async (c) => {
-      const token = getCookie(c, SESSION_COOKIE)
-      const user = c.get('user')
-      if (token) await deleteWebSession(deps.db, token)
-      if (user && c.req.query('everywhere') === '1') {
-        await deleteAllWebSessions(deps.db, user.did)
+      // The display name and the avatar's thumbnail, which the browser loads from Bluesky's CDN. A
+      // PDS that can't be reached leaves only the handle to show, rather than failing the page.
+      .get('/me/profile', requireUser, async (c) => {
+        const { did } = signedInUser(c)
         try {
-          await deps.oauth.revoke(user.did)
+          const profile = (await deps.profiles?.read(did)) ?? { displayName: null, avatar: null }
+          return c.json({ displayName: profile.displayName, avatar: profile.avatar })
         } catch (err) {
-          deps.logger.warn({ err, did: user.did }, 'oauth revoke failed')
+          deps.logger.warn({ err, did }, 'could not read the profile')
+          return c.json({ displayName: null, avatar: null })
         }
-      }
-      deleteCookie(c, SESSION_COOKIE, { path: '/' })
-      return c.json({ ok: true })
-    })
+      })
+      .post('/logout', async (c) => {
+        const token = getCookie(c, SESSION_COOKIE)
+        const user = c.get('user')
+        if (token) await deleteWebSession(deps.db, token)
+        if (user && c.req.query('everywhere') === '1') {
+          await deleteAllWebSessions(deps.db, user.did)
+          try {
+            await deps.oauth.revoke(user.did)
+          } catch (err) {
+            deps.logger.warn({ err, did: user.did }, 'oauth revoke failed')
+          }
+        }
+        deleteCookie(c, SESSION_COOKIE, { path: '/' })
+        return c.json({ ok: true })
+      })
+  )
 }

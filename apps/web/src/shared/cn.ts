@@ -6,10 +6,21 @@ import { extendTailwindMerge } from 'tailwind-merge'
  * text-muted, a color. A test keeps these in step with styles/theme.css.
  */
 export const themeNames = {
-  text: ['caption', 'small', 'ui', 'body', 'heading', 'title', 'display'],
+  text: ['caption', 'small', 'ui', 'body', 'heading', 'title', 'display', 'code'],
   tracking: ['title', 'heading', 'label', 'key'],
   font: ['ui', 'prose', 'mono'],
-  radius: ['panel', 'card', 'small', 'badge', 'row', 'menu', 'bubble', 'composer'],
+  radius: [
+    'panel',
+    'card',
+    'small',
+    'badge',
+    'row',
+    'menu',
+    'bubble',
+    'editor',
+    'mark',
+    'composer',
+  ],
   shadow: ['float', 'lift'],
   spacing: [
     'icon',
@@ -29,7 +40,7 @@ export const themeNames = {
   ],
   container: ['column', 'settings', 'narrow'],
   ease: ['out', 'swap'],
-  animate: ['fade-in', 'breathe'],
+  animate: ['fade-in', 'breathe', 'panel-up'],
   breakpoint: ['wide'],
 }
 

@@ -29,6 +29,7 @@ const { openStore, question, store } = vi.hoisted(() => {
         { skey: 's1', title: 'Tiles', rkey: 'u', role: 'user', snippet: 'tiles', time: '' },
       ],
       remainingDownloads: async () => 0,
+      syncStatus: async () => ({ syncedAt: '2026-09-26T00:00:00Z', remaining: 0 }),
     },
     state: () => 'active',
     onState: () => () => {},
@@ -218,7 +219,7 @@ describe('App', () => {
     const router = renderApp('/chat/s1?q=tiles')
     expect(await screen.findByText('Which tiles?')).toBeInTheDocument()
     const scrollTo = vi.spyOn(window, 'scrollTo')
-    await userEvent.click(await screen.findByRole('link', { name: /Tiles/ }))
+    await userEvent.click(await screen.findByRole('link', { name: /^You:\s*tiles/ }))
     expect(router.state.location.search).toMatchObject({ m: 'u' })
     await vi.waitFor(() => expect(scrolled).toHaveBeenCalledWith('m-u'))
     // The router's reset to the top would otherwise run after it.
@@ -229,7 +230,7 @@ describe('App', () => {
     signedIn()
     Element.prototype.scrollIntoView = () => {}
     const router = renderApp('/?q=tiles')
-    await userEvent.click(await screen.findByRole('link', { name: /Tiles/ }))
+    await userEvent.click(await screen.findByRole('link', { name: /^You:\s*tiles/ }))
     await vi.waitFor(() => expect(router.state.location.pathname).toBe('/chat/s1'))
     expect(router.state.location.search).toEqual({ q: 'tiles', m: 'u' })
     const box = screen.getByRole('searchbox', { name: 'Search chats' })
