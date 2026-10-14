@@ -190,10 +190,7 @@ export async function credentialById(db: Db, box: SecretBox, did: string, id: st
   const row = await rowById(db, did, id)
   if (!row) return undefined
   const summary = summarize(row, box)
-  const apiKey = box.tryDecrypt(row.api_key_encrypted)
-  if (apiKey === undefined)
-    throw new UnreadableCredential(summary.name ?? summary.slug ?? summary.providerId)
-  return { summary, apiKey }
+  return { summary, apiKey: decryptKey(row, summary, box) }
 }
 
 /** The user's credential that covers a model reference, with its decrypted key. */
@@ -211,8 +208,13 @@ export async function credentialFor(
   const summary = summarize(row, box)
   const info = summary.models.find((model) => model.id === ref.id)
   if (!info) return undefined
+  return { summary, info, apiKey: decryptKey(row, summary, box) }
+}
+
+/** A credential's key, refused when no current or retired key can decrypt it. */
+function decryptKey(row: Row, summary: CredentialSummary, box: SecretBox) {
   const apiKey = box.tryDecrypt(row.api_key_encrypted)
   if (apiKey === undefined)
     throw new UnreadableCredential(summary.name ?? summary.slug ?? summary.providerId)
-  return { summary, info, apiKey }
+  return apiKey
 }

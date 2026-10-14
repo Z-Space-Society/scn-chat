@@ -9,5 +9,8 @@ export const capabilities = [
   { key: 'tools', label: 'Tools', description: 'Calls the tools plugins offer.' },
 ] as const
 
+/** Whether a model can do each of the things above. */
+export type Capabilities = Record<(typeof capabilities)[number]['key'], boolean>
+
 /** What a model can do when nothing says, as for one typed by its ID. */
-export const noCapabilities = { vision: false, reasoning: false, tools: false }
+export const noCapabilities: Capabilities = { vision: false, reasoning: false, tools: false }

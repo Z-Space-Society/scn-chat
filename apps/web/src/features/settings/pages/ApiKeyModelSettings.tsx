@@ -24,6 +24,7 @@ import {
 } from '../../../shared/ui/SettingsPage.tsx'
 import { ToggleChip } from '../../../shared/ui/ToggleChip.tsx'
 import { capabilities, noCapabilities } from '../../models/capabilities.ts'
+import { ModelName } from '../../models/components/ModelName.tsx'
 import { useKeysChanged } from '../hooks/changes.ts'
 import { type Credential, keyDescription, keyLabel } from '../lib/api-keys.ts'
 import { credentialsQuery, providersQuery } from '../queries.ts'
@@ -253,10 +254,7 @@ function AddModels(props: AddModelsProps) {
               checked={using.has(model.id)}
               onChange={() => toggle(model)}
             >
-              {model.name}{' '}
-              {model.name !== model.id && (
-                <code className="text-caption text-muted">{model.id}</code>
-              )}
+              <ModelName model={model} />
             </ChecklistItem>
           ))}
         </Checklist>

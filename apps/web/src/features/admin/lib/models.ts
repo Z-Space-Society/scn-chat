@@ -5,7 +5,5 @@ export type AdminModel = Omit<AdminModelEntry, 'warning'>
 
 export type Capabilities = AdminModel['capabilities']
 
-export const capabilityNames = ['vision', 'reasoning', 'tools'] as const
-
 /** The model as it is saved. */
 export const storedModel = ({ warning: _warning, ...model }: AdminModelEntry): AdminModel => model

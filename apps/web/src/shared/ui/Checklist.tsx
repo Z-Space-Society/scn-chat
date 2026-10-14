@@ -1,20 +1,13 @@
 import type { ReactNode } from 'react'
-import { cn } from '../cn.ts'
 
 interface ChecklistProps {
-  className?: string
   children: ReactNode
 }
 
 /** A card's grid of things to tick, such as the models a provider lists, which scrolls when long. */
 export function Checklist(props: ChecklistProps) {
   return (
-    <ul
-      className={cn(
-        'grid max-h-72 grid-cols-[repeat(auto-fill,minmax(--spacing(56),1fr))] gap-x-4 gap-y-1.5 overflow-y-auto px-card-pad pt-card-pad text-small',
-        props.className,
-      )}
-    >
+    <ul className="grid max-h-72 grid-cols-[repeat(auto-fill,minmax(--spacing(56),1fr))] gap-x-4 gap-y-1.5 overflow-y-auto px-card-pad pt-card-pad text-small">
       {props.children}
     </ul>
   )

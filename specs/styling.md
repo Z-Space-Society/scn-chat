@@ -92,7 +92,7 @@ Spacing literals from `design-reference` snap to the nearest quarter step of the
 - `ToggleChip.tsx`: a small button that stays pressed while what it names is on, for several on/off choices in one row, such as what a model can do, where switches would crowd it. Pressed, it turns green and gains a check, and it carries `aria-pressed`.
 - `Checklist.tsx`: `Checklist`, a card's grid of checkboxes that scrolls when long, and `ChecklistItem`, such as the models a provider lists to tick.
 - `controls.tsx`: the `field` look of text fields, selects, and textareas, `Switch`, and `Radio`. The switch stays a checkbox to the browser and screen readers, and the switch and radio draw their knob and dot as elements beside the input, so every browser can show them.
-- `Select.tsx`: the select-only combobox from `design-reference`, its list rendered into the body and placed by `usePlacement` in `src/shared/`. A portal rather than the Popover API keeps it testable in jsdom.
+- `Select.tsx`: the select-only combobox from `design-reference`, its list rendered into the body and placed by `usePlacement` in `src/shared/`. A portal rather than the Popover API keeps it testable in jsdom. It scrolls the active option into view only when the active option changes, since the list re-renders as it scrolls, and scrolling back then would keep a long list from reaching its end.
 - `menu.ts`: the look of floating menus and panels and of the rows in them, shared by the select's list and the app's menus.
 - `CopyButton.tsx`: Copy, as words or as an icon that cross-fades to a check.
 - `ItemList.tsx`: lists in a card, each `Item` with an `ItemMark`, its `ItemNames` over a line of details, and its actions, and `LinkItem`, a row that opens a page.
@@ -141,6 +141,7 @@ The port is done. Main's stand-in sheets, the `legacy` layer they loaded in, and
 
 - [x] `pnpm dev` and a production build serve the styled app from `src/styles/app.css`.
 - [x] Tailwind's default palette, type scale, radii, shadows, and breakpoints produce no utilities.
+- [x] A select's long list can be scrolled to its end without jumping back to the active option.
 - [x] Changing a color token in `theme.css` changes it everywhere it is used, in light and dark.
 - [x] Appearance in Preferences switches between System, Light, and Dark at once, and the choice survives a reload with no flash, on server-rendered and client-only routes.
 - [x] The guard test fails on a raw color or arbitrary length in a component.

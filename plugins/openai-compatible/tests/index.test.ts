@@ -96,6 +96,19 @@ describe('openai-compatible plugin', () => {
     expect((fetch.mock.calls[0] as unknown as [string])[0]).toBe('https://cocore.dev/v1/models')
   })
 
+  it('sends the user agent the admin set, and a session of its own, with the model list', async () => {
+    const { providers } = await setupForTest(
+      plugin({ ...cocore, sessionHeader: 'x-opencode-session', userAgent: 'scn-chat/1.0' }),
+    )
+    const fetch = vi.fn(async () => Response.json({ data: [{ id: 'llama-3' }] }))
+    await providers[0]!.listModels!({ fetch: fetch as unknown as typeof globalThis.fetch })
+    const headers = new Headers(
+      (fetch.mock.calls[0] as unknown as [string, RequestInit])[1].headers,
+    )
+    expect(headers.get('user-agent')).toBe('scn-chat/1.0')
+    expect(headers.get('x-opencode-session')).toMatch(/^[0-9a-f]{32}$/)
+  })
+
   it('fails without a base URL, before fetching', async () => {
     const { providers } = await setupForTest(plugin({ id: 'x', name: 'X' }))
     const fetch = vi.fn()

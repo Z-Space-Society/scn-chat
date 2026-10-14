@@ -127,6 +127,7 @@ Provider IDs appear in the model references stored in users' records, so each pr
 - [ ] Startup fails with a message naming the variable for a missing `SECRET_KEY` or `ADMIN_DIDS`, a non-HTTPS `PUBLIC_URL` in production, or `OAUTH_SCOPE_MODE=raw` in production.
 - [ ] Removed environment variables are no longer read.
 - [ ] The General, Turns, and Sync sections save their settings, and the system prompt is a textarea.
+- [ ] The app's description defaults to "AI chats that live on your own PDS. Use any model, and every conversation stays yours.", and the login page shows it under the logo.
 
 ## Files
 

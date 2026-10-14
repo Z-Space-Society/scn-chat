@@ -361,6 +361,29 @@ describe("Settings for one API key's models", () => {
     await vi.waitFor(() => expect(patchedModels(fetch)?.map((m) => m.id)).toEqual(['gpt', 'o9']))
   })
 
+  it('unticking a listed model takes it out of the draft, as removing it does', async () => {
+    stubKey({
+      '/api/credentials/k1/list-models': () =>
+        Response.json({ models: [{ id: 'gpt', name: 'GPT', capabilities: caps }] }),
+    })
+    await renderPage('/api-keys/k1')
+    await userEvent.click(await screen.findByRole('button', { name: 'Load models' }))
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'GPT gpt' }))
+    expect(screen.queryByRole('group', { name: 'What GPT can do' })).toBeNull()
+    expect(screen.getByText(/No models/)).toBeInTheDocument()
+  })
+
+  it("asks for a key that can't be read anymore to be added again", async () => {
+    stubKey({
+      '/api/credentials': () =>
+        Response.json({ credentials: [{ ...workKey, keyUnreadable: true }] }),
+    })
+    await renderPage('/api-keys/k1')
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "This key can't be read anymore. Delete it and add it again.",
+    )
+  })
+
   it("won't save a key with no models", async () => {
     stubKey()
     await renderPage('/api-keys/k1')

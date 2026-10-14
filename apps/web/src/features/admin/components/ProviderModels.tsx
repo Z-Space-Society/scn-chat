@@ -16,9 +16,10 @@ import {
   SettingsGroup,
   undivided,
 } from '../../../shared/ui/SettingsPage.tsx'
-import { noCapabilities } from '../../models/capabilities.ts'
+import { capabilities, noCapabilities } from '../../models/capabilities.ts'
+import { ModelName } from '../../models/components/ModelName.tsx'
 import { useModelsChanged } from '../hooks/changes.ts'
-import { type AdminModel, type Capabilities, capabilityNames } from '../lib/models.ts'
+import type { AdminModel, Capabilities } from '../lib/models.ts'
 import type { AdminPlugin } from '../queries.ts'
 
 type Provider = AdminPlugin['providers'][number]
@@ -88,7 +89,7 @@ export function ProviderModels(props: Props) {
                   offer({ id: model.id, name: model.name, capabilities: model.capabilities })
                 }
               >
-                {model.name} <code className="text-caption text-muted">{model.id}</code>
+                <ModelName model={model} />
               </ChecklistItem>
             ))}
           </Checklist>
@@ -139,7 +140,9 @@ function ModelList(props: ModelListProps) {
   return (
     <ItemList>
       {props.models.map((model) => {
-        const capabilities = capabilityNames.filter((c) => model.capabilities[c])
+        const can = capabilities
+          .filter((capability) => model.capabilities[capability.key])
+          .map((capability) => capability.label)
         return (
           <LinkItem
             key={model.id}
@@ -159,7 +162,7 @@ function ModelList(props: ModelListProps) {
               <code key="id" className="text-caption">
                 {model.id}
               </code>,
-              capabilities.length > 0 && capabilities.join(', '),
+              can.length > 0 && can.join(', '),
               model.roles.length ? `For ${model.roles.join(', ')}` : 'No roles',
             ]}
           />

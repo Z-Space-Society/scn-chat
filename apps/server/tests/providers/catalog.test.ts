@@ -155,6 +155,7 @@ describe('ModelCatalog.resolve', () => {
     await catalog.resolve('did:plc:alice', ref)
     const sessions = created.map((access) => access.session)
     expect(sessions[0]).toMatch(/^[0-9a-f]{32}$/)
+    expect(sessions[0]).not.toContain('alice')
     expect(sessions[1]).toBe(sessions[0])
     expect(sessions[2]).not.toBe(sessions[0])
     expect(sessions[3]).toBeUndefined()

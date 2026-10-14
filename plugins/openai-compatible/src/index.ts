@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { definePlugin, type ModelInfo } from '@scn-chat/plugin-api'
 import { z } from 'zod'
@@ -31,7 +32,8 @@ export const optionsSchema = z
       }),
     userAgent: z.string().min(1).optional().meta({
       title: 'User agent',
-      description: "Sent in place of the SDK's, for endpoints that ask clients to name themselves.",
+      description:
+        "Leads the user agent, for endpoints that ask clients to name themselves. Chat calls add the SDK's name after it.",
     }),
   })
   .strict()
@@ -84,7 +86,11 @@ export default function openaiCompatible(options: OpenAICompatibleOptions) {
           if (!url) throw new Error(`Provider "${options.id}" has no base URL`)
           const key = apiKey ?? options.apiKey
           const response = await fetch(`${url.replace(/\/$/, '')}/models`, {
-            headers: { ...headersFor(options), ...(key ? { authorization: `Bearer ${key}` } : {}) },
+            // The list belongs to no conversation, so it carries a session of its own, shaped like one.
+            headers: {
+              ...headersFor(options, randomBytes(16).toString('hex')),
+              ...(key ? { authorization: `Bearer ${key}` } : {}),
+            },
             redirect: 'error',
           })
           if (!response.ok) throw new Error(`Listing models at ${url} returned ${response.status}`)

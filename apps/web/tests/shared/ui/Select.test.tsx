@@ -1,7 +1,7 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { Select, type SelectOption } from '../../../src/shared/ui/Select.tsx'
 
 const options: SelectOption[] = [
@@ -63,6 +63,26 @@ describe('Select', () => {
     await userEvent.keyboard('{Enter}')
     expect(onChange).toHaveBeenCalledWith('a')
     expect(screen.queryByRole('listbox')).toBeNull()
+  })
+
+  it('scrolls the active option into view only when it changes, so the list can be scrolled', async () => {
+    const scrollIntoView = vi.fn()
+    const original = Element.prototype.scrollIntoView
+    Element.prototype.scrollIntoView = scrollIntoView
+    onTestFinished(() => {
+      Element.prototype.scrollIntoView = original
+    })
+    const { rerender } = render(<Fruit />)
+    box().focus()
+    await userEvent.keyboard('{ArrowDown}')
+    expect(scrollIntoView).toHaveBeenCalledTimes(1)
+    expect(scrollIntoView.mock.contexts[0]).toHaveTextContent('Apple')
+    fireEvent.scroll(screen.getByRole('listbox'))
+    rerender(<Fruit />)
+    expect(scrollIntoView).toHaveBeenCalledTimes(1)
+    await userEvent.keyboard('{ArrowDown}')
+    expect(scrollIntoView).toHaveBeenCalledTimes(2)
+    expect(scrollIntoView.mock.contexts[1]).toHaveTextContent('Cherry')
   })
 
   it('does not pick a disabled option', async () => {
