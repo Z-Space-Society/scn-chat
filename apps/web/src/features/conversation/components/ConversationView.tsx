@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
 import { JumpDownIcon, RetryIcon } from '../../../shared/icons.tsx'
 import { Button } from '../../../shared/ui/Button.tsx'
+import { useDocumentTitle } from '../../../shared/useDocumentTitle.ts'
 import { useConversation } from '../../../store/react.tsx'
 import { useMe } from '../../auth/session.ts'
 import { useModels } from '../../models/hooks/useModels.ts'
@@ -47,6 +48,8 @@ export function ConversationView(props: Props) {
   // Every chat has an info record from its creation, so until it arrives, from the local copy or
   // the PDS, the chat's title and instructions are unknown rather than empty.
   const info = conversation?.info ?? null
+  const title = waiting && !info ? undefined : ((info?.title as string | undefined) ?? 'New chat')
+  useDocumentTitle(title)
   // The messages there when the chat first loaded, which show at once. Only later ones fade in.
   const [opened, setOpened] = useState<Set<string> | null>(null)
   if (opened === null && conversation) setOpened(new Set(messages.map((m) => m.rkey)))
@@ -105,7 +108,7 @@ export function ConversationView(props: Props) {
     >
       <ConversationHeader
         skey={props.skey}
-        title={waiting && !info ? undefined : ((info?.title as string | undefined) ?? 'New chat')}
+        title={title}
         instructions={info ? ((info.systemPrompt as string | undefined) ?? '') : undefined}
         outline={outlineOf(branch)}
         onRename={actions.rename}

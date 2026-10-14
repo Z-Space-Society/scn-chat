@@ -1,6 +1,7 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { useLocation } from '@tanstack/react-router'
 import { button } from '../../../shared/ui/Button.tsx'
+import { useDocumentTitle } from '../../../shared/useDocumentTitle.ts'
 import { BranchView } from '../../conversation/components/BranchView.tsx'
 import { DetailsButton, recordRows } from '../../conversation/components/RecordDetails.tsx'
 import { useBranch } from '../../conversation/hooks/useBranch.ts'
@@ -48,6 +49,8 @@ function SharedChat(props: ChatProps) {
     record: m.value as Record<string, unknown>,
   }))
   const { branch, pick } = useBranch(messages)
+  // An untitled chat keeps the route's title, Shared chat.
+  useDocumentTitle(shared.title ?? undefined)
   return (
     <SharedColumn>
       <header className="mb-4">

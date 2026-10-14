@@ -37,6 +37,7 @@ describe('SharedPage', () => {
     await renderAt(<SharedPage ownerDid="did:plc:alice" skey="3abc" signedIn />)
     expect(await screen.findByRole('heading', { name: 'Tile quotes' })).toBeInTheDocument()
     expect(screen.getByText('Shared by alice.test')).toBeInTheDocument()
+    expect(document.title).toMatch(/^Tile quotes · /)
     expect(screen.getByText('Roughly $450')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Previous version' }))
     expect(screen.getByText('About $500')).toBeInTheDocument()

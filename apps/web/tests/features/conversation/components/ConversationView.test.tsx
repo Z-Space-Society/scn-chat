@@ -145,6 +145,7 @@ describe('ConversationView', () => {
     await act(async () => answer())
     expect(await screen.findByText('question')).toBeInTheDocument()
     expect(screen.getByText('Tiles')).toBeInTheDocument()
+    expect(document.title).toMatch(/^Tiles · /)
     expect(screen.queryByText('Loading messages')).toBeNull()
   })
 
