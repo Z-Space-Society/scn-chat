@@ -1,6 +1,6 @@
 {
   "name": "@scn-chat/plugin-scn-member-registry",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Gives active Shared Computer Network members a role, from the SCN member registry on HappyView.",
   "keywords": [
     "scn-chat-plugin"

@@ -1,6 +1,6 @@
 {
   "name": "@scn-chat/plugin-web-search",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "A web_search tool for the model, on the search engine you choose.",
   "keywords": [
     "scn-chat-plugin"

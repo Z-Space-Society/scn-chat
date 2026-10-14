@@ -1,6 +1,6 @@
 {
   "name": "@scn-chat/plugin-web-fetch",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "A web_fetch tool that reads a web page and returns its text as Markdown.",
   "keywords": [
     "scn-chat-plugin"

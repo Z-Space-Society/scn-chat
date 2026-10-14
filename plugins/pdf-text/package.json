@@ -1,6 +1,6 @@
 {
   "name": "@scn-chat/plugin-pdf-text",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Extracts the text from PDF attachments.",
   "keywords": [
     "scn-chat-plugin"

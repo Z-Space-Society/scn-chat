@@ -1,6 +1,6 @@
 {
   "name": "@scn-chat/plugin-openai",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "OpenAI models as a model provider, through the Responses API.",
   "keywords": [
     "scn-chat-plugin"
