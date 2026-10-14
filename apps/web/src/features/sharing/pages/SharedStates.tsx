@@ -2,7 +2,7 @@ import type { ErrorComponentProps } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { RouteError } from '../../../shared/route-states.tsx'
 import { Loading, SkeletonText } from '../../../shared/ui/Skeleton.tsx'
-import { TurnSkeleton } from '../../conversation/components/ConversationSkeleton.tsx'
+import { MessagesSkeleton } from '../../conversation/components/ConversationSkeleton.tsx'
 
 /*
  * The shared page's frame, its skeleton, and its error page. The route names its pending and error
@@ -26,9 +26,9 @@ export function SharedColumn(props: ColumnProps) {
 }
 
 /**
- * The shared chat on its way: its title and who shared it, over its first turn. It is the route's
- * pending page, which the server sends and the router otherwise holds back until loading takes a
- * while, so it shows at once.
+ * The shared chat on its way: its title and who shared it, over a few paragraphs of text. It is
+ * the route's pending page, which the server sends and the router otherwise holds back until
+ * loading takes a while, so it shows at once.
  */
 export function SharedPageSkeleton() {
   return (
@@ -38,7 +38,7 @@ export function SharedPageSkeleton() {
           <SkeletonText className="w-64 max-w-full text-title leading-tight" />
           <SkeletonText className="mt-1 w-40 text-ui" />
         </div>
-        <TurnSkeleton />
+        <MessagesSkeleton />
       </Loading>
     </SharedColumn>
   )

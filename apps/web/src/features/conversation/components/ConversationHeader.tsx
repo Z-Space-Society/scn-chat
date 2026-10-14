@@ -13,11 +13,11 @@ import {
 import { Button } from '../../../shared/ui/Button.tsx'
 import { MenuItem } from '../../../shared/ui/MenuItem.tsx'
 import { floating } from '../../../shared/ui/menu.ts'
-import { SkeletonText } from '../../../shared/ui/Skeleton.tsx'
 import { useDismiss } from '../../../shared/useDismiss.ts'
 import { useMe } from '../../auth/session.ts'
 import { SharePanel } from '../../sharing/components/SharePanel.tsx'
 import type { OutlineEntry } from '../lib/outline.ts'
+import { headerBar, TitleSkeleton } from './HeaderFrame.tsx'
 import { InstructionsPanel } from './InstructionsPanel.tsx'
 import { PromptStack } from './PromptStack.tsx'
 
@@ -57,22 +57,8 @@ export function ConversationHeader(props: Props) {
   useDismiss(panel !== null, [header], close, { outside: light.includes(panel) })
 
   return (
-    <header
-      ref={header}
-      className={cn(
-        // Out of the centered column to the panel's edges.
-        'group/header sticky top-0 isolate z-1 mx-[calc((100%-100cqi)/2)] flex min-h-bar items-center gap-4 px-2.75 transition-[padding-inline-start] duration-(--dur-slide) ease-slide before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:-bottom-6 before:-z-1 before:bg-panel motion-reduce:transition-none before:[mask-image:linear-gradient(black_calc(100%-(--spacing(10))),transparent)]',
-        // The title moves aside for the sidebar's toggle as the sidebar slides away, and back, and
-        // stays clear of it on a narrow screen, where the sidebar is a drawer.
-        'in-data-sidebar-collapsed:ps-[calc(--spacing(2.75)+var(--spacing-toggle)+--spacing(1.5))] max-wide:ps-[calc(--spacing(2.75)+var(--spacing-toggle)+--spacing(1.5))]',
-      )}
-    >
-      {props.title === undefined && (
-        // The title on its way, a line where the title's text will be.
-        <span className="min-w-0 flex-1 px-2.25 py-1.25 text-ui">
-          <SkeletonText className="w-40 max-w-full" />
-        </span>
-      )}
+    <header ref={header} className={headerBar}>
+      {props.title === undefined && <TitleSkeleton />}
       {props.title !== undefined && panel === 'rename' && (
         <RenameForm
           title={props.title}

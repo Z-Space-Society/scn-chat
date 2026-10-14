@@ -1,8 +1,11 @@
 import { useLayoutEffect, useState } from 'react'
-import { Loading, Skeleton, SkeletonText } from '../../../shared/ui/Skeleton.tsx'
+import { Loading, SkeletonText } from '../../../shared/ui/Skeleton.tsx'
 
-/** The widths of the reply's lines, ending short as a paragraph does. */
-const lines = ['w-full', 'w-11/12', 'w-full', 'w-3/5']
+/** The widths of each paragraph's lines, each ending short as a paragraph does. */
+const paragraphs = [
+  ['w-full', 'w-11/12', 'w-full', 'w-3/5'],
+  ['w-full', 'w-4/5', 'w-2/5'],
+]
 
 interface Props {
   /** Whether it shows at once, as in a page the server sends. */
@@ -29,28 +32,27 @@ export function ConversationSkeleton(props: Props) {
   }, [immediate])
   return (
     <Loading label="Loading messages" immediate={immediate} className={props.className}>
-      <TurnSkeleton />
+      <MessagesSkeleton />
     </Loading>
   )
 }
 
 /**
- * The shape of a conversation's first turn: your message's bubble at the end, then a reply's name
- * over a paragraph of its text.
+ * Messages on their way: a few paragraphs of text, spaced as a reply's are, with no bubble or
+ * name, since who said what isn't known yet.
  */
-export function TurnSkeleton() {
+export function MessagesSkeleton() {
   return (
-    <div className="flex flex-col">
-      <Skeleton className="mt-5.5 h-11 w-2/5 self-end rounded-bubble" />
-      <div className="mt-turn">
-        <SkeletonText className="mb-0.75 w-24 text-caption" />
-        <div className="font-prose text-body leading-[1.65]">
+    <div className="mt-5.5 flex flex-col gap-4 font-prose text-body leading-[1.65]">
+      {paragraphs.map((lines, paragraph) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: the paragraphs are a fixed set, in order.
+        <div key={paragraph}>
           {lines.map((width, index) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: the lines are a fixed set, in order.
             <SkeletonText key={index} className={width} />
           ))}
         </div>
-      </div>
+      ))}
     </div>
   )
 }
