@@ -38,7 +38,7 @@ Each group is a key in the settings store, with a zod schema in `apps/server/src
 
 | Key | Fields |
 |---|---|
-| `general` | `appName` (default `SCN Chat`) |
+| `general` | `appName` (default `SCN Chat`), `description` (default the login page's tagline) |
 | `sessions` | `ttlDays` (1 or more, default 30) |
 | `turns` | `ratePerMinute` (default 10), `maxSteps` (default 8), `timeoutSeconds` (default 600), `backfillMinutes` (default 60), `systemPrompt` (multi-line, default today's `DEFAULT_SYSTEM_PROMPT`, placeholders unchanged) |
 | `sync` | `safetyNet` (`enabled`, `intervalMinutes`, `activeWithinHours`), `discovery` (`intervalMinutes`, `activeWithinDays`), `allowUserOptOut` |
@@ -48,6 +48,7 @@ Each group is a key in the settings store, with a zod schema in `apps/server/src
 Consumers read the current value from the settings store when they need it, and never copy it at startup:
 
 - **App name.** The page title the server renders, the OAuth client metadata's `client_name`, the `{{appName}}` placeholder, and `ctx.app.name` all read it per use.
+- **Description.** The login page's tagline, and the description and link preview tags the server renders, read it per use.
 - **Session lifetime.** Applies to sessions created or extended after the change. Existing expiry times stay as they are.
 - **Turns.** The rate limiter reads the rate on each check. A turn reads the step limit, timeout, and system prompt when it starts. The sync engine reads the backfill window per sync.
 - **Sync.** The scheduler subscribes to `sync` and restarts its timers with the new intervals. `allowUserOptOut` is read per request.

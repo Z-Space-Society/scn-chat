@@ -18,9 +18,13 @@ describe.each(dialects)('SettingsStore on $name', ({ create }) => {
     const { db, store } = await setup()
     const listener = vi.fn()
     store.subscribe('general', listener)
-    await store.set('general', { appName: 'Renamed' }, 'did:plc:admin')
-    expect(store.get('general')).toEqual({ appName: 'Renamed' })
-    expect(listener).toHaveBeenCalledWith({ appName: 'Renamed' })
+    await store.set(
+      'general',
+      { appName: 'Renamed', description: 'Renamed chat.' },
+      'did:plc:admin',
+    )
+    expect(store.get('general')).toEqual({ appName: 'Renamed', description: 'Renamed chat.' })
+    expect(listener).toHaveBeenCalledWith({ appName: 'Renamed', description: 'Renamed chat.' })
     expect((await SettingsStore.load(db, logger)).get('general').appName).toBe('Renamed')
   })
 

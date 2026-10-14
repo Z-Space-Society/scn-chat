@@ -7,6 +7,8 @@ import { Logo } from '../../../shared/ui/Logo.tsx'
 
 interface Props {
   appName: string
+  /** The app's description from the admin area, under its name. */
+  description: string
   error?: string
   next?: string
   /** Why a signed-in viewer can only open shared chats. */
@@ -35,9 +37,7 @@ export function LoginPage(props: Props) {
         <h1 className="text-balance font-semibold text-display text-ink-strong leading-tight tracking-title">
           {props.appName}
         </h1>
-        <p className="mt-2 mb-8 text-balance font-medium text-muted text-ui">
-          Chat with any model. Every chat is saved to your own PDS, not to this server.
-        </p>
+        <p className="mt-2 mb-8 text-balance font-medium text-muted text-ui">{props.description}</p>
         {props.notice && (
           // Why a signed-in viewer is here: a quiet note over the form.
           <p

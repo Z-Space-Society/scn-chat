@@ -1,4 +1,4 @@
-import { appName } from '../../../shared/app-name.ts'
+import { appName } from '../../../shared/site.ts'
 import { useStore, useStoreState } from '../../../store/react.tsx'
 
 /** The fallback message when the current tab can't open the local store. */

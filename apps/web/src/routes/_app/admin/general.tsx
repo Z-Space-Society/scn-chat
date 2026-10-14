@@ -9,7 +9,7 @@ export const Route = createFileRoute('/_app/admin/general')({
   component: () => (
     <SettingsAdmin
       title="General"
-      description="The app's name, and how long people stay signed in."
+      description="The app's name and description, and how long people stay signed in."
       sections={sections}
     />
   ),

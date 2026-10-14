@@ -35,16 +35,28 @@ describe('server-rendered pages', () => {
   }, 120_000)
   afterAll(() => dev?.close())
 
-  /** Request a page as Hono hands it to Start, with /api/me answering for the given user. */
-  function requestAs(user: ReturnType<typeof me>, path: string) {
-    const fetch: WebContext['fetch'] = async (input) =>
-      String(input) === '/api/me' ? Response.json(user) : Response.json({})
-    return dev.web.fetch(new Request(`http://localhost${path}`), { appName: 'Test Chat', fetch })
+  /**
+   * Request a page as Hono hands it to Start, with /api/me answering for the given user, or
+   * signed out without one.
+   */
+  function requestAs(user: ReturnType<typeof me> | null, path: string) {
+    const fetch: WebContext['fetch'] = async (input) => {
+      if (String(input) !== '/api/me') return Response.json({})
+      return user ? Response.json(user) : Response.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    return dev.web.fetch(new Request(`http://localhost${path}`), {
+      appName: 'Test Chat',
+      description: 'Chats on your PDS.',
+      publicUrl: 'https://chat.example',
+      fetch,
+    })
   }
 
   describe('through the server', () => {
     const db = createSqliteDb()
-    const settings = new SettingsStore(db, logger, { general: { appName: 'Test Chat' } })
+    const settings = new SettingsStore(db, logger, {
+      general: { appName: 'Test Chat', description: 'Chats on your PDS.' },
+    })
     beforeAll(() => migrateToLatest(db))
     afterAll(() => db.destroy())
     const request = (path: string) =>
@@ -74,6 +86,23 @@ describe('server-rendered pages', () => {
       expect(html).toContain('<title>Test Chat</title>')
       expect(html).toContain('<meta name="application-name" content="Test Chat"/>')
     })
+  })
+
+  it('lets search engines list the login page, under the public URL, with the description', async () => {
+    const html = await (await requestAs(null, '/login')).text()
+    expect(html).toContain('<meta name="description" content="Chats on your PDS."/>')
+    expect(html).toContain('<meta property="og:title" content="Test Chat"/>')
+    expect(html).toContain('<meta name="robots" content="index, follow"/>')
+    expect(html).not.toContain('content="noindex"')
+    expect(html).toContain('<link rel="canonical" href="https://chat.example/login"/>')
+    expect(html).toContain('Chats on your PDS.</p>')
+  })
+
+  it("keeps someone's own pages out of search engines, titled by page", async () => {
+    const html = await (await requestAs(me(), '/settings')).text()
+    expect(html).toContain('<meta name="robots" content="noindex"/>')
+    expect(html).toContain('<title>Settings · Test Chat</title>')
+    expect(html).toContain('<meta property="og:title" content="Settings · Test Chat"/>')
   })
 
   it.each(['/chat/abc', '/settings'])(

@@ -1,7 +1,19 @@
 import { createStart } from '@tanstack/react-start'
 
 /** What the server passes with each request. See WebContext in apps/server/src/app.ts. */
-export type RequestContext = { appName: string; fetch: typeof fetch }
+export type RequestContext = {
+  appName: string
+  description: string
+  publicUrl: string
+  fetch: typeof fetch
+}
+
+declare module '@tanstack/react-router' {
+  interface StaticDataRouteOption {
+    /** The page's title in the browser tab and link previews, before the app's name. */
+    title?: string
+  }
+}
 
 declare module '@tanstack/react-start' {
   interface Register {

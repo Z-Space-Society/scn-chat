@@ -19,6 +19,16 @@ export const settingSchemas = {
       title: 'App name',
       description: 'Shown on the login page, in the sidebar, and in the browser tab.',
     }),
+    description: z
+      .string()
+      .trim()
+      .min(1)
+      .default('Chat with any model. Every chat is saved to your own PDS, not to this server.')
+      .meta({
+        title: 'Description',
+        description:
+          'Shown under the name on the login page, in search results, and in link previews.',
+      }),
   }),
   sessions: z.object({
     ttlDays: z.number().int().min(1).default(30).meta({

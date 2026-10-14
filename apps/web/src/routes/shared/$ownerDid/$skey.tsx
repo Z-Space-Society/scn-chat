@@ -5,6 +5,7 @@ import { sharedQuery } from '../../../features/sharing/queries.ts'
 import { validateBranchSearch } from '../../../shared/search-params.ts'
 
 export const Route = createFileRoute('/shared/$ownerDid/$skey')({
+  staticData: { title: 'Shared chat' },
   validateSearch: validateBranchSearch,
   // It reads the viewer's link from the browser, and shows only after the viewer signs in.
   ssr: false,

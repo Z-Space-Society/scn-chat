@@ -41,10 +41,16 @@ import { type SyncRoutesDeps, syncRoutes } from './sync/routes.ts'
 import { type TurnRoutesDeps, turnRoutes } from './turns/routes.ts'
 
 /**
- * What the web app's server-side routes receive with each request: the app name, and a `fetch`
- * that calls this app in process as the requesting user, for rendering pages with their data.
+ * What the web app's server-side routes receive with each request: the app's name and
+ * description, the URL people reach it at, and a `fetch` that calls this app in process as the
+ * requesting user, for rendering pages with their data.
  */
-export type WebContext = { appName: string; fetch: typeof fetch }
+export type WebContext = {
+  appName: string
+  description: string
+  publicUrl: string
+  fetch: typeof fetch
+}
 
 /** The web app: its built client assets, if any, and a handler that renders every other page. */
 export type Web = {
@@ -169,6 +175,12 @@ export function createApp(deps: AppDeps) {
   })
   app.all('/api/*', (c) => c.json({ error: 'NotFound' }, 404))
 
+  // Search engines may list the login page, which the pages say for themselves. Everything else
+  // a signed-out crawler can reach redirects to it.
+  app.get('/robots.txt', (c) =>
+    c.text('User-agent: *\nDisallow: /api/\nDisallow: /oauth/\nDisallow: /xrpc/\n'),
+  )
+
   const web = deps.web
   if (web) {
     if (web.assets) {
@@ -182,9 +194,15 @@ export function createApp(deps: AppDeps) {
       // them, so nothing is compressed per request.
       app.use('*', serveStatic({ root: web.assets, precompressed: true }))
     }
-    app.get('*', (c) =>
-      web.fetch(c.req.raw, { appName: appName(), fetch: inProcessFetch(app, c.req.raw) }),
-    )
+    app.get('*', (c) => {
+      const { appName, description } = settings.get('general')
+      return web.fetch(c.req.raw, {
+        appName,
+        description,
+        publicUrl: config.publicUrl,
+        fetch: inProcessFetch(app, c.req.raw),
+      })
+    })
   }
 
   return app

@@ -3,8 +3,8 @@ import { createRootRouteWithContext, HeadContent, Navigate, Scripts } from '@tan
 import type { ReactNode } from 'react'
 import { checkSession } from '../features/auth/session.ts'
 import logo from '../logo.svg?url'
-import { appName } from '../shared/app-name.ts'
 import { ErrorPage } from '../shared/ErrorPage.tsx'
+import { site } from '../shared/site.ts'
 import { themeScript } from '../shared/theme.ts'
 import { useInstantThemeSwitch } from '../shared/useInstantThemeSwitch.ts'
 import { sidebarScript } from '../shared/useSidebar.ts'
@@ -13,14 +13,26 @@ import styles from '../styles/app.css?url'
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   staleTime: Number.POSITIVE_INFINITY,
   beforeLoad: async ({ context }) => ({ session: await checkSession(context.queryClient) }),
-  // The app name comes with each server request, and from the rendered page in the browser.
-  loader: ({ serverContext }) => ({ appName: serverContext?.appName ?? appName() }),
-  head: ({ loaderData }) => ({
+  // The site comes with each server request, and from the rendered page in the browser.
+  loader: ({ serverContext }) =>
+    serverContext
+      ? { appName: serverContext.appName, description: serverContext.description }
+      : site(),
+  head: ({ loaderData, matches }) => ({
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: loaderData?.appName },
+      { title: pageTitle(matches, loaderData?.appName) },
       { name: 'application-name', content: loaderData?.appName },
+      { name: 'description', content: loaderData?.description },
+      // Every page but the login page is someone's own, so search engines leave them out.
+      { name: 'robots', content: 'noindex' },
+      // What a pasted link shows.
+      { property: 'og:type', content: 'website' },
+      { property: 'og:site_name', content: loaderData?.appName },
+      { property: 'og:title', content: pageTitle(matches, loaderData?.appName) },
+      { property: 'og:description', content: loaderData?.description },
+      { name: 'twitter:card', content: 'summary' },
     ],
     links: [
       { rel: 'stylesheet', href: styles },
@@ -42,6 +54,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   errorComponent: ErrorPage,
   notFoundComponent: () => <Navigate to="/" replace />,
 })
+
+/** The deepest page's title, from its route's static data, before the app's name. */
+function pageTitle(matches: { staticData: { title?: string } }[], appName = '') {
+  const page = matches.findLast((match) => match.staticData.title)?.staticData.title
+  return page ? `${page} · ${appName}` : appName
+}
 
 interface Props {
   children: ReactNode

@@ -7,8 +7,11 @@ describe('settings routes', () => {
     const bad = await h.call('PUT', '/admin/settings/turns', { maxSteps: 0 })
     expect(bad.status).toBe(400)
     expect(bad.body.issues).toEqual([expect.objectContaining({ path: ['maxSteps'] })])
-    const good = await h.call('PUT', '/admin/settings/general', { appName: 'Renamed' })
-    expect(good.body).toEqual({ value: { appName: 'Renamed' } })
+    const good = await h.call('PUT', '/admin/settings/general', {
+      appName: 'Renamed',
+      description: 'Renamed chat.',
+    })
+    expect(good.body).toEqual({ value: { appName: 'Renamed', description: 'Renamed chat.' } })
     expect(h.settings.get('general').appName).toBe('Renamed')
     expect(await (await h.app.request('/oauth-client-metadata.json')).json()).not.toHaveProperty(
       'client_name',

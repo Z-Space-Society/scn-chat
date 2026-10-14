@@ -19,7 +19,8 @@ import { pdsError } from './helpers/pds-errors.ts'
 
 const config = testConfig()
 const logger = pino({ level: 'silent' })
-const named = (db: Db, appName: string) => new SettingsStore(db, logger, { general: { appName } })
+const named = (db: Db, appName: string) =>
+  new SettingsStore(db, logger, { general: { appName, description: 'A test chat.' } })
 
 describe.each(dialects)('GET /api/health on $name', ({ create }) => {
   it('returns 200 with the app name when the database is reachable', async () => {
@@ -96,7 +97,7 @@ describe('web app serving', () => {
     expect(await res.text()).toBe('<title>page</title>')
     expect(rendered.at(-1)).toMatchObject({
       path: '/chat/some-chat',
-      context: { appName: 'Test Chat' },
+      context: { appName: 'Test Chat', description: 'A test chat.', publicUrl: config.publicUrl },
     })
   })
 
@@ -116,6 +117,14 @@ describe('web app serving', () => {
     await app.request('/')
     expect(rendered.at(-1)?.context.appName).toBe('After')
     expect(await (await app.request('/api/health')).json()).toMatchObject({ appName: 'After' })
+  })
+
+  it('lets crawlers in, apart from the API and OAuth routes', async () => {
+    const res = await app.request('/robots.txt')
+    expect(res.status).toBe(200)
+    expect(await res.text()).toBe(
+      'User-agent: *\nDisallow: /api/\nDisallow: /oauth/\nDisallow: /xrpc/\n',
+    )
   })
 
   it('returns 404 for unknown API paths', async () => {
