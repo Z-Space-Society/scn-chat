@@ -6,14 +6,18 @@ import { loadConfig } from './config.ts'
 import { createDb } from './db/index.ts'
 import { createLogger } from './logger.ts'
 import { findInstalledPlugins } from './plugins/installed.ts'
+import { withFreePort } from './port.ts'
 import { createServer } from './server.ts'
 import { loadBuiltWeb, loadDevWeb } from './web.ts'
 
 if (existsSync('.env')) process.loadEnvFile('.env')
 else if (existsSync('../../.env')) process.loadEnvFile('../../.env')
 
-const config = loadConfig(process.env)
+const env = await withFreePort(process.env)
+const config = loadConfig(env)
 const logger = createLogger(config.logLevel)
+if (env !== process.env)
+  logger.warn(`port ${process.env.PORT || 3000} is in use, so the server moved to ${config.port}`)
 process.on('unhandledRejection', (err) => logger.error({ err }, 'unhandled promise rejection'))
 const db = createDb(config.databaseUrl)
 const installed = await findInstalledPlugins(

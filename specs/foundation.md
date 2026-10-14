@@ -57,7 +57,7 @@ Settings live in one of two places, never both:
 | `NODE_ENV` | `development` | `development`, `test`, or `production`. |
 | `DATABASE_URL` | `sqlite:./data/scn-chat.sqlite` | `sqlite:<path>` or `postgres://...`. |
 | `PUBLIC_URL` | `http://127.0.0.1:3000` | The URL people reach the app at. |
-| `PORT` | `3000` | |
+| `PORT` | `3000` | When `PUBLIC_URL` is loopback on this port and the port is taken, the server moves to the next free one and `PUBLIC_URL` with it, and logs a warning. A deployment keeps its port. |
 | `DATA_DIR` | `./data` | |
 | `LOG_LEVEL` | `info` | |
 

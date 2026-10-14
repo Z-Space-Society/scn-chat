@@ -1,5 +1,6 @@
 import { type ChildProcess, spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
+import { findFreePort } from './port.ts'
 
 // Runs the dev server behind a localhost.run tunnel, so a phone or another device can sign in over
 // HTTPS. It needs only ssh and no account. The tunnel URL becomes PUBLIC_URL for this run only,
@@ -17,7 +18,8 @@ if (!process.env.OAUTH_PRIVATE_KEYS) {
 
 const start = process.argv.includes('--start')
 const args = process.argv.slice(2).filter((arg) => arg !== '--start')
-const port = process.env.PORT || '3000'
+// The tunnel forwards to the next free port when this one is taken, and the server listens there.
+const port = String(await findFreePort(Number(process.env.PORT || 3000)))
 const children: ChildProcess[] = []
 
 /** Stop every child, then exit with the given code. */
@@ -85,9 +87,10 @@ const server = spawn(
   {
     stdio: 'inherit',
     env: start
-      ? { ...process.env, NODE_ENV: 'production', PUBLIC_URL: publicUrl }
+      ? { ...process.env, NODE_ENV: 'production', PORT: port, PUBLIC_URL: publicUrl }
       : {
           ...process.env,
+          PORT: port,
           PUBLIC_URL: publicUrl,
           // Vite's dev server rejects requests for hosts it doesn't know.
           __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS: new URL(publicUrl).hostname,
