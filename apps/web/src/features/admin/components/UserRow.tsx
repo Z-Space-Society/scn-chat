@@ -1,8 +1,9 @@
 import { ClientOnly } from '@tanstack/react-router'
-import { CloseIcon } from '../../../shared/icons.tsx'
+import { ChevronDownIcon, CloseIcon } from '../../../shared/icons.tsx'
 import { timeAgo } from '../../../shared/time.ts'
 import { Badge, Chip } from '../../../shared/ui/Badge.tsx'
 import { Item, ItemMark, ItemNames } from '../../../shared/ui/ItemList.tsx'
+import { Select } from '../../../shared/ui/Select.tsx'
 import type { UserActions } from '../hooks/useUserActions.ts'
 import type { AdminUser } from '../queries.ts'
 import { SuspendControl } from './SuspendControl.tsx'
@@ -67,18 +68,19 @@ export function UserRow(props: Props) {
               )}
             </Chip>
           ))}
-          <select
-            aria-label={`Add ${name} to a role`}
-            className="cursor-pointer rounded-badge border border-line border-dashed bg-transparent px-1.5 py-px text-caption text-muted hover:text-ink"
-            // Always shows the prompt: picking a role adds the account to it.
-            value=""
-            onChange={(e) => e.target.value && props.actions.addToRole(e.target.value, user.did)}
-          >
-            <option value="">Add role…</option>
-            {props.assignable.map((role) => (
-              <option key={role}>{role}</option>
-            ))}
-          </select>
+          {props.assignable.length > 0 && (
+            <Select
+              aria-label={`Add ${name} to a role`}
+              className="gap-1 rounded-badge border-dashed bg-transparent px-1.5 py-px text-caption text-muted hover:text-ink"
+              // Always shows the prompt: picking a role adds the account to it.
+              value=""
+              options={props.assignable.map((role) => ({ value: role, label: role }))}
+              onChange={(role) => props.actions.addToRole(role, user.did)}
+            >
+              Add role…
+              <ChevronDownIcon className="size-3" />
+            </Select>
+          )}
         </span>
       </ItemNames>
       <SuspendControl

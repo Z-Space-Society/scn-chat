@@ -268,7 +268,7 @@ describe('Admin users', () => {
       expect(fetch.mock.calls.some(([url]) => String(url) === '/api/admin/users?q=bo')).toBe(true),
     )
     expect(router.state.location.search).toEqual({ q: 'bo' })
-    await userEvent.selectOptions(screen.getByLabelText('Add bob.test to a role'), 'member')
+    await choose(await screen.findByRole('combobox', { name: 'Add bob.test to a role' }), 'member')
     await waitFor(() =>
       expect(callsTo(fetch, 'POST', '/api/admin/roles/member/members')).toEqual([
         { identifier: 'did:plc:bob' },
