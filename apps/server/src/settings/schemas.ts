@@ -23,11 +23,13 @@ export const settingSchemas = {
       .string()
       .trim()
       .min(1)
-      .default('Chat with any model. Every chat is saved to your own PDS, not to this server.')
+      .default(
+        'AI chats that live on your own PDS. Use any model, and every conversation stays yours.',
+      )
       .meta({
         title: 'Description',
         description:
-          'Shown under the name on the login page, in search results, and in link previews.',
+          'Shown under the logo on the login page, in search results, and in link previews.',
       }),
   }),
   sessions: z.object({
