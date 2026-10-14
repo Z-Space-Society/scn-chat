@@ -9,9 +9,11 @@
   },
   "scripts": {
     "dev": "pnpm --filter @scn-chat/server dev",
+    "dev:remote": "pnpm --filter @scn-chat/server dev:remote",
     "build": "pnpm --filter @scn-chat/web build",
     "start": "pnpm --filter @scn-chat/server start",
     "preview": "pnpm build && pnpm start",
+    "preview:remote": "pnpm build && pnpm --filter @scn-chat/server start:remote",
     "test": "vitest run",
     "typecheck": "pnpm -r --parallel typecheck",
     "lint": "biome check .",

@@ -112,9 +112,11 @@ Vitest runs every package from the root config. Tests live in a `tests/` directo
 | Root script | Does |
 |---|---|
 | `pnpm dev` | Runs the server with `node --watch`, serving the web app through Vite in the same process |
+| `pnpm dev:remote` | `pnpm dev` behind a localhost.run tunnel, with its HTTPS URL as `PUBLIC_URL`, for testing from a phone |
 | `pnpm build` | Builds the web app |
 | `pnpm start` | Runs the server in production mode, serving the built web app |
 | `pnpm preview` | Builds, then runs `pnpm start` on this machine |
+| `pnpm preview:remote` | Builds, then runs the production build behind the same tunnel as `pnpm dev:remote` |
 | `pnpm test` | Runs all tests once |
 | `pnpm typecheck` | Type checks every package |
 | `pnpm lint` | Lints and checks formatting with Biome |

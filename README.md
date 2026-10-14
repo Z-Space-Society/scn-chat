@@ -66,6 +66,8 @@ Phase 1:
 
    To try the production build on this machine, run `pnpm preview` instead. It builds the web app, then starts the server in production mode at the same address.
 
+   To test from a phone or another device, run `pnpm dev:remote`, or `pnpm preview:remote` for the production build. Either runs the server behind a [localhost.run](https://localhost.run) tunnel, which needs only `ssh` and no account, and prints an HTTPS URL to open in place of 127.0.0.1. It needs `OAUTH_PRIVATE_KEYS`. The URL changes on every run, and localhost.run can change it during a long one too, so if signing in stops working, run it again. The free tunnel is slow, so the first load takes a while. A Cloudflare quick tunnel would be faster, but it holds back a reply's stream until the reply ends.
+
  3. Open Settings > Admin to add your plugins and models, and choose who else can sign in.
 
 ## Deploying

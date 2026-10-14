@@ -9,7 +9,9 @@
   },
   "scripts": {
     "dev": "node --watch src/index.ts",
+    "dev:remote": "node src/tunnel-cli.ts",
     "start": "NODE_ENV=production node src/index.ts",
+    "start:remote": "node src/tunnel-cli.ts --start",
     "migrate": "node src/migrate-cli.ts",
     "typecheck": "tsc --noEmit -p .",
     "keys": "node src/keys-cli.ts"
