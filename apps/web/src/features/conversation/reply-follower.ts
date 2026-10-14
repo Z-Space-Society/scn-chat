@@ -6,7 +6,7 @@ import {
   useQuery,
 } from '@tanstack/react-query'
 import { useState } from 'react'
-import { conversationRefreshKey, useStore } from '../../store/react.tsx'
+import { refreshConversation, useRefreshConversation } from '../../store/react.tsx'
 import type { BranchMessage } from './lib/branch.ts'
 import { addEvent, noParts, type ReplyParts, replyEvents } from './lib/reply-stream.ts'
 
@@ -33,7 +33,7 @@ const streamQuery = (skey: string, rkey: string) =>
         for await (const event of replyEvents(url, signal)) {
           yield event
           if (event.type === 'status' && FINISHED.has(event.status))
-            void client.invalidateQueries({ queryKey: conversationRefreshKey(skey) })
+            void refreshConversation(client, skey)
         }
       },
       reducer: addEvent,
@@ -55,7 +55,7 @@ const endedStreams = (results: UseQueryResult[]) =>
  * pending record reaches the local copy.
  */
 export function useReplyFollower(skey: string, messages: BranchMessage[]) {
-  const store = useStore()
+  const refresh = useRefreshConversation()
   const pending = messages.filter((m) => m.record.status === 'pending').map((m) => m.rkey)
   const [followed, setFollowed] = useState<string[]>([])
   const follow = (rkey: string) =>
@@ -70,9 +70,9 @@ export function useReplyFollower(skey: string, messages: BranchMessage[]) {
 
   useQuery({
     // A new key for each set of replies waited on, so each wait starts its backoff over.
-    queryKey: ['conversation', skey, 'poll', ...waiting],
+    queryKey: ['reply-poll', skey, ...waiting],
     queryFn: async () => {
-      await store.worker.refreshConversation(skey)
+      await refresh(skey)
       return true
     },
     enabled: waiting.length > 0,

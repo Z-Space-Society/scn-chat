@@ -21,7 +21,7 @@ import { useAppForm } from '../../../shared/form.tsx'
 import { CloseIcon, PencilIcon } from '../../../shared/icons.tsx'
 import { touchOnly } from '../../../shared/touch.ts'
 import { Button } from '../../../shared/ui/Button.tsx'
-import { conversationRefreshKey } from '../../../store/react.tsx'
+import { useRefreshConversation } from '../../../store/react.tsx'
 import { EffortSelect } from '../../models/components/EffortSelect.tsx'
 import { ModelSelect } from '../../models/components/ModelSelect.tsx'
 import { useModels } from '../../models/hooks/useModels.ts'
@@ -116,6 +116,7 @@ export function Composer({ ref, ...props }: ComposerProps) {
     setQuotes((current) => current.filter((quote) => !dropped.includes(quote)))
   const { models, loading: modelsLoading, fallback, noModels } = useModels(props.inherited ?? null)
   const queryClient = useQueryClient()
+  const refreshConversation = useRefreshConversation()
   // The chat created by a first message, kept so trying again after a failed send reuses it.
   const created = useRef<string | null>(null)
   /** The chat to send to, created on the first message when there is none yet. */
@@ -158,7 +159,7 @@ export function Composer({ ref, ...props }: ComposerProps) {
       return skey
     },
     // Refreshing picks up the sent message without waiting for the stream.
-    onSuccess: (skey) => queryClient.invalidateQueries({ queryKey: conversationRefreshKey(skey) }),
+    onSuccess: (skey) => refreshConversation(skey),
   })
   const form = useAppForm({
     // The effort starts where the last message on this device left it.

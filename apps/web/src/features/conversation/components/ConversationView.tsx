@@ -30,21 +30,13 @@ interface Props {
 
 /** A conversation: its header, the branch on screen with replies streaming in, and the composer. */
 export function ConversationView(props: Props) {
-  const {
-    conversation,
-    isLoading,
-    refreshed,
-    refreshing,
-    error: loadError,
-  } = useConversation(props.skey)
+  // While another tab holds the local copy, the banner over the page says why it is waiting.
+  const { conversation, waiting, empty, error: loadError } = useConversation(props.skey)
   const me = useMe()
   const { models } = useModels()
   // The user message being edited, by rkey, so the composer reads it from the conversation.
   const [editingRkey, setEditingRkey] = useState<string | null>(null)
   const messages = conversation?.messages ?? []
-  // The messages are on their way until the local copy answers, or, when it has none, until the
-  // PDS has. While another tab holds the copy, the banner over the page says why instead.
-  const waiting = isLoading || (messages.length === 0 && refreshing)
   // Every chat has an info record from its creation, so until it arrives, from the local copy or
   // the PDS, the chat's title and instructions are unknown rather than empty.
   const info = conversation?.info ?? null
@@ -116,9 +108,7 @@ export function ConversationView(props: Props) {
       />
       <ErrorAlert error={actions.error ?? loadError} />
       {waiting && <ConversationSkeleton />}
-      {refreshed && messages.length === 0 && (
-        <EmptyConversation onStart={(text) => composer.current?.fill(text)} />
-      )}
+      {empty && <EmptyConversation onStart={(text) => composer.current?.fill(text)} />}
       <BranchView
         branch={branch}
         blobUrl={blobUrl}

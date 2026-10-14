@@ -5,7 +5,7 @@ import { CloudIcon, DriveIcon, SyncIcon } from '../../../shared/icons.tsx'
 import { plural } from '../../../shared/plural.ts'
 import { timeAgo } from '../../../shared/time.ts'
 import type { HandoverState } from '../../../store/handover.ts'
-import { useStore, useStoreState, useSyncStatus } from '../../../store/react.tsx'
+import { useStoreState, useSyncIndex, useSyncStatus } from '../../../store/react.tsx'
 import { MeContext } from '../../auth/session.ts'
 
 /** The current time, ticking every half minute so "2 min ago" stays true. */
@@ -20,8 +20,8 @@ function useNow(): Date {
 
 /** Checks the chat index for changes now. The dot and the panel share one, so both show how it went. */
 export function useSyncNow() {
-  const store = useStore()
-  return useMutation({ mutationFn: () => store.worker.syncIndex() })
+  const syncIndex = useSyncIndex()
+  return useMutation({ mutationFn: syncIndex })
 }
 
 type SyncNow = ReturnType<typeof useSyncNow>

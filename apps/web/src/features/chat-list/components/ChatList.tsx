@@ -20,7 +20,7 @@ import {
   useChatSearch,
   useConversations,
   useLatestReplies,
-  useStore,
+  useSyncIndex,
   useSyncStatus,
   useTags,
 } from '../../../store/react.tsx'
@@ -63,7 +63,7 @@ export function ChatList() {
   // The chats are on their way until the local copy answers, or, when it has none yet, until the
   // chat index first syncs, as on a first sign-in.
   const loading = isLoading || (conversations.length === 0 && status?.syncedAt === null)
-  const store = useStore()
+  const syncIndex = useSyncIndex()
   const navigate = useNavigate()
   const current = useParams({ strict: false, select: (params) => params.skey })
   // The box starts from the URL's `q`, and the settled search goes back into it.
@@ -91,7 +91,7 @@ export function ChatList() {
   const end = useLoadMore(scroll, list.hasNextPage && !list.isFetchingNextPage, list.fetchNextPage)
 
   // The same for every row, so a row rerenders only when its own chat changes.
-  const changed = () => store.worker.syncIndex()
+  const changed = syncIndex
   const deleted = (skey: string) => {
     if (skey === current) void navigate({ to: '/' })
   }

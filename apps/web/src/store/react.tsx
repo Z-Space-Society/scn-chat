@@ -1,4 +1,10 @@
-import { keepPreviousData, useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  keepPreviousData,
+  type QueryClient,
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { createContext, type ReactNode, useContext, useEffect, useSyncExternalStore } from 'react'
 import { MeContext } from '../features/auth/session.ts'
 import { reportUnauthorized } from '../shared/api.ts'
@@ -29,6 +35,8 @@ export function StoreProvider(props: Props) {
         // A conversation's messages decide whether it shows as replying or new in the list.
         if (change.type === 'index' || change.type === 'conversation')
           void queryClient.invalidateQueries({ queryKey: ['conversations'] })
+        // Exactly the local read, not the refresh from the PDS under the same prefix, which a
+        // change would otherwise set off again.
         if (change.type === 'conversation')
           void queryClient.invalidateQueries({
             queryKey: ['conversation', change.skey],
@@ -143,17 +151,39 @@ export function useLatestReplies(): Record<string, string | null> | null {
 }
 
 /** The query that refreshes a conversation from the PDS. Invalidating it refreshes again. */
-export const conversationRefreshKey = (skey: string) => ['conversation', skey, 'refresh']
+const conversationRefreshKey = (skey: string) => ['conversation', skey, 'refresh']
+
+/**
+ * Check an open conversation against the PDS again, as opening it does: fetch what changed, then
+ * make sure nothing was missed. Resolves once the check is done. It reruns the open conversation's
+ * own check, so a conversation that isn't open, with nothing reading it, isn't checked. For code
+ * that holds a query client rather than a hook, like a query's own function.
+ */
+export const refreshConversation = (client: QueryClient, skey: string) =>
+  client.invalidateQueries({ queryKey: conversationRefreshKey(skey) })
+
+/** `refreshConversation`, for a component. */
+export function useRefreshConversation(): (skey: string) => Promise<void> {
+  const client = useQueryClient()
+  return (skey) => refreshConversation(client, skey)
+}
+
+/** Sync the chat index now, as when another client may have changed it. */
+export function useSyncIndex(): () => Promise<void> {
+  const store = useStore()
+  return () => store.worker.syncIndex()
+}
 
 /** A conversation from the local copy, shown at once and refreshed from the PDS when opened. */
 export function useConversation(skey: string): {
   conversation: Conversation | null
-  /** Whether the conversation is on its way from the local copy for the first time. */
-  isLoading: boolean
-  /** Whether the refresh from the PDS has finished, so a conversation with no messages has none. */
-  refreshed: boolean
-  /** Whether the first refresh from the PDS is on its way. */
-  refreshing: boolean
+  /**
+   * Whether its messages are on their way: the local copy hasn't answered, or it has none and the
+   * PDS hasn't answered yet, so a conversation that has messages never shows as empty.
+   */
+  waiting: boolean
+  /** Whether the PDS has confirmed the conversation has no messages. */
+  empty: boolean
   error: string | null
 } {
   const { store, active, opening } = useActiveStore()
@@ -172,11 +202,11 @@ export function useConversation(skey: string): {
     },
     enabled: active,
   })
+  const none = (local.data?.messages.length ?? 0) === 0
   return {
     conversation: local.data ?? null,
-    isLoading: opening || local.isLoading,
-    refreshed: refreshed.isSuccess,
-    refreshing: opening || refreshed.isLoading,
+    waiting: opening || local.isLoading || (none && refreshed.isLoading),
+    empty: none && refreshed.isSuccess,
     error: storeError(local.error ?? refreshed.error),
   }
 }

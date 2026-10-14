@@ -1,8 +1,8 @@
 import type { ModelRef } from '@scn-chat/lexicons'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 import { api, json, read } from '../../../shared/api.ts'
 import { lastError } from '../../../shared/errors.ts'
-import { conversationRefreshKey } from '../../../store/react.tsx'
+import { useRefreshConversation } from '../../../store/react.tsx'
 
 /**
  * Rename, set the chat's instructions, sync, stop a reply, and regenerate one, each refreshing the
@@ -10,8 +10,8 @@ import { conversationRefreshKey } from '../../../store/react.tsx'
  * conversation's one alert.
  */
 export function useConversationActions(skey: string, onRegenerated: (replyRkey: string) => void) {
-  const queryClient = useQueryClient()
-  const refresh = () => queryClient.invalidateQueries({ queryKey: conversationRefreshKey(skey) })
+  const refreshConversation = useRefreshConversation()
+  const refresh = () => refreshConversation(skey)
 
   // Renaming and setting the instructions both change the conversation's info record.
   const patching = useMutation({
