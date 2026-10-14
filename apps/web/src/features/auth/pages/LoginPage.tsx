@@ -35,7 +35,7 @@ export function LoginPage(props: Props) {
         <h1 className="text-balance font-semibold text-display text-ink-strong leading-tight tracking-title">
           {props.appName}
         </h1>
-        <p className="mt-2 mb-8 text-balance text-muted text-ui">
+        <p className="mt-2 mb-8 text-balance font-medium text-muted text-ui">
           Chat with any model. Every chat is saved to your own PDS, not to this server.
         </p>
         {props.notice && (
