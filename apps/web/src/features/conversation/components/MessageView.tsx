@@ -127,7 +127,13 @@ export function MessageView(props: MessageViewProps) {
         )}
       </footer>
       {workOpen && steps.length > 0 && (
-        <WorkList id={workId} steps={steps} blobUrl={props.blobUrl} scope={props.rkey} />
+        <WorkList
+          id={workId}
+          steps={steps}
+          record={record}
+          blobUrl={props.blobUrl}
+          scope={props.rkey}
+        />
       )}
     </article>
   )

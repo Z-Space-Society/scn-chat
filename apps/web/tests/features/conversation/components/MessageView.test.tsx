@@ -15,7 +15,7 @@ const working = {
     $type: d('plainContent'),
     parts: [
       { $type: d('reasoningPart'), text: 'Look it up first' },
-      { $type: d('toolCallPart'), callId: 'c', tool: 'web_search', input: '{"query":"tiles"}' },
+      { $type: d('toolCallPart'), callId: 'c', tool: 'lookup', input: '{"query":"tiles"}' },
       { $type: d('toolResultPart'), callId: 'c', output: '{"hits":2}' },
       { $type: d('textPart'), text: 'Found it' },
     ],
@@ -26,7 +26,7 @@ describe('MessageView', () => {
   it('keeps the steps of a finished reply behind a footer button that opens them under it', async () => {
     const { container } = render(<MessageView blobUrl={blobUrl} record={working} />)
     expect(container.querySelector('[data-steps]')).toBeNull()
-    const button = screen.getByRole('button', { name: 'Thought · web_search' })
+    const button = screen.getByRole('button', { name: 'Thought · lookup' })
     expect(button).toHaveAttribute('aria-expanded', 'false')
     await userEvent.click(button)
     expect(button).toHaveAttribute('aria-expanded', 'true')
@@ -43,7 +43,7 @@ describe('MessageView', () => {
 
   it('shows a thought that fits in three lines with nothing to open', async () => {
     const { container } = render(<MessageView blobUrl={blobUrl} record={working} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Thought · web_search' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Thought · lookup' }))
     const thought = container.querySelector('[data-step=reasoning]') as HTMLElement
     expect(thought).toHaveTextContent('Look it up first')
     expect(thought.querySelector('button')).toBeNull()
@@ -55,7 +55,7 @@ describe('MessageView', () => {
       height: 200,
     } as DOMRect)
     const { container } = render(<MessageView blobUrl={blobUrl} record={working} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Thought · web_search' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Thought · lookup' }))
     const text = container.querySelector('[data-step=reasoning] [data-thought] p') as HTMLElement
     await userEvent.click(screen.getByRole('button', { name: 'Show more' }))
     const toggle = screen.getByRole('button', { name: 'Show less' })
@@ -73,9 +73,9 @@ describe('MessageView', () => {
 
   it('pairs a tool call with its result, showing the input at a glance and both in full', async () => {
     const { container } = render(<MessageView blobUrl={blobUrl} record={working} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Thought · web_search' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Thought · lookup' }))
     const tool = container.querySelector('[data-step=tool]') as HTMLDetailsElement
-    expect(tool.querySelector('summary')).toHaveTextContent('web_search "tiles"')
+    expect(tool.querySelector('summary')).toHaveTextContent('lookup "tiles"')
     expect(tool.dataset.state).toBe('done')
     const shown = Array.from(tool.querySelectorAll('pre')).map((pre) => pre.textContent)
     expect(shown).toEqual(['{\n  "query": "tiles"\n}', '{\n  "hits": 2\n}'])
@@ -427,5 +427,228 @@ describe('MessageView', () => {
       />,
     )
     expect(screen.getByText('This message is encrypted.')).toBeInTheDocument()
+  })
+})
+
+const call = (callId: string, tool: string, input: unknown) => ({
+  $type: d('toolCallPart'),
+  callId,
+  tool,
+  input: JSON.stringify(input),
+})
+const result = (callId: string, output: unknown, more: Record<string, unknown> = {}) => ({
+  $type: d('toolResultPart'),
+  callId,
+  output: typeof output === 'string' ? output : JSON.stringify(output),
+  ...more,
+})
+/** A finished reply that made these tool parts, with its steps opened from the footer. */
+async function openSteps(parts: object[], status = 'complete') {
+  const record = {
+    role: 'assistant',
+    status,
+    content: {
+      $type: d('plainContent'),
+      parts: [...parts, { $type: d('textPart'), text: 'Done' }],
+    },
+  }
+  const view = render(<MessageView blobUrl={blobUrl} record={record} />)
+  const footer = view.container.querySelector('footer') as HTMLElement
+  await userEvent.click(within(footer).getByRole('button'))
+  return view
+}
+const toolSteps = (container: HTMLElement) =>
+  Array.from(container.querySelectorAll<HTMLDetailsElement>('[data-step=tool]'))
+
+describe('tool views', () => {
+  it('shows every call still waiting for its result in a streaming reply as running', () => {
+    const parts = [call('a', 'lookup', { q: 'one' }), call('b', 'lookup', { q: 'two' })]
+    const { container } = render(<StreamingReply reply={{ ...noParts, parts }} blobUrl={blobUrl} />)
+    expect(toolSteps(container).map((step) => step.dataset.state)).toEqual(['running', 'running'])
+    expect(toolSteps(container).map((step) => step.querySelector('summary')?.textContent)).toEqual([
+      expect.stringContaining('running'),
+      expect.stringContaining('running'),
+    ])
+  })
+
+  it('says a call cut off without its result is incomplete, and a failed one failed', async () => {
+    const { container } = await openSteps(
+      [
+        call('a', 'lookup', { q: 'one' }),
+        call('b', 'lookup', { q: 'two' }),
+        result('b', 'Rate limited', { isError: true }),
+        call('c', 'lookup', { q: 'three' }),
+        result('c', 'fine'),
+      ],
+      'cancelled',
+    )
+    const steps = toolSteps(container)
+    expect(steps.map((step) => step.dataset.state)).toEqual(['incomplete', 'error', 'done'])
+    expect(steps[0]?.querySelector('summary')).toHaveTextContent('incomplete')
+    expect(steps[1]?.querySelector('summary')).toHaveTextContent('failed')
+    expect(steps[2]?.querySelector('summary')).not.toHaveTextContent(/running|failed|incomplete/)
+  })
+
+  it('names a web search by what it did, on the live line, its row, and the summary', async () => {
+    const search = call('a', 'web_search', { query: 'espresso grinders' })
+    const live = render(
+      <StreamingReply reply={{ ...noParts, parts: [search] }} blobUrl={blobUrl} />,
+    )
+    expect(live.container.querySelector('[data-steps] summary')).toHaveTextContent(
+      'Searching the web…',
+    )
+    live.unmount()
+    const { container } = await openSteps([
+      search,
+      result('a', { results: [] }),
+      call('b', 'web_search', { query: 'burr sizes' }),
+      result('b', { results: [] }),
+      call('c', 'lookup', { q: 'x' }),
+      result('c', 'ok'),
+    ])
+    expect(
+      within(container.querySelector('footer') as HTMLElement).getByRole('button'),
+    ).toHaveTextContent('Searched the web ×2 · lookup')
+    const rows = toolSteps(container).map((step) => step.querySelector('summary')?.textContent)
+    expect(rows[0]).toMatch(/^Searched the web\s*espresso grinders\s*$/)
+    expect(rows[2]).toMatch(/^lookup\s*"x"\s*$/)
+  })
+
+  it("lists a web search's results as links to their pages, each with its site and snippet", async () => {
+    const { container } = await openSteps([
+      call('a', 'web_search', { query: 'grinders' }),
+      result('a', {
+        results: [
+          {
+            title: 'Grinder review',
+            url: 'https://www.example.test/review',
+            snippet: 'A <b>burr</b> grinder ![x](https://t.test/x.png)',
+          },
+          { title: 'Odd link', url: 'javascript:alert(1)', snippet: 'Never a link' },
+        ],
+      }),
+    ])
+    const step = toolSteps(container)[0] as HTMLElement
+    const link = within(step).getByRole('link', { name: 'Grinder review' })
+    expect(link).toHaveAttribute('href', 'https://www.example.test/review')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noreferrer')
+    const items = within(step).getAllByRole('listitem')
+    expect(items[0]).toHaveTextContent('example.test')
+    expect(items[0]).toHaveTextContent('A <b>burr</b> grinder ![x](https://t.test/x.png)')
+    expect(step.querySelector('b, img')).toBeNull()
+    expect(items[1]).toHaveTextContent('Odd link')
+    expect(within(items[1] as HTMLElement).queryByRole('link')).toBeNull()
+    expect(step.querySelector('pre')).toBeNull()
+  })
+
+  it('says a web search is searching while it runs, and when it found nothing', async () => {
+    const search = call('a', 'web_search', { query: 'grinders' })
+    const live = render(
+      <StreamingReply reply={{ ...noParts, parts: [search] }} blobUrl={blobUrl} />,
+    )
+    expect(toolSteps(live.container)[0]).toHaveTextContent('Searching…')
+    live.unmount()
+    const { container } = await openSteps([search, result('a', { results: [] })])
+    expect(toolSteps(container)[0]).toHaveTextContent('No results.')
+  })
+
+  it("shows a web search it can't read as its input and output", async () => {
+    const blob = { $type: 'blob', ref: { $link: 'big' }, mimeType: 'text/plain', size: 9 }
+    const { container } = await openSteps([
+      call('a', 'web_search', { query: 'failed' }),
+      result('a', 'Search engine timed out', { isError: true }),
+      call('b', 'web_search', { query: 'kept in a blob' }),
+      result('b', 'Output stored as a blob (9 bytes).', { outputBlob: blob }),
+      call('c', 'web_search', { query: 'older shape' }),
+      result('c', { hits: 2 }),
+    ])
+    const [failed, inBlob, older] = toolSteps(container) as HTMLElement[]
+    expect(failed).toHaveTextContent('Search engine timed out')
+    expect(
+      within(inBlob as HTMLElement).getByRole('link', { name: 'Full output' }),
+    ).toHaveAttribute('href', '/blob/big')
+    expect(
+      Array.from((older as HTMLElement).querySelectorAll('pre')).map((pre) => pre.textContent),
+    ).toEqual(['{\n  "query": "older shape"\n}', '{\n  "hits": 2\n}'])
+  })
+
+  it('shows a page fetch as the page it read, with the part of its text it read', async () => {
+    const { container } = await openSteps([
+      call('a', 'web_fetch', { url: 'https://www.example.test/guide?x=1', offset: 20000 }),
+      result('a', {
+        url: 'https://example.test/guide/',
+        title: 'The <i>guide</i>',
+        content: '# Heading\n\nSome **text**',
+        offset: 20000,
+        nextOffset: 40000,
+        totalCharacters: 48213,
+      }),
+      call('b', 'web_fetch', { url: 'https://short.test/' }),
+      result('b', {
+        url: 'https://short.test/',
+        content: 'All of it',
+        offset: 0,
+        totalCharacters: 9,
+      }),
+      call('c', 'web_fetch', { url: 'https://down.test/' }),
+      result('c', 'Fetch failed with 503', { isError: true }),
+    ])
+    const [long, short, failed] = toolSteps(container) as HTMLElement[]
+    expect(long?.querySelector('summary')?.textContent).toMatch(
+      /^Read a page\s*example\.test\/guide\?x=1\s*$/,
+    )
+    const link = within(long as HTMLElement).getByRole('link', { name: 'The <i>guide</i>' })
+    expect(link).toHaveAttribute('href', 'https://example.test/guide/')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noreferrer')
+    expect(long).toHaveTextContent('Characters 20,001–40,000 of 48,213')
+    expect(long?.querySelector('pre')?.textContent).toBe('# Heading\n\nSome **text**')
+    expect(long?.querySelector('i, h1, strong, img')).toBeNull()
+    const body = long?.querySelector(':scope > summary ~ *') as HTMLElement
+    expect(within(body).getByText('example.test')).toBeInTheDocument()
+    expect(
+      within(short as HTMLElement).getByRole('link', { name: 'short.test' }),
+    ).toBeInTheDocument()
+    expect(short).not.toHaveTextContent('Characters')
+    expect(failed).toHaveTextContent('Fetch failed with 503')
+    expect(container.querySelector('footer')).toHaveTextContent('Read a page ×3')
+  })
+
+  it('shows a result whose call it never saw alone, as its output', async () => {
+    const { container } = await openSteps([result('lost', { results: [] })])
+    const [step] = toolSteps(container)
+    expect(step?.dataset.state).toBe('done')
+    expect(step?.querySelector('pre')?.textContent).toBe('{\n  "results": []\n}')
+  })
+
+  it('says a fetch of the last part of a page read to its end', async () => {
+    const { container } = await openSteps([
+      call('a', 'web_fetch', { url: 'https://x.test/', offset: 40000 }),
+      result('a', {
+        url: 'https://x.test/',
+        content: 'The end',
+        offset: 40000,
+        totalCharacters: 48213,
+      }),
+    ])
+    expect(toolSteps(container)[0]).toHaveTextContent('Characters 40,001–48,213 of 48,213')
+  })
+
+  it("shows a page fetch it can't read as its input and output", async () => {
+    const blob = { $type: 'blob', ref: { $link: 'big' }, mimeType: 'text/plain', size: 9 }
+    const { container } = await openSteps([
+      call('a', 'web_fetch', { url: 'https://x.test/' }),
+      result('a', 'Output stored as a blob (9 bytes).', { outputBlob: blob }),
+      call('b', 'web_fetch', { url: 'https://y.test/' }),
+      result('b', { page: 'older shape' }),
+    ])
+    const [inBlob, older] = toolSteps(container) as HTMLElement[]
+    expect(
+      within(inBlob as HTMLElement).getByRole('link', { name: 'Full output' }),
+    ).toBeInTheDocument()
+    expect(
+      Array.from((older as HTMLElement).querySelectorAll('pre')).map((pre) => pre.textContent),
+    ).toEqual(['{\n  "url": "https://y.test/"\n}', '{\n  "page": "older shape"\n}'])
   })
 })

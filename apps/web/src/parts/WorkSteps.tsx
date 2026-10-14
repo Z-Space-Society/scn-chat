@@ -2,10 +2,13 @@ import { memo, type ReactNode, useId, useLayoutEffect, useRef, useState } from '
 import { cn } from '../shared/cn.ts'
 import { ChevronDownIcon, ChevronRightIcon } from '../shared/icons.tsx'
 import { action } from '../shared/ui/actions.ts'
+import { Badge } from '../shared/ui/Badge.tsx'
 import { Markdown } from './markdown.tsx'
 import { formatSeconds, stepDuration, useStepClock, useStepDurations } from './step-clock.ts'
-import { inputGlimpse, pretty, type Step, stepsSummary, thoughtFor } from './steps.ts'
-import type { BlobRef, BlobUrl } from './types.ts'
+import { type Step, stepsSummary, thoughtFor } from './steps.ts'
+import { type ToolStatus, toolStatus } from './tool-status.ts'
+import { toolEntry } from './tools/index.ts'
+import type { BlobUrl } from './types.ts'
 
 /*
  * The model's work: a tinted row that opens onto a numbered timeline of more tinted rows, with no
@@ -16,6 +19,8 @@ import type { BlobRef, BlobUrl } from './types.ts'
 
 interface Props {
   steps: Step[]
+  /** The message the steps belong to, whose status tells a tool still running from one cut off. */
+  record: Record<string, unknown>
   /** Whether the model is still working in this block, so its last step is the current one. */
   live: boolean
   blobUrl: BlobUrl
@@ -28,15 +33,16 @@ const clockId = (scope: string | undefined, step: Step) =>
   scope ? `${scope}:${step.key}` : undefined
 
 /** What the model is doing right now, from the last step it took. */
-function activity(step: Step | undefined): string {
+function activity(step: Step | undefined, record: Record<string, unknown>): string {
   if (step?.kind === 'reasoning') return 'Thinking…'
-  if (step?.kind === 'tool' && !step.result) return `Running ${step.call.tool as string}…`
+  if (step?.kind === 'tool' && toolStatus(step.result, record) === 'running')
+    return `${toolEntry(step.call.tool as string).activity}…`
   return 'Reading the results…'
 }
 
 /** Whether a step is still going: reasoning still streaming, or a tool waiting for its result. */
-const isRunning = (step: Step, current: boolean) =>
-  current && (step.kind === 'reasoning' || !step.result)
+const isRunning = (step: Step, current: boolean, record: Record<string, unknown>) =>
+  step.kind === 'reasoning' ? current : toolStatus(step.result, record) === 'running'
 
 const breathe = 'animate-breathe motion-reduce:animate-none'
 
@@ -77,16 +83,17 @@ function Elapsed(props: ElapsedProps) {
 
 interface ActivityProps {
   step: Step | undefined
+  record: Record<string, unknown>
   scope?: string
 }
 
 /** The live summary of a block: what the model is doing, and for how long. */
 function Activity(props: ActivityProps) {
-  const running = props.step ? isRunning(props.step, true) : false
+  const running = props.step ? isRunning(props.step, true, props.record) : false
   const clock = useStepClock(props.step && clockId(props.scope, props.step), running)
   return (
     <>
-      {activity(props.step)}
+      {activity(props.step, props.record)}
       {clock.elapsed !== undefined && <Elapsed seconds={clock.elapsed} />}
     </>
   )
@@ -101,6 +108,7 @@ const finishedSummary = (steps: Step[], scope: string | undefined) =>
       return id ? stepDuration(id) : undefined
     },
     formatSeconds,
+    (tool) => toolEntry(tool).label,
   )
 
 /**
@@ -112,7 +120,7 @@ const stepRow = cn(
   'relative rounded-card bg-sunken py-1.5 ps-10 pe-3 [counter-increment:step]',
   'before:absolute before:start-2.75 before:top-2 before:grid before:size-5.25 before:place-items-center before:rounded-full before:bg-hover before:font-semibold before:text-caption before:text-muted before:content-[counter(step)]',
   'has-[>[data-state=done]]:before:bg-accent-soft has-[>[data-state=done]]:before:text-accent-strong',
-  'has-[>[data-state=failed]]:before:bg-danger-soft has-[>[data-state=failed]]:before:text-danger',
+  'has-[>[data-state=error]]:before:bg-danger-soft has-[>[data-state=error]]:before:text-danger',
   'has-[>[data-current]]:before:animate-breathe has-[>[data-state=running]]:before:animate-breathe has-[>[data-current]]:before:bg-accent has-[>[data-state=running]]:before:bg-accent has-[>[data-current]]:before:text-on-accent has-[>[data-state=running]]:before:text-on-accent motion-reduce:before:animate-none',
 )
 
@@ -126,6 +134,7 @@ export function WorkSteps(props: Props) {
       key={step.key}
       step={step}
       current={props.live && i === last}
+      record={props.record}
       blobUrl={props.blobUrl}
       clock={clockId(props.scope, step)}
     />
@@ -148,7 +157,11 @@ export function WorkSteps(props: Props) {
         )}
       >
         <Chevron group="steps" />
-        {props.live ? <Activity step={props.steps[last]} scope={props.scope} /> : finished}
+        {props.live ? (
+          <Activity step={props.steps[last]} record={props.record} scope={props.scope} />
+        ) : (
+          finished
+        )}
       </summary>
       <ol className={timeline}>
         {views.map((view) => (
@@ -191,6 +204,7 @@ export function WorkButton(props: WorkButtonProps) {
 interface WorkListProps {
   id: string
   steps: Step[]
+  record: Record<string, unknown>
   blobUrl: BlobUrl
   scope?: string
 }
@@ -205,6 +219,7 @@ export function WorkList(props: WorkListProps) {
             <StepView
               step={step}
               current={false}
+              record={props.record}
               blobUrl={props.blobUrl}
               clock={clockId(props.scope, step)}
             />
@@ -218,6 +233,7 @@ export function WorkList(props: WorkListProps) {
 interface StepViewProps {
   step: Step
   current: boolean
+  record: Record<string, unknown>
   blobUrl: BlobUrl
   /** The step's clock id, when its reply is known. */
   clock?: string
@@ -237,7 +253,7 @@ function sameStep(a: Step, b: Step): boolean {
 const StepView = memo(
   function StepView(props: StepViewProps) {
     const step = props.step
-    const clock = useStepClock(props.clock, isRunning(step, props.current))
+    const clock = useStepClock(props.clock, isRunning(step, props.current, props.record))
     if (step.kind === 'reasoning') {
       return (
         <Thought
@@ -251,7 +267,8 @@ const StepView = memo(
     return (
       <ToolStep
         step={step}
-        current={props.current}
+        status={toolStatus(step.result, props.record)}
+        record={props.record}
         blobUrl={props.blobUrl}
         elapsed={clock.elapsed}
       />
@@ -259,6 +276,7 @@ const StepView = memo(
   },
   (prev, next) =>
     prev.current === next.current &&
+    prev.record.status === next.record.status &&
     prev.blobUrl === next.blobUrl &&
     prev.clock === next.clock &&
     sameStep(prev.step, next.step),
@@ -372,70 +390,67 @@ function ReasoningLabel(props: ReasoningLabelProps) {
   return <>{thoughtFor(props.duration, formatSeconds)}</>
 }
 
-interface ToolStepProps extends Omit<StepViewProps, 'step' | 'clock'> {
+interface ToolStepProps {
   step: Extract<Step, { kind: 'tool' }>
+  status: ToolStatus
+  record: Record<string, unknown>
+  blobUrl: BlobUrl
   /** Seconds the tool has been running, while it runs. */
   elapsed?: number
 }
 
-/** A label over a tool's input or output. */
-const stepLabel =
-  'mt-2.5 font-semibold text-caption text-muted group-data-[state=failed]/step:text-danger'
+/** What a tool's badge says, for each status but done, which needs none. */
+const badges: Record<Exclude<ToolStatus, 'done'>, string> = {
+  running: 'running',
+  error: 'failed',
+  incomplete: 'incomplete',
+}
 
-/** A tool's input or output, as it was sent or returned, scrolling when long. */
-const stepCode =
-  'mt-1.25 mb-0.75 max-h-80 overflow-auto whitespace-pre-wrap rounded-small bg-surface px-3.5 py-3 font-mono text-code-block text-ink leading-normal'
-
-/** A tool call and its result, as one step, with its state as a badge beside its name. */
+/**
+ * A tool call and its result, as one step: a row naming what it did, with a glimpse of its input
+ * and its state as a badge, that opens onto the tool's view.
+ */
 function ToolStep(props: ToolStepProps) {
   const { call, result } = props.step
-  const input = (call.input as string | undefined) ?? ''
-  const outputBlob = result?.outputBlob as BlobRef | undefined
-  let state = 'done'
-  if (result?.isError) state = 'failed'
-  else if (!result) state = props.current ? 'running' : 'no result'
+  const entry = toolEntry(call.tool as string)
+  const status = props.status
   return (
-    <details data-step="tool" data-state={state} className="group/step details-unfold">
+    <details data-step="tool" data-state={status} className="group/step details-unfold">
       <summary className={cn(summary, 'gap-1 truncate py-0.5 group-open/step:text-ink')}>
         <Chevron group="step" />
-        <code className="text-caption text-ink-strong">{call.tool as string}</code>{' '}
-        {/* The glimpse of the input only stands in for what is inside, so it goes once open. */}
-        <span className="truncate font-mono font-normal text-caption text-muted group-open/step:hidden">
-          {inputGlimpse(input)}
+        {entry.code ? (
+          <code className="text-caption text-ink-strong">{entry.label}</code>
+        ) : (
+          <span className="text-ink-strong">{entry.label}</span>
+        )}{' '}
+        {/* The glimpse of the input stands in for the input the default view shows in full, so
+            there it goes once open. A tool's own view shows what it found, not what it asked. */}
+        <span
+          dir="auto"
+          className={cn(
+            'truncate font-normal text-muted',
+            entry.code && 'font-mono text-caption group-open/step:hidden',
+          )}
+        >
+          {entry.glimpse((call.input as string | undefined) ?? '')}
         </span>{' '}
-        {state !== 'done' && (
-          <span
-            className={cn(
-              'ms-1.25 inline-block rounded-badge bg-surface px-1.5 py-px font-semibold text-caption text-muted',
-              state === 'running' && cn('bg-accent-soft text-accent-strong', breathe),
-              state === 'failed' && 'bg-danger-soft text-danger',
-            )}
+        {status !== 'done' && (
+          <Badge
+            tone={status === 'running' ? 'good' : status === 'error' ? 'danger' : undefined}
+            className={cn('ms-1.25', status === 'running' && breathe)}
           >
-            {state}
-          </span>
+            {badges[status]}
+          </Badge>
         )}
         {props.elapsed !== undefined && <Elapsed seconds={props.elapsed} />}
       </summary>
-      {input && (
-        <>
-          <div className={stepLabel}>Input</div>
-          <pre className={stepCode}>{pretty(input)}</pre>
-        </>
-      )}
-      {result && (
-        <>
-          <div className={stepLabel}>{result.isError ? 'Error' : 'Output'}</div>
-          <pre className={stepCode}>{pretty(result.output as string)}</pre>
-          {outputBlob && (
-            <a
-              href={props.blobUrl(outputBlob.ref.$link, outputBlob.mimeType)}
-              className="text-caption"
-            >
-              Full output
-            </a>
-          )}
-        </>
-      )}
+      <entry.View
+        call={call}
+        result={result}
+        status={status}
+        record={props.record}
+        blobUrl={props.blobUrl}
+      />
     </details>
   )
 }

@@ -12,7 +12,7 @@ The web app uses Hono server, listing on port 3000 by default. It runs [TanStack
 
 Code is grouped by feature in `src/features/`, and `src/routes/` maps each URL to a feature's page.
 
-Each route's loader fetches the server data its page needs, and the page reads it with `useSuspenseQuery`, so a page renders with its data and a failed load shows inside the page's layout with a Retry. Chats are the exception: they come from the browser's local copy in `src/store/`, not from loaders. Message parts are drawn by the views in `src/parts/`, looked up by part type, and `src/shared/` holds what features share, like the form kit in `form.tsx` that every form is built with.
+Each route's loader fetches the server data its page needs, and the page reads it with `useSuspenseQuery`, so a page renders with its data and a failed load shows inside the page's layout with a Retry. Chats are the exception: they come from the browser's local copy in `src/store/`, not from loaders. Message parts are drawn by the views in `src/parts/`, looked up by part type, and tool calls by the views in `src/parts/tools/`, looked up by tool name, and `src/shared/` holds what features share, like the form kit in `form.tsx` that every form is built with.
 
 The look comes from one file of design tokens, `src/styles/theme.css`, and each component styles itself with Tailwind utilities that can only name those tokens, since the theme clears Tailwind's own palette and scales. A look used in more than one place is a component in `src/shared/ui/`, such as `Button` or the settings page kit. Light and dark follow the system, or a choice kept on the device in Preferences. Replies render through Streamdown, with code highlighted in the theme's colors. The styling spec has the rules.
 

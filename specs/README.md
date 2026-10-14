@@ -58,6 +58,7 @@ After the initial build-out:
 - [[admin]]
 - [[admin-plugins]]
 - [[admin-settings]]
+- [[tool-views]]: tool calls shown as what they did, through a table of tool views with one derived status, starting with web search and web fetch. Split out of [[extending]].
 
 Phase 1 of the web rebuild:
 

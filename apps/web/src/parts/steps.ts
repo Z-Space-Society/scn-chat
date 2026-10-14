@@ -95,7 +95,8 @@ export function pretty(text: string): string {
   }
 }
 
-const clip = (text: string, max: number) =>
+/** Text cut to at most `max` characters, ending in an ellipsis when cut. */
+export const clip = (text: string, max: number) =>
   text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text
 
 /** A one-line glimpse of a tool's input, such as the query it searched for. */
@@ -119,13 +120,15 @@ export const thoughtFor = (seconds: number, format: (s: number) => string) =>
   `Thought for ${format(Math.max(1, Math.round(seconds)))}`
 
 /**
- * A summary of a block of steps, such as "Thought · web_search ×2 · fetch". When every reasoning
- * step's duration is known, the thinking reads as its total, as "Thought for 12s".
+ * A summary of a block of steps, such as "Thought · Searched the web ×2 · lookup", naming each tool
+ * step by its tool's label. When every reasoning step's duration is known, the thinking reads as its
+ * total, as "Thought for 12s".
  */
 export function stepsSummary(
   steps: Step[],
   durationOf: (step: Step) => number | undefined = () => undefined,
   format: (seconds: number) => string = (s) => `${s}s`,
+  labelOf: (tool: string) => string = (tool) => tool,
 ): string {
   const reasoning = steps.filter((step) => step.kind === 'reasoning')
   const times = reasoning.map(durationOf)
@@ -137,7 +140,7 @@ export function stepsSummary(
     : null
   const labels: { label: string; count: number }[] = []
   for (const step of steps) {
-    const label = step.kind === 'reasoning' ? 'Thought' : (step.call.tool as string)
+    const label = step.kind === 'reasoning' ? 'Thought' : labelOf(step.call.tool as string)
     const previous = labels.find((l) => l.label === label)
     if (previous) previous.count++
     else labels.push({ label, count: 1 })

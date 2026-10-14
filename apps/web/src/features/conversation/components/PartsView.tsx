@@ -34,6 +34,7 @@ export function PartsView(props: Props) {
             <div key={block.key} hidden={!current}>
               <StepsView
                 steps={block.steps}
+                record={props.record}
                 live={current}
                 blobUrl={props.blobUrl}
                 scope={props.scope}

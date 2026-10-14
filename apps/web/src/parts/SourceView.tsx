@@ -1,13 +1,5 @@
+import { siteOf } from './links.ts'
 import type { PartViewProps } from './types.ts'
-
-/** The site a URL is on, to name a source that has no title. */
-function siteOf(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '')
-  } catch {
-    return url
-  }
-}
 
 /** A source's title, or its site when it has none, with the site after a title. */
 export function SourceView(props: PartViewProps) {

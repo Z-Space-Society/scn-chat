@@ -165,6 +165,8 @@ A tool supports:
 
 The model gets tools listed in `generation.tools`. Defaults to tools the user has switched on.
 
+The web app shows a tool's calls by its input and output as they are. To show them as what the tool did, such as a search's results, add a view for the tool in your fork's `apps/web/src/parts/tools/`, as `specs/tool-views.md` describes. A view reads the output your tool returns, so changing its shape means changing the view too.
+
 ## Roles
 
 A plugin can manage role membership itself.
