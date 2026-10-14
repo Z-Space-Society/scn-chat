@@ -1,6 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
+import { Block, defaultRemarkPlugins } from 'streamdown'
 import { cn } from '../../../shared/cn.ts'
 import { ChatIcon } from '../../../shared/icons.tsx'
 import { plural } from '../../../shared/plural.ts'
@@ -101,23 +100,35 @@ function markMatches(node: HtmlNode) {
   })
 }
 
-const remarkPlugins = [remarkGfm]
-const rehypePlugins = [() => markMatches]
+/** Named, since Streamdown caches its parsers by the names of their plugins. */
+function markSearchMatches() {
+  return markMatches
+}
+
+const remarkPlugins = Object.values(defaultRemarkPlugins)
+const rehypePlugins = [markSearchMatches]
 // Inline styling only, so the snippet stays one run of text. Other elements give way to their
 // text, and images, which have none, drop out.
 const inlineElements = ['strong', 'em', 'del', 'code', 'mark']
 
-/** A snippet of a reply with its Markdown styled inline, as the reply shows it. */
+/**
+ * A snippet of a reply with its Markdown styled inline, as the reply shows it. Streamdown's one
+ * block, rather than all of Streamdown, which would wrap the snippet's run of text in a div and
+ * complete the Markdown the snippet's cut left open.
+ */
 export function MarkdownSnippet(props: SnippetProps) {
   return (
-    <ReactMarkdown
+    <Block
+      content={dropCutLinks(props.text)}
+      index={0}
+      isIncomplete={false}
+      shouldParseIncompleteMarkdown={false}
+      shouldNormalizeHtmlIndentation={false}
       remarkPlugins={remarkPlugins}
       rehypePlugins={rehypePlugins}
       allowedElements={inlineElements}
       unwrapDisallowed
-    >
-      {dropCutLinks(props.text)}
-    </ReactMarkdown>
+    />
   )
 }
 
