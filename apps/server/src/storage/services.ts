@@ -40,20 +40,19 @@ export function createChatServices(deps: {
     storeFor,
     forAccount(account) {
       const store = storeFor(account)
-      const chats: ChatService = new ChatService(
-        store,
-        blobsFor(account),
-        deps.logger,
-        (space, cid) => {
+      const { did } = account
+      const chats: ChatService = new ChatService(store, blobsFor(account), deps.logger, {
+        wrote(space, cid) {
           deps.recentWrites.add(cid)
-          if (space === chats.settingsUri) deps.events.emit('index:changed', { did: account.did })
-          else
-            deps.events.emit('conversation:changed', {
-              did: account.did,
-              skey: chats.skeyOf(space),
-            })
+          if (space === chats.settingsUri) deps.events.emit('index:changed', { did })
+          else deps.events.emit('conversation:changed', { did, skey: chats.skeyOf(space) })
         },
-      )
+        created: (skey) => deps.events.emit('conversation:created', { did, skey }),
+        deleted(skey) {
+          deps.recentWrites.addDeletion(chats.conversationUri(skey))
+          deps.events.emit('conversation:deleted', { did, skey })
+        },
+      })
       return chats
     },
   }

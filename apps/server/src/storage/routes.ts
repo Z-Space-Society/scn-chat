@@ -7,7 +7,6 @@ import { jsonBody } from '../body.ts'
 import type { Db } from '../db/index.ts'
 import type { AppEnv } from '../env.ts'
 import type { Logger } from '../logger.ts'
-import type { HookRunner } from '../plugins/hooks.ts'
 import { jsonObject } from '../schemas.ts'
 import type { Settings } from '../settings/schemas.ts'
 import type { SyncEngine } from '../sync/engine.ts'
@@ -19,8 +18,6 @@ export type StorageRoutesDeps = {
   services: ChatServices
   events: SyncEventBus
   engine?: SyncEngine
-  /** The current plugin runtime's hooks. */
-  hooks?: () => HookRunner
   /** The current sync settings. */
   sync: () => Settings['sync']
   logger: Logger
@@ -61,9 +58,6 @@ export function storageRoutes(deps: StorageRoutesDeps) {
         systemPrompt: body.systemPrompt,
         tags: body.tags,
       })
-      await deps
-        .hooks?.()
-        .action('conversation:created', { user: chats.did, conversation: created.uri }, deps.logger)
       return c.json(created, 201)
     })
     .get('/conversations/keys', async (c) => c.json({ keys: await chatsFor(c).listKeys() }))
@@ -94,16 +88,7 @@ export function storageRoutes(deps: StorageRoutesDeps) {
       return c.json({ ok: true })
     })
     .delete('/conversations/:skey', async (c) => {
-      const chats = chatsFor(c)
-      const skey = c.req.param('skey')
-      await chats.deleteConversation(skey)
-      await deps
-        .hooks?.()
-        .action(
-          'conversation:deleted',
-          { user: chats.did, conversation: chats.conversationUri(skey) },
-          deps.logger,
-        )
+      await chatsFor(c).deleteConversation(c.req.param('skey'))
       return c.json({ ok: true })
     })
     .post('/conversations/:skey/sync', async (c) => {

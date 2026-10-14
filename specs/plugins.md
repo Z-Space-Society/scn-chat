@@ -96,13 +96,14 @@ Hooks let many plugins act on the same event. Every payload uses our own normali
 | `messages:beforeModel` | filter | The system prompt and message list about to be sent, with the turn context |
 | `message:afterModel` | filter | The assistant's final content before it is written, with the turn context |
 | `turn:after` | action | The finished turn: conversation, user, request, and the written reply |
-| `conversation:created` | action | The new conversation and its owner |
-| `conversation:deleted` | action | The deleted conversation and its owner |
+| `conversation:created` | action | The new conversation and its owner, once, whichever client created it |
+| `conversation:deleted` | action | The deleted conversation and its owner, once, whichever client deleted it |
 | `signIn:before` | action | The DID, handle, and PDS of someone signing in, before the access check. See the scn-member-registry spec. |
 | `cron` | action | When the cron run started. See the cron spec. |
 
 - **Filters** run in order, and each handler returns the value the next one receives. A filter that throws fails the turn, which ends with status `error` and an error naming the plugin.
 - **Actions** run in order, and their return values are ignored. An action that throws is logged with the plugin ID, and the turn is unaffected.
+- **Conversation hooks** come from the in-process event bus, through `fireChatHooks`, not from the routes. `ChatService` announces the conversations this app creates and deletes. Sync announces a conversation another client created when an index sync finds a new `conversationRef`, one whose op has no previous CID, and one another client deleted when an index sync finds its entry deleted, a conversation's space is gone, or the PDS notifies a deletion. The first index sync after sign-in, and any while the index is still empty, treats what it finds as already there, so it announces nothing. The server remembers the spaces it deleted for ten minutes, as it remembers its own writes, so sync noticing its own deletion doesn't announce it again. A fallback user's chats are written only by this app, so its own announcements cover them.
 - **Order.** Handlers are sorted by `options.order` (`'pre'`, `'normal'`, or `'post'`, default `'normal'`), then by the plugin's position in the admin area. There are no numeric priorities. The server logs each hook's resolved handler order whenever the plugins load.
 
 The hook runner is a small typed module in the server, about 80 lines, that handles ordering, filter chaining, and action error isolation. The `hookable` library has no ordering and cannot pass a value through a chain of handlers, which filters need. `tapable` has both, but needs a class per hook.
@@ -152,3 +153,4 @@ Per-user settings are stored in a `plugin_user_settings` table: DID, plugin ID, 
 - [ ] Per-user secrets no key can decrypt read as unset with `secretsUnreadable`, and are kept until the user enters a secret.
 - [ ] Deleting a plugin's settings clears the user's stored values, so the schema defaults apply.
 - [ ] `ctx.conversations.updateInfo` writes through the storage layer under the user's DID.
+- [x] `conversation:created` and `conversation:deleted` run once per change, for a conversation this app creates or deletes and for one another client does, and not for conversations already there at the first sync.

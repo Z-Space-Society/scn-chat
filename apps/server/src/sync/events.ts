@@ -15,6 +15,9 @@ export type SyncEvents = {
   ]
   'message:invalid': [{ did: string; skey: string; rkey: string; raw: JsonRecord; error: string }]
   'conversation:changed': [{ did: string; skey: string }]
+  /** A conversation was created, by this app or, as sync noticed, another client. Once each. */
+  'conversation:created': [{ did: string; skey: string }]
+  /** A conversation was deleted, by this app or, as sync noticed, another client. Once each. */
   'conversation:deleted': [{ did: string; skey: string }]
   'index:changed': [{ did: string }]
 }

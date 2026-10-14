@@ -16,6 +16,7 @@ import type { Db } from './db/index.ts'
 import { migrateToLatest } from './db/migrate.ts'
 import type { Logger } from './logger.ts'
 import { PluginAdmin } from './plugins/admin.ts'
+import { fireChatHooks } from './plugins/chat-hooks.ts'
 import type { PluginServices } from './plugins/host.ts'
 import type { InstalledPlugins } from './plugins/installed.ts'
 import { readInstances } from './plugins/instances.ts'
@@ -183,6 +184,7 @@ export async function createServer(deps: ServerDeps) {
     logger,
   })
   runner.attach(events)
+  fireChatHooks(events, () => runtime().host.hooks, logger)
   const sharing = new SharingService({
     getPdsClient,
     identity,
@@ -241,7 +243,6 @@ export async function createServer(deps: ServerDeps) {
       services,
       events,
       engine,
-      hooks: () => runtime().host.hooks,
       sync: () => settings.get('sync'),
       logger,
     },

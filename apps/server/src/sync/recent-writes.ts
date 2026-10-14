@@ -1,4 +1,4 @@
-/** CIDs of records the server wrote recently, so sync can skip its own changes. */
+/** Records the server wrote and spaces it deleted recently, so sync can skip its own changes. */
 export class RecentWrites {
   private readonly entries = new Map<string, number>()
   private readonly ttlMs: number
@@ -18,6 +18,15 @@ export class RecentWrites {
     if (expires > now) return true
     this.entries.delete(cid)
     return false
+  }
+
+  /** Remember a space this server deleted, so sync can tell the deletion is its own. */
+  addDeletion(space: string, now = Date.now()): void {
+    this.add(`deleted ${space}`, now)
+  }
+
+  hasDeletion(space: string, now = Date.now()): boolean {
+    return this.has(`deleted ${space}`, now)
   }
 
   private prune(now: number): void {

@@ -69,8 +69,8 @@ export function syncRoutes(deps: SyncRoutesDeps) {
       const { did, type, skey } = authorityOf(space)
       const refusal = await authorize(c.req.header('authorization'), 'notifySpaceDeleted', did)
       if (refusal) return c.json(refusal, 401)
-      await deps.db.deleteFrom('sync_state').where('space_uri', '=', space).execute()
-      if (type === nsid.conversation) deps.events.emit('conversation:deleted', { did, skey })
+      if (type === nsid.conversation) await deps.engine.conversationDeleted(did, skey)
+      else await deps.db.deleteFrom('sync_state').where('space_uri', '=', space).execute()
       return c.body(null, 200)
     })
     .post(`/xrpc/${nsid.requestSync}`, async (c) => {

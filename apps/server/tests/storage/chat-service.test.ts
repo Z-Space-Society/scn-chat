@@ -33,9 +33,9 @@ describe.each(dialects)('ChatService on $name', ({ create }) => {
     await migrateToLatest(db)
     const writes: string[] = []
     const blobs = new LocalBlobStore(did, mkdtempSync(join(tmpdir(), 'scn-')))
-    const chats = new ChatService(new LocalRecordStore(did, db), blobs, logger, (_space, cid) =>
-      writes.push(cid),
-    )
+    const chats = new ChatService(new LocalRecordStore(did, db), blobs, logger, {
+      wrote: (_space, cid) => writes.push(cid),
+    })
     return { db, chats, writes }
   }
 

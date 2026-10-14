@@ -40,6 +40,14 @@ export type ConversationChanges = {
   full: boolean
 }
 
+/** What a ChatService tells its owner about the changes it makes. */
+export type ChatListener = {
+  /** A record was written to a space. */
+  wrote?: (space: string, cid: string) => void
+  created?: (skey: string) => void
+  deleted?: (skey: string) => void
+}
+
 export type IndexChanges = {
   conversations: ConversationSummary[]
   deleted: string[]
@@ -57,19 +65,14 @@ export class ChatService {
   readonly settingsUri: string
   private readonly blobs: BlobStore
   private readonly logger: Logger
-  private readonly onWrite: (space: string, cid: string) => void
+  private readonly listener: ChatListener
 
-  constructor(
-    store: RecordStore,
-    blobs: BlobStore,
-    logger: Logger,
-    onWrite: (space: string, cid: string) => void = () => {},
-  ) {
+  constructor(store: RecordStore, blobs: BlobStore, logger: Logger, listener: ChatListener = {}) {
     this.did = store.did
     this.store = store
     this.blobs = blobs
     this.logger = logger
-    this.onWrite = onWrite
+    this.listener = listener
     this.settingsUri = spaceUri(store.did, nsid.settings, SETTINGS_SKEY)
   }
 
@@ -116,7 +119,7 @@ export class ChatService {
     const { cid } = create
       ? await this.store.createRecord(space, collection, rkey, value)
       : await this.store.putRecord(space, collection, rkey, value)
-    this.onWrite(space, cid)
+    this.listener.wrote?.(space, cid)
     return cid
   }
 
@@ -128,6 +131,7 @@ export class ChatService {
     if (input.systemPrompt) info.systemPrompt = input.systemPrompt
     await this.put(uri, nsid.info, 'self', info)
     await this.inSettingsSpace(() => this.writeRef(skey, { tags: input.tags ?? [] }))
+    this.listener.created?.(skey)
     return { skey, uri }
   }
 
@@ -225,6 +229,7 @@ export class ChatService {
   async deleteConversation(skey: string): Promise<void> {
     await this.store.deleteSpace(this.conversationUri(skey))
     await this.store.deleteRecord(this.settingsUri, nsid.conversationRef, skey)
+    this.listener.deleted?.(skey)
   }
 
   async getPreferences(): Promise<JsonRecord | null> {

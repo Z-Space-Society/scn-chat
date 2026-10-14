@@ -193,14 +193,15 @@ See [`plugins/pdf-text`](../plugins/pdf-text/src/index.ts) as an example.
 | `messages:beforeModel` | filter | Instructions and messages about to be sent to the model, and the turn context. |
 | `message:afterModel` | filter | Reply's final content, before it's written to the PDS, and the turn context. |
 | `turn:after` | action | The completed turn, including the written reply. |
-| `conversation:created` | action | The owner's DID and the conversation URI. |
-| `conversation:deleted` | action | The owner's DID and the conversation URI. |
+| `conversation:created` | action | The owner's DID and the conversation URI, once per new conversation. |
+| `conversation:deleted` | action | The owner's DID and the conversation URI, once per deleted conversation. |
 | `signIn:before` | action | The DID, handle, and PDS of the user signing in. |
 | `cron` | action | Cron run start time. |
 
 - **Filters:** Each handlers return value is sent to the next filter.
 - **Actions:** Return values are ignored. If an action raises an exception it's logged and the turn and later actions continue.
 - **Order:** Pass `{ order: 'pre' }` or `{ order: 'post' }` to run before or after the `'normal'` handlers.
+- **Conversations from any client:** `conversation:created` and `conversation:deleted` run for a change made in this app and for one another client makes on the user's PDS, once sync notices it. That is soon after the change when the PDS can notify the app, and at the next sync otherwise, as in local development. Conversations already there when a user first signs in don't count as created.
 - **Turn context:** `turn.tools` lists the tools offered to the model this turn, so a `messages:beforeModel` filter can add guidance for its tools only when they are in use.
 
 ## Per-user settings

@@ -8,7 +8,7 @@ import type { Logger } from '../logger.ts'
 import type { Loose } from '../loose.ts'
 import type { ChatService } from '../storage/chat-service.ts'
 import { type OpsPage, type RecordStore, SpaceNotFound } from '../storage/record-store.ts'
-import type { JsonRecord } from '../storage/records.ts'
+import { type JsonRecord, spaceUri } from '../storage/records.ts'
 import type { ChatServices } from '../storage/services.ts'
 import { Coalescer } from './coalescer.ts'
 import type { CredentialCache } from './credentials.ts'
@@ -110,6 +110,17 @@ export class SyncEngine {
     return this.coalescer.request(`index ${did}`, () => this.runIndexSync(did, false))
   }
 
+  /**
+   * Forget a conversation another client deleted, as an index sync, a conversation sync, or the
+   * PDS's notification found, and say so once. A deletion this server made was already announced.
+   */
+  async conversationDeleted(did: string, skey: string): Promise<void> {
+    const space = spaceUri(did, nsid.conversation, skey)
+    await this.dropState(space)
+    if (!this.deps.recentWrites.hasDeletion(space))
+      this.deps.events.emit('conversation:deleted', { did, skey })
+  }
+
   /** Sync one conversation now. */
   async syncConversation(did: string, skey: string): Promise<void> {
     const ctx = await this.context(did)
@@ -127,9 +138,11 @@ export class SyncEngine {
       for (const op of page.ops) {
         if (op.collection !== nsid.conversationRef) continue
         if (!op.cid) {
-          await this.dropState(ctx.chats.conversationUri(op.rkey))
-          this.deps.events.emit('conversation:deleted', { did, skey: op.rkey })
+          await this.conversationDeleted(did, op.rkey)
         } else if (!this.deps.recentWrites.has(op.cid)) {
+          // A new index entry from another client is a conversation created there.
+          if (op.prev === null)
+            this.deps.events.emit('conversation:created', { did, skey: op.rkey })
           await this.runConversationSync(ctx, op.rkey, false)
         }
       }
@@ -168,8 +181,7 @@ export class SyncEngine {
         page = await ctx.store.listOps(space, state?.last_rev)
       } catch (err) {
         if (!(err instanceof SpaceNotFound)) throw err
-        await this.dropState(space)
-        this.deps.events.emit('conversation:deleted', { did, skey })
+        await this.conversationDeleted(did, skey)
         return
       }
       let external = false
