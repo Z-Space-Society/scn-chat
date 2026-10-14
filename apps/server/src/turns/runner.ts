@@ -454,7 +454,7 @@ export class TurnRunner {
     try {
       if (!model)
         throw new Error('No model selected. Choose a model or set a default in your preferences.')
-      const resolved = await catalog.resolve(did, model)
+      const resolved = await catalog.resolve(did, model, conversationUri)
       const branch = branchTo(loaded.messages, userMessage.rkey)
       const requested = generation.tools
       if (requested?.length && !resolved.capabilities.tools)

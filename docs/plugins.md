@@ -140,7 +140,7 @@ A provider connects SCN Chat to a model API. See [`plugins/openai-compatible`](.
 | `allowPrivateNetworks` | True if user endpoints are allowed to use private network addresses, such as a self-hosted model on a home network. Off by default. |
 | `replay` | Set to `'replay'` to send earlier reasoning and provider data back on later turns (some providers require this). `'drop'` leaves them out. |
 | `providerOptions` | AI SDK provider options. Optional. |
-| `createModel(access)` | Returns the model. `access.apiKey` is the user's own key when they have one; otherwise use the admin key. When `access.fetch` is set, the model must use it: it guards user endpoints against private addresses. |
+| `createModel(access)` | Returns the model. `access.apiKey` is the user's own key when they have one; otherwise use the admin key. When `access.fetch` is set, the model must use it: it guards user endpoints against private addresses. `access.session` is an opaque ID that stays the same for one conversation, for APIs that route or cache by session. |
 | `listModels(access)` | Lists the models that can be used. Optional. |
 
 ## Tools
@@ -215,7 +215,7 @@ If `userSettings` is configured users will see a settings form for the plugin on
 
 ## Calling models and changing records
 
-- Use `ctx.models.generateText({ user, model, system, prompt, maxOutputTokens, effort })` for a one-off model call. The model resolves as it would in a chat (previously used model => user default => system default). It returns `{ text, finishReason }`.
+- Use `ctx.models.generateText({ user, model, system, prompt, maxOutputTokens, effort, conversation })` for a one-off model call. Pass `conversation`, the conversation's URI, when the call is about one, so providers get its session ID. The model resolves as it would in a chat (previously used model => user default => system default). It returns `{ text, finishReason }`.
 - Use `ctx.conversations.updateInfo(user, conversation, patch, options?)` to update a conversation's `info` record. Pass `{ unlessUserTitled: true }` so a title the user set won't be overwritten.
 
 These are the only ways a plugin should touch the user's data. Never write records via any other route.

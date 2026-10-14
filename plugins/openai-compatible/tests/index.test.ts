@@ -9,6 +9,15 @@ const cocore = {
   apiKey: 'admin-key',
 }
 
+const completion = {
+  id: 'c',
+  object: 'chat.completion',
+  created: 1,
+  model: 'm',
+  choices: [{ index: 0, message: { role: 'assistant', content: 'hi' }, finish_reason: 'stop' }],
+  usage: { prompt_tokens: 1, completion_tokens: 1 },
+}
+
 describe('openai-compatible plugin', () => {
   it('offers admin models for a keyless local server with only a base URL', async () => {
     const { providers } = await setupForTest(
@@ -25,18 +34,7 @@ describe('openai-compatible plugin', () => {
     const { providers } = await setupForTest(
       plugin({ id: 'custom', name: 'Custom', userEndpoints: true }),
     )
-    const fetch = vi.fn(async () =>
-      Response.json({
-        id: 'c',
-        object: 'chat.completion',
-        created: 1,
-        model: 'm',
-        choices: [
-          { index: 0, message: { role: 'assistant', content: 'hi' }, finish_reason: 'stop' },
-        ],
-        usage: { prompt_tokens: 1, completion_tokens: 1 },
-      }),
-    )
+    const fetch = vi.fn(async () => Response.json(completion))
     const model = providers[0]!.createModel({
       modelId: 'llama',
       apiKey: 'user-key',
@@ -49,6 +47,43 @@ describe('openai-compatible plugin', () => {
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toBe('https://my.host/v1/chat/completions')
     expect(new Headers(init.headers).get('authorization')).toBe('Bearer user-key')
+  })
+
+  it('sends the session header and user agent the admin set', async () => {
+    const { providers } = await setupForTest(
+      plugin({ ...cocore, sessionHeader: 'x-opencode-session', userAgent: 'scn-chat/1.0' }),
+    )
+    const fetch = vi.fn(async () => Response.json(completion))
+    const model = providers[0]!.createModel({
+      modelId: 'kimi',
+      session: 'abc123',
+      fetch: fetch as unknown as typeof globalThis.fetch,
+    })
+    await model.doGenerate({
+      prompt: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
+    } as never)
+    const headers = new Headers(
+      (fetch.mock.calls[0] as unknown as [string, RequestInit])[1].headers,
+    )
+    expect(headers.get('x-opencode-session')).toBe('abc123')
+    expect(headers.get('user-agent')).toMatch(/^scn-chat\/1\.0/)
+  })
+
+  it('sends no session header when the admin set none', async () => {
+    const { providers } = await setupForTest(plugin(cocore))
+    const fetch = vi.fn(async () => Response.json(completion))
+    const model = providers[0]!.createModel({
+      modelId: 'kimi',
+      session: 'abc123',
+      fetch: fetch as unknown as typeof globalThis.fetch,
+    })
+    await model.doGenerate({
+      prompt: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
+    } as never)
+    const headers = new Headers(
+      (fetch.mock.calls[0] as unknown as [string, RequestInit])[1].headers,
+    )
+    expect([...headers.keys()].some((name) => name.includes('session'))).toBe(false)
   })
 
   it('lists models from the endpoint', async () => {

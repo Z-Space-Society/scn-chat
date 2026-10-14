@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type { Capabilities, LanguageModelV4, ModelProvider, ModelRef } from '@scn-chat/plugin-api'
 import type { Db } from '../db/index.ts'
 import type { Logger } from '../logger.ts'
@@ -46,6 +47,13 @@ export type CatalogDeps = {
 function defaultOf(models: AdminModel[]): ModelRef | undefined {
   const model = models.find((m) => m.default)
   return model ? { provider: model.provider, id: model.id } : undefined
+}
+
+/** A session ID for a conversation that doesn't reveal its owner's DID. */
+function sessionOf(conversation: string | undefined): string | undefined {
+  return conversation
+    ? createHash('sha256').update(conversation).digest('hex').slice(0, 32)
+    : undefined
 }
 
 /** Which models a user can use, and how to reach them. */
@@ -125,8 +133,12 @@ export class ModelCatalog {
     return [...listed.values()]
   }
 
-  /** Resolve a model reference for a user: their own key first, then the admin key if their roles allow it. */
-  async resolve(did: string, ref: ModelRef): Promise<ResolvedModel> {
+  /**
+   * Resolve a model reference for a user: their own key first, then the admin key if their roles allow it.
+   * `conversation` is the URI of the conversation the call is for, when there is one.
+   */
+  async resolve(did: string, ref: ModelRef, conversation?: string): Promise<ResolvedModel> {
+    const session = sessionOf(conversation)
     const own = await credentialFor(this.deps.db, this.deps.box, did, ref)
     if (own) {
       const provider = this.deps.providers.get(own.summary.providerId)
@@ -137,6 +149,7 @@ export class ModelCatalog {
         apiKey: own.apiKey,
         baseURL: own.summary.baseUrl ?? undefined,
         fetch: endpoint && !provider.allowPrivateNetworks ? this.deps.guardedFetch : undefined,
+        session,
       })
       return { ref, provider, model, capabilities: own.info.capabilities }
     }
@@ -150,7 +163,7 @@ export class ModelCatalog {
     return {
       ref,
       provider,
-      model: provider.createModel({ modelId: ref.id }),
+      model: provider.createModel({ modelId: ref.id, session }),
       capabilities: admin.capabilities,
     }
   }

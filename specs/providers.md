@@ -20,7 +20,7 @@ interface ModelProvider {
   name: string                  // shown in the UI
   userKeys: boolean             // whether users may add their own API key
   userEndpoints?: boolean       // whether users may add their own base URLs (OpenAI-compatible only)
-  createModel(args: { modelId: string; apiKey?: string; baseURL?: string }): LanguageModelV4
+  createModel(args: { modelId: string; apiKey?: string; baseURL?: string; session?: string }): LanguageModelV4
   listModels?(args: { apiKey?: string; baseURL?: string }): Promise<ModelInfo[]>
   replay: ReplayPolicy          // how earlier reasoning is sent back, see below
 }
@@ -34,7 +34,7 @@ interface ModelInfo {
 
 `LanguageModelV4` is the AI SDK's provider specification, from `@ai-sdk/provider`. That package is separate from the `ai` runtime and versions the interface explicitly. Returning a model that implements it, instead of our own streaming interface, means any AI SDK provider package, including community ones, can become an SCN Chat provider in a few lines. The rest of our interface (IDs, keys, listing, replay) stays ours.
 
-`createModel` is called per request, since API keys can differ per user. The AI SDK factories are cheap to call.
+`createModel` is called per request, since API keys can differ per user. The AI SDK factories are cheap to call. When the call belongs to a conversation, as a turn or a plugin's `generateText` naming one does, `session` is an ID that stays the same for that conversation: the first 32 hex characters of the SHA-256 of its URI, so a provider can keep a conversation's calls together without learning the user's DID.
 
 ### Phase 1 provider plugins
 
@@ -45,7 +45,7 @@ interface ModelInfo {
 | `@scn-chat/plugin-google` | `@ai-sdk/google` | `createGoogle({ apiKey })` |
 | `@scn-chat/plugin-openai-compatible` | `@ai-sdk/openai-compatible` | Takes `id`, `name`, `baseURL`, and optional `apiKey`. Can be listed several times with different IDs. Sets `includeUsage: true` |
 
-Each plugin takes an optional admin `apiKey`, marked secret, and `userKeys` (default `true`) as options, and exports a zod `optionsSchema` for them. The Anthropic, OpenAI, and Google plugins list their models from each API's model list endpoint, with every capability off for the admin to set. The OpenAI-compatible plugin also takes `userEndpoints` (default `false`) and `allowPrivateNetworks` (default `false`).
+Each plugin takes an optional admin `apiKey`, marked secret, and `userKeys` (default `true`) as options, and exports a zod `optionsSchema` for them. The Anthropic, OpenAI, and Google plugins list their models from each API's model list endpoint, with every capability off for the admin to set. The OpenAI-compatible plugin also takes `userEndpoints` (default `false`), `allowPrivateNetworks` (default `false`), and two optional headers for endpoints that require them. `sessionHeader` names a header that carries each call's `session`, such as `x-opencode-session`, which OpenCode Go refuses requests without. `userAgent` replaces the user agent, for endpoints that ask clients to name themselves. Both apply to the endpoint's model list too, and to users' own endpoints under the instance.
 
 ### Models
 
@@ -149,6 +149,8 @@ The provider data is stored in the `providerData` field of reasoning, text, and 
 - [ ] A value encrypted with a key in `SECRET_KEYS_OLD` still decrypts, and new values use `SECRET_KEY`.
 - [ ] A credential whose key no current or retired key can decrypt is listed with `keyUnreadable`, and a turn using it ends with an error asking the user to add the key again.
 - [ ] A user endpoint's model references use the user's slug.
+- [ ] A model resolved for a conversation gets a session ID that is the same for every call in that conversation and doesn't contain the user's DID.
+- [ ] An OpenAI-compatible instance with `sessionHeader` sends the session in that header, and one without it sends no session header.
 - [ ] Each lexicon effort value maps to the AI SDK reasoning value in the table.
 - [ ] Reasoning from a different provider than the current turn's is not replayed.
 - [ ] `GET /api/models` lists the admin models the user may use plus the models from the user's credentials, and returns the admin default only when the user may use it.

@@ -20,6 +20,19 @@ export const optionsSchema = z
       title: 'User endpoints can reach private networks',
       description: 'For self-hosted local models.',
     }),
+    sessionHeader: z
+      .string()
+      .regex(/^[A-Za-z0-9-]+$/)
+      .optional()
+      .meta({
+        title: 'Session header',
+        description:
+          "A header that carries an ID for each conversation, for endpoints that require one, such as 'x-opencode-session' for OpenCode Go.",
+      }),
+    userAgent: z.string().min(1).optional().meta({
+      title: 'User agent',
+      description: "Sent in place of the SDK's, for endpoints that ask clients to name themselves.",
+    }),
   })
   .strict()
 
@@ -27,6 +40,14 @@ export type OpenAICompatibleOptions = z.infer<typeof optionsSchema>
 
 /** Each endpoint is its own instance, with its own provider ID. */
 export const multipleInstances = true
+
+/** The headers the admin set for this endpoint, with the conversation's session ID when there is one. */
+function headersFor(options: OpenAICompatibleOptions, session?: string): Record<string, string> {
+  return {
+    ...(options.userAgent ? { 'user-agent': options.userAgent } : {}),
+    ...(options.sessionHeader && session ? { [options.sessionHeader]: session } : {}),
+  }
+}
 
 const modelList = z.object({ data: z.array(z.object({ id: z.string().min(1) })) })
 
@@ -46,13 +67,14 @@ export default function openaiCompatible(options: OpenAICompatibleOptions) {
         userEndpoints: options.userEndpoints ?? false,
         allowPrivateNetworks: options.allowPrivateNetworks ?? false,
         replay: 'drop',
-        createModel: ({ modelId, apiKey, baseURL, fetch }) => {
+        createModel: ({ modelId, apiKey, baseURL, fetch, session }) => {
           const url = baseURL ?? options.baseURL
           if (!url) throw new Error(`Provider "${options.id}" has no base URL`)
           return createOpenAICompatible({
             name: options.id,
             baseURL: url,
             apiKey: apiKey ?? options.apiKey,
+            headers: headersFor(options, session),
             includeUsage: true,
             fetch,
           })(modelId)
@@ -62,7 +84,7 @@ export default function openaiCompatible(options: OpenAICompatibleOptions) {
           if (!url) throw new Error(`Provider "${options.id}" has no base URL`)
           const key = apiKey ?? options.apiKey
           const response = await fetch(`${url.replace(/\/$/, '')}/models`, {
-            headers: key ? { authorization: `Bearer ${key}` } : {},
+            headers: { ...headersFor(options), ...(key ? { authorization: `Bearer ${key}` } : {}) },
             redirect: 'error',
           })
           if (!response.ok) throw new Error(`Listing models at ${url} returned ${response.status}`)

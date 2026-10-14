@@ -37,7 +37,7 @@ The turn context from the chat-turns spec carries the conversation info and the 
 
 ### Generating
 
-The handler calls `ctx.models.generateText` for the user. The system prompt asks for a title of at most `maxWords` words, with no quotes and no trailing punctuation, in the language of the conversation. The input is the text parts of the triggering user message and the reply, each cut to 2,000 characters. Reasoning, tool calls, and attachments are left out. The call sets effort to `none`, so a reasoning model spends its output on the title, and allows 1,000 output tokens for models that reason anyway.
+The handler calls `ctx.models.generateText` for the user. The system prompt asks for a title of at most `maxWords` words, with no quotes and no trailing punctuation, in the language of the conversation. The input is the text parts of the triggering user message and the reply, each cut to 2,000 characters. Reasoning, tool calls, and attachments are left out. The call names the conversation, so endpoints that group calls by session see it with the conversation's turns. It sets effort to `none`, so a reasoning model spends its output on the title, and allows 1,000 output tokens for models that reason anyway.
 
 The output is cleaned up before writing. Whitespace is collapsed, surrounding quotes and trailing periods are removed, and the result is cut to the lexicon's 300 graphemes. An empty result is treated as a failure.
 

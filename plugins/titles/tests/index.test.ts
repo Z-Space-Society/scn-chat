@@ -63,7 +63,10 @@ describe('titles plugin', () => {
   it('writes a generated title after the first completed reply', async () => {
     const { updateInfo, generateText } = await run(turn())
     expect(generateText).toHaveBeenCalledWith(
-      expect.objectContaining({ model: { provider: 'fake', id: 'reply-model' } }),
+      expect.objectContaining({
+        model: { provider: 'fake', id: 'reply-model' },
+        conversation: 'at://did:plc:alice/space/c/1',
+      }),
     )
     expect(updateInfo).toHaveBeenCalledWith(
       'did:plc:alice',

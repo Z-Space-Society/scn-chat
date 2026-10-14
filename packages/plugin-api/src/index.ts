@@ -39,6 +39,8 @@ export type ModelAccess = {
   baseURL?: string
   /** A fetch the provider must use for user endpoints, guarded against private networks. */
   fetch?: typeof globalThis.fetch
+  /** An opaque ID, stable for one conversation, for endpoints that route or cache by session. */
+  session?: string
 }
 
 export interface ModelProvider {
@@ -193,6 +195,8 @@ export type GenerateTextRequest = {
   maxOutputTokens?: number
   /** Ignored by models without reasoning. Unset uses the provider default. */
   effort?: Effort
+  /** The conversation the call is for, so the provider can keep it with that conversation's turns. */
+  conversation?: string
   signal?: AbortSignal
 }
 

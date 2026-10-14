@@ -128,6 +128,7 @@ Per-user settings are stored in a `plugin_user_settings` table: DID, plugin ID, 
 - Plugin output that becomes a record goes through the context's storage methods, so it is always written under the user's DID.
 - `ModelProvider` gained an optional `providerOptions`, sent with every call to that provider. The OpenAI plugin needs `store: false` and encrypted reasoning on every request, and the interface had nowhere to say so.
 - `ModelAccess` carries an optional `fetch`, so a user endpoint can be reached through the private network guard.
+- `ModelAccess` carries an optional `session`, stable for one conversation, and `GenerateTextRequest` an optional `conversation` to derive it from. OpenCode Go refuses requests without a session header, and nothing else told a provider which calls belong together.
 - `@scn-chat/plugin-api/testing` exports `setupForTest`, which runs a plugin's setup against a recording context, for plugin tests.
 - The per-user settings API is `GET /api/plugins/settings`, `PUT /api/plugins/:id/settings`, and `DELETE /api/plugins/:id/settings`. Secret values are never returned. A blank secret on save keeps the stored one.
 - An OpenAI-compatible plugin's ID is `openai-compatible-<provider id>`, so the same package can be listed several times.

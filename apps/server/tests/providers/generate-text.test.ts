@@ -33,7 +33,21 @@ describe('createGenerateText', () => {
   it('resolves the model for the user and returns the text and finish reason', async () => {
     const { catalog, generate } = setup(false)
     expect(await generate(request)).toEqual({ text: 'A short title', finishReason: 'stop' })
-    expect(catalog.resolve).toHaveBeenCalledWith('did:plc:alice', { provider: 'fake', id: 'm' })
+    expect(catalog.resolve).toHaveBeenCalledWith(
+      'did:plc:alice',
+      { provider: 'fake', id: 'm' },
+      undefined,
+    )
+  })
+
+  it("resolves the model for the request's conversation", async () => {
+    const { catalog, generate } = setup(false)
+    await generate({ ...request, conversation: 'at://did:plc:alice/chat/abc' })
+    expect(catalog.resolve).toHaveBeenCalledWith(
+      'did:plc:alice',
+      { provider: 'fake', id: 'm' },
+      'at://did:plc:alice/chat/abc',
+    )
   })
 
   it('passes the requested effort to a reasoning model', async () => {

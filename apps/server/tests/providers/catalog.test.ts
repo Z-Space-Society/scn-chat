@@ -143,6 +143,22 @@ describe('ModelCatalog.resolve', () => {
     await catalog.resolve('did:plc:alice', { provider: 'user:home', id: 'qwen' })
     expect(created[0]?.fetch).toBeUndefined()
   })
+
+  it('gives the provider a session ID per conversation that does not reveal the DID', async () => {
+    const { provider, created } = fakeProvider()
+    const { catalog } = await catalogWith([model()], provider)
+    const ref = { provider: 'fake', id: 'big' }
+    const chat = 'at://did:plc:alice/network.sharedcomputer.chat.conversation/abc'
+    await catalog.resolve('did:plc:alice', ref, chat)
+    await catalog.resolve('did:plc:alice', ref, chat)
+    await catalog.resolve('did:plc:alice', ref, `${chat}d`)
+    await catalog.resolve('did:plc:alice', ref)
+    const sessions = created.map((access) => access.session)
+    expect(sessions[0]).toMatch(/^[0-9a-f]{32}$/)
+    expect(sessions[1]).toBe(sessions[0])
+    expect(sessions[2]).not.toBe(sessions[0])
+    expect(sessions[3]).toBeUndefined()
+  })
 })
 
 describe('ModelCatalog.listForUser', () => {

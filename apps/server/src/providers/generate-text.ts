@@ -7,7 +7,7 @@ import { mapEffort } from './effort.ts'
 /** Make one-off model calls for plugins, resolving the model the same way as a turn. */
 export function createGenerateText(catalog: ModelCatalog, logger: Logger) {
   return async (request: GenerateTextRequest): Promise<{ text: string; finishReason: string }> => {
-    const resolved = await catalog.resolve(request.user, request.model)
+    const resolved = await catalog.resolve(request.user, request.model, request.conversation)
     const result = await generateText({
       model: resolved.model,
       instructions: request.system,

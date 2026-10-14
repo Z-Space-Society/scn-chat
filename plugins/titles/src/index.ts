@@ -89,6 +89,7 @@ export default function titles(options: TitlesOptions = {}) {
             prompt: `User: ${textOf(turn.userMessage.record)}\n\nAssistant: ${textOf(turn.reply.record)}`,
             maxOutputTokens: OUTPUT_LIMIT,
             effort: 'none',
+            conversation: turn.conversation.uri,
           })
           const title = cleanTitle(text)
           if (!title)
