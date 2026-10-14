@@ -381,6 +381,15 @@ describe('Composer', () => {
     await vi.waitFor(() => expect(sendButton).toBeEnabled())
   })
 
+  it('says neither Reply nor Ask anything, and sends nothing, while the messages are on their way', async () => {
+    const fetch = serve()
+    await renderComposer(<Composer skey="s1" waiting onSent={() => {}} />)
+    expect(screen.getByLabelText('Message')).toHaveAttribute('placeholder', '')
+    await userEvent.type(screen.getByLabelText('Message'), 'Hello{Enter}')
+    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
+    expect(writes(fetch)).toHaveLength(0)
+  })
+
   it('offers Clear once there is something, and clearing drops the text and attachments', async () => {
     let signal: AbortSignal | null | undefined
     serve((_url, init) => {

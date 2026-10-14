@@ -15,6 +15,8 @@ interface Props {
   /** An edit was sent, as a new sibling of the edited message. */
   onEdited: (sent: Sent) => void
   onCancelEdit: () => void
+  /** Whether the chat's messages are still on their way. */
+  waiting: boolean
   /** Stop the reply running at the end of the branch, offered in place of Send. */
   onStop?: () => void
   /** What floats just above the composer, such as a button that jumps to the latest message. */
@@ -51,6 +53,7 @@ export function BranchComposer({ ref, ...props }: Props) {
       onStop={props.onStop}
       skey={props.skey}
       parent={leaf}
+      waiting={props.waiting}
       inherited={inheritedModel(props.branch, leaf)}
       onSent={props.onSent}
     />

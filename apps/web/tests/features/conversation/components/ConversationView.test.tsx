@@ -130,7 +130,7 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('ConversationView', () => {
-  it('shows skeletons in place of the title and messages until the local copy answers', async () => {
+  it('shows skeletons in place of the title and messages, and no placeholder, until the local copy answers', async () => {
     const store = fakeStore([user('u', 'question')])
     let answer = () => {}
     store.worker.getConversation.mockImplementationOnce(
@@ -142,9 +142,12 @@ describe('ConversationView', () => {
     await renderWith(store, <ConversationView skey="s1" />)
     expect(await screen.findByText('Loading messages')).toBeInTheDocument()
     expect(screen.queryByText('New chat')).toBeNull()
+    // Until the messages say whether it replies, the box says neither "Reply" nor "Ask anything".
+    expect(screen.getByLabelText('Message')).toHaveAttribute('placeholder', '')
     await act(async () => answer())
     expect(await screen.findByText('question')).toBeInTheDocument()
     expect(screen.getByText('Tiles')).toBeInTheDocument()
+    expect(screen.getByLabelText('Message')).toHaveAttribute('placeholder', 'Reply')
     expect(document.title).toMatch(/^Tiles · /)
     expect(screen.queryByText('Loading messages')).toBeNull()
   })

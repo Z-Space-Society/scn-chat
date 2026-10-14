@@ -166,6 +166,7 @@ export function ConversationView(props: Props) {
           sent(message)
         }}
         onCancelEdit={() => setEditingRkey(null)}
+        waiting={waiting}
       />
     </section>
   )

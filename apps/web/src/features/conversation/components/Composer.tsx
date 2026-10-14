@@ -9,6 +9,7 @@ import {
   type RefObject,
   useId,
   useImperativeHandle,
+  useLayoutEffect,
   useRef,
   useState,
 } from 'react'
@@ -17,7 +18,7 @@ import { cn } from '../../../shared/cn.ts'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
 import { messageOf } from '../../../shared/errors.ts'
 import { useAppForm } from '../../../shared/form.tsx'
-import { CloseIcon, PaperclipIcon, PencilIcon, SendIcon, StopIcon } from '../../../shared/icons.tsx'
+import { CloseIcon, PencilIcon } from '../../../shared/icons.tsx'
 import { touchOnly } from '../../../shared/touch.ts'
 import { Button } from '../../../shared/ui/Button.tsx'
 import { conversationRefreshKey } from '../../../store/react.tsx'
@@ -29,12 +30,30 @@ import { sameModel } from '../../models/models.ts'
 import { attachmentTypesQuery } from '../attachment-types.ts'
 import { useAttachments } from '../hooks/useAttachments.ts'
 import { useAutoGrow } from '../hooks/useAutoGrow.ts'
+import { restoreDraft, takeDraft } from '../lib/composer-handoff.ts'
 import { AttachmentChips, removeChip } from './AttachmentChips.tsx'
+import {
+  AttachButton,
+  ClearButton,
+  ComposerCard,
+  ComposerDock,
+  ComposerToolbar,
+  composerPart,
+  MessageBox,
+  messagePlaceholder,
+  SendButton,
+  StopButton,
+} from './composer-parts.tsx'
 
 export interface ComposerProps {
   /** The chat to send to. Without one, sending the first message creates the chat. */
   skey?: string
   parent?: string
+  /**
+   * Whether the chat's messages are still on their way, so it isn't known yet whether the message
+   * starts the chat or replies. The box says neither, and nothing sends until they arrive.
+   */
+  waiting?: boolean
   /** The model of the nearest completed reply above `parent`, which the server falls back to. */
   inherited?: ModelRef | null
   initialText?: string
@@ -79,9 +98,6 @@ const asQuote = (text: string) =>
 /** What the attach button takes: any type an ingester reads, and images when the model sees them. */
 const acceptedTypes = (types: { images: string[]; files: string[] }, images: boolean) =>
   [...(images ? types.images : []), ...types.files].join(',')
-
-/** A round button at the toolbar's end or start, nesting in the composer's corner. */
-const round = 'inline-grid size-composer-button flex-none place-items-center rounded-full p-0'
 
 /**
  * The message box: one white card floating at the bottom of the panel, over the conversation fading
@@ -154,11 +170,23 @@ export function Composer({ ref, ...props }: ComposerProps) {
       // runs there is nothing finished to answer. The cache knows of a send at once, before the
       // composer rerenders, so a second Enter right after the first is caught too.
       const onItsWay = queryClient.isMutating({ mutationKey: sendKey }) > 0
-      if (onItsWay || props.onStop || blocked || attachments.uploading || empty) return
+      if (onItsWay || props.onStop || props.waiting || blocked || attachments.uploading || empty)
+        return
       attachments.clearError()
       sending.mutate(value)
     },
   })
+  // What was typed into the composer's frame, before this took its place, carries over with its
+  // cursor and focus. A frame only stands in for a composer that starts empty, so one editing a
+  // message leaves the draft be.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only on taking the frame's place.
+  useLayoutEffect(() => {
+    if (props.onCancel || props.initialText) return
+    const draft = takeDraft()
+    if (!draft || !box.current) return
+    form.setFieldValue('text', draft.text)
+    restoreDraft(box.current, draft)
+  }, [])
   // Only whether there is text, so typing rerenders the box rather than the whole composer.
   const hasText = useFormStore(form.store, (state) => state.values.text.trim() !== '')
   const chosenModel = useFormStore(form.store, (state) => state.values.model)
@@ -214,14 +242,14 @@ export function Composer({ ref, ...props }: ComposerProps) {
     attachments.error ??
     (sending.error && messageOf(sending.error)) ??
     (typesError && "Couldn't load which files you can attach. Reload the page to try again.")
-  // The box's parts share one card: the first takes its top corners, and only the box's edge
-  // firms while it is being typed in.
-  const part =
-    'border-x border-line bg-raised group-focus-within/composer:border-line-strong in-data-dropping:border-dashed in-data-dropping:border-accent'
-
   return (
     <form.AppForm>
-      <form.Form className="group/composer sticky bottom-0 isolate mt-auto pt-6 pb-4.5 before:absolute before:-inset-x-gutter before:inset-y-0 before:-z-1 before:bg-panel before:[mask-image:linear-gradient(transparent,black_--spacing(6))]">
+      <ComposerDock
+        onSubmit={(e) => {
+          e.preventDefault()
+          void form.handleSubmit()
+        }}
+      >
         {props.above}
         {props.onCancel && (
           // Editing an earlier message says so above the box, with a way back.
@@ -238,12 +266,12 @@ export function Composer({ ref, ...props }: ComposerProps) {
             </Button>
           </div>
         )}
-        <div className="relative [&>:first-child]:rounded-t-composer [&>:first-child]:border-t has-[>[data-clear]]:[&>:first-child]:pe-[calc(var(--spacing-composer-button)+--spacing(3.5))]">
+        <ComposerCard>
           {quotes.length > 0 && (
             // A quote shows as a well across the card, like a sent quote, cut to two lines.
             <ul
               aria-label="Quotes"
-              className={cn(part, 'flex flex-col gap-1.5 px-2.75 pt-2.5 pb-0.5')}
+              className={cn(composerPart, 'flex flex-col gap-1.5 px-2.75 pt-2.5 pb-0.5')}
             >
               {quotes.map((quote) => (
                 <li
@@ -269,16 +297,19 @@ export function Composer({ ref, ...props }: ComposerProps) {
           <AttachmentChips
             attachments={attachments.attachments}
             onRemove={(attachment) => attachments.drop([attachment])}
-            className={cn(part, 'px-2.75 pt-2.5 pb-0.5')}
+            className={cn(composerPart, 'px-2.75 pt-2.5 pb-0.5')}
           />
           <form.AppField name="text">
             {(field) => (
               <>
                 <AutoGrow box={box} text={field.state.value} />
-                <field.TextAreaField
+                <MessageBox
                   ref={box}
-                  aria-label="Message"
-                  placeholder={props.parent ? 'Reply' : 'Ask anything'}
+                  name={field.name}
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  onBlur={field.handleBlur}
+                  placeholder={messagePlaceholder(props)}
                   onPaste={(e) => {
                     // Copied text can carry a picture of itself, as from an office app, so it pastes
                     // as text.
@@ -302,52 +333,16 @@ export function Composer({ ref, ...props }: ComposerProps) {
                       props.onCancel()
                     }
                   }}
-                  // Each paragraph runs in the direction of its own text, while the box keeps the
-                  // page's, so Clear's room stays on Clear's side in right-to-left text too.
-                  className={cn(
-                    part,
-                    'block max-h-composer-max min-h-13.5 w-full resize-none rounded-none border-y-0 px-4.5 pt-3.5 pb-1.5 text-[max(var(--input-floor),var(--text-body))] text-ink-strong [field-sizing:content] [unicode-bidi:plaintext] focus-visible:border-line-strong focus-visible:ring-0',
-                  )}
                 />
               </>
             )}
           </form.AppField>
-          {!empty && (
-            // Clear sits in the box's top corner, as a field's own clear button, apart from the
-            // toolbar's controls.
-            <button
-              type="button"
-              data-clear
-              aria-label="Clear"
-              title="Clear the message"
-              disabled={sending.isPending}
-              onClick={clear}
-              className={cn(
-                round,
-                'absolute end-2.5 top-2.5 cursor-pointer text-faint hover:not-disabled:bg-hover hover:not-disabled:text-ink',
-              )}
-            >
-              <CloseIcon />
-            </button>
-          )}
-          <div
-            className={cn(
-              part,
-              'flex flex-wrap items-center gap-1.75 rounded-b-composer border-b ps-3.25 pe-2.25 pt-1.75 pb-2.25 text-small',
-            )}
-          >
-            <button
-              type="button"
-              aria-label="Attach files"
+          {!empty && <ClearButton disabled={sending.isPending} onClick={clear} />}
+          <ComposerToolbar>
+            <AttachButton
               title={seesImages ? 'Attach files or images' : 'Attach files'}
               onClick={() => picker.current?.click()}
-              className={cn(
-                round,
-                '-ms-1.5 me-auto cursor-pointer text-faint hover:bg-hover hover:text-ink',
-              )}
-            >
-              <PaperclipIcon />
-            </button>
+            />
             <input
               ref={picker}
               aria-label="Files to attach"
@@ -392,33 +387,20 @@ export function Composer({ ref, ...props }: ComposerProps) {
               />
             )}
             {props.onStop ? (
-              <Button
-                tone="danger"
-                aria-label="Stop"
-                title="Stop the reply"
-                onClick={props.onStop}
-                className={round}
-              >
-                {/* The stop square fills most of its box, so it draws smaller to sit at the
-                    arrow's weight. */}
-                <StopIcon className="size-3.25" />
-              </Button>
+              <StopButton onClick={props.onStop} />
             ) : (
-              <Button
-                type="submit"
-                aria-label="Send"
+              <SendButton
                 title={props.onCancel ? 'Send as a new version' : 'Send'}
-                disabled={empty || blocked || attachments.uploading || sending.isPending}
-                className={round}
-              >
-                <SendIcon className="size-4.75" />
-              </Button>
+                disabled={
+                  empty || blocked || props.waiting || attachments.uploading || sending.isPending
+                }
+              />
             )}
-          </div>
-        </div>
+          </ComposerToolbar>
+        </ComposerCard>
         <ModelNotice noModels={noModels} needsModel={needsModel} />
         <ErrorAlert error={error} className="mx-2 mt-2.5 text-small" />
-      </form.Form>
+      </ComposerDock>
     </form.AppForm>
   )
 }

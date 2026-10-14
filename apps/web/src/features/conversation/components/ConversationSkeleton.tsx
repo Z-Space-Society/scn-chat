@@ -1,3 +1,4 @@
+import { useLayoutEffect, useState } from 'react'
 import { Loading, Skeleton, SkeletonText } from '../../../shared/ui/Skeleton.tsx'
 
 /** The widths of the reply's lines, ending short as a paragraph does. */
@@ -9,10 +10,25 @@ interface Props {
   className?: string
 }
 
+/**
+ * Whether the conversation's skeleton on screen showed at once. On a reload the page's frame
+ * shows one, then the conversation's column and the conversation each show their own in its
+ * place, and they carry on showing rather than vanishing to fade in again.
+ */
+let shownAtOnce = false
+
 /** A conversation on its way, read out once as loading. */
 export function ConversationSkeleton(props: Props) {
+  // It renders while the skeleton it replaces is still on the page, which lets go as it leaves.
+  const [immediate] = useState(() => Boolean(props.immediate) || shownAtOnce)
+  useLayoutEffect(() => {
+    shownAtOnce = immediate
+    return () => {
+      shownAtOnce = false
+    }
+  }, [immediate])
   return (
-    <Loading label="Loading messages" immediate={props.immediate} className={props.className}>
+    <Loading label="Loading messages" immediate={immediate} className={props.className}>
       <TurnSkeleton />
     </Loading>
   )
