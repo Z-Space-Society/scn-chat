@@ -55,11 +55,15 @@ interface LiveAuthorProps {
 
 /**
  * The header of a pending reply, following its stream: waiting until something arrives, then the
- * model's name. It reads the stream query without starting it, so a delta rerenders only this.
+ * model's name. It reads the stream query without starting it, and rerenders only once it starts.
  */
 export function LiveAuthor(props: LiveAuthorProps) {
-  const { data } = useQuery({ ...replyStreamQuery(props.skey, props.rkey), enabled: false })
-  const started = (data?.parts ?? []).some(Boolean)
+  const { data: started } = useQuery({
+    ...replyStreamQuery(props.skey, props.rkey),
+    enabled: false,
+    // Only whether anything has arrived, so later deltas leave it alone.
+    select: (reply) => reply.parts.some(Boolean),
+  })
   if (!started) return <WaitingAuthor model={props.model} since={props.since} />
   return <strong>{props.model}</strong>
 }

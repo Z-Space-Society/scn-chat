@@ -3,7 +3,15 @@ import { nsid } from '@scn-chat/lexicons/nsid'
 import { useStore as useFormStore } from '@tanstack/react-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { type ReactNode, type Ref, useImperativeHandle, useRef, useState } from 'react'
+import {
+  type ReactNode,
+  type Ref,
+  type RefObject,
+  useId,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react'
 import { api, json, read } from '../../../shared/api.ts'
 import { cn } from '../../../shared/cn.ts'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
@@ -16,9 +24,9 @@ import { ModelSelect } from '../../models/components/ModelSelect.tsx'
 import { useModels } from '../../models/hooks/useModels.ts'
 import { lastEffort, rememberEffort } from '../../models/last-effort.ts'
 import { sameModel } from '../../models/models.ts'
+import { attachmentTypesQuery } from '../attachment-types.ts'
 import { useAttachments } from '../hooks/useAttachments.ts'
 import { useAutoGrow } from '../hooks/useAutoGrow.ts'
-import { attachmentTypesQuery } from '../queries.ts'
 import { AttachmentChips, removeChip } from './AttachmentChips.tsx'
 
 export interface ComposerProps {
@@ -103,7 +111,10 @@ export function Composer({ ref, ...props }: ComposerProps) {
     return created.current
   }
 
+  // This composer's sends, so the cache can tell whether one is on its way.
+  const sendKey = ['send', useId()]
   const sending = useMutation({
+    mutationKey: sendKey,
     mutationFn: async (draft: Draft) => {
       const attached = attachments.attachments
       const quoted = quotes
@@ -141,16 +152,18 @@ export function Composer({ ref, ...props }: ComposerProps) {
     // below, and submitting reads them as they are when it runs.
     onSubmit: ({ value }) => {
       // A second Enter while the message is on its way would send it again, and while a reply
-      // runs there is nothing finished to answer.
-      if (sending.isPending || props.onStop || blocked || attachments.uploading || empty) return
+      // runs there is nothing finished to answer. The cache knows of a send at once, before the
+      // composer rerenders, so a second Enter right after the first is caught too.
+      const onItsWay = queryClient.isMutating({ mutationKey: sendKey }) > 0
+      if (onItsWay || props.onStop || blocked || attachments.uploading || empty) return
       attachments.clearError()
       sending.mutate(value)
     },
   })
-  const text = useFormStore(form.store, (state) => state.values.text)
+  // Only whether there is text, so typing rerenders the box rather than the whole composer.
+  const hasText = useFormStore(form.store, (state) => state.values.text.trim() !== '')
   const chosenModel = useFormStore(form.store, (state) => state.values.model)
   const chosenEffort = useFormStore(form.store, (state) => state.values.effort)
-  useAutoGrow(box, text)
   const model = chosenModel && models.find((m) => sameModel(m, chosenModel))
   // With the fallback model, the server checks vision when the turn starts. A chosen model no
   // longer on offer takes no images, as nothing says it can read them.
@@ -165,7 +178,7 @@ export function Composer({ ref, ...props }: ComposerProps) {
   const fallbackName = fallback && models.find((m) => sameModel(m, fallback))?.name
   const blocked = noModels || needsModel
   // Nothing to send: no text but spaces, no quotes, and no attachments.
-  const empty = !text.trim() && quotes.length === 0 && attachments.attachments.length === 0
+  const empty = !hasText && quotes.length === 0 && attachments.attachments.length === 0
   const { data: types, error: typesError } = useQuery(attachmentTypesQuery)
   const accept = types && acceptedTypes(types, seesImages)
 
@@ -261,39 +274,42 @@ export function Composer({ ref, ...props }: ComposerProps) {
           />
           <form.AppField name="text">
             {(field) => (
-              <field.TextAreaField
-                ref={box}
-                aria-label="Message"
-                dir="auto"
-                placeholder={props.parent ? 'Reply' : 'Ask anything'}
-                onPaste={(e) => {
-                  // Copied text can carry a picture of itself, as from an office app, so it pastes
-                  // as text.
-                  const files = Array.from(e.clipboardData.files)
-                  if (files.length === 0 || e.clipboardData.types.includes('text/plain')) return
-                  e.preventDefault()
-                  attachments.add(files)
-                }}
-                onKeyDown={(e) => {
-                  // Enter while an input method composes, as for Japanese, picks the words instead.
-                  if (
-                    e.key === 'Enter' &&
-                    !e.shiftKey &&
-                    !e.nativeEvent.isComposing &&
-                    !touchOnly()
-                  ) {
+              <>
+                <AutoGrow box={box} text={field.state.value} />
+                <field.TextAreaField
+                  ref={box}
+                  aria-label="Message"
+                  dir="auto"
+                  placeholder={props.parent ? 'Reply' : 'Ask anything'}
+                  onPaste={(e) => {
+                    // Copied text can carry a picture of itself, as from an office app, so it pastes
+                    // as text.
+                    const files = Array.from(e.clipboardData.files)
+                    if (files.length === 0 || e.clipboardData.types.includes('text/plain')) return
                     e.preventDefault()
-                    void form.handleSubmit()
-                  } else if (e.key === 'Escape' && props.onCancel) {
-                    e.preventDefault()
-                    props.onCancel()
-                  }
-                }}
-                className={cn(
-                  part,
-                  'block max-h-composer-max min-h-13.5 w-full resize-none rounded-none border-y-0 px-4.5 pt-3.5 pb-1.5 text-[max(var(--input-floor),var(--text-body))] text-ink-strong [field-sizing:content] focus-visible:border-line-strong focus-visible:ring-0',
-                )}
-              />
+                    attachments.add(files)
+                  }}
+                  onKeyDown={(e) => {
+                    // Enter while an input method composes, as for Japanese, picks the words instead.
+                    if (
+                      e.key === 'Enter' &&
+                      !e.shiftKey &&
+                      !e.nativeEvent.isComposing &&
+                      !touchOnly()
+                    ) {
+                      e.preventDefault()
+                      void form.handleSubmit()
+                    } else if (e.key === 'Escape' && props.onCancel) {
+                      e.preventDefault()
+                      props.onCancel()
+                    }
+                  }}
+                  className={cn(
+                    part,
+                    'block max-h-composer-max min-h-13.5 w-full resize-none rounded-none border-y-0 px-4.5 pt-3.5 pb-1.5 text-[max(var(--input-floor),var(--text-body))] text-ink-strong [field-sizing:content] focus-visible:border-line-strong focus-visible:ring-0',
+                  )}
+                />
+              </>
             )}
           </form.AppField>
           {!empty && (
@@ -405,6 +421,17 @@ export function Composer({ ref, ...props }: ComposerProps) {
       </form.Form>
     </form.AppForm>
   )
+}
+
+interface AutoGrowProps {
+  box: RefObject<HTMLTextAreaElement | null>
+  text: string
+}
+
+/** Grows the message box with its text where CSS can't, in the field, so typing rerenders only it. */
+function AutoGrow(props: AutoGrowProps) {
+  useAutoGrow(props.box, props.text)
+  return null
 }
 
 interface ModelNoticeProps {

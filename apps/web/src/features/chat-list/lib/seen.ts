@@ -12,14 +12,23 @@ const cache = new Map<string, Seen | null>()
 
 const keyFor = (did: string) => `scn-chat:seen:${did}`
 
+/** Whether a stored value has the shape kept here, so anything else starts over. */
+const isSeen = (value: unknown): value is Seen =>
+  typeof value === 'object' &&
+  value !== null &&
+  !Array.isArray(value) &&
+  Object.values(value).every((reply) => typeof reply === 'string')
+
 function load(did: string): Seen | null {
   if (cache.has(did)) return cache.get(did) ?? null
   let seen: Seen | null = null
   try {
     const raw = localStorage.getItem(keyFor(did))
-    seen = raw ? (JSON.parse(raw) as Seen) : null
+    const stored: unknown = raw ? JSON.parse(raw) : null
+    if (isSeen(stored)) seen = stored
   } catch {
-    // Unreadable or blocked storage starts over, as on a new device.
+    // Unreadable or blocked storage starts over, as on a new device, as does a value of another
+    // shape.
   }
   cache.set(did, seen)
   return seen

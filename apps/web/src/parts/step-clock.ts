@@ -14,20 +14,20 @@ export function formatSeconds(seconds: number): string {
  */
 const started = new Map<string, number>()
 const durations = new Map<string, number>()
-// Bumped each time a duration is recorded, so summaries of finished steps update.
-let version = 0
+// Told each time a duration is recorded, so summaries of finished steps update.
 const listeners = new Set<() => void>()
 
-/** Rerender when a step's duration is recorded, as a block's summary needs. */
-export function useStepDurations(): number {
-  return useSyncExternalStore(
-    (listener) => {
-      listeners.add(listener)
-      return () => listeners.delete(listener)
-    },
-    () => version,
-    () => 0,
-  )
+const subscribe = (listener: () => void) => {
+  listeners.add(listener)
+  return () => listeners.delete(listener)
+}
+
+/**
+ * A value read from the recorded durations, such as a block's summary, which rerenders only when
+ * a newly recorded duration changes it, rather than whenever any step stops.
+ */
+export function useStepDurations<T extends string | number | undefined>(read: () => T): T {
+  return useSyncExternalStore(subscribe, read, read)
 }
 
 /** How long a step ran, in seconds, if it was watched while it ran. */
@@ -45,8 +45,8 @@ export function useStepClock(
   running: boolean,
 ): { elapsed?: number; duration?: number } {
   const [now, setNow] = useState(() => Date.now())
-  // Recording this step's duration rerenders it through the same signal summaries listen to.
-  useStepDurations()
+  // Recording this step's duration rerenders it, and only it, through the signal summaries use.
+  const duration = useStepDurations(() => (id ? stepDuration(id) : undefined))
   useEffect(() => {
     if (!id || !running) return
     if (!started.has(id)) started.set(id, Date.now())
@@ -59,14 +59,12 @@ export function useStepClock(
     const start = started.get(id)
     if (start === undefined || durations.has(id)) return
     durations.set(id, Date.now() - start)
-    version++
     for (const listener of listeners) listener()
   }, [id, running])
 
   if (!id) return {}
   const start = started.get(id)
   if (running) return { elapsed: start === undefined ? 0 : (now - start) / 1000 }
-  const duration = stepDuration(id)
   return duration === undefined ? {} : { duration }
 }
 
@@ -74,5 +72,4 @@ export function useStepClock(
 export function resetStepClocks() {
   started.clear()
   durations.clear()
-  version = 0
 }

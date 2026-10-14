@@ -1,6 +1,7 @@
 import { cjk } from '@streamdown/cjk'
 import {
   type ComponentProps,
+  memo,
   type ReactNode,
   useEffect,
   useLayoutEffect,
@@ -136,8 +137,12 @@ interface LineProps {
   tokens: ThemedToken[] | undefined
 }
 
-/** A line's tokens, when the highlight has reached it, or its plain text until then. */
-function Line(props: LineProps) {
+/**
+ * A line's tokens, when the highlight has reached it, or its plain text until then. Memoized, so a
+ * streaming block renders only its newest lines as it grows: the highlighter carries the tokens of
+ * finished lines over from one highlight to the next.
+ */
+const Line = memo(function Line(props: LineProps) {
   const tokens = props.tokens
   if (!tokens || tokens.map((token) => token.content).join('') !== props.text) return props.text
   return (
@@ -150,7 +155,7 @@ function Line(props: LineProps) {
       ))}
     </>
   )
-}
+})
 
 interface CodeBlockProps {
   className?: string

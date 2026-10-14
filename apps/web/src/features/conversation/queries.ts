@@ -1,14 +1,6 @@
 import { queryOptions, experimental_streamedQuery as streamedQuery } from '@tanstack/react-query'
-import { api, read } from '../../shared/api.ts'
-import { staleTime } from '../../shared/queries.ts'
 import { conversationRefreshKey } from '../../store/react.tsx'
 import { addEvent, FINISHED, noParts, replyEvents } from './lib/reply-stream.ts'
-
-export const attachmentTypesQuery = queryOptions({
-  queryKey: ['attachments', 'types'],
-  staleTime,
-  queryFn: () => read(api.blobs.attachments.types.$get()),
-})
 
 /** A reply's stream, reduced to its parts so far. A finished status refreshes the conversation. */
 export const replyStreamQuery = (skey: string, rkey: string) =>

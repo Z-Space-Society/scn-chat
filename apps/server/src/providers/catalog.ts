@@ -42,6 +42,12 @@ export type CatalogDeps = {
   logger: Logger
 }
 
+/** The admin default among the admin models a user may use. */
+function defaultOf(models: AdminModel[]): ModelRef | undefined {
+  const model = models.find((m) => m.default)
+  return model ? { provider: model.provider, id: model.id } : undefined
+}
+
 /** Which models a user can use, and how to reach them. */
 export class ModelCatalog {
   private readonly deps: CatalogDeps
@@ -58,21 +64,36 @@ export class ModelCatalog {
   }
 
   private async adminModelsFor(did: string): Promise<AdminModel[]> {
-    const userRoles = new Set(await this.deps.rolesOf(did))
-    return (await this.availableAdminModels()).filter((model) =>
-      model.roles.some((role) => userRoles.has(role)),
-    )
+    const [roles, models] = await Promise.all([this.deps.rolesOf(did), this.availableAdminModels()])
+    const userRoles = new Set(roles)
+    return models.filter((model) => model.roles.some((role) => userRoles.has(role)))
   }
 
   /** The admin default, when the user's roles allow it. */
   async defaultModelFor(did: string): Promise<ModelRef | undefined> {
-    const model = (await this.adminModelsFor(did)).find((m) => m.default)
-    return model ? { provider: model.provider, id: model.id } : undefined
+    return defaultOf(await this.adminModelsFor(did))
   }
 
   async listForUser(did: string): Promise<ListedModel[]> {
+    return (await this.modelsFor(did)).models
+  }
+
+  /** The models a user can use, and the admin default, from one read of each. */
+  async modelsFor(did: string): Promise<{ models: ListedModel[]; defaultModel?: ModelRef }> {
+    const [admin, credentials] = await Promise.all([
+      this.adminModelsFor(did),
+      listCredentials(this.deps.db, did),
+    ])
+    return { models: this.listed(did, admin, credentials), defaultModel: defaultOf(admin) }
+  }
+
+  private listed(
+    did: string,
+    admin: AdminModel[],
+    credentials: Awaited<ReturnType<typeof listCredentials>>,
+  ): ListedModel[] {
     const listed = new Map<string, ListedModel>()
-    for (const model of await this.adminModelsFor(did)) {
+    for (const model of admin) {
       listed.set(`${model.provider}/${model.id}`, {
         provider: model.provider,
         id: model.id,
@@ -82,7 +103,7 @@ export class ModelCatalog {
         default: Boolean(model.default),
       })
     }
-    for (const credential of await listCredentials(this.deps.db, did)) {
+    for (const credential of credentials) {
       if (!this.deps.providers.get(credential.providerId)) {
         this.deps.logger.warn(
           { did, provider: credential.providerId },

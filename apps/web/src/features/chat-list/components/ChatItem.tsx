@@ -1,6 +1,6 @@
 import { noop, useMutation } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { type ReactNode, useRef, useState } from 'react'
+import { memo, type ReactNode, useRef, useState } from 'react'
 import { api, json, read } from '../../../shared/api.ts'
 import { cn } from '../../../shared/cn.ts'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
@@ -36,11 +36,13 @@ interface Props {
   unseen: boolean
   /** Called after the chat changes on the server, to bring the change into the local copy. */
   onChanged: () => Promise<void>
-  onDeleted: () => void
+  onDeleted: (skey: string) => void
 }
 
 /** One chat in the sidebar: its title and state on one line, and a menu to rename, tag, or delete it. */
-export function ChatItem(props: Props) {
+// Memoized, since a change to one chat or a page loading rerenders the list, and each row
+// would otherwise rerender with it. Its callbacks are the list's own, the same for every row.
+export const ChatItem = memo(function ChatItem(props: Props) {
   const [mode, setMode] = useState<Mode>('idle')
   const skey = props.chat.skey
   const title = props.chat.title || 'New chat'
@@ -62,7 +64,7 @@ export function ChatItem(props: Props) {
   const deleting = useMutation({
     mutationFn: () => read(api.chats.conversations[':skey'].$delete({ param: { skey } })),
     onSuccess: async () => {
-      props.onDeleted()
+      props.onDeleted(skey)
       await props.onChanged()
     },
   })
@@ -151,7 +153,7 @@ export function ChatItem(props: Props) {
       {error}
     </li>
   )
-}
+})
 
 const alert = 'mt-1 px-row-inset text-small'
 

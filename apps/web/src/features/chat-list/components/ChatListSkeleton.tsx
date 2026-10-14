@@ -36,6 +36,15 @@ export function ChatRowsSkeleton(props: RowsProps) {
   )
 }
 
+/** A search on its way, in the place its results will take. */
+export function SearchSkeleton() {
+  return (
+    <div className={sidebarScroll}>
+      <ChatRowsSkeleton label="Searching" />
+    </div>
+  )
+}
+
 /**
  * The whole chat sidebar while the page's code loads: New chat and search, the chats, and the
  * account at the foot, each in its own shape, so nothing moves as the real ones take their places.

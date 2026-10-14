@@ -35,6 +35,10 @@ export function getRouter({ history }: { history?: RouterHistory } = {}) {
     routeTree,
     history,
     context: { queryClient },
+    // Pointing at or focusing a link loads its page's code and data, so the click finds them
+    // there. The query cache decides when data is stale, rather than the router's own cache.
+    defaultPreload: 'intent',
+    defaultPreloadStaleTime: 0,
     // A conversation places its own scroll, at the bottom or on the message in `m`. The router's
     // reset to the top would run after it and undo it, so the router leaves conversations alone.
     scrollRestoration: ({ location }) => !location.pathname.startsWith('/chat/'),

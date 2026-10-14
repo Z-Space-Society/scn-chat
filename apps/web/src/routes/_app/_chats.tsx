@@ -1,6 +1,9 @@
 import sqliteWasm from '@sqlite.org/sqlite-wasm/sqlite3.wasm?url'
 import { createFileRoute, Outlet, retainSearchParams } from '@tanstack/react-router'
+import { profileQuery } from '../../features/auth/queries.ts'
+import { attachmentTypesQuery } from '../../features/conversation/attachment-types.ts'
 import { ChatPageFrame } from '../../features/conversation/pages/ChatPageFrame.tsx'
+import { modelsQuery } from '../../features/models/queries.ts'
 import { validateChatListSearch } from '../../shared/search-params.ts'
 import { openStore } from '../../store/client.ts'
 import { StoreProvider } from '../../store/react.tsx'
@@ -19,10 +22,19 @@ export const Route = createFileRoute('/_app/_chats')({
     links: [
       { rel: 'preload', href: storeWorker, as: 'fetch', crossOrigin: 'anonymous' },
       { rel: 'preload', href: sqliteWasm, as: 'fetch', crossOrigin: 'anonymous' },
+      // The account card's avatar comes from Bluesky's image CDN, as the server's profile says.
+      { rel: 'preconnect', href: 'https://cdn.bsky.app' },
     ],
   }),
   // Opening the store here starts its worker and database downloading alongside the route's code.
   beforeLoad: ({ context }) => ({ store: openStore(context.me.did) }),
+  // What the page asks for as it renders starts here instead, alongside its code, without the
+  // route waiting for it.
+  loader: ({ context: { queryClient } }) => {
+    void queryClient.prefetchQuery(modelsQuery)
+    void queryClient.prefetchQuery(attachmentTypesQuery)
+    void queryClient.prefetchQuery(profileQuery)
+  },
   component: Chats,
   // The server sends the page's frame in place of the chats, so a reload never starts blank.
   pendingComponent: ChatPageFrame,

@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { attachmentTypesQuery } from '../../conversation/queries.ts'
+import { attachmentTypesQuery } from '../../conversation/attachment-types.ts'
 import { modelsQuery } from '../../models/queries.ts'
 import { pluginSettingsQuery, providersQuery } from '../../settings/queries.ts'
 import { adminModelsQuery, adminPluginsQuery, adminRolesQuery, adminUsersKey } from '../queries.ts'

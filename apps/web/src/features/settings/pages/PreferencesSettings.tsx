@@ -1,8 +1,10 @@
 import type { ModelRef } from '@scn-chat/lexicons'
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { ClientOnly } from '@tanstack/react-router'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
 import { messageOf } from '../../../shared/errors.ts'
 import { useAppForm } from '../../../shared/form.tsx'
+import { ChevronDownIcon } from '../../../shared/icons.tsx'
 import { chooseTheme, type ThemeChoice, useThemeChoice } from '../../../shared/theme.ts'
 import { Select } from '../../../shared/ui/Select.tsx'
 import {
@@ -11,6 +13,7 @@ import {
   SettingsGroup,
   SettingsPage,
 } from '../../../shared/ui/SettingsPage.tsx'
+import { SkeletonText } from '../../../shared/ui/Skeleton.tsx'
 import { EffortSelect } from '../../models/components/EffortSelect.tsx'
 import { ModelSelect } from '../../models/components/ModelSelect.tsx'
 import { useModels } from '../../models/hooks/useModels.ts'
@@ -45,7 +48,6 @@ const themes: { value: ThemeChoice; label: string }[] = [
 
 /** Light or dark for this device, applied at once and kept here, apart from the saved preferences. */
 function Appearance() {
-  const theme = useThemeChoice()
   return (
     <SettingsGroup title="Appearance">
       <SettingRow
@@ -53,14 +55,35 @@ function Appearance() {
         htmlFor="theme"
         description="Follow your system, or keep this device light or dark."
       >
-        <Select
-          id="theme"
-          options={themes}
-          value={theme}
-          onChange={(value) => chooseTheme(value as ThemeChoice)}
-        />
+        {/* Only the browser knows this device's choice, so the server's page holds its place,
+            rather than showing System and changing once the page loads. */}
+        <ClientOnly fallback={<ThemeSelectPending />}>
+          <ThemeSelect />
+        </ClientOnly>
       </SettingRow>
     </SettingsGroup>
+  )
+}
+
+function ThemeSelect() {
+  const theme = useThemeChoice()
+  return (
+    <Select
+      id="theme"
+      options={themes}
+      value={theme}
+      onChange={(value) => chooseTheme(value as ThemeChoice)}
+    />
+  )
+}
+
+/** The theme's select before the page knows the choice, as a line where its name will be. */
+function ThemeSelectPending() {
+  return (
+    <Select id="theme" options={[]} value="" onChange={() => {}} disabled>
+      <SkeletonText className="w-12 min-w-0 flex-1" />
+      <ChevronDownIcon className="size-3.25 text-muted" />
+    </Select>
   )
 }
 

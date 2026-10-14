@@ -1,4 +1,4 @@
-import { type ReactNode, useId, useLayoutEffect, useRef, useState } from 'react'
+import { memo, type ReactNode, useId, useLayoutEffect, useRef, useState } from 'react'
 import { cn } from '../shared/cn.ts'
 import { ChevronDownIcon, ChevronRightIcon } from '../shared/icons.tsx'
 import { action } from '../shared/ui/actions.ts'
@@ -119,7 +119,7 @@ const stepRow = cn(
 /** A run of reasoning and tool use, shown as it happens. */
 export function WorkSteps(props: Props) {
   // The finished summary totals the thinking time, which a step records when it stops.
-  useStepDurations()
+  const finished = useStepDurations(() => finishedSummary(props.steps, props.scope))
   const last = props.steps.length - 1
   const views = props.steps.map((step, i) => (
     <StepView
@@ -148,11 +148,7 @@ export function WorkSteps(props: Props) {
         )}
       >
         <Chevron group="steps" />
-        {props.live ? (
-          <Activity step={props.steps[last]} scope={props.scope} />
-        ) : (
-          finishedSummary(props.steps, props.scope)
-        )}
+        {props.live ? <Activity step={props.steps[last]} scope={props.scope} /> : finished}
       </summary>
       <ol className={timeline}>
         {views.map((view) => (
@@ -177,7 +173,7 @@ interface WorkButtonProps {
 /** The footer button that opens a finished reply's steps under it, named by what they did. */
 export function WorkButton(props: WorkButtonProps) {
   // The summary totals the thinking time, which a step records when it stops.
-  useStepDurations()
+  const label = useStepDurations(() => finishedSummary(props.steps, props.scope))
   return (
     <button
       type="button"
@@ -186,7 +182,7 @@ export function WorkButton(props: WorkButtonProps) {
       onClick={props.onToggle}
       className={cn(action, 'group/work pe-1.5')}
     >
-      {finishedSummary(props.steps, props.scope)}
+      {label}
       <ChevronDownIcon className="size-3.25 transition-transform duration-(--dur-layout) ease-out group-aria-expanded/work:rotate-180 motion-reduce:transition-none" />
     </button>
   )
@@ -227,23 +223,46 @@ interface StepViewProps {
   clock?: string
 }
 
-function StepView(props: StepViewProps) {
-  const step = props.step
-  const clock = useStepClock(props.clock, isRunning(step, props.current))
-  if (step.kind === 'reasoning') {
+/** Whether two steps show the same: the steps are rebuilt as a reply streams, their parts aren't. */
+function sameStep(a: Step, b: Step): boolean {
+  if (a.key !== b.key) return false
+  if (a.kind === 'reasoning') return b.kind === 'reasoning' && a.text === b.text
+  return b.kind === 'tool' && a.call === b.call && a.result === b.result
+}
+
+/**
+ * One step. Memoized by what it shows, so a streaming reply rerenders only the step still going,
+ * not every step before it.
+ */
+const StepView = memo(
+  function StepView(props: StepViewProps) {
+    const step = props.step
+    const clock = useStepClock(props.clock, isRunning(step, props.current))
+    if (step.kind === 'reasoning') {
+      return (
+        <Thought
+          text={step.text}
+          current={props.current}
+          label={props.current ? 'Thinking' : <ReasoningLabel duration={clock.duration} />}
+          elapsed={clock.elapsed}
+        />
+      )
+    }
     return (
-      <Thought
-        text={step.text}
+      <ToolStep
+        step={step}
         current={props.current}
-        label={props.current ? 'Thinking' : <ReasoningLabel duration={clock.duration} />}
+        blobUrl={props.blobUrl}
         elapsed={clock.elapsed}
       />
     )
-  }
-  return (
-    <ToolStep step={step} current={props.current} blobUrl={props.blobUrl} elapsed={clock.elapsed} />
-  )
-}
+  },
+  (prev, next) =>
+    prev.current === next.current &&
+    prev.blobUrl === next.blobUrl &&
+    prev.clock === next.clock &&
+    sameStep(prev.step, next.step),
+)
 
 interface ThoughtProps {
   text: string

@@ -1,5 +1,14 @@
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router'
-import { type RefObject, useContext, useEffect, useRef, useState } from 'react'
+import {
+  lazy,
+  type RefObject,
+  Suspense,
+  useContext,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+} from 'react'
 import { cn } from '../../../shared/cn.ts'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
 import { lastError } from '../../../shared/errors.ts'
@@ -21,10 +30,16 @@ import { MeContext } from '../../auth/session.ts'
 import { groupByDate } from '../lib/groups.ts'
 import { markSeen, type Seen, useSeen } from '../lib/seen.ts'
 import { ChatItem } from './ChatItem.tsx'
-import { ChatRowsSkeleton } from './ChatListSkeleton.tsx'
-import { SearchResults } from './SearchResults.tsx'
+import { ChatRowsSkeleton, SearchSkeleton } from './ChatListSkeleton.tsx'
 import { SyncDot, SyncPanel, useSyncNow } from './SyncStatus.tsx'
 import { TagFilter } from './TagFilter.tsx'
+
+/**
+ * The search's results, which bring a Markdown parser for the replies' snippets, so they download
+ * once the search opens rather than with every chat page.
+ */
+const loadSearchResults = () => import('./SearchResults.tsx')
+const SearchResults = lazy(async () => ({ default: (await loadSearchResults()).SearchResults }))
 
 /** Whether a chat has a finished reply the user hasn't seen on this device. */
 const isUnseen = (chat: ChatListItem, seen: Seen | null, current: string | undefined) =>
@@ -75,6 +90,12 @@ export function ChatList() {
   const scroll = useRef<HTMLDivElement>(null)
   const end = useLoadMore(scroll, list.hasNextPage && !list.isFetchingNextPage, list.fetchNextPage)
 
+  // The same for every row, so a row rerenders only when its own chat changes.
+  const changed = () => store.worker.syncIndex()
+  const deleted = (skey: string) => {
+    if (skey === current) void navigate({ to: '/' })
+  }
+
   // Closing the search clears it, so the chats show again.
   const closeSearch = () => {
     setQuery('')
@@ -103,7 +124,11 @@ export function ChatList() {
           aria-label="Search chats"
           title="Search chats"
           aria-pressed={searchOpen}
-          onClick={() => (searchOpen ? closeSearch() : setSearchOpen(true))}
+          onClick={() => {
+            if (searchOpen) return closeSearch()
+            void loadSearchResults()
+            setSearchOpen(true)
+          }}
           className={cn(
             tool,
             'w-row flex-none justify-center text-muted aria-pressed:bg-row-active aria-pressed:text-ink',
@@ -135,39 +160,30 @@ export function ChatList() {
       )}
       <ErrorAlert error={error} className="px-row-inset text-small" />
       {searching ? (
-        <SearchResults
-          query={typed}
-          results={found.results}
-          remaining={found.remaining}
-          loading={found.isLoading}
-          onClear={() => {
-            closeSearch()
-            searchButton.current?.focus()
-          }}
-        />
+        <Suspense fallback={<SearchSkeleton />}>
+          <SearchResults
+            query={typed}
+            results={found.results}
+            remaining={found.remaining}
+            loading={found.isLoading}
+            onClear={() => {
+              closeSearch()
+              searchButton.current?.focus()
+            }}
+          />
+        </Suspense>
       ) : (
         <div ref={scroll} className={sidebarScroll}>
           {/* At once, as it takes over from the frame's. */}
           {loading && <ChatRowsSkeleton heading immediate label="Loading chats" />}
           {tags.length > 0 && <TagFilter tags={tags} active={activeTag} onChange={setTag} />}
-          {groupByDate(conversations).map((group) => (
-            <section key={group.label} aria-label={group.label} className="group/section">
-              <h3 className={cn(sectionHeading, 'group-first/section:mt-0')}>{group.label}</h3>
-              <ul className="flex flex-col gap-0.5">
-                {group.items.map((chat) => (
-                  <ChatItem
-                    key={chat.skey}
-                    chat={chat}
-                    unseen={isUnseen(chat, seen, current)}
-                    onChanged={() => store.worker.syncIndex()}
-                    onDeleted={() => {
-                      if (chat.skey === current) void navigate({ to: '/' })
-                    }}
-                  />
-                ))}
-              </ul>
-            </section>
-          ))}
+          <ChatRows
+            conversations={conversations}
+            seen={seen}
+            current={current}
+            onChanged={changed}
+            onDeleted={deleted}
+          />
           {/* Where the loaded chats end, which loads the next page as it nears view. */}
           {list.hasNextPage && <div ref={end} />}
           {list.isFetchingNextPage && <ChatRowsSkeleton rows={3} label="Loading more chats" />}
@@ -181,6 +197,42 @@ export function ChatList() {
           onSignOut={() => signOut.mutate()}
         />
       </footer>
+    </>
+  )
+}
+
+interface ChatRowsProps {
+  conversations: ChatListItem[]
+  seen: Seen | null
+  /** The open chat's key, whose replies count as seen. */
+  current: string | undefined
+  onChanged: () => Promise<void>
+  onDeleted: (skey: string) => void
+}
+
+/**
+ * The loaded chats under their dates. Apart from the list, so typing a search or loading the next
+ * page leaves them alone.
+ */
+function ChatRows(props: ChatRowsProps) {
+  return (
+    <>
+      {groupByDate(props.conversations).map((group) => (
+        <section key={group.label} aria-label={group.label} className="group/section">
+          <h3 className={cn(sectionHeading, 'group-first/section:mt-0')}>{group.label}</h3>
+          <ul className="flex flex-col gap-0.5">
+            {group.items.map((chat) => (
+              <ChatItem
+                key={chat.skey}
+                chat={chat}
+                unseen={isUnseen(chat, props.seen, props.current)}
+                onChanged={props.onChanged}
+                onDeleted={props.onDeleted}
+              />
+            ))}
+          </ul>
+        </section>
+      ))}
     </>
   )
 }
@@ -226,17 +278,19 @@ function useLoadMore(
   onReach: () => void,
 ): RefObject<HTMLDivElement | null> {
   const end = useRef<HTMLDivElement>(null)
+  // Read when the end comes into view, so a new callback doesn't rebuild the observer.
+  const reach = useEffectEvent(onReach)
   useEffect(() => {
     const target = end.current
     if (!enabled || !target) return
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) onReach()
+        if (entries.some((entry) => entry.isIntersecting)) reach()
       },
       { root: scroll.current, rootMargin: '0px 0px 200px 0px' },
     )
     observer.observe(target)
     return () => observer.disconnect()
-  }, [scroll, enabled, onReach])
+  }, [scroll, enabled])
   return end
 }

@@ -8,7 +8,7 @@ import { parseDate, shortTime } from '../../../shared/time.ts'
 import { Button } from '../../../shared/ui/Button.tsx'
 import { sidebarRow, sidebarScroll } from '../../../shared/ui/sidebar.ts'
 import { MATCH_END, MATCH_START, type SearchResult } from '../../../store/search.ts'
-import { ChatRowsSkeleton } from './ChatListSkeleton.tsx'
+import { SearchSkeleton } from './ChatListSkeleton.tsx'
 
 const MATCH = new RegExp(`(${MATCH_START}[^${MATCH_END}]*${MATCH_END})`)
 
@@ -228,12 +228,7 @@ interface SearchResultsProps {
 }
 
 export function SearchResults(props: SearchResultsProps) {
-  if (props.loading)
-    return (
-      <div className={sidebarScroll}>
-        <ChatRowsSkeleton label="Searching" />
-      </div>
-    )
+  if (props.loading) return <SearchSkeleton />
   return (
     <div className={sidebarScroll}>
       {props.remaining > 0 && (

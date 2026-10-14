@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { brotliCompressSync, constants, gzipSync } from 'node:zlib'
 import babel from '@rolldown/plugin-babel'
 import tailwindcss from '@tailwindcss/vite'
@@ -49,6 +50,10 @@ export default defineConfig({
     babel({ presets: [reactCompilerPreset()] }),
     precompress(),
   ],
+  // Streamdown's HTML plugin, which markdown.tsx never uses, stays out of the build.
+  resolve: {
+    alias: { 'rehype-raw': fileURLToPath(new URL('src/parts/no-raw.ts', import.meta.url)) },
+  },
   optimizeDeps: {
     // There is no index.html to scan, so scan every route up front. Otherwise a dependency found
     // only when a split route loads makes Vite re-optimize mid-load, and that route fails to import.
