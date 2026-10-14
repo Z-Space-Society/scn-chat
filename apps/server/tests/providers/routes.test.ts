@@ -22,12 +22,10 @@ async function setup() {
     'provider',
     (p) => p.id,
   )
-  providers.register(
-    fakeProvider({
-      listModels: vi.fn(async () => [{ id: 'listed', name: 'Listed', capabilities: caps }]),
-    }).provider,
-    't',
-  )
+  const listModels = vi.fn(async (_access: object) => [
+    { id: 'listed', name: 'Listed', capabilities: caps },
+  ])
+  providers.register(fakeProvider({ listModels }).provider, 't')
   providers.register(fakeProvider({ id: 'adminonly', userKeys: false }).provider, 't')
   const guardedFetch = (async () => new Response()) as unknown as typeof fetch
   await saveAdminModel(
@@ -73,7 +71,7 @@ async function setup() {
     })
     return { status: res.status, body: (await res.json()) as Record<string, unknown> }
   }
-  return { call, app, cookie }
+  return { call, app, cookie, listModels, db }
 }
 
 describe('provider routes', () => {
@@ -115,10 +113,17 @@ describe('provider routes', () => {
     ).toBe(400)
   })
 
-  it('rejects a key that covers no models', async () => {
+  it('rejects a key that covers no models or lists one twice', async () => {
     const { call } = await setup()
     const res = await call('POST', '/credentials', { providerId: 'fake', apiKey: 'k', models: [] })
     expect(res.status).toBe(400)
+    const model = { id: 'm', name: 'M', capabilities: caps }
+    const twice = await call('POST', '/credentials', {
+      providerId: 'fake',
+      apiKey: 'k',
+      models: [model, model],
+    })
+    expect(twice.status).toBe(400)
   })
 
   it('deletes a credential', async () => {
@@ -180,5 +185,38 @@ describe('provider routes', () => {
     const { call } = await setup()
     const { body } = await call('POST', '/providers/fake/list-models', { apiKey: 'k' })
     expect(body.models).toMatchObject([{ id: 'listed' }])
+  })
+
+  it("lists a provider's models with a saved credential's own key", async () => {
+    const { call, listModels } = await setup()
+    const { body } = await call('POST', '/credentials', {
+      providerId: 'fake',
+      apiKey: 'sk-stored',
+      models: [{ id: 'mine', name: 'Mine', capabilities: caps }],
+    })
+    const id = (body.credential as { id: string }).id
+    const listed = await call('POST', `/credentials/${id}/list-models`)
+    expect(listed.body.models).toMatchObject([{ id: 'listed' }])
+    expect(listModels).toHaveBeenLastCalledWith(expect.objectContaining({ apiKey: 'sk-stored' }))
+    expect((await call('POST', '/credentials/nope/list-models')).status).toBe(404)
+  })
+
+  it("refuses to list models with a saved key that can't be read", async () => {
+    const { call, db } = await setup()
+    const { body } = await call('POST', '/credentials', {
+      providerId: 'fake',
+      apiKey: 'sk-stored',
+      models: [{ id: 'mine', name: 'Mine', capabilities: caps }],
+    })
+    const id = (body.credential as { id: string }).id
+    const lost = new SecretBox(Buffer.alloc(32, 9)).encrypt('sk-stored')
+    await db
+      .updateTable('provider_credential')
+      .set({ api_key_encrypted: lost })
+      .where('id', '=', id)
+      .execute()
+    const listed = await call('POST', `/credentials/${id}/list-models`)
+    expect(listed.status).toBe(400)
+    expect(listed.body.message).toContain('Add it again')
   })
 })

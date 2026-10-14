@@ -25,6 +25,7 @@ import type { Logger } from './logger.ts'
 import { type PluginRoutesDeps, pluginRoutes } from './plugins/routes.ts'
 import { ModelUnavailable } from './providers/catalog.ts'
 import { type ProviderRoutesDeps, providerRoutes } from './providers/routes.ts'
+import { CredentialInputError, UnreadableCredential } from './providers/user-credentials.ts'
 import { safeErrorMessage } from './safe-error.ts'
 import { SettingsStore } from './settings/store.ts'
 import { sharingRoutes } from './sharing/routes.ts'
@@ -154,6 +155,8 @@ export function createApp(deps: AppDeps) {
       return c.json({ error: 'InvalidRequest', message: err.message }, 400)
     if (err instanceof ModelUnavailable)
       return c.json({ error: 'ModelUnavailable', message: err.message }, 400)
+    if (err instanceof CredentialInputError || err instanceof UnreadableCredential)
+      return c.json({ error: 'InvalidRequest', message: err.message }, 400)
     if (err instanceof SpaceNotFound)
       return c.json({ error: 'NotFound', message: err.message }, 404)
     const pds = pdsFailure(err)

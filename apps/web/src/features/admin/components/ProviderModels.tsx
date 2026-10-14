@@ -7,6 +7,7 @@ import { lastError } from '../../../shared/errors.ts'
 import { useAppForm } from '../../../shared/form.tsx'
 import { Badge } from '../../../shared/ui/Badge.tsx'
 import { Button } from '../../../shared/ui/Button.tsx'
+import { Checklist, ChecklistItem } from '../../../shared/ui/Checklist.tsx'
 import { ItemList, LinkItem } from '../../../shared/ui/ItemList.tsx'
 import {
   cardAlert,
@@ -15,13 +16,9 @@ import {
   SettingsGroup,
   undivided,
 } from '../../../shared/ui/SettingsPage.tsx'
+import { noCapabilities } from '../../models/capabilities.ts'
 import { useModelsChanged } from '../hooks/changes.ts'
-import {
-  type AdminModel,
-  type Capabilities,
-  capabilityNames,
-  noCapabilities,
-} from '../lib/models.ts'
+import { type AdminModel, type Capabilities, capabilityNames } from '../lib/models.ts'
 import type { AdminPlugin } from '../queries.ts'
 
 type Provider = AdminPlugin['providers'][number]
@@ -81,24 +78,20 @@ export function ProviderModels(props: Props) {
       <SettingsGroup title={`Add ${name} models`} description={addHint(props.provider)}>
         {listed.length > 0 && (
           // Models the provider lists, to tick the ones to offer, over the field to type one.
-          <ul className="grid max-h-72 grid-cols-[repeat(auto-fill,minmax(--spacing(56),1fr))] gap-x-4 gap-y-1.5 overflow-y-auto px-card-pad pt-card-pad text-small">
+          <Checklist>
             {listed.map((model) => (
-              <li key={model.id}>
-                <label className="flex items-baseline gap-1.5">
-                  <input
-                    type="checkbox"
-                    className="m-0 flex-none self-center accent-accent"
-                    checked={offered.has(model.id)}
-                    disabled={offered.has(model.id) || !props.provider.hasAdminKey}
-                    onChange={() =>
-                      offer({ id: model.id, name: model.name, capabilities: model.capabilities })
-                    }
-                  />
-                  {model.name} <code className="text-caption text-muted">{model.id}</code>
-                </label>
-              </li>
+              <ChecklistItem
+                key={model.id}
+                checked={offered.has(model.id)}
+                disabled={offered.has(model.id) || !props.provider.hasAdminKey}
+                onChange={() =>
+                  offer({ id: model.id, name: model.name, capabilities: model.capabilities })
+                }
+              >
+                {model.name} <code className="text-caption text-muted">{model.id}</code>
+              </ChecklistItem>
             ))}
-          </ul>
+          </Checklist>
         )}
         <form.AppForm>
           <form.Form className={cn(inlineForm, listed.length > 0 && undivided)}>

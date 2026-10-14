@@ -89,6 +89,8 @@ Spacing literals from `design-reference` snap to the nearest quarter step of the
 
 - `Button.tsx`: `Button`, whose tone is default, primary, danger, or quiet, and which is primary when it submits a form, since green marks both what is live and the main action. A `busy` button is disabled and turns a spinner before its label, a little stronger than a disabled one. `IconButton` is a quiet button with only an icon, red for something that can't be undone. The `button` variants also style a link that acts as a button.
 - `Badge.tsx`: `Badge` for status, green, red, or grey, and `Chip` and `Chips` for short values.
+- `ToggleChip.tsx`: a small button that stays pressed while what it names is on, for several on/off choices in one row, such as what a model can do, where switches would crowd it. Pressed, it turns green and gains a check, and it carries `aria-pressed`.
+- `Checklist.tsx`: `Checklist`, a card's grid of checkboxes that scrolls when long, and `ChecklistItem`, such as the models a provider lists to tick.
 - `controls.tsx`: the `field` look of text fields, selects, and textareas, `Switch`, and `Radio`. The switch stays a checkbox to the browser and screen readers, and the switch and radio draw their knob and dot as elements beside the input, so every browser can show them.
 - `Select.tsx`: the select-only combobox from `design-reference`, its list rendered into the body and placed by `usePlacement` in `src/shared/`. A portal rather than the Popover API keeps it testable in jsdom.
 - `menu.ts`: the look of floating menus and panels and of the rows in them, shared by the select's list and the app's menus.

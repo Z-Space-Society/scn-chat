@@ -14,6 +14,7 @@ import { dialects } from '../helpers/db.ts'
 import { fakeProvider } from '../helpers/providers.ts'
 
 const caps = { vision: false, reasoning: false, tools: false }
+const model = { id: 'm', name: 'M', capabilities: caps }
 const box = new SecretBox(Buffer.alloc(32, 5))
 const did = 'did:plc:alice'
 
@@ -28,7 +29,7 @@ describe.each(dialects)('user credentials on $name', ({ create }) => {
     const db = await setup()
     await saveCredential(db, box, did, fakeProvider().provider, {
       apiKey: 'sk-live-abcd1234',
-      models: [],
+      models: [model],
     })
     const [credential] = await listCredentials(db, box, did)
     expect(credential).toMatchObject({ providerId: 'fake', modelProvider: 'fake', keyHint: '1234' })
@@ -44,8 +45,8 @@ describe.each(dialects)('user credentials on $name', ({ create }) => {
   it('replaces the earlier key for the same provider', async () => {
     const db = await setup()
     const { provider } = fakeProvider()
-    await saveCredential(db, box, did, provider, { apiKey: 'old-key-1111', models: [] })
-    await saveCredential(db, box, did, provider, { apiKey: 'new-key-2222', models: [] })
+    await saveCredential(db, box, did, provider, { apiKey: 'old-key-1111', models: [model] })
+    await saveCredential(db, box, did, provider, { apiKey: 'new-key-2222', models: [model] })
     expect((await listCredentials(db, box, did)).map((c) => c.keyHint)).toEqual(['2222'])
     await db.destroy()
   })
@@ -54,14 +55,14 @@ describe.each(dialects)('user credentials on $name', ({ create }) => {
     const db = await setup()
     const { provider } = fakeProvider({ userKeys: false })
     await expect(
-      saveCredential(db, box, did, provider, { apiKey: 'k', models: [] }),
+      saveCredential(db, box, did, provider, { apiKey: 'k', models: [model] }),
     ).rejects.toBeInstanceOf(CredentialInputError)
     await db.destroy()
   })
 
   it('requires user endpoints to be allowed and to have a valid, unique slug', async () => {
     const db = await setup()
-    const endpoint = { apiKey: 'k', baseUrl: 'https://x.example/v1', models: [] }
+    const endpoint = { apiKey: 'k', baseUrl: 'https://x.example/v1', models: [model] }
     await expect(
       saveCredential(db, box, did, fakeProvider().provider, { ...endpoint, slug: 'x' }),
     ).rejects.toBeInstanceOf(CredentialInputError)
@@ -125,7 +126,7 @@ describe.each(dialects)('user credentials on $name', ({ create }) => {
     const db = await setup()
     const saved = await saveCredential(db, box, did, fakeProvider().provider, {
       apiKey: 'k',
-      models: [],
+      models: [model],
     })
     expect(await deleteCredential(db, 'did:plc:bob', saved.id)).toBe(false)
     expect(await deleteCredential(db, did, saved.id)).toBe(true)

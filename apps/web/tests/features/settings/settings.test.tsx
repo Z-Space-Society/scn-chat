@@ -287,34 +287,86 @@ describe('Settings API keys', () => {
   })
 })
 
+/** A server holding the Work key, whose provider lists its models. */
+const stubKey = (overrides: Record<string, () => Response> = {}) =>
+  stubServer({
+    '/api/credentials': () => Response.json({ credentials: [workKey] }),
+    '/api/providers': () =>
+      Response.json({
+        providers: [{ id: 'openai', name: 'OpenAI', userEndpoints: false, listsModels: true }],
+      }),
+    '/api/credentials/k1': () => Response.json({ credential: workKey }),
+    ...overrides,
+  })
+
+/** The models the last save sent, if any. */
+function patchedModels(fetch: ReturnType<typeof stubServer>) {
+  const patch = fetch.mock.calls.findLast(([, init]) => init?.method === 'PATCH')
+  if (!patch) return undefined
+  expect(patch[0]).toBe('/api/credentials/k1')
+  return (JSON.parse(String(patch[1]?.body)) as { models: { id: string }[] }).models
+}
+
 describe("Settings for one API key's models", () => {
   it('saves what each model can do, leaving the key alone', async () => {
-    const fetch = stubServer({
-      '/api/credentials': () => Response.json({ credentials: [workKey] }),
-      '/api/providers': () =>
-        Response.json({
-          providers: [{ id: 'openai', name: 'OpenAI', userEndpoints: false, listsModels: true }],
-        }),
-      '/api/credentials/k1': () => Response.json({ credential: workKey }),
-    })
+    const fetch = stubKey()
     await renderPage('/api-keys/k1')
     expect(await screen.findByRole('heading', { name: 'Work' })).toBeInTheDocument()
     // A key's page counts as the API keys section.
     expect(
       within(screen.getByRole('navigation')).getByRole('link', { name: 'API keys' }),
     ).toHaveAttribute('aria-current', 'page')
-    const gpt = screen.getByRole('group', { name: 'GPT' })
-    await userEvent.click(within(gpt).getByLabelText('Tools'))
-    await userEvent.click(within(gpt).getByLabelText('Thinking'))
+    const gpt = screen.getByRole('group', { name: 'What GPT can do' })
+    await userEvent.click(within(gpt).getByRole('button', { name: 'Tools' }))
+    await userEvent.click(within(gpt).getByRole('button', { name: 'Thinking' }))
+    expect(within(gpt).getByRole('button', { name: 'Tools' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     await vi.waitFor(() => expect(screen.getByText('Saved')).toBeInTheDocument())
-    const patch = fetch.mock.calls.find(([, init]) => init?.method === 'PATCH')
-    expect(patch?.[0]).toBe('/api/credentials/k1')
-    expect(JSON.parse(String(patch?.[1]?.body))).toEqual({
-      models: [
-        { id: 'gpt', name: 'GPT', capabilities: { vision: false, reasoning: true, tools: true } },
-      ],
+    expect(patchedModels(fetch)).toEqual([
+      { id: 'gpt', name: 'GPT', capabilities: { vision: false, reasoning: true, tools: true } },
+    ])
+  })
+
+  it('adds a typed model and removes one, saving them together', async () => {
+    const fetch = stubKey()
+    await renderPage('/api-keys/k1')
+    await userEvent.type(await screen.findByLabelText('Model ID'), 'gpt-mini{Enter}')
+    expect(screen.getByLabelText('Model ID')).toHaveValue('')
+    await userEvent.click(screen.getByRole('button', { name: 'Remove GPT' }))
+    expect(fetch.mock.calls.some(([, init]) => init?.method === 'PATCH')).toBe(false)
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await vi.waitFor(() => expect(patchedModels(fetch)).toBeDefined())
+    expect(patchedModels(fetch)).toEqual([{ id: 'gpt-mini', name: 'gpt-mini', capabilities: caps }])
+  })
+
+  it("ticks models from the provider's list, loaded with the saved key", async () => {
+    const fetch = stubKey({
+      '/api/credentials/k1/list-models': () =>
+        Response.json({
+          models: [
+            { id: 'gpt', name: 'GPT', capabilities: caps },
+            { id: 'o9', name: 'o9', capabilities: caps },
+          ],
+        }),
     })
+    await renderPage('/api-keys/k1')
+    await userEvent.click(await screen.findByRole('button', { name: 'Load models' }))
+    expect(await screen.findByRole('checkbox', { name: 'GPT gpt' })).toBeChecked()
+    await userEvent.click(screen.getByRole('checkbox', { name: 'o9' }))
+    expect(screen.getByRole('group', { name: 'What o9 can do' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await vi.waitFor(() => expect(patchedModels(fetch)?.map((m) => m.id)).toEqual(['gpt', 'o9']))
+  })
+
+  it("won't save a key with no models", async () => {
+    stubKey()
+    await renderPage('/api-keys/k1')
+    await userEvent.click(await screen.findByRole('button', { name: 'Remove GPT' }))
+    expect(screen.getByText(/No models/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
   })
 
   it("says so when the key isn't saved anymore", async () => {

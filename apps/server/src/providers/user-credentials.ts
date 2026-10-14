@@ -60,8 +60,8 @@ const summarize = (row: Row, box: SecretBox): CredentialSummary => ({
   models: JSON.parse(row.models_json) as ModelInfo[],
 })
 
-async function rows(db: Db, did: string): Promise<Row[]> {
-  return db
+const select = (db: Db, did: string) =>
+  db
     .selectFrom('provider_credential')
     .select([
       'id',
@@ -74,8 +74,19 @@ async function rows(db: Db, did: string): Promise<Row[]> {
       'api_key_encrypted',
     ])
     .where('owner_did', '=', did)
-    .orderBy('created_at')
-    .execute()
+
+const rows = (db: Db, did: string): Promise<Row[]> =>
+  select(db, did).orderBy('created_at').execute()
+
+/** One of the user's credentials, or undefined when it isn't theirs or doesn't exist. */
+const rowById = (db: Db, did: string, id: string): Promise<Row | undefined> =>
+  select(db, did).where('id', '=', id).executeTakeFirst()
+
+/** Refuse a list of models that is empty or names a model twice. */
+function checkModels(models: ModelInfo[]) {
+  if (!models.length) throw new CredentialInputError('Add at least one model')
+  const ids = new Set(models.map((model) => model.id))
+  if (ids.size < models.length) throw new CredentialInputError('Each model can be listed once')
 }
 
 export async function listCredentials(
@@ -113,6 +124,7 @@ export async function saveCredential(
   }
   if (endpoint && !URL.canParse(input.baseUrl as string))
     throw new CredentialInputError('The base URL is not a valid URL')
+  checkModels(input.models)
   const existing = await rows(db, did)
   if (endpoint && existing.some((row) => row.slug === input.slug)) {
     throw new CredentialInputError(`You already have an endpoint named "${input.slug}"`)
@@ -151,10 +163,8 @@ export async function updateCredentialModels(
   id: string,
   models: ModelInfo[],
 ): Promise<CredentialSummary | undefined> {
-  if (!models.length) throw new CredentialInputError('Add at least one model')
-  const ids = new Set(models.map((model) => model.id))
-  if (ids.size < models.length) throw new CredentialInputError('Each model can be listed once')
-  const row = (await rows(db, did)).find((r) => r.id === id)
+  checkModels(models)
+  const row = await rowById(db, did, id)
   if (!row) return undefined
   const models_json = JSON.stringify(models)
   await db
@@ -173,6 +183,17 @@ export async function deleteCredential(db: Db, did: string, id: string): Promise
     .where('id', '=', id)
     .executeTakeFirst()
   return Number(result.numDeletedRows) > 0
+}
+
+/** One of the user's credentials by its ID, with its decrypted key, such as to list its models. */
+export async function credentialById(db: Db, box: SecretBox, did: string, id: string) {
+  const row = await rowById(db, did, id)
+  if (!row) return undefined
+  const summary = summarize(row, box)
+  const apiKey = box.tryDecrypt(row.api_key_encrypted)
+  if (apiKey === undefined)
+    throw new UnreadableCredential(summary.name ?? summary.slug ?? summary.providerId)
+  return { summary, apiKey }
 }
 
 /** The user's credential that covers a model reference, with its decrypted key. */

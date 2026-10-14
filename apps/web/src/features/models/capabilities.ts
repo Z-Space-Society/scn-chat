@@ -8,3 +8,6 @@ export const capabilities = [
   },
   { key: 'tools', label: 'Tools', description: 'Calls the tools plugins offer.' },
 ] as const
+
+/** What a model can do when nothing says, as for one typed by its ID. */
+export const noCapabilities = { vision: false, reasoning: false, tools: false }

@@ -17,8 +17,9 @@ import {
   SettingsGroup,
   SettingsPage,
 } from '../../../shared/ui/SettingsPage.tsx'
-import { useKeysChanged } from '../hooks/useKeysChanged.ts'
-import { type Credential, keyLabel } from '../lib/api-keys.ts'
+import { noCapabilities } from '../../models/capabilities.ts'
+import { useKeysChanged } from '../hooks/changes.ts'
+import { type Credential, keyDescription, keyLabel } from '../lib/api-keys.ts'
 import { credentialsQuery, providersQuery } from '../queries.ts'
 
 interface KeyDraft {
@@ -38,9 +39,6 @@ const emptyDraft: KeyDraft = {
   baseUrl: '',
   models: '',
 }
-
-/** What a model typed by its ID can do, since nothing says. */
-const noCapabilities = { vision: false, reasoning: false, tools: false }
 
 /** The user's own API keys, and a form to add one. */
 export function ApiKeySettings() {
@@ -114,9 +112,7 @@ function ApiKeyRow(props: ApiKeyRowProps) {
           {label}
         </Link>
       }
-      description={
-        credential.baseUrl ? `${props.provider} · ${credential.baseUrl}` : props.provider
-      }
+      description={keyDescription(credential, props.provider)}
       details={[plural(credential.models.length, { one: '# model', other: '# models' })]}
       actions={
         <>
