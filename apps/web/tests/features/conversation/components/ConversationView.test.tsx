@@ -8,6 +8,7 @@ import { ConversationView } from '../../../../src/features/conversation/componen
 import type { StoreClient } from '../../../../src/store/client.ts'
 import type { HandoverState } from '../../../../src/store/handover.ts'
 import { StoreProvider } from '../../../../src/store/react.tsx'
+import { FakeEventSource, stubEventSource } from '../../../helpers/event-source.ts'
 import { stubFetch, writes } from '../../../helpers/fetch.ts'
 import { renderAt } from '../../../helpers/router.tsx'
 
@@ -32,27 +33,6 @@ const reply = (rkey: string, value: string, parent: string, status = 'complete')
     status,
     createdAt: '2026-09-26T00:00:01Z',
   })
-
-class FakeEventSource {
-  static instances: FakeEventSource[] = []
-  listeners = new Map<string, ((event: { data: string }) => void)[]>()
-  onerror: (() => void) | null = null
-  closed = false
-  readonly url: string
-  constructor(url: string) {
-    this.url = url
-    FakeEventSource.instances.push(this)
-  }
-  addEventListener(type: string, listener: (event: { data: string }) => void) {
-    this.listeners.set(type, [...(this.listeners.get(type) ?? []), listener])
-  }
-  emit(type: string, data: object) {
-    for (const listener of this.listeners.get(type) ?? []) listener({ data: JSON.stringify(data) })
-  }
-  close() {
-    this.closed = true
-  }
-}
 
 function fakeStore(messages: ReturnType<typeof msg>[], state: HandoverState = 'active') {
   const data = { messages }
@@ -124,8 +104,7 @@ async function fromMenu(name: string) {
 
 beforeEach(() => {
   stubFetch()
-  FakeEventSource.instances = []
-  vi.stubGlobal('EventSource', FakeEventSource)
+  stubEventSource()
 })
 afterEach(() => vi.unstubAllGlobals())
 
@@ -276,7 +255,7 @@ describe('ConversationView', () => {
     )
   })
 
-  it('shows streamed text for a pending reply and refreshes when the stream ends', async () => {
+  it('shows a pending reply as it streams', async () => {
     const store = fakeStore([user('u', 'q'), reply('u.r0', '', 'u', 'pending')])
     await renderWith(store, <ConversationView skey="s1" />)
     await vi.waitFor(() => expect(FakeEventSource.instances).toHaveLength(1))
@@ -292,9 +271,6 @@ describe('ConversationView', () => {
     expect(await screen.findByText('Hello')).toBeInTheDocument()
     // The work gives way to the reply once it starts.
     expect(screen.getByText('pondering')).not.toBeVisible()
-    act(() => source.emit('status', { status: 'complete' }))
-    await vi.waitFor(() => expect(source.closed).toBe(true))
-    await vi.waitFor(() => expect(store.worker.refreshConversation).toHaveBeenCalled())
   })
 
   it('scrolls to the bottom on send, even after the reader scrolled up', async () => {
@@ -343,21 +319,6 @@ describe('ConversationView', () => {
     expect(await screen.findByText('from my phone')).toBeInTheDocument()
     expect(String((writes(fetch)[0] as [string])[0])).toBe('/api/conversations/s1/sync')
     expect(store.worker.refreshConversation).toHaveBeenCalledWith('s1')
-  })
-
-  it('keeps refreshing until the reply finishes when the stream drops', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true })
-    try {
-      const store = fakeStore([user('u', 'q'), reply('u.r0', '', 'u', 'pending')])
-      await renderWith(store, <ConversationView skey="s1" />)
-      await vi.waitFor(() => expect(FakeEventSource.instances).toHaveLength(1))
-      store.worker.refreshConversation.mockClear()
-      act(() => (FakeEventSource.instances[0] as FakeEventSource).onerror?.())
-      await act(async () => vi.advanceTimersByTimeAsync(6_100))
-      expect(store.worker.refreshConversation.mock.calls.length).toBeGreaterThanOrEqual(2)
-    } finally {
-      vi.useRealTimers()
-    }
   })
 })
 
@@ -555,44 +516,6 @@ describe('ConversationView errors', () => {
     )
     await renderWith(store, <ConversationView skey="s1" />)
     expect(await screen.findByRole('alert')).toHaveTextContent('Space not found')
-  })
-
-  it('stops polling once the reply finishes', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true })
-    try {
-      const store = fakeStore([user('u', 'q'), reply('u.r0', '', 'u', 'pending')])
-      await renderWith(store, <ConversationView skey="s1" />)
-      await vi.waitFor(() => expect(FakeEventSource.instances).toHaveLength(1))
-      act(() => (FakeEventSource.instances[0] as FakeEventSource).onerror?.())
-      await act(async () => store.update([user('u', 'q'), reply('u.r0', 'done', 'u')]))
-      await act(async () => vi.advanceTimersByTimeAsync(2_100))
-      const calls = store.worker.refreshConversation.mock.calls.length
-      await act(async () => vi.advanceTimersByTimeAsync(6_000))
-      expect(store.worker.refreshConversation.mock.calls.length).toBe(calls)
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-})
-
-describe('ConversationView streams', () => {
-  it('waits and polls, instead of re-following, when this server is not running the reply', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true })
-    try {
-      const store = fakeStore([user('u', 'q'), reply('u.r0', '', 'u', 'pending')])
-      await renderWith(store, <ConversationView skey="s1" />)
-      await vi.waitFor(() => expect(FakeEventSource.instances).toHaveLength(1))
-      await act(async () =>
-        (FakeEventSource.instances[0] as FakeEventSource).emit('status', { status: 'unknown' }),
-      )
-      await act(async () => vi.advanceTimersByTimeAsync(1_000))
-      expect(FakeEventSource.instances).toHaveLength(1)
-      const before = store.worker.refreshConversation.mock.calls.length
-      await act(async () => vi.advanceTimersByTimeAsync(2_100))
-      expect(store.worker.refreshConversation.mock.calls.length).toBe(before + 1)
-    } finally {
-      vi.useRealTimers()
-    }
   })
 })
 

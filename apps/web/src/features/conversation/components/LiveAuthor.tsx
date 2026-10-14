@@ -1,8 +1,7 @@
-import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { formatSeconds } from '../../../parts/step-clock.ts'
 import { parseDate } from '../../../shared/time.ts'
-import { replyStreamQuery } from '../queries.ts'
+import { useReplyStarted } from '../reply-follower.ts'
 
 const secondsSince = (start: number) => Math.max(0, Math.floor((Date.now() - start) / 1000))
 
@@ -55,15 +54,10 @@ interface LiveAuthorProps {
 
 /**
  * The header of a pending reply, following its stream: waiting until something arrives, then the
- * model's name. It reads the stream query without starting it, and rerenders only once it starts.
+ * model's name. It rerenders only once the reply starts, not with each delta.
  */
 export function LiveAuthor(props: LiveAuthorProps) {
-  const { data: started } = useQuery({
-    ...replyStreamQuery(props.skey, props.rkey),
-    enabled: false,
-    // Only whether anything has arrived, so later deltas leave it alone.
-    select: (reply) => reply.parts.some(Boolean),
-  })
+  const started = useReplyStarted(props.skey, props.rkey)
   if (!started) return <WaitingAuthor model={props.model} since={props.since} />
   return <strong>{props.model}</strong>
 }

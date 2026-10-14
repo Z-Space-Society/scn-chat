@@ -5,9 +5,6 @@ import type { Part } from '../../../parts/types.ts'
 /** A reply's stream events, as the server sends them. See TurnsApi's stream route. */
 export type ReplyEvent = HubEvent
 
-/** Statuses after which the reply's record is final. Others mean another server runs the reply. */
-export const FINISHED = new Set(['complete', 'error', 'cancelled'])
-
 /**
  * A reply's events from its stream endpoint. It ends after the status event, and throws if the
  * connection drops or sends an event it can't parse first. The connection closes when it ends or

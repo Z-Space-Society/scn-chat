@@ -56,6 +56,10 @@ _Avoid_: Guest, read-only user
 The model a turn runs with when it names none: the model of the nearest completed reply up the branch, else the user's default model, else the admin's.
 _Avoid_: Default model (that is the user's preference), inherited model
 
+**Reply follower**:
+What follows each pending reply in the open conversation until its final record arrives: it shows the reply's stream as it comes, and checks for the record when the stream can't tell.
+_Avoid_: Reply stream (that is the stream itself), live reply
+
 ## Look
 
 **Theme**:

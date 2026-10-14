@@ -9,11 +9,11 @@ import { useModels } from '../../models/hooks/useModels.ts'
 import { useBranch } from '../hooks/useBranch.ts'
 import { useConversationActions } from '../hooks/useConversationActions.ts'
 import { useFileDrop } from '../hooks/useFileDrop.ts'
-import { useReplyStream } from '../hooks/useReplyStream.ts'
 import { useScrollToFocus } from '../hooks/useScrollToFocus.ts'
 import { type Following, useAtBottom, useStickToBottom } from '../hooks/useStickToBottom.ts'
 import { blobUrlFor } from '../lib/blob-url.ts'
 import { outlineOf } from '../lib/outline.ts'
+import { useReplyFollower } from '../reply-follower.ts'
 import { BranchComposer } from './BranchComposer.tsx'
 import { BranchView } from './BranchView.tsx'
 import type { ComposerHandle } from './Composer.tsx'
@@ -53,8 +53,7 @@ export function ConversationView(props: Props) {
   // The messages there when the chat first loaded, which show at once. Only later ones fade in.
   const [opened, setOpened] = useState<Set<string> | null>(null)
   if (opened === null && conversation) setOpened(new Set(messages.map((m) => m.rkey)))
-  const pending = messages.filter((m) => m.record.status === 'pending').map((m) => m.rkey)
-  const { follow } = useReplyStream(props.skey, pending)
+  const { follow } = useReplyFollower(props.skey, messages)
 
   const { focus, branch, pick } = useBranch(messages)
   // Opening the conversation on a message scrolls to that message instead.
