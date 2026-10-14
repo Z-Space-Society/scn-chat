@@ -1,3 +1,5 @@
+import { useId } from 'react'
+import { useFold } from '../../../parts/fold.ts'
 import { StepsView, viewFor } from '../../../parts/index.ts'
 import { groupParts } from '../../../parts/steps.ts'
 import type { BlobUrl, Part } from '../../../parts/types.ts'
@@ -55,26 +57,58 @@ export function PartsView(props: Props) {
         )
       })}
       {sources.length > 0 && (
-        <section aria-label="Sources" className="mt-3.5">
-          <p className="mb-1.5 text-caption text-muted">
-            {plural(sources.length, { one: '# source', other: '# sources' })}
-          </p>
-          {/* A flex item is no list item, so the badges count themselves. */}
-          <ol className="flex flex-wrap gap-1.5 [counter-reset:source]">
-            {sources.map((part) => {
-              const View = viewFor(part)
-              return (
-                <li
-                  key={part.url as string}
-                  className="inline-flex max-w-88 items-baseline gap-1.5 rounded-small bg-surface px-2.25 py-0.5 text-caption transition-colors duration-(--dur-feedback) [counter-increment:source] before:text-muted before:tabular-nums before:content-[counter(source)] has-[a:hover]:bg-accent-soft"
-                >
-                  {View && <View part={part} record={props.record} blobUrl={props.blobUrl} />}
-                </li>
-              )
-            })}
-          </ol>
-        </section>
+        <Sources sources={sources} record={props.record} blobUrl={props.blobUrl} />
       )}
     </>
+  )
+}
+
+interface SourcesProps {
+  sources: Part[]
+  record: Record<string, unknown>
+  blobUrl: BlobUrl
+}
+
+/**
+ * A reply's sources as numbered badges under their count. Past seven, the rest fold behind a
+ * badge that shows them, which then closes them again.
+ */
+function Sources(props: SourcesProps) {
+  const fold = useFold(props.sources)
+  const id = useId()
+  return (
+    <section aria-label="Sources" className="mt-3.5">
+      <p className="mb-1.5 text-caption text-muted">
+        {plural(props.sources.length, { one: '# source', other: '# sources' })}
+      </p>
+      {/* A flex item is no list item, so the badges count themselves. */}
+      <ol id={id} ref={fold.list} className="flex flex-wrap gap-1.5 [counter-reset:source]">
+        {fold.shown.map((part) => {
+          const View = viewFor(part)
+          return (
+            <li
+              key={part.url as string}
+              className="inline-flex max-w-88 items-baseline gap-1.5 rounded-small bg-surface px-2.25 py-0.5 text-caption transition-colors duration-(--dur-feedback) [counter-increment:source] before:text-muted before:tabular-nums before:content-[counter(source)] has-[a:hover]:bg-accent-soft"
+            >
+              {View && <View part={part} record={props.record} blobUrl={props.blobUrl} />}
+            </li>
+          )
+        })}
+        {/* The button sits among the badges, but it is not a source, so it is no list item. */}
+        {fold.folds && (
+          <li role="none" className="inline-flex">
+            <button
+              type="button"
+              aria-expanded={fold.open}
+              aria-controls={id}
+              onClick={fold.toggle}
+              className="cursor-pointer rounded-small px-2.25 py-0.5 text-caption text-muted transition-colors duration-(--dur-feedback) hover:bg-accent-soft hover:text-ink focus-visible:text-ink"
+            >
+              {fold.open ? 'Show less' : `+${fold.hidden} more`}
+            </button>
+          </li>
+        )}
+      </ol>
+    </section>
   )
 }

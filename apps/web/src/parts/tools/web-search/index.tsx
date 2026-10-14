@@ -1,3 +1,5 @@
+import { useId } from 'react'
+import { useFold } from '../../fold.ts'
 import { clip } from '../../steps.ts'
 import type { ToolEntry, ToolViewProps } from '../../types.ts'
 import { DefaultToolView } from '../default/index.tsx'
@@ -35,8 +37,8 @@ function resultsOf(output: unknown): SearchResult[] | undefined {
 }
 
 /**
- * A search's results, each its title linking to its page, its site, and its snippet as plain text.
- * Anything it can't read, such as an error or output kept in a blob, shows as the default view.
+ * A search's results, each its title linking to its page, its site, and its snippet as plain text,
+ * the first seven showing until the rest are opened. Anything it can't read, such as an error or output kept in a blob, shows as the default view.
  */
 function WebSearchView(props: ToolViewProps) {
   if (props.status === 'running') return <ToolNote>Searching…</ToolNote>
@@ -44,20 +46,44 @@ function WebSearchView(props: ToolViewProps) {
   const results = readable ? resultsOf(props.result?.output) : undefined
   if (!results) return <DefaultToolView {...props} />
   if (results.length === 0) return <ToolNote>No results.</ToolNote>
+  return <ResultList results={results} />
+}
+
+interface ResultListProps {
+  results: SearchResult[]
+}
+
+/** The results, folded after the first seven under a quiet button that shows the rest. */
+function ResultList(props: ResultListProps) {
+  const fold = useFold(props.results)
+  const id = useId()
   return (
-    <ul className="mt-2 mb-1 flex flex-col gap-2.5">
-      {results.map((result, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: results have no identity beyond their place, and a URL can repeat.
-        <li key={i} className="min-w-0">
-          <PageTitle url={result.url} title={result.title} />
-          {result.snippet && (
-            <p className="mt-0.5 line-clamp-2 text-muted" dir="auto">
-              {result.snippet}
-            </p>
-          )}
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul id={id} ref={fold.list} className="mt-2 mb-1 flex flex-col gap-2.5">
+        {fold.shown.map((result, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: results have no identity beyond their place, and a URL can repeat.
+          <li key={i} className="min-w-0">
+            <PageTitle url={result.url} title={result.title} />
+            {result.snippet && (
+              <p className="mt-0.5 line-clamp-2 text-muted" dir="auto">
+                {result.snippet}
+              </p>
+            )}
+          </li>
+        ))}
+      </ul>
+      {fold.folds && (
+        <button
+          type="button"
+          aria-expanded={fold.open}
+          aria-controls={id}
+          onClick={fold.toggle}
+          className="mb-0.75 block cursor-pointer rounded-badge py-0.5 text-caption text-tint-quiet transition-colors duration-(--dur-feedback) hover:text-ink focus-visible:text-ink"
+        >
+          {fold.open ? 'Show less' : `Show ${fold.hidden} more`}
+        </button>
+      )}
+    </>
   )
 }
 

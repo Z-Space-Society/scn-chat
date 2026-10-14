@@ -107,7 +107,7 @@
   /* The list's section headings, such as Today and Tags, in the quietest grey that still clears
      4.5:1 on the sidebar once rounded to sRGB: 4.5:1 light and 4.62:1 dark. */
   --color-section-ink: light-dark(oklch(0.555 0 0), oklch(0.585 0 0));
-  /* The quietest text on the steps' sunken tint, such as a thought's Show more, a visible step
+  /* The quietest text on the steps' sunken tint, such as a search's Show more, a visible step
      under muted ink that still clears 4.5:1 there once rounded to sRGB: 4.5:1 light and 4.61:1
      dark. The tint is lighter than the sidebar in dark, so section ink falls short on it. */
   --color-tint-quiet: light-dark(oklch(0.555 0 0), oklch(0.635 0 0));

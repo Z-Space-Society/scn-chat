@@ -94,6 +94,7 @@ Opening it shows the tool's view. A tool view decides for itself when to fall ba
   - its title, as a link to its URL, opening in a new tab with `rel="noreferrer"`
   - the URL's host without a leading `www.`, muted, under the title
   - its snippet as plain text, cut to two lines
+- **Many results:** the first seven show, over a quiet "Show 3 more" button, which shows the rest in place and becomes "Show less". A list that would hide only one result shows all eight instead. Opening it moves focus to the first link it showed. The list starts folded each time it is drawn.
 - **No results:** "No results."
 - **A result whose URL is not `http` or `https`:** its title as plain text, with no link and no host.
 - **Fallback:** the default body, for an error, an output in a blob, or an output that is not an object with a `results` array whose items each have a string `title` and `url`, and a string `snippet` or none.
@@ -148,6 +149,7 @@ Each is checked by rendering a reply through `MessageView`, or `StreamingReply` 
 - [x] A pending reply's live line says "Searching the web…" while a search runs, and a tool without a view says "Running <tool>…".
 - [x] A web search step's row shows "Searched the web" and its query.
 - [x] An open web search step lists its results as titles linking to their URLs in a new tab with `rel="noreferrer"`, each with its host and snippet as plain text.
+- [x] A web search with more than eight results shows the first seven and a "Show 3 more" button, which shows the rest, moves focus to the first link it showed, and becomes "Show less". One with eight shows them all.
 - [x] A web search with no results says "No results."
 - [x] A search result with a non-HTTP URL shows its title without a link.
 - [x] A running web search says "Searching…".
@@ -164,6 +166,7 @@ Each is checked by rendering a reply through `MessageView`, or `StreamingReply` 
 - `apps/web/src/parts/tools/web-search/index.tsx`: the web search entry and view
 - `apps/web/src/parts/tools/web-fetch/index.tsx`: the web fetch entry and view
 - `apps/web/src/parts/tools/ui.tsx` and `json.ts`: what the views share
+- `apps/web/src/parts/fold.ts`: `useFold`, which folds a list after seven items, shared with the reply's sources
 - `apps/web/src/parts/tool-status.ts`: `toolStatus`
 - `apps/web/src/parts/links.ts`: `siteOf`, which `SourceView` shares, and `isWebUrl`
 - `apps/web/src/parts/types.ts`: `ToolEntry` and `ToolViewProps`

@@ -1,11 +1,11 @@
-import { memo, type ReactNode, useId, useLayoutEffect, useRef, useState } from 'react'
+import { memo, type ReactNode } from 'react'
 import { cn } from '../shared/cn.ts'
 import { ChevronDownIcon, ChevronRightIcon } from '../shared/icons.tsx'
 import { action } from '../shared/ui/actions.ts'
 import { Badge } from '../shared/ui/Badge.tsx'
 import { Markdown } from './markdown.tsx'
 import { formatSeconds, stepDuration, useStepClock, useStepDurations } from './step-clock.ts'
-import { type Step, stepsSummary, thoughtFor } from './steps.ts'
+import { type Step, stepsSummary, thoughtFor, thoughtGlimpse } from './steps.ts'
 import { type ToolStatus, toolStatus } from './tool-status.ts'
 import { toolEntry } from './tools/index.ts'
 import type { BlobUrl } from './types.ts'
@@ -293,90 +293,31 @@ interface ThoughtProps {
 }
 
 /**
- * A reasoning step: a row naming the thought, with its first three lines showing below it, or its
- * newest three while it runs, fading out where they are cut. A quiet Show more under them, or a
- * click anywhere on it, opens the whole thought, and Show less closes it again. A thought that
- * fits in three lines has nothing to open.
+ * A reasoning step, as a tool step is: a row naming the thought with a glimpse of its first line,
+ * which opens onto the whole thought. Open, the thought shows its first line itself, so the glimpse
+ * goes.
  */
 function Thought(props: ThoughtProps) {
-  const [open, setOpen] = useState(false)
-  const [overflows, setOverflows] = useState(false)
-  const body = useRef<HTMLDivElement>(null)
-  const id = useId()
-
-  // Closed, the thought is cut to three lines, and only one that runs past them can open.
-  useLayoutEffect(() => {
-    const element = body.current
-    const content = element?.firstElementChild
-    if (open || !element || !content) return
-    const measure = () =>
-      setOverflows(content.getBoundingClientRect().height > element.clientHeight + 1)
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(element)
-    observer.observe(content)
-    return () => observer.disconnect()
-  }, [open])
-
-  const openable = open || overflows
-  const state = {
-    'data-current': props.current || undefined,
-    'data-open': open || undefined,
-    'data-openable': openable || undefined,
-  }
   return (
-    // Show more is the button, for the keyboard and screen readers. A click anywhere else on a
-    // closed thought opens it too, as a larger target, unless it follows a link or ends a
-    // selection.
-    // biome-ignore lint/a11y/noStaticElementInteractions: Show more is the control; this only widens its target.
-    // biome-ignore lint/a11y/useKeyWithClickEvents: Show more opens it from the keyboard.
-    <div
-      {...state}
+    <details
       data-step="reasoning"
-      className="group/thought data-openable:not-data-open:cursor-pointer"
-      onClick={(event) => {
-        if (open || !overflows) return
-        if ((event.target as Element).closest('a, button')) return
-        if (window.getSelection()?.toString()) return
-        setOpen(true)
-      }}
+      data-current={props.current || undefined}
+      className="group/step details-unfold"
     >
-      <p
-        className={cn(
-          'py-0.5 font-medium text-muted transition-colors duration-(--dur-feedback) group-data-open/thought:text-ink group-data-openable/thought:group-hover/thought:text-ink',
-          props.current && breathe,
-        )}
-      >
-        {props.label}
+      <summary className={cn(summary, 'gap-1 truncate py-0.5 group-open/step:text-ink')}>
+        <Chevron group="step" />
+        <span className="flex-none text-ink-strong">{props.label}</span>{' '}
+        <span dir="auto" className="truncate font-normal text-muted group-open/step:hidden">
+          {thoughtGlimpse(props.text)}
+        </span>
         {props.elapsed !== undefined && <Elapsed seconds={props.elapsed} />}
-      </p>
-      {/* The thought, the same size as the row above it and as quiet. Running, its newest lines
-          show, so the oldest fade out at the top. */}
-      <div
-        {...state}
-        data-thought
-        id={id}
-        ref={body}
-        className="mt-0.75 mb-1 not-data-open:max-h-[3lh] not-data-open:overflow-hidden text-muted leading-[1.6] data-current:not-data-open:flex data-current:not-data-open:flex-col data-current:not-data-open:justify-end data-current:data-openable:not-data-open:[mask-image:linear-gradient(transparent,black_1lh)] data-openable:not-data-open:[mask-image:linear-gradient(black_calc(100%-1lh),transparent)]"
-      >
-        <Markdown
-          text={props.text}
-          streaming={props.current}
-          className="text-inherit leading-[inherit] [font-size:inherit] [&>*>:first-child]:mt-0 [&_strong]:text-ink"
-        />
-      </div>
-      {openable && (
-        <button
-          type="button"
-          aria-expanded={open}
-          aria-controls={id}
-          onClick={() => setOpen(!open)}
-          className="mb-0.75 block cursor-pointer rounded-badge py-0.5 text-caption text-tint-quiet transition-colors duration-(--dur-feedback) hover:text-ink focus-visible:text-ink group-data-openable/thought:group-hover/thought:text-ink"
-        >
-          {open ? 'Show less' : 'Show more'}
-        </button>
-      )}
-    </div>
+      </summary>
+      <Markdown
+        text={props.text}
+        streaming={props.current}
+        className="mt-0.75 mb-1 text-muted leading-[1.6] [font-size:inherit] [&>*>:first-child]:mt-0 [&>*>:last-child]:mb-0 [&_strong]:text-ink"
+      />
+    </details>
   )
 }
 

@@ -99,6 +99,19 @@ export function pretty(text: string): string {
 export const clip = (text: string, max: number) =>
   text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text
 
+/**
+ * A thought's first line, as a glimpse on its row: its first line with text, without the Markdown
+ * that marks it as a heading, quote, or list item, or emphasizes or codes its words.
+ */
+export function thoughtGlimpse(text: string): string {
+  const line = text.split('\n').find((l) => l.trim()) ?? ''
+  const plain = line
+    .replace(/^\s*(?:#{1,6}\s+|>\s*|[-*+]\s+|\d+[.)]\s+)/, '')
+    .replace(/(\*\*|__|`|~~)(.+?)\1/g, '$2')
+    .replace(/\*(\S(?:.*?\S)?)\*/g, '$1')
+  return clip(plain.replace(/\s+/g, ' ').trim(), 120)
+}
+
 /** A one-line glimpse of a tool's input, such as the query it searched for. */
 export function inputGlimpse(input: string): string {
   let value: unknown

@@ -270,7 +270,7 @@ describe('ConversationView', () => {
     })
     expect(await screen.findByText('Hello')).toBeInTheDocument()
     // The work gives way to the reply once it starts.
-    expect(screen.getByText('pondering')).not.toBeVisible()
+    for (const thought of screen.getAllByText('pondering')) expect(thought).not.toBeVisible()
   })
 
   it('scrolls to the bottom on send, even after the reader scrolled up', async () => {

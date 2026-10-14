@@ -41,34 +41,28 @@ describe('MessageView', () => {
     expect(container.querySelector('[data-steps]')).toBeNull()
   })
 
-  it('shows a thought that fits in three lines with nothing to open', async () => {
-    const { container } = render(<MessageView blobUrl={blobUrl} record={working} />)
+  it('shows a thought as a row with a glimpse of its first line, which opens onto all of it', async () => {
+    const record = {
+      ...working,
+      content: {
+        $type: d('plainContent'),
+        parts: [
+          { $type: d('reasoningPart'), text: '\n## **Planning** the `search`\n\nThen look closer' },
+          ...working.content.parts.slice(1),
+        ],
+      },
+    }
+    const { container } = render(<MessageView blobUrl={blobUrl} record={record} />)
     await userEvent.click(screen.getByRole('button', { name: 'Thought · lookup' }))
-    const thought = container.querySelector('[data-step=reasoning]') as HTMLElement
-    expect(thought).toHaveTextContent('Look it up first')
-    expect(thought.querySelector('button')).toBeNull()
-  })
-
-  it('opens a long thought from Show more or anywhere on it, and closes it from Show less', async () => {
-    // jsdom lays nothing out, so the thought's text stands taller than the three lines it shows.
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
-      height: 200,
-    } as DOMRect)
-    const { container } = render(<MessageView blobUrl={blobUrl} record={working} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Thought · lookup' }))
-    const text = container.querySelector('[data-step=reasoning] [data-thought] p') as HTMLElement
-    await userEvent.click(screen.getByRole('button', { name: 'Show more' }))
-    const toggle = screen.getByRole('button', { name: 'Show less' })
-    expect(toggle).toHaveAttribute('aria-expanded', 'true')
-    // Open, a click on the text leaves it open, so the text can be read and selected.
-    await userEvent.click(text)
-    expect(toggle).toHaveAttribute('aria-expanded', 'true')
-    await userEvent.click(toggle)
-    expect(toggle).toHaveTextContent('Show more')
-    expect(toggle).toHaveAttribute('aria-expanded', 'false')
-    await userEvent.click(text)
-    expect(toggle).toHaveAttribute('aria-expanded', 'true')
-    vi.restoreAllMocks()
+    const thought = container.querySelector('[data-step=reasoning]') as HTMLDetailsElement
+    const row = thought.querySelector('summary') as HTMLElement
+    expect(row.textContent).toMatch(/^Thought\s*Planning the search\s*$/)
+    expect(thought.open).toBe(false)
+    await userEvent.click(row)
+    expect(thought.open).toBe(true)
+    expect(thought.querySelector('h2')).toHaveTextContent('Planning the search')
+    expect(thought).toHaveTextContent('Then look closer')
+    expect(within(thought).queryByRole('button')).toBeNull()
   })
 
   it('pairs a tool call with its result, showing the input at a glance and both in full', async () => {
@@ -174,6 +168,44 @@ describe('MessageView', () => {
         .getAllByRole('listitem')
         .map((item) => item.textContent),
     ).toEqual(['Exampleexample.com', 'other.org'])
+  })
+
+  it('folds sources after the first seven behind a badge that shows the rest', async () => {
+    const sourcesOf = (count: number) =>
+      render(
+        <MessageView
+          blobUrl={blobUrl}
+          record={{
+            role: 'assistant',
+            status: 'complete',
+            content: {
+              $type: d('plainContent'),
+              parts: Array.from({ length: count }, (_, i) => ({
+                $type: d('sourcePart'),
+                url: `https://site${i + 1}.test/`,
+                title: `Source ${i + 1}`,
+              })),
+            },
+          }}
+        />,
+      )
+    const eight = sourcesOf(8)
+    let sources = screen.getByRole('region', { name: 'Sources' })
+    expect(within(sources).getAllByRole('listitem')).toHaveLength(8)
+    expect(within(sources).queryByRole('button')).toBeNull()
+    eight.unmount()
+
+    sourcesOf(10)
+    sources = screen.getByRole('region', { name: 'Sources' })
+    expect(sources).toHaveTextContent('10 sources')
+    expect(within(sources).getAllByRole('listitem')).toHaveLength(7)
+    const more = within(sources).getByRole('button', { name: '+3 more' })
+    expect(more).toHaveAttribute('aria-expanded', 'false')
+    await userEvent.click(more)
+    expect(within(sources).getAllByRole('listitem')).toHaveLength(10)
+    expect(within(sources).getByRole('link', { name: 'Source 8' })).toHaveFocus()
+    await userEvent.click(within(sources).getByRole('button', { name: 'Show less' }))
+    expect(within(sources).getAllByRole('listitem')).toHaveLength(7)
   })
 
   it("copies a code block's code", async () => {
@@ -540,6 +572,31 @@ describe('tool views', () => {
     expect(items[1]).toHaveTextContent('Odd link')
     expect(within(items[1] as HTMLElement).queryByRole('link')).toBeNull()
     expect(step.querySelector('pre')).toBeNull()
+  })
+
+  it("folds a web search's results after the first seven behind Show more", async () => {
+    const results = (count: number) => ({
+      results: Array.from({ length: count }, (_, i) => ({
+        title: `Result ${i + 1}`,
+        url: `https://site${i + 1}.test/`,
+      })),
+    })
+    const { container } = await openSteps([
+      call('a', 'web_search', { query: 'eight' }),
+      result('a', results(8)),
+      call('b', 'web_search', { query: 'ten' }),
+      result('b', results(10)),
+    ])
+    const [eight, ten] = toolSteps(container) as HTMLElement[]
+    expect(within(eight as HTMLElement).getAllByRole('listitem')).toHaveLength(8)
+    expect(within(eight as HTMLElement).queryByRole('button')).toBeNull()
+    const step = ten as HTMLElement
+    expect(within(step).getAllByRole('listitem')).toHaveLength(7)
+    await userEvent.click(within(step).getByRole('button', { name: 'Show 3 more' }))
+    expect(within(step).getAllByRole('listitem')).toHaveLength(10)
+    expect(within(step).getByRole('link', { name: 'Result 8' })).toHaveFocus()
+    await userEvent.click(within(step).getByRole('button', { name: 'Show less' }))
+    expect(within(step).getAllByRole('listitem')).toHaveLength(7)
   })
 
   it('says a web search is searching while it runs, and when it found nothing', async () => {
