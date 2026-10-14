@@ -1,5 +1,6 @@
 import { useStore as useFormStore } from '@tanstack/react-form'
-import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import { api, json, read } from '../../../shared/api.ts'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
 import { lastError } from '../../../shared/errors.ts'
@@ -7,7 +8,7 @@ import { useAppForm } from '../../../shared/form.tsx'
 import { KeyIcon, TrashIcon } from '../../../shared/icons.tsx'
 import { plural } from '../../../shared/plural.ts'
 import { Button } from '../../../shared/ui/Button.tsx'
-import { Item, ItemList, ItemMark, ItemNames } from '../../../shared/ui/ItemList.tsx'
+import { ItemList, LinkItem } from '../../../shared/ui/ItemList.tsx'
 import {
   ConfirmButton,
   Field,
@@ -16,7 +17,8 @@ import {
   SettingsGroup,
   SettingsPage,
 } from '../../../shared/ui/SettingsPage.tsx'
-import { modelsQuery } from '../../models/queries.ts'
+import { useKeysChanged } from '../hooks/useKeysChanged.ts'
+import { type Credential, keyLabel } from '../lib/api-keys.ts'
 import { credentialsQuery, providersQuery } from '../queries.ts'
 
 interface KeyDraft {
@@ -57,17 +59,7 @@ export function ApiKeySettings() {
   )
 }
 
-/** Refresh the keys, and the models, since keys decide which of the user's own models are offered. */
-function useKeysChanged() {
-  const queryClient = useQueryClient()
-  return () =>
-    Promise.all([
-      queryClient.invalidateQueries({ queryKey: credentialsQuery.queryKey }),
-      queryClient.invalidateQueries({ queryKey: modelsQuery.queryKey }),
-    ])
-}
-
-/** The user's keys, each named and ending in its last four characters, with a way to delete it. */
+/** The user's keys, each opening its page, named and ending in its last four characters, with a way to delete it. */
 function ApiKeyList() {
   const { data: credentials } = useSuspenseQuery(credentialsQuery)
   const { data: providers } = useSuspenseQuery(providersQuery)
@@ -101,11 +93,6 @@ function ApiKeyList() {
   )
 }
 
-/** A stored key as the server lists it, without the key itself. */
-type Credential = Awaited<
-  ReturnType<Exclude<typeof credentialsQuery.queryFn, symbol | undefined>>
->[number]
-
 interface ApiKeyRowProps {
   credential: Credential
   /** The key's provider, by name. */
@@ -114,29 +101,35 @@ interface ApiKeyRowProps {
   onDelete: () => void
 }
 
-/** One key, which asks in place before it is deleted. */
+/** One key, which opens its models' page and asks in place before it is deleted. */
 function ApiKeyRow(props: ApiKeyRowProps) {
   const credential = props.credential
-  const label = credential.name ?? credential.slug ?? props.provider
+  const label = keyLabel(credential, props.provider)
   return (
-    <Item deleting={props.deleting}>
-      <ItemMark>
-        <KeyIcon />
-      </ItemMark>
-      <ItemNames
-        title={label}
-        description={
-          credential.baseUrl ? `${props.provider} · ${credential.baseUrl}` : props.provider
-        }
-      />
-      <KeyHint credential={credential} />
-      <ConfirmButton
-        label="Delete key"
-        question="Delete this key?"
-        icon={{ icon: <TrashIcon />, label: `Delete ${label}` }}
-        onConfirm={props.onDelete}
-      />
-    </Item>
+    <LinkItem
+      deleting={props.deleting}
+      mark={<KeyIcon />}
+      link={
+        <Link to="/settings/api-keys/$id" params={{ id: credential.id }}>
+          {label}
+        </Link>
+      }
+      description={
+        credential.baseUrl ? `${props.provider} · ${credential.baseUrl}` : props.provider
+      }
+      details={[plural(credential.models.length, { one: '# model', other: '# models' })]}
+      actions={
+        <>
+          <KeyHint credential={credential} />
+          <ConfirmButton
+            label="Delete key"
+            question="Delete this key?"
+            icon={{ icon: <TrashIcon />, label: `Delete ${label}` }}
+            onConfirm={props.onDelete}
+          />
+        </>
+      }
+    />
   )
 }
 

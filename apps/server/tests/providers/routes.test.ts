@@ -135,6 +135,47 @@ describe('provider routes', () => {
     expect((await call('GET', '/credentials')).body.credentials).toEqual([])
   })
 
+  it("changes a credential's models without touching its key", async () => {
+    const { call } = await setup()
+    const { body } = await call('POST', '/credentials', {
+      providerId: 'fake',
+      apiKey: 'sk-secret-7777',
+      models: [{ id: 'mine', name: 'Mine', capabilities: caps }],
+    })
+    const id = (body.credential as { id: string }).id
+    const on = { vision: true, reasoning: true, tools: true }
+    const changed = await call('PATCH', `/credentials/${id}`, {
+      models: [{ id: 'mine', name: 'Mine', capabilities: on }],
+    })
+    expect(changed.status).toBe(200)
+    expect(changed.body.credential).toMatchObject({
+      keyHint: '7777',
+      models: [{ capabilities: on }],
+    })
+    const models = (await call('GET', '/models')).body.models as { id: string }[]
+    expect(models.find((m) => m.id === 'mine')).toMatchObject({ capabilities: on })
+  })
+
+  it('refuses a change that leaves no models or lists one twice, and an unknown key', async () => {
+    const { call } = await setup()
+    const { body } = await call('POST', '/credentials', {
+      providerId: 'fake',
+      apiKey: 'k',
+      models: [{ id: 'mine', name: 'Mine', capabilities: caps }],
+    })
+    const id = (body.credential as { id: string }).id
+    expect((await call('PATCH', `/credentials/${id}`, { models: [] })).status).toBe(400)
+    const twice = [
+      { id: 'mine', name: 'Mine', capabilities: caps },
+      { id: 'mine', name: 'Again', capabilities: caps },
+    ]
+    expect((await call('PATCH', `/credentials/${id}`, { models: twice })).status).toBe(400)
+    const missing = await call('PATCH', '/credentials/nope', {
+      models: [{ id: 'mine', name: 'Mine', capabilities: caps }],
+    })
+    expect(missing.status).toBe(404)
+  })
+
   it('lists a provider models with a pasted key', async () => {
     const { call } = await setup()
     const { body } = await call('POST', '/providers/fake/list-models', { apiKey: 'k' })

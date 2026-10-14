@@ -14,6 +14,7 @@ import {
   deleteCredential,
   listCredentials,
   saveCredential,
+  updateCredentialModels,
 } from './user-credentials.ts'
 
 export type ProviderRoutesDeps = {
@@ -28,16 +29,20 @@ export type ProviderRoutesDeps = {
 
 const capabilities = z.object({ vision: z.boolean(), reasoning: z.boolean(), tools: z.boolean() })
 
+const credentialModels = z
+  .array(z.object({ id: z.string().min(1), name: z.string().min(1), capabilities }))
+  .min(1, 'Add at least one model')
+
 const newCredential = z.object({
   providerId: z.string().min(1),
   apiKey: z.string(),
   name: z.string().optional(),
   slug: z.string().optional(),
   baseUrl: z.string().optional(),
-  models: z
-    .array(z.object({ id: z.string().min(1), name: z.string().min(1), capabilities }))
-    .min(1, 'Add at least one model'),
+  models: credentialModels,
 })
+
+const credentialChange = z.object({ models: credentialModels })
 
 const listModelsRequest = z.object({
   apiKey: z.string().min(1, 'An API key is required'),
@@ -116,6 +121,24 @@ export function providerRoutes(deps: ProviderRoutesDeps) {
           models: body.models,
         })
         return c.json({ credential }, 201)
+      } catch (err) {
+        if (err instanceof CredentialInputError) {
+          return c.json({ error: 'InvalidRequest', message: err.message }, 400)
+        }
+        throw err
+      }
+    })
+    .patch('/credentials/:id', async (c) => {
+      const body = await jsonBody(c, credentialChange)
+      try {
+        const credential = await updateCredentialModels(
+          deps.db,
+          deps.box,
+          signedInUser(c).did,
+          c.req.param('id'),
+          body.models,
+        )
+        return credential ? c.json({ credential }) : c.json({ error: 'NotFound' }, 404)
       } catch (err) {
         if (err instanceof CredentialInputError) {
           return c.json({ error: 'InvalidRequest', message: err.message }, 400)

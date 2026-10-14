@@ -7,6 +7,7 @@ import {
   listCredentials,
   saveCredential,
   UnreadableCredential,
+  updateCredentialModels,
 } from '../../src/providers/user-credentials.ts'
 import { SecretBox } from '../../src/secrets.ts'
 import { dialects } from '../helpers/db.ts'
@@ -99,6 +100,24 @@ describe.each(dialects)('user credentials on $name', ({ create }) => {
     await expect(
       credentialFor(db, lost, did, { provider: 'fake', id: 'm1' }),
     ).rejects.toBeInstanceOf(UnreadableCredential)
+    await db.destroy()
+  })
+
+  it("changes only the owner's credential's models, keeping its key", async () => {
+    const db = await setup()
+    const saved = await saveCredential(db, box, did, fakeProvider().provider, {
+      apiKey: 'sk-1111',
+      models: [{ id: 'm1', name: 'M1', capabilities: caps }],
+    })
+    const on = { vision: false, reasoning: true, tools: true }
+    const models = [{ id: 'm1', name: 'M1', capabilities: on }]
+    expect(await updateCredentialModels(db, box, 'did:plc:bob', saved.id, models)).toBeUndefined()
+    expect(await updateCredentialModels(db, box, did, saved.id, models)).toMatchObject({
+      keyHint: '1111',
+      models,
+    })
+    const found = await credentialFor(db, box, did, { provider: 'fake', id: 'm1' })
+    expect(found).toMatchObject({ apiKey: 'sk-1111', info: { capabilities: on } })
     await db.destroy()
   })
 

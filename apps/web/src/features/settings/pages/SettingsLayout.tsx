@@ -5,7 +5,8 @@ import { SidebarLayout } from '../../../shared/SidebarLayout.tsx'
 import { useMe } from '../../auth/session.ts'
 
 const sections = [
-  { to: '/settings', label: 'Preferences', icon: <SlidersIcon /> },
+  // Every other section lies under Preferences' path, and a key's page counts as API keys.
+  { to: '/settings', label: 'Preferences', icon: <SlidersIcon />, exact: true },
   { to: '/settings/api-keys', label: 'API keys', icon: <KeyIcon /> },
   { to: '/settings/plugins', label: 'Plugins', icon: <PuzzleIcon /> },
   { to: '/settings/sync', label: 'Sync', icon: <SyncIcon /> },
@@ -26,7 +27,7 @@ export function SettingsLayout(props: Props) {
       nav={
         <>
           <NavHeader title="Settings" />
-          <SectionNav sections={sections} activeOptions={{ exact: true }} />
+          <SectionNav sections={sections} activeOptions={{}} />
           {me.admin && <SectionNav sections={admin} activeOptions={{ exact: true }} apart />}
         </>
       }

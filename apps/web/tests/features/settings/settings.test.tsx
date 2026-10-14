@@ -1,8 +1,9 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Suspense } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { type Me, MeContext } from '../../../src/features/auth/session.ts'
+import { ApiKeyModelSettings } from '../../../src/features/settings/pages/ApiKeyModelSettings.tsx'
 import { ApiKeySettings } from '../../../src/features/settings/pages/ApiKeySettings.tsx'
 import { PluginSettings } from '../../../src/features/settings/pages/PluginSettings.tsx'
 import { PreferencesSettings } from '../../../src/features/settings/pages/PreferencesSettings.tsx'
@@ -53,6 +54,7 @@ function stubServer(overrides: Record<string, () => Response>) {
 const sections = {
   '': PreferencesSettings,
   '/api-keys': ApiKeySettings,
+  '/api-keys/k1': () => <ApiKeyModelSettings id="k1" />,
   '/plugins': PluginSettings,
   '/sync': SyncSettings,
 }
@@ -196,6 +198,17 @@ describe('Settings preferences fields', () => {
   })
 })
 
+const workKey = {
+  id: 'k1',
+  providerId: 'openai',
+  name: 'Work',
+  slug: null,
+  baseUrl: null,
+  keyHint: 'abcd',
+  keyUnreadable: false,
+  models: [{ id: 'gpt', name: 'GPT', capabilities: caps }],
+}
+
 describe('Settings API keys', () => {
   it('adds a key and clears the form once it is saved', async () => {
     const fetch = stubServer({
@@ -249,9 +262,7 @@ describe('Settings API keys', () => {
   })
 
   it('deletes a stored key and drops it from the list', async () => {
-    let credentials = [
-      { id: 'k1', providerId: 'openai', name: 'Work', slug: null, baseUrl: null, keyHint: 'abcd' },
-    ]
+    let credentials = [workKey]
     const fetch = stubServer({
       '/api/credentials': () => Response.json({ credentials }),
       '/api/credentials/k1': () => {
@@ -260,7 +271,11 @@ describe('Settings API keys', () => {
       },
     })
     await renderPage('/api-keys')
-    expect(await screen.findByText('Work')).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Work' })).toHaveAttribute(
+      'href',
+      '/settings/api-keys/k1',
+    )
+    expect(screen.getByText('1 model')).toBeInTheDocument()
     expect(screen.getByTitle("The key's last four characters")).toHaveTextContent('ending abcd')
     await userEvent.click(screen.getByRole('button', { name: 'Delete Work' }))
     expect(screen.getByText('Delete this key?')).toBeInTheDocument()
@@ -269,6 +284,43 @@ describe('Settings API keys', () => {
     expect(
       fetch.mock.calls.filter(([, init]) => init?.method === 'DELETE').map(([url]) => url),
     ).toEqual(['/api/credentials/k1'])
+  })
+})
+
+describe("Settings for one API key's models", () => {
+  it('saves what each model can do, leaving the key alone', async () => {
+    const fetch = stubServer({
+      '/api/credentials': () => Response.json({ credentials: [workKey] }),
+      '/api/providers': () =>
+        Response.json({
+          providers: [{ id: 'openai', name: 'OpenAI', userEndpoints: false, listsModels: true }],
+        }),
+      '/api/credentials/k1': () => Response.json({ credential: workKey }),
+    })
+    await renderPage('/api-keys/k1')
+    expect(await screen.findByRole('heading', { name: 'Work' })).toBeInTheDocument()
+    // A key's page counts as the API keys section.
+    expect(
+      within(screen.getByRole('navigation')).getByRole('link', { name: 'API keys' }),
+    ).toHaveAttribute('aria-current', 'page')
+    const gpt = screen.getByRole('group', { name: 'GPT' })
+    await userEvent.click(within(gpt).getByLabelText('Tools'))
+    await userEvent.click(within(gpt).getByLabelText('Thinking'))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await vi.waitFor(() => expect(screen.getByText('Saved')).toBeInTheDocument())
+    const patch = fetch.mock.calls.find(([, init]) => init?.method === 'PATCH')
+    expect(patch?.[0]).toBe('/api/credentials/k1')
+    expect(JSON.parse(String(patch?.[1]?.body))).toEqual({
+      models: [
+        { id: 'gpt', name: 'GPT', capabilities: { vision: false, reasoning: true, tools: true } },
+      ],
+    })
+  })
+
+  it("says so when the key isn't saved anymore", async () => {
+    stubServer({})
+    await renderPage('/api-keys/k1')
+    expect(await screen.findByRole('alert')).toHaveTextContent("This key isn't saved anymore.")
   })
 })
 

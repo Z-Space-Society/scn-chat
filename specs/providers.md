@@ -58,7 +58,7 @@ Each admin model's `roles` lists the roles allowed to use it, using the roles fr
 
 ### User credentials
 
-A user adds a credential for a provider that allows user keys. It holds an API key, an optional display name, a base URL when the provider allows user endpoints, and the model IDs the user wants to use, with their capabilities. When the provider implements `listModels`, the UI offers its list.
+A user adds a credential for a provider that allows user keys. It holds an API key, an optional display name, a base URL when the provider allows user endpoints, and the model IDs the user wants to use, with their capabilities. When the provider implements `listModels`, the UI offers its list. Models start with every capability off, as admin models do, and the user turns on what each can do afterwards. `PATCH /api/credentials/:id` with `{ models }` replaces a credential's models, which must list at least one and each once, and leaves its key, name, slug, and base URL as they are.
 
 Credentials are stored in a `provider_credential` table: ID, owner DID, provider ID, name, slug, base URL, encrypted API key, models as JSON, and timestamps. A user has at most one credential per provider ID, except on providers with user endpoints, where each credential is its own endpoint. The user picks a slug for each endpoint, unique among their credentials and matching `^[a-z0-9-]+$`, and the model reference's provider value becomes `user:<slug>`. Records therefore name something the user chose, not a database ID, which survives deleting and re-adding the endpoint.
 
@@ -123,7 +123,7 @@ The provider data is stored in the `providerData` field of reasoning, text, and 
 - NAT64 addresses are judged by the IPv4 address inside them, not refused as a range. Refusing the range broke sign-in and every guarded fetch on IPv6-only networks, where DNS64 adds one for each IPv4-only host, and the network translates them to the IPv4 address anyway.
 - Provider data is kept as an opaque JSON string per part, so any provider's replay data fits without lexicon changes.
 - The plugin API depends on `@ai-sdk/provider`'s model specification, not on the `ai` runtime. If the AI SDK were ever abandoned, an adapter implementing that interface keeps existing plugins working.
-- The provider routes are `GET /api/models`, `GET /api/providers`, `POST /api/providers/:id/list-models`, and `GET`, `POST`, and `DELETE` under `/api/credentials`.
+- The provider routes are `GET /api/models`, `GET /api/providers`, `POST /api/providers/:id/list-models`, and `GET`, `POST`, `PATCH`, and `DELETE` under `/api/credentials`.
 - Credentials store the key's last four characters in a `key_hint` column, so listing them never decrypts a key.
 - The guard's blocklist is injectable, so tests can use a local server as a stand-in for a public host.
 
@@ -149,6 +149,7 @@ The provider data is stored in the `providerData` field of reasoning, text, and 
 - [ ] A value encrypted with a key in `SECRET_KEYS_OLD` still decrypts, and new values use `SECRET_KEY`.
 - [ ] A credential whose key no current or retired key can decrypt is listed with `keyUnreadable`, and a turn using it ends with an error asking the user to add the key again.
 - [ ] A user endpoint's model references use the user's slug.
+- [ ] Changing a credential's models keeps its key, refuses an empty list or a model listed twice, and touches only the owner's credentials.
 - [ ] A model resolved for a conversation gets a session ID that is the same for every call in that conversation and doesn't contain the user's DID.
 - [ ] An OpenAI-compatible instance with `sessionHeader` sends the session in that header, and one without it sends no session header.
 - [ ] Each lexicon effort value maps to the AI SDK reasoning value in the table.

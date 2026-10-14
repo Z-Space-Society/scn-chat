@@ -143,6 +143,29 @@ export async function saveCredential(
   return summarize({ id, ...row }, box)
 }
 
+/** Replace the models a user's key covers, such as to say what each can do, leaving the key itself. */
+export async function updateCredentialModels(
+  db: Db,
+  box: SecretBox,
+  did: string,
+  id: string,
+  models: ModelInfo[],
+): Promise<CredentialSummary | undefined> {
+  if (!models.length) throw new CredentialInputError('Add at least one model')
+  const ids = new Set(models.map((model) => model.id))
+  if (ids.size < models.length) throw new CredentialInputError('Each model can be listed once')
+  const row = (await rows(db, did)).find((r) => r.id === id)
+  if (!row) return undefined
+  const models_json = JSON.stringify(models)
+  await db
+    .updateTable('provider_credential')
+    .set({ models_json, updated_at: new Date().toISOString() })
+    .where('owner_did', '=', did)
+    .where('id', '=', id)
+    .execute()
+  return summarize({ ...row, models_json }, box)
+}
+
 export async function deleteCredential(db: Db, did: string, id: string): Promise<boolean> {
   const result = await db
     .deleteFrom('provider_credential')

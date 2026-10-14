@@ -8,6 +8,8 @@ export interface Section {
   to: NonNullable<LinkProps['to']>
   label: string
   icon?: ReactNode
+  /** Whether only the section's own path counts as it, not the pages under it. */
+  exact?: boolean
 }
 
 interface Props {
@@ -37,7 +39,9 @@ export function SectionNav(props: Props) {
           <li key={section.to}>
             <Link
               to={section.to}
-              activeOptions={props.activeOptions}
+              activeOptions={
+                section.exact ? { ...props.activeOptions, exact: true } : props.activeOptions
+              }
               className={cn(
                 sidebarRow,
                 'wide:hover:bg-surface/55 wide:aria-[current=page]:bg-surface',

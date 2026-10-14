@@ -13,6 +13,7 @@ import {
   SettingsGroup,
   SettingsPage,
 } from '../../../shared/ui/SettingsPage.tsx'
+import { capabilities } from '../../models/capabilities.ts'
 import { RolePicker } from '../components/RolePicker.tsx'
 import { useModelsChanged } from '../hooks/changes.ts'
 import { type AdminModel, storedModel } from '../lib/models.ts'
@@ -117,16 +118,6 @@ interface ModelFormProps {
   /** Called on any change, since what is shown is no longer what was saved. */
   onEdit: () => void
 }
-
-const capabilities = [
-  { key: 'vision', label: 'Vision', description: 'Reads images people attach.' },
-  {
-    key: 'reasoning',
-    label: 'Thinking',
-    description: 'Thinks before it answers, at the effort people pick.',
-  },
-  { key: 'tools', label: 'Tools', description: 'Calls the tools plugins offer.' },
-] as const
 
 /** One admin model's name, capabilities, and roles. */
 function ModelForm(props: ModelFormProps) {

@@ -130,6 +130,8 @@ interface LinkItemProps {
   actions?: ReactNode
   /** A small square before the names, such as the item's place in an order. */
   mark?: ReactNode
+  /** Whether the item is on its way out, which fades it. */
+  deleting?: boolean
   /** More lines under the names, such as an error. */
   children?: ReactNode
 }
@@ -141,9 +143,10 @@ interface LinkItemProps {
 export function LinkItem(props: LinkItemProps) {
   return (
     <li
+      data-deleting={props.deleting || undefined}
       className={cn(
         row,
-        'relative flex-nowrap has-[strong_a:focus-visible]:outline-2 has-[strong_a:focus-visible]:outline-focus has-[strong_a:focus-visible]:-outline-offset-2 hover:has-[strong_a:hover]:bg-row-hover [&_button]:relative [&_button]:z-1',
+        'relative flex-nowrap has-[strong_a:focus-visible]:outline-2 has-[strong_a:focus-visible]:outline-focus has-[strong_a:focus-visible]:-outline-offset-2 hover:has-[strong_a:hover]:bg-row-hover data-deleting:opacity-50 [&_button]:relative [&_button]:z-1',
       )}
     >
       {props.mark !== undefined && <ItemMark>{props.mark}</ItemMark>}
