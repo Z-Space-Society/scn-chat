@@ -19,7 +19,7 @@ interface Props {
 
 /**
  * The sign-in form, which signs in through the server's OAuth flow: one quiet column with the
- * app's name and a handle field.
+ * app's logo, its description, and a handle field.
  */
 export function LoginPage(props: Props) {
   const [redirecting, setRedirecting] = useState(false)
@@ -33,11 +33,10 @@ export function LoginPage(props: Props) {
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center bg-panel px-4 py-12">
       <section className="w-full max-w-96 text-center">
-        <Logo className="mx-auto mb-3 block h-10" />
-        <h1 className="text-balance font-semibold text-display text-ink-strong leading-tight tracking-title">
-          {props.appName}
-        </h1>
-        <p className="mt-2 mb-8 text-balance font-medium text-muted text-ui">{props.description}</p>
+        <Logo className="mx-auto mb-4 block h-10" />
+        {/* The logo says the name to the eye, so the name is only the page's heading for screen readers. */}
+        <h1 className="sr-only">{props.appName}</h1>
+        <p className="mb-8 text-balance font-medium text-muted text-ui">{props.description}</p>
         {props.notice && (
           // Why a signed-in viewer is here: a quiet note over the form.
           <p
