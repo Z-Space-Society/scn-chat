@@ -24,6 +24,10 @@ Phase 1:
 - Chat history search
 - Web search and page fetch plugins
 - User and admin model configuration
+- Model and thinking effort chosen per message, with model search
+- Custom instructions for every chat, and each chat's own instructions
+- Handle suggestions when signing in
+- A message box you can type in as soon as the page appears, before the app has loaded
 
 ## TODO
 
