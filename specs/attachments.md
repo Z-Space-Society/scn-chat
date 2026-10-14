@@ -24,19 +24,19 @@ The web UI includes the returned parts in the message it sends. The server does 
 
 ### Blob store
 
-`apps/server/src/blobs/` has one interface with two implementations, chosen by the user's storage mode:
+`apps/server/src/blobs/` has one interface with two implementations, each bound to one user's DID like a `RecordStore`. `createChatServices` gives each user's `ChatService` the one for their storage mode, and callers use the service's `putBlob` and `readBlob`:
 
 ```ts
 interface BlobStore {
-  put(user, bytes: Uint8Array, mimeType: string): Promise<BlobRef>
-  get(user, conversation, ref: BlobRef): Promise<Uint8Array>
+  put(bytes: Uint8Array, mimeType: string): Promise<BlobRef>
+  get(conversationUri: string, cid: string): Promise<{ bytes: Uint8Array; mimeType: string }>
 }
 ```
 
 - **Spaces users.** `put` calls `com.atproto.repo.uploadBlob` on the user's PDS with their OAuth session, which needs the blob permission in the permission set. `get` calls `com.atproto.space.getBlob` for the conversation.
 - **Fallback users.** Bytes are written under `DATA_DIR/blobs/<did>/<cid>`, one directory per owner, with the CID computed the way a PDS computes it: CIDv1, raw codec, SHA-256. The same bytes therefore get the same CID if the user later moves to a spaces PDS, so their records' blob references stay valid after migration.
 
-A PDS keeps an uploaded blob only if a record references it within a time window. An attachment that is never sent is cleaned up by the PDS for spaces users, and by a daily sweep of unreferenced files older than a day for fallback users.
+A PDS keeps an uploaded blob only if a record references it within a time window. An attachment that is never sent is cleaned up by the PDS for spaces users, and by a daily sweep of unreferenced files older than a day for fallback users, `sweepLocalBlobs`, which asks the local record store whether any record still references a blob.
 
 Blobs are not cached on the server. A turn fetches the images it sends to the model from the blob store each time, and holds them in memory only for that turn.
 

@@ -320,7 +320,9 @@ describe('TurnRunner.start', () => {
     )
     expect(result?.outputBlob).toMatchObject({ $type: 'blob', mimeType: 'text/plain' })
     expect(String(result?.output).length).toBeLessThan(1000)
-    expect(h.stored.get(`bafkrei0fake`)?.length).toBeGreaterThan(900_000)
+    const cid = (result!.outputBlob as { ref: { $link: string } }).ref.$link
+    const blob = await h.chats.readBlob(skey, cid)
+    expect(new TextDecoder().decode(blob.bytes)).toBe(huge)
   })
 
   it('queues past the rate limit without claiming, and starts once the limit allows', async () => {

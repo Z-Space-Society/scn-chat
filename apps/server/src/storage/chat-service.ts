@@ -1,5 +1,6 @@
 import { nsid } from '@scn-chat/lexicons'
 import type { InfoPatch } from '@scn-chat/plugin-api'
+import type { BlobStore, StoredBlob } from '../blobs/store.ts'
 import type { Logger } from '../logger.ts'
 import {
   type Op,
@@ -46,21 +47,27 @@ export type IndexChanges = {
   full: boolean
 }
 
-/** Chat operations for one user, keeping their chat index in step with every write. */
+/**
+ * Chat operations for one user, keeping their chat index in step with every write, over their
+ * records and blobs in whichever storage their account uses.
+ */
 export class ChatService {
   readonly did: string
   readonly store: RecordStore
   readonly settingsUri: string
+  private readonly blobs: BlobStore
   private readonly logger: Logger
   private readonly onWrite: (space: string, cid: string) => void
 
   constructor(
     store: RecordStore,
+    blobs: BlobStore,
     logger: Logger,
     onWrite: (space: string, cid: string) => void = () => {},
   ) {
     this.did = store.did
     this.store = store
+    this.blobs = blobs
     this.logger = logger
     this.onWrite = onWrite
     this.settingsUri = spaceUri(store.did, nsid.settings, SETTINGS_SKEY)
@@ -68,6 +75,16 @@ export class ChatService {
 
   conversationUri(skey: string): string {
     return spaceUri(this.did, nsid.conversation, skey)
+  }
+
+  /** Store bytes as one of the user's blobs, returning its reference for a record to hold. */
+  putBlob(bytes: Uint8Array, mimeType: string): Promise<JsonRecord> {
+    return this.blobs.put(bytes, mimeType)
+  }
+
+  /** Read a blob that a record in one of the user's conversations references. */
+  readBlob(skey: string, cid: string): Promise<StoredBlob> {
+    return this.blobs.get(this.conversationUri(skey), cid)
   }
 
   async ensureSettingsSpace(): Promise<void> {

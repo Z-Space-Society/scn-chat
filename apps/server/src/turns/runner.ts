@@ -22,7 +22,6 @@ import type { ChatServices } from '../storage/services.ts'
 import type { SyncEventBus, SyncEvents } from '../sync/events.ts'
 import { encode, PartAccumulator } from './accumulator.ts'
 import {
-  type BlobReader,
   branchTo,
   buildInstructions,
   fillBasePrompt,
@@ -33,11 +32,6 @@ import {
 } from './prompt.ts'
 import type { StreamHub } from './stream-hub.ts'
 import { wrapUntrusted } from './untrusted.ts'
-
-export type TurnBlobs = {
-  reader(account: Account, skey: string): BlobReader
-  put(account: Account, bytes: Uint8Array, mimeType: string): Promise<JsonRecord>
-}
 
 export type TurnSettings = {
   ratePerMinute: number
@@ -53,7 +47,6 @@ export type TurnRunnerDeps = {
   /** Hold the current plugin runtime for the length of a turn. */
   plugins: { acquire(): RuntimeLease }
   hub: StreamHub
-  blobs: TurnBlobs
   /** The current turn settings, read when each turn starts. */
   settings: () => TurnSettings
   appName: () => string
@@ -394,7 +387,7 @@ export class TurnRunner {
   }
 
   /** Move the largest tool outputs into blobs until the record fits a PDS write. */
-  private async fitRecord(account: Account, record: JsonRecord): Promise<JsonRecord> {
+  private async fitRecord(chats: ChatService, record: JsonRecord): Promise<JsonRecord> {
     const content = record.content as { parts: Record<string, unknown>[] }
     const size = () => new TextEncoder().encode(JSON.stringify(record)).length
     const results = content.parts
@@ -408,7 +401,7 @@ export class TurnRunner {
     for (const part of results) {
       if (size() <= MAX_RECORD_BYTES) break
       const bytes = new TextEncoder().encode(String(part.output))
-      part.outputBlob = await this.deps.blobs.put(account, bytes, 'text/plain')
+      part.outputBlob = await chats.putBlob(bytes, 'text/plain')
       part.output = `Output stored as a blob (${bytes.length} bytes).`
     }
     if (size() > MAX_RECORD_BYTES) throw new Error('The reply is too large to store')
@@ -486,7 +479,7 @@ export class TurnRunner {
       const messages = await toModelMessages(prompt.messages, {
         provider: resolved.provider,
         capabilities: resolved.capabilities,
-        readBlob: this.deps.blobs.reader(account, skey),
+        readBlob: (cid) => chats.readBlob(skey, cid),
         isUntrusted: (name) => this.isUntrusted(host, name),
       })
       const result = streamText({
@@ -546,7 +539,7 @@ export class TurnRunner {
       ...(error ? { error } : {}),
     }
     try {
-      final = await this.fitRecord(account, final)
+      final = await this.fitRecord(chats, final)
       await chats.putMessage(skey, replyRkey, final)
     } catch (err) {
       this.deps.logger.error({ err, did, skey, replyRkey }, 'could not write the finished reply')

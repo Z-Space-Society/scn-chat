@@ -9,8 +9,7 @@ import { addPluginMember, syncMembers } from './auth/role-store.ts'
 import { type RoleIdentity, Roles } from './auth/roles.ts'
 import { buildScope } from './auth/scope.ts'
 import { sweepExpired } from './auth/web-session.ts'
-import { turnBlobs } from './blobs/routes.ts'
-import { createBlobStores } from './blobs/store.ts'
+import { sweepLocalBlobs } from './blobs/store.ts'
 import type { Config } from './config.ts'
 import { Cron } from './cron.ts'
 import type { Db } from './db/index.ts'
@@ -70,8 +69,14 @@ export async function createServer(deps: ServerDeps) {
   const resolvePds = async (did: string) => (await identity.resolve(did)).pdsUrl
   const events = new SyncEventBus()
   const recentWrites = new RecentWrites()
-  const services = createChatServices({ db, getPdsClient, logger, events, recentWrites })
-  const blobStores = createBlobStores({ getPdsClient, dataDir: config.dataDir, db })
+  const services = createChatServices({
+    db,
+    getPdsClient,
+    dataDir: config.dataDir,
+    logger,
+    events,
+    recentWrites,
+  })
   const guardedFetch = createGuardedFetch()
 
   // Set once the plugins load, which needs the services below.
@@ -156,13 +161,11 @@ export async function createServer(deps: ServerDeps) {
     hasAccess,
   })
   const hub = new StreamHub()
-  const blobsFor = blobStores.forAccount
   const runner = new TurnRunner({
     db,
     services,
     plugins: holder,
     hub,
-    blobs: turnBlobs(blobsFor, services),
     settings: () => {
       const turns = settings.get('turns')
       return {
@@ -190,7 +193,6 @@ export async function createServer(deps: ServerDeps) {
 
   const onLogin = async (account: Account) => {
     await services.forAccount(account).ensureSettingsSpace()
-    if (account.storageMode !== 'space') return
     const did = account.did
     // Each step runs even if an earlier one fails.
     const background = async () => {
@@ -252,7 +254,7 @@ export async function createServer(deps: ServerDeps) {
       logger,
     },
     turns: { services, runner, hub },
-    blobs: { blobsFor, services, ingesters: () => runtime().host.ingesters, logger },
+    blobs: { services, ingesters: () => runtime().host.ingesters, logger },
     sharing,
     sync: {
       db,
@@ -280,7 +282,7 @@ export async function createServer(deps: ServerDeps) {
       }),
     )
     const sweepAll = () => {
-      blobStores.local.sweep().catch((err) => logger.warn({ err }, 'blob sweep failed'))
+      sweepLocalBlobs(config.dataDir, db).catch((err) => logger.warn({ err }, 'blob sweep failed'))
       sweepExpired(db).catch((err) => logger.warn({ err }, 'session sweep failed'))
     }
     sweepAll()

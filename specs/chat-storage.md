@@ -45,7 +45,7 @@ Local space URIs use the same format as spaces, and record CIDs are computed the
 
 ### ChatService
 
-`ChatService` implements chat operations for one user, over their `RecordStore`:
+`ChatService` implements chat operations for one user, over their `RecordStore` and their blob store. `createChatServices` builds each user's `ChatService` over the record store and blob store for their storage mode, so that is the one place that chooses between a spaces PDS and the local fallback. Removing the fallback means deleting its two adapters and that choice.
 
 - **Settings space.** At login, it creates the settings space with key `self`, `readPolicy` and `writePolicy` `#memberListPolicy`, and `appAccess` `#open`, treating `SpaceExists` as success.
 - **Creating a conversation.** It creates the conversation space, writes the `info` record at key `self`, then writes the conversation's `conversationRef` in the settings space, keyed by the conversation's key, with `updatedAt`.
@@ -54,6 +54,7 @@ Local space URIs use the same format as spaces, and record CIDs are computed the
 - **Tags.** Tags live only in the `conversationRef`, in the owner's private settings space. `setTags` rewrites the entry with the new tags.
 - **Deleting a conversation.** It deletes the space, then deletes the `conversationRef`.
 - **Preferences.** They are read and written at key `self` in the settings space.
+- **Blobs.** `putBlob` stores bytes as one of the user's blobs and returns its reference, and `readBlob` reads a blob that a record in one of their conversations references. The attachment routes and the turn runner reach blobs only through these, as the attachments spec describes.
 
 The index update is a second write, so it can fail after the message write succeeds. A failure is logged as a warning, and discovery repairs the index later. `putRecord` has no compare-and-swap, so two clients writing the same conversation at once can overwrite each other's info or index entry. That is a risk the user accepts by writing from several clients.
 

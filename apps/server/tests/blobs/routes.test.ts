@@ -1,10 +1,6 @@
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { createApp } from '../../src/app.ts'
 import { buildScope } from '../../src/auth/scope.ts'
-import { createBlobStores } from '../../src/blobs/store.ts'
 import { IngesterRegistry } from '../../src/plugins/registry.ts'
 import {
   authDeps,
@@ -20,11 +16,6 @@ import { spacesHarness } from '../helpers/spaces.ts'
 
 async function setup(storageMode: 'space' | 'local') {
   const h = await spacesHarness({ storageMode })
-  const stores = createBlobStores({
-    getPdsClient: async (did) => h.pds.client(did) as never,
-    dataDir: mkdtempSync(join(tmpdir(), 'scn-')),
-    db: h.db,
-  })
   const ingesters = new IngesterRegistry()
   ingesters.register(
     {
@@ -61,7 +52,6 @@ async function setup(storageMode: 'space' | 'local') {
     logger: h.logger,
     auth: authDeps(h.db, { oauth }),
     blobs: {
-      blobsFor: stores.forAccount,
       services: h.services,
       ingesters: () => ingesters,
       logger: h.logger,

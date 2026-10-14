@@ -7,7 +7,7 @@ import { RuntimeHolder } from '../../src/plugins/runtime.ts'
 import { type AdminModel, saveAdminModel } from '../../src/providers/admin-models.ts'
 import { ModelCatalog } from '../../src/providers/catalog.ts'
 import { SecretBox } from '../../src/secrets.ts'
-import { type TurnBlobs, TurnRunner } from '../../src/turns/runner.ts'
+import { TurnRunner } from '../../src/turns/runner.ts'
 import { StreamHub } from '../../src/turns/stream-hub.ts'
 import { spacesHarness } from './spaces.ts'
 
@@ -140,30 +140,12 @@ export async function turnsHarness(
     backfillWindowMs: 60 * 60_000,
     systemPrompt: options.systemPrompt ?? '',
   }
-  const stored = new Map<string, Uint8Array>()
-  const blobs: TurnBlobs = {
-    reader: () => async (cid) => ({
-      bytes: stored.get(cid) ?? new Uint8Array(),
-      mimeType: 'text/plain',
-    }),
-    put: async (_account, bytes, mimeType) => {
-      const cid = `bafkrei${stored.size}fake`
-      stored.set(cid, bytes)
-      return {
-        $type: 'blob',
-        ref: { $link: 'bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy' },
-        mimeType,
-        size: bytes.length,
-      }
-    },
-  }
   const hub = new StreamHub()
   const runner = new TurnRunner({
     db: h.db,
     services: h.services,
     plugins,
     hub,
-    blobs,
     settings: () => settings,
     appName: options.appName ?? (() => 'Test Chat'),
     hasAccess: options.hasAccess ?? (async () => true),
@@ -189,7 +171,5 @@ export async function turnsHarness(
     created,
     setModel,
     messages,
-    blobs,
-    stored,
   }
 }

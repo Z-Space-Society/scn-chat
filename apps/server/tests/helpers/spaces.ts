@@ -1,3 +1,6 @@
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { nsid } from '@scn-chat/lexicons'
 import pino from 'pino'
 import { vi } from 'vitest'
@@ -38,11 +41,14 @@ export async function spacesHarness(
   await migrateToLatest(db)
   const logger = pino({ level: 'silent' })
   const pds = await FakePds.create(db)
+  // Where fallback users' blobs go.
+  const dataDir = mkdtempSync(join(tmpdir(), 'scn-'))
   const events = new SyncEventBus()
   const recentWrites = new RecentWrites()
   const services = createChatServices({
     db,
     getPdsClient: async (did) => pds.client(did) as never,
+    dataDir,
     logger,
     events,
     recentWrites,
@@ -79,7 +85,19 @@ export async function spacesHarness(
   const external = services.storeFor(account)
   const chats = services.forAccount(account)
   await chats.ensureSettingsSpace()
-  return { db, pds, events, recentWrites, services, account, chats, engine, external, logger }
+  return {
+    db,
+    pds,
+    events,
+    recentWrites,
+    services,
+    account,
+    chats,
+    engine,
+    external,
+    logger,
+    dataDir,
+  }
 }
 
 export function collect<E extends string>(events: SyncEventBus, name: E) {

@@ -70,7 +70,7 @@ export function storageRoutes(deps: StorageRoutesDeps) {
     .get('/conversations/:skey', async (c) => {
       const user = signedInUser(c)
       const skey = c.req.param('skey')
-      if (user.account.storageMode === 'space') await syncBeforeRead(user.did, skey)
+      await syncBeforeRead(user.did, skey)
       const result = await chatsFor(c).getConversation(skey, c.req.query('since'))
       if (result.full && !result.info) return c.json({ error: 'NotFound' }, 404)
       return c.json(result)
@@ -108,8 +108,7 @@ export function storageRoutes(deps: StorageRoutesDeps) {
     })
     .post('/conversations/:skey/sync', async (c) => {
       const user = signedInUser(c)
-      if (user.account.storageMode === 'space' && deps.engine)
-        await deps.engine.syncConversation(user.did, c.req.param('skey'))
+      await deps.engine?.syncConversation(user.did, c.req.param('skey'))
       return c.json({ ok: true })
     })
     .get('/preferences', async (c) => c.json({ preferences: await chatsFor(c).getPreferences() }))

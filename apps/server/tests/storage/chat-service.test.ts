@@ -1,7 +1,11 @@
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { nsid } from '@scn-chat/lexicons'
 import { sql } from 'kysely'
 import pino from 'pino'
 import { describe, expect, it, vi } from 'vitest'
+import { LocalBlobStore } from '../../src/blobs/store.ts'
 import type { Db } from '../../src/db/index.ts'
 import { migrateToLatest } from '../../src/db/migrate.ts'
 import { ChatService } from '../../src/storage/chat-service.ts'
@@ -28,7 +32,8 @@ describe.each(dialects)('ChatService on $name', ({ create }) => {
     const db = create()
     await migrateToLatest(db)
     const writes: string[] = []
-    const chats = new ChatService(new LocalRecordStore(did, db), logger, (_space, cid) =>
+    const blobs = new LocalBlobStore(did, mkdtempSync(join(tmpdir(), 'scn-')))
+    const chats = new ChatService(new LocalRecordStore(did, db), blobs, logger, (_space, cid) =>
       writes.push(cid),
     )
     return { db, chats, writes }

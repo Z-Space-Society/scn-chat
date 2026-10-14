@@ -5,7 +5,7 @@ import type { AppEnv } from '../env.ts'
 import type { Logger } from '../logger.ts'
 import type { IngesterRegistry } from '../plugins/registry.ts'
 import type { ChatServices } from '../storage/services.ts'
-import { BlobNotFound, type BlobStore } from './store.ts'
+import { BlobNotFound } from './store.ts'
 
 export const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
 export const MAX_IMAGE_BYTES = 20_000_000
@@ -41,7 +41,6 @@ async function readLimited(
 }
 
 export type BlobRoutesDeps = {
-  blobsFor: (account: Parameters<ChatServices['forAccount']>[0]) => BlobStore
   services: ChatServices
   ingesters: () => IngesterRegistry
   logger: Logger
@@ -80,9 +79,9 @@ export function blobRoutes(deps: BlobRoutesDeps) {
       const bytes = await readLimited(c.req.raw.body, limit)
       if (!bytes)
         return c.json({ error: 'PayloadTooLarge', message: `Limit is ${limit} bytes` }, 413)
-      const store = deps.blobsFor(account)
+      const chats = deps.services.forAccount(account)
       if (image) {
-        const blob = await store.put(account, bytes, mimeType)
+        const blob = await chats.putBlob(bytes, mimeType)
         return c.json({ part: { $type: `${nsid.defs}#imagePart`, image: blob } }, 201)
       }
       let text: string
@@ -105,8 +104,8 @@ export function blobRoutes(deps: BlobRoutesDeps) {
           { error: 'PayloadTooLarge', message: 'This file has more text than a message can hold' },
           413,
         )
-      const file = await store.put(account, bytes, mimeType)
-      const extracted = await store.put(account, extractedBytes, 'text/plain')
+      const file = await chats.putBlob(bytes, mimeType)
+      const extracted = await chats.putBlob(extractedBytes, 'text/plain')
       return c.json(
         {
           part: {
@@ -126,9 +125,7 @@ export function blobRoutes(deps: BlobRoutesDeps) {
       const { account } = signedInUser(c)
       const chats = deps.services.forAccount(account)
       try {
-        const blob = await deps
-          .blobsFor(account)
-          .get(account, chats.conversationUri(c.req.param('skey')), c.req.param('cid'))
+        const blob = await chats.readBlob(c.req.param('skey'), c.req.param('cid'))
         const mimeType =
           c.req.query('type') && IMAGE_TYPES.has(String(c.req.query('type')))
             ? String(c.req.query('type'))
@@ -142,18 +139,4 @@ export function blobRoutes(deps: BlobRoutesDeps) {
         throw err
       }
     })
-}
-
-/** Blob access for the turn runner, through each account's store. */
-export function turnBlobs(blobsFor: BlobRoutesDeps['blobsFor'], services: ChatServices) {
-  return {
-    reader:
-      (account: Parameters<BlobRoutesDeps['blobsFor']>[0], skey: string) => async (cid: string) =>
-        blobsFor(account).get(account, services.forAccount(account).conversationUri(skey), cid),
-    put: (
-      account: Parameters<BlobRoutesDeps['blobsFor']>[0],
-      bytes: Uint8Array,
-      mimeType: string,
-    ) => blobsFor(account).put(account, bytes, mimeType),
-  }
 }

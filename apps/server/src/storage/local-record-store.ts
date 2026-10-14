@@ -15,6 +15,16 @@ import { assertValidRecord } from './validate.ts'
 
 const rev = (seq: number) => String(seq).padStart(16, '0')
 
+/** Whether any fallback user's current record mentions a CID, as one referencing a blob does. */
+export async function localRecordReferences(db: Db, cid: string): Promise<boolean> {
+  const referenced = await db
+    .selectFrom('local_record')
+    .select('rkey')
+    .where('value_json', 'like', `%${cid}%`)
+    .executeTakeFirst()
+  return referenced !== undefined
+}
+
 /** A stand-in for a PDS in the app database, for users whose PDS lacks spaces. */
 export class LocalRecordStore implements RecordStore {
   readonly did: string
