@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { definePlugin, type ModelInfo } from '@scn-chat/plugin-api'
+import { extractReasoningMiddleware, wrapLanguageModel } from 'ai'
 import { z } from 'zod'
 
 export const optionsSchema = z
@@ -34,6 +35,11 @@ export const optionsSchema = z
       title: 'User agent',
       description:
         "Leads the user agent, for endpoints that ask clients to name themselves. Chat calls add the SDK's name after it.",
+    }),
+    startWithReasoning: z.boolean().optional().meta({
+      title: 'Replies start inside the reasoning',
+      description:
+        'For models whose template opens the <think> tag in the prompt, such as DeepSeek R1 served without a reasoning parser, so a reply has only the closing tag. Leave it off if any model on this endpoint answers without reasoning, since all of its reply would show as reasoning.',
     }),
   })
   .strict()
@@ -72,7 +78,7 @@ export default function openaiCompatible(options: OpenAICompatibleOptions) {
         createModel: ({ modelId, apiKey, baseURL, fetch, session }) => {
           const url = baseURL ?? options.baseURL
           if (!url) throw new Error(`Provider "${options.id}" has no base URL`)
-          return createOpenAICompatible({
+          const model = createOpenAICompatible({
             name: options.id,
             baseURL: url,
             apiKey: apiKey ?? options.apiKey,
@@ -80,6 +86,14 @@ export default function openaiCompatible(options: OpenAICompatibleOptions) {
             includeUsage: true,
             fetch,
           })(modelId)
+          // Servers that leave reasoning in the text, such as llama.cpp with --reasoning-format none, wrap it in think tags.
+          return wrapLanguageModel({
+            model,
+            middleware: extractReasoningMiddleware({
+              tagName: 'think',
+              startWithReasoning: options.startWithReasoning ?? false,
+            }),
+          })
         },
         async listModels({ apiKey, baseURL, fetch = globalThis.fetch }) {
           const url = baseURL ?? options.baseURL

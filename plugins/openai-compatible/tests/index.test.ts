@@ -18,6 +18,30 @@ const completion = {
   usage: { prompt_tokens: 1, completion_tokens: 1 },
 }
 
+/** Stream a reply made of the given content deltas, returning its reasoning and text. */
+async function streamWith(instance: ReturnType<typeof plugin>, deltas: string[]) {
+  const { providers } = await setupForTest(instance)
+  const chunk = (content: string) =>
+    `data: ${JSON.stringify({ ...completion, object: 'chat.completion.chunk', choices: [{ index: 0, delta: { content }, finish_reason: null }] })}\n\n`
+  const body = `${deltas.map(chunk).join('')}data: [DONE]\n\n`
+  const fetch = vi.fn(
+    async () => new Response(body, { headers: { 'content-type': 'text/event-stream' } }),
+  )
+  const model = providers[0]!.createModel({
+    modelId: 'qwen3',
+    fetch: fetch as unknown as typeof globalThis.fetch,
+  })
+  const { stream } = await model.doStream({
+    prompt: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
+  } as never)
+  const streamed = { reasoning: '', text: '' }
+  for await (const part of stream as unknown as AsyncIterable<{ type: string; delta?: string }>) {
+    if (part.type === 'reasoning-delta') streamed.reasoning += part.delta
+    if (part.type === 'text-delta') streamed.text += part.delta
+  }
+  return streamed
+}
+
 describe('openai-compatible plugin', () => {
   it('offers admin models for a keyless local server with only a base URL', async () => {
     const { providers } = await setupForTest(
@@ -107,6 +131,41 @@ describe('openai-compatible plugin', () => {
     )
     expect(headers.get('user-agent')).toBe('scn-chat/1.0')
     expect(headers.get('x-opencode-session')).toMatch(/^[0-9a-f]{32}$/)
+  })
+
+  it('streams reasoning in think tags as reasoning, apart from the text', async () => {
+    const streamed = await streamWith(plugin(cocore), ['<think>Plan', ' it.</think>', 'Hi'])
+    expect(streamed).toEqual({ reasoning: 'Plan it.', text: 'Hi' })
+  })
+
+  it('treats a reply up to the closing tag as reasoning when replies start inside it', async () => {
+    const streamed = await streamWith(plugin({ ...cocore, startWithReasoning: true }), [
+      'Plan it.',
+      '</think>Hi',
+    ])
+    expect(streamed).toEqual({ reasoning: 'Plan it.', text: 'Hi' })
+  })
+
+  it('separates reasoning in think tags from the text of a whole reply', async () => {
+    const { providers } = await setupForTest(plugin(cocore))
+    const content = '<think>Plan it.</think>Hi'
+    const fetch = vi.fn(async () =>
+      Response.json({
+        ...completion,
+        choices: [{ ...completion.choices[0], message: { role: 'assistant', content } }],
+      }),
+    )
+    const model = providers[0]!.createModel({
+      modelId: 'qwen3',
+      fetch: fetch as unknown as typeof globalThis.fetch,
+    })
+    const result = await model.doGenerate({
+      prompt: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
+    } as never)
+    expect(result.content).toEqual([
+      expect.objectContaining({ type: 'reasoning', text: 'Plan it.' }),
+      expect.objectContaining({ type: 'text', text: 'Hi' }),
+    ])
   })
 
   it('fails without a base URL, before fetching', async () => {

@@ -659,7 +659,7 @@ describe('TurnRunner.start', () => {
 
   it('publishes stream events that a late subscriber replays before following live', async () => {
     const h = await turnsHarness({
-      model: () => scriptedModel(textReply('abc'), { delayMs: 15 }).model,
+      model: () => scriptedModel(textReply('a b c'), { delayMs: 15 }).model,
     })
     const { skey } = await h.chats.createConversation()
     await sendUser(h, skey, '3uuuuuuuuuuu1')
@@ -675,6 +675,23 @@ describe('TurnRunner.start', () => {
     expect(seen[0]).toBe('part-start')
     expect(seen.filter((t) => t === 'delta')).toHaveLength(3)
     expect(seen.at(-1)).toBe('status')
+  })
+
+  it('smooths text into words, and Chinese and Japanese into single characters', async () => {
+    const h = await turnsHarness({
+      model: () => scriptedModel(textReply('Hello there 你好です', { whole: true })).model,
+    })
+    const { skey } = await h.chats.createConversation()
+    await sendUser(h, skey, '3uuuuuuuuuuu1')
+    await h.runner.start(ALICE, skey, '3uuuuuuuuuuu1')
+    const deltas: string[] = []
+    await new Promise<void>((resolve) =>
+      h.hub.subscribe(h.runner.streamKey(ALICE, skey, '3uuuuuuuuuuu1.r0'), (event) => {
+        if (event.type === 'delta') deltas.push(event.text)
+        if (event.type === 'status') resolve()
+      }),
+    )
+    expect(deltas).toEqual(['Hello ', 'there ', '你', '好', 'で', 'す'])
   })
 
   it('works the same for a local account', async () => {

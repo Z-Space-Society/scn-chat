@@ -128,7 +128,7 @@ Context passed to the plugins `setup` handler can include the following data. Pl
 
 ## Model providers
 
-A provider connects SCN Chat to a model API. See [`plugins/openai-compatible`](../plugins/openai-compatible/src/index.ts) for an example.
+A provider connects SCN Chat to a model API. See [`plugins/openai-compatible`](../plugins/openai-compatible/src/index.ts) for an example. `createModel` returns an AI SDK language model, which a provider usually gets from an `@ai-sdk/*` package. That example also wraps its models in AI SDK middleware, which needs the `ai` package as a dependency. A provider that doesn't wrap its models doesn't need it.
 
 | Field | Meaning |
 |---|---|

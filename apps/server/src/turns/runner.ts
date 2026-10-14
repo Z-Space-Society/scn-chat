@@ -6,7 +6,7 @@ import type {
   ToolContext,
   TurnContext,
 } from '@scn-chat/plugin-api'
-import { isStepCount, jsonSchema, streamText, type ToolSet, tool } from 'ai'
+import { isStepCount, jsonSchema, smoothStream, streamText, type ToolSet, tool } from 'ai'
 import { type Account, getAccount } from '../auth/accounts.ts'
 import type { Db } from '../db/index.ts'
 import type { Logger } from '../logger.ts'
@@ -68,6 +68,8 @@ export type StartResult = {
 
 const MAX_RECORD_BYTES = 900_000
 const defs = (name: string) => `${nsid.defs}#${name}`
+/** A word, or a single Chinese or Japanese character, since those run on without spaces. */
+const SMOOTH_CHUNKING = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]|\S+\s+/u
 
 type QueuedTurn = { skey: string; userRkey: string; replyRkey: string; attempt: number }
 
@@ -527,6 +529,7 @@ export class TurnRunner {
           : undefined,
         abortSignal: controller.signal,
         providerOptions: resolved.provider.providerOptions as never,
+        experimental_transform: smoothStream({ delayInMs: 10, chunking: SMOOTH_CHUNKING }),
       })
       for await (const chunk of result.stream) {
         if (chunk.type === 'abort') status = 'cancelled'

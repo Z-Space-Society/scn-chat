@@ -58,7 +58,7 @@ When sync emits `message:invalid` for a user message that carries a generation r
    - User text parts become text parts. Attachments follow the attachments spec.
    - Assistant replies with status `complete` or `cancelled` contribute their text parts, tool calls and results, and reasoning according to the provider's replay policy. Replies with status `error` or `pending` are skipped.
 7. **Filter.** It runs the `messages:beforeModel` hook.
-8. **Generate.** It calls `streamText` with the model, instructions, messages, the tools for the turn, `stopWhen: isStepCount(turns.maxSteps)` (default 8), the mapped `reasoning` value, and an abort signal. The signal fires on cancel or after `turns.timeoutSeconds`, default 600. The tools are the ones named in `generation.tools`, or, when a message names none, the tools the user has switched on, as the web-search spec describes.
+8. **Generate.** It calls `streamText` with the model, instructions, messages, the tools for the turn, `stopWhen: isStepCount(turns.maxSteps)` (default 8), the mapped `reasoning` value, an abort signal, and `smoothStream` as its transform, which releases text and reasoning a word at a time, or a character at a time for Chinese and Japanese. The signal fires on cancel or after `turns.timeoutSeconds`, default 600. The tools are the ones named in `generation.tools`, or, when a message names none, the tools the user has switched on, as the web-search spec describes.
 9. **Stream.** It reads `result.stream`, builds the reply's parts, and publishes events to the turn's stream buffer.
 10. **Finish.** It builds the final record: parts in the order the model produced them, usage from `result.usage` (input, output, and `outputTokenDetails.reasoningTokens`), and a status. It runs the `message:afterModel` hook, then writes the record with `putMessage`. After that it runs the `turn:after` hook.
 
@@ -128,6 +128,7 @@ The `turns` admin setting, from the admin-settings spec, holds `ratePerMinute`, 
 - The send route returns the user message key, the reply key, and whether the turn was claimed, queued, or already answered.
 - Tools from a tool source are named `<source id>_<tool name>`, since providers only accept letters, digits, underscores, and dashes.
 - The default base prompt gives the date but not the time. The time changes every turn, and a changing start of the prompt defeats provider prompt caching for the whole conversation. Admins who want it can add `{{time}}`.
+- Smoothing happens on the server, so every client following the stream gets the same even pace, however unevenly the provider sends its text. It waits 10 ms after each word, or each Chinese or Japanese character, of text and reasoning alike, whether or not anyone is watching. That caps a reply at about 100 words, or 100 characters, a second. A model writing faster, as fast hosts and long reasoning do, falls behind, and the reply's record is written only once smoothing catches up, so a reply of 10,000 words takes at least 100 seconds. The wait counts against `turns.timeoutSeconds`. Cancelling or timing out keeps what smoothing had released, which is what clients showed, and drops text the provider had sent that it had not yet reached. The AI SDK's word chunking waits for a space, which would hold back Chinese and Japanese until a line ended, so their characters go one at a time.
 - The time zone is a preference so turns started from direct PDS writes still use it. The web app saves the browser's zone on sign-in and with every settings save.
 
 ## Acceptance Criteria
@@ -152,6 +153,7 @@ The `turns` admin setting, from the admin-settings spec, holds `ratePerMinute`, 
 - [ ] A turn past the timeout is cancelled.
 - [ ] A final record over 900 KB moves the largest tool outputs into `outputBlob` blobs.
 - [ ] The stream endpoint replays buffered events to a late subscriber, then sends live ones.
+- [ ] A reply streams a word at a time, and Chinese and Japanese a character at a time.
 - [ ] Past the rate limit, the turn waits unclaimed and starts once the limit allows.
 - [ ] A backfill starts turns for unanswered messages newer than the backfill window, and not for older ones.
 - [ ] On startup, requested but unclaimed turns newer than the backfill window are retried, and older ones are dropped.

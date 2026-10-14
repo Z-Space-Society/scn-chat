@@ -16,12 +16,13 @@ const usage = {
   outputTokens: { total: 5, text: 5, reasoning: 0 },
 }
 
-/** Stream parts for a plain text reply. */
-export function textReply(text: string) {
+/** Stream parts for a plain text reply, a character at a time unless `whole` sends it in one delta. */
+export function textReply(text: string, options: { whole?: boolean } = {}) {
+  const deltas = options.whole ? [text] : [...text]
   return [
     { type: 'stream-start', warnings: [] },
     { type: 'text-start', id: 't1' },
-    ...[...text].map((char) => ({ type: 'text-delta', id: 't1', delta: char })),
+    ...deltas.map((delta) => ({ type: 'text-delta', id: 't1', delta })),
     { type: 'text-end', id: 't1' },
     { type: 'finish', usage, finishReason: { unified: 'stop', raw: 'stop' } },
   ]

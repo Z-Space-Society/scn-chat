@@ -44,11 +44,12 @@ async function run(
   context: TurnContext,
   generated: string | Error = 'Tiling a Bathroom',
   options = {},
+  finishReason = 'stop',
 ) {
   const { hooks, ctx } = await setupForTest(titles(options))
   const generateText = vi.fn(async () => {
     if (generated instanceof Error) throw generated
-    return { text: generated, finishReason: 'stop' }
+    return { text: generated, finishReason }
   })
   const updateInfo = vi.fn(async () => {})
   const warn = vi.fn()
@@ -98,6 +99,17 @@ describe('titles plugin', () => {
       }),
       expect.anything(),
     )
+  })
+
+  it('treats output cut off at the limit as a failure', async () => {
+    const { updateInfo, warn } = await run(
+      turn(),
+      '<think>The user wants a title for',
+      {},
+      'length',
+    )
+    expect(updateInfo).not.toHaveBeenCalled()
+    expect(warn).toHaveBeenCalled()
   })
 
   it('logs a warning and writes nothing when a completed reply has no model', async () => {

@@ -91,6 +91,9 @@ export default function titles(options: TitlesOptions = {}) {
             effort: 'none',
             conversation: turn.conversation.uri,
           })
+          // Output cut off at the limit is unfinished, such as reasoning that never reached its closing tag.
+          if (finishReason === 'length')
+            throw new Error('The model ran out of output before finishing the title')
           const title = cleanTitle(text)
           if (!title)
             throw new Error(`The model returned an empty title (finish reason: ${finishReason})`)

@@ -39,7 +39,7 @@ The turn context from the chat-turns spec carries the conversation info and the 
 
 The handler calls `ctx.models.generateText` for the user. The system prompt asks for a title of at most `maxWords` words, with no quotes and no trailing punctuation, in the language of the conversation. The input is the text parts of the triggering user message and the reply, each cut to 2,000 characters. Reasoning, tool calls, and attachments are left out. The call names the conversation, so endpoints that group calls by session see it with the conversation's turns. It sets effort to `none`, so a reasoning model spends its output on the title, and allows 1,000 output tokens for models that reason anyway.
 
-The output is cleaned up before writing. Whitespace is collapsed, surrounding quotes and trailing periods are removed, and the result is cut to the lexicon's 300 graphemes. An empty result is treated as a failure.
+The output is cleaned up before writing. Whitespace is collapsed, surrounding quotes and trailing periods are removed, and the result is cut to the lexicon's 300 graphemes. An empty result is treated as a failure, and so is output that stopped at the output limit, since it is unfinished, such as a model's reasoning in `<think>` tags that never reached the closing tag and so was never separated from the title.
 
 ### Writing
 
@@ -47,7 +47,7 @@ The handler calls `ctx.conversations.updateInfo` with `title` and `titleSource: 
 
 ### Failure
 
-A failed model call or an empty result logs a warning with the conversation URI and the error, and no title is written. An empty result's error names the model's finish reason. A title is a nice-to-have, so a failure never affects the turn. The next completed reply tries again, since the conversation still has no title.
+A failed model call, an empty result, or output cut off at the limit logs a warning with the conversation URI and the error, and no title is written. An empty result's error names the model's finish reason. A title is a nice-to-have, so a failure never affects the turn. The next completed reply tries again, since the conversation still has no title.
 
 ## Scope Boundaries
 
@@ -72,5 +72,6 @@ A failed model call or an empty result logs a warning with the conversation URI 
 - [ ] A configured `model` option is used instead of the reply's model.
 - [ ] Quotes, trailing periods, and extra whitespace are removed, and long output is cut to 300 graphemes.
 - [ ] A failed model call logs a warning, writes nothing, and the turn stays `complete`.
+- [ ] Output that stopped at the output limit writes no title.
 - [ ] A later completed reply retries after an earlier failure.
 - [ ] A user title written during generation is not overwritten.
