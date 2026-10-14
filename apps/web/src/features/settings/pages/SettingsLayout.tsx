@@ -27,7 +27,7 @@ export function SettingsLayout(props: Props) {
       nav={
         <>
           <NavHeader title="Settings" />
-          <SectionNav sections={sections} activeOptions={{}} />
+          <SectionNav sections={sections} />
           {me.admin && <SectionNav sections={admin} activeOptions={{ exact: true }} apart />}
         </>
       }

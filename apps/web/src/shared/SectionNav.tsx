@@ -14,8 +14,8 @@ export interface Section {
 
 interface Props {
   sections: readonly Section[]
-  /** When a section's link counts as the current page. */
-  activeOptions: ActiveOptions
+  /** When a section's link counts as the current page, by default its path and the pages under it. */
+  activeOptions?: ActiveOptions
   /** A quiet label over the links, for sections in groups. */
   label?: string
   /** Whether the links lead out of these sections, set apart by a line above them. */
