@@ -60,7 +60,7 @@ When a component renders different things depending on a condition, return early
 ## atproto spaces alpha
 
 - The spaces SDK is the `@atproto/*` packages at `0.0.0-spaces-alpha-*` versions. Pin exact versions, since breaking changes land without notice.
-- These packages only install with pnpm. Every `@atproto/*` package with an alpha release must be pinned to the exact same alpha version through `pnpm.overrides`. A range like `^0.0.0-spaces-alpha-*` also matches the plain `0.0.0` releases, which were published broken.
+- These packages only install with pnpm. Every `@atproto/*` package with an alpha release must be pinned to the exact same alpha version through `overrides` in `pnpm-workspace.yaml`. A range like `^0.0.0-spaces-alpha-*` also matches the plain `0.0.0` releases, which were published broken.
 - Reference material: the permissioned data proposal (`bluesky-social/proposals`, `0016-permissioned-data`), the `permissioned-data-alpha` branch of `bluesky-social/atproto`, and the `bluesky-social/bulletin` example app.
 
 ## Server build-out notes

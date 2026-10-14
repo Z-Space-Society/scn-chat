@@ -33,7 +33,7 @@ The plugin API package and the `plugins/` directory are created by the plugins s
 
 ### atproto alpha packages
 
-Every `@atproto/*` package with an alpha release is pinned to one exact alpha version through `pnpm.overrides` in the root `package.json`. A range like `^0.0.0-spaces-alpha-*` also matches the broken `0.0.0` releases, so ranges are never used. The lockfile is committed. Upgrading the alpha means changing one version string for every override at once.
+Every `@atproto/*` package with an alpha release is pinned to one exact alpha version through `overrides` in `pnpm-workspace.yaml`. A range like `^0.0.0-spaces-alpha-*` also matches the broken `0.0.0` releases, so ranges are never used. The lockfile is committed. Upgrading the alpha means changing one version string for every override at once.
 
 ### Lexicon package
 
