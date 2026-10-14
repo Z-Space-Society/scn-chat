@@ -16,7 +16,7 @@ export function MenuItem(props: Props) {
       type={type}
       className={cn(
         menuRow,
-        'w-full cursor-pointer hover:bg-row-hover active:bg-row-hover [&_svg]:text-muted hover:[&_svg]:text-ink',
+        'w-full cursor-pointer hover:bg-row-hover active:bg-row-hover disabled:pointer-events-none disabled:opacity-50 [&_svg]:text-muted hover:[&_svg]:text-ink',
         danger && 'text-danger [&_svg]:text-danger hover:[&_svg]:text-danger',
         className,
       )}

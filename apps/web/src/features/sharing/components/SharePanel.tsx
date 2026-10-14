@@ -1,13 +1,12 @@
 import { useStore as useFormStore } from '@tanstack/react-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { ReactNode } from 'react'
 import { api, json, read } from '../../../shared/api.ts'
 import { cn } from '../../../shared/cn.ts'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
 import { useAppForm } from '../../../shared/form.tsx'
 import { Button } from '../../../shared/ui/Button.tsx'
 import { field } from '../../../shared/ui/controls.tsx'
-import { floating } from '../../../shared/ui/menu.ts'
+import { PanelCard, panelForm } from '../../../shared/ui/PanelCard.tsx'
 import { Select } from '../../../shared/ui/Select.tsx'
 import { Loading, Skeleton } from '../../../shared/ui/Skeleton.tsx'
 import { formatMembers, type Members, parseMembers } from '../lib/members.ts'
@@ -39,21 +38,21 @@ export function SharePanel(props: Props) {
   const settings = useQuery(sharingQuery(props.skey))
   if (settings.error)
     return (
-      <Card className={props.className}>
+      <PanelCard title="Sharing" className={props.className}>
         <ErrorAlert error={settings.error} className="w-full text-small" />
         <CloseButton onClose={props.onClose} />
-      </Card>
+      </PanelCard>
     )
   if (!settings.data)
     return (
-      <Card className={props.className}>
+      <PanelCard title="Sharing" className={props.className}>
         {/* The mode's select and Save, on their way. */}
         <Loading label="Loading sharing" className="flex min-w-48 flex-1 gap-2">
           <Skeleton className="h-8.5 flex-1" />
           <Skeleton className="h-8.5 w-14" />
         </Loading>
         <CloseButton onClose={props.onClose} />
-      </Card>
+      </PanelCard>
     )
   return (
     <SharingForm
@@ -64,27 +63,6 @@ export function SharePanel(props: Props) {
       onClose={props.onClose}
       className={props.className}
     />
-  )
-}
-
-interface CardProps {
-  className?: string
-  children: ReactNode
-}
-
-/** The panel: a floating card whose corner nests around its controls'. */
-function Card(props: CardProps) {
-  return (
-    <fieldset
-      className={cn(
-        floating,
-        'flex w-[min(--spacing(104),calc(100%-(--spacing(5.5))))] flex-wrap gap-2 rounded-[calc(var(--radius-small)+--spacing(3.5)+var(--menu-edge))] p-3.5',
-        props.className,
-      )}
-    >
-      <legend className="float-start w-full font-semibold text-ink-strong text-ui">Sharing</legend>
-      {props.children}
-    </fieldset>
   )
 }
 
@@ -115,8 +93,8 @@ function SharingForm(props: SharingFormProps) {
   const mode = useFormStore(form.store, (state) => state.values.mode)
   return (
     <form.AppForm>
-      <form.Form>
-        <Card className={props.className}>
+      <form.Form className={panelForm}>
+        <PanelCard title="Sharing" className={props.className}>
           <form.AppField name="mode">
             {(modeField) => (
               <Select
@@ -150,7 +128,7 @@ function SharingForm(props: SharingFormProps) {
           )}
           <CloseButton onClose={props.onClose} />
           <ErrorAlert error={save.error} className="w-full text-small" />
-        </Card>
+        </PanelCard>
       </form.Form>
     </form.AppForm>
   )

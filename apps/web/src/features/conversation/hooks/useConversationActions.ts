@@ -5,16 +5,18 @@ import { lastError } from '../../../shared/errors.ts'
 import { conversationRefreshKey } from '../../../store/react.tsx'
 
 /**
- * Rename, sync, stop a reply, and regenerate one, each refreshing the conversation from the PDS
- * once it is done. `error` is the error of whichever ran last, for the conversation's one alert.
+ * Rename, set the chat's instructions, sync, stop a reply, and regenerate one, each refreshing the
+ * conversation from the PDS once it is done. `error` is the error of whichever ran last, for the
+ * conversation's one alert.
  */
 export function useConversationActions(skey: string, onRegenerated: (replyRkey: string) => void) {
   const queryClient = useQueryClient()
   const refresh = () => queryClient.invalidateQueries({ queryKey: conversationRefreshKey(skey) })
 
-  const renaming = useMutation({
-    mutationFn: (title: string) =>
-      read(api.chats.conversations[':skey'].$patch({ param: { skey } }, json({ title }))),
+  // Renaming and setting the instructions both change the conversation's info record.
+  const patching = useMutation({
+    mutationFn: (patch: { title: string } | { systemPrompt: string }) =>
+      read(api.chats.conversations[':skey'].$patch({ param: { skey } }, json(patch))),
     onSuccess: refresh,
   })
   const syncing = useMutation({
@@ -54,12 +56,13 @@ export function useConversationActions(skey: string, onRegenerated: (replyRkey: 
   })
 
   return {
-    rename: (title: string) => renaming.mutateAsync(title),
+    rename: (title: string) => patching.mutateAsync({ title }),
+    setInstructions: (systemPrompt: string) => patching.mutateAsync({ systemPrompt }),
     sync: () => syncing.mutate(),
     stop: (replyRkey: string) => stopping.mutate(replyRkey),
     regenerate: (parent: string | null, model: ModelRef | null) =>
       regenerating.mutate({ parent, model }),
     regenerating: regenerating.isPending,
-    error: lastError(renaming, syncing, stopping, regenerating),
+    error: lastError(patching, syncing, stopping, regenerating),
   }
 }

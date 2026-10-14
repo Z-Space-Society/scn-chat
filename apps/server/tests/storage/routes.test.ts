@@ -133,6 +133,27 @@ describe.each(['space', 'local'] as const)('chat API for a %s account', (mode) =
     ])
   })
 
+  it("updates a conversation's instructions without touching its title", async () => {
+    const { get, send } = await setup(mode)
+    const { body } = await send('POST', '/conversations', { systemPrompt: 'Be brief' })
+    await send('PATCH', `/conversations/${body.skey}`, { title: 'Tile quotes' })
+    await send('PATCH', `/conversations/${body.skey}`, { systemPrompt: 'Use metric units' })
+    const conversation = await get(`/conversations/${body.skey}`)
+    expect((conversation.body.info as Json).value).toMatchObject({
+      title: 'Tile quotes',
+      systemPrompt: 'Use metric units',
+    })
+  })
+
+  it('removes the instructions from the record when they are saved blank', async () => {
+    const { get, send } = await setup(mode)
+    const { body } = await send('POST', '/conversations', { systemPrompt: 'Be brief' })
+    const res = await send('PATCH', `/conversations/${body.skey}`, { systemPrompt: ' ' })
+    expect(res.status).toBe(200)
+    const conversation = await get(`/conversations/${body.skey}`)
+    expect((conversation.body.info as Json).value).not.toHaveProperty('systemPrompt')
+  })
+
   it('deletes a conversation', async () => {
     const { get, send } = await setup(mode)
     const { body } = await send('POST', '/conversations')

@@ -84,7 +84,9 @@ export function storageRoutes(deps: StorageRoutesDeps) {
       const chats = chatsFor(c)
       const patch: Record<string, unknown> = {}
       if (body.title !== undefined) Object.assign(patch, { title: body.title, titleSource: 'user' })
-      if (body.systemPrompt !== undefined) patch.systemPrompt = body.systemPrompt
+      // Blank instructions are left out of the record, as when the conversation was created.
+      if (body.systemPrompt !== undefined)
+        patch.systemPrompt = body.systemPrompt.trim() === '' ? undefined : body.systemPrompt
       if (Object.keys(patch).length > 0 && !(await chats.updateInfo(skey, patch))) {
         return c.json({ error: 'NotFound' }, 404)
       }

@@ -179,6 +179,8 @@ export class ChatService {
     if (!info) return false
     if (options.unlessUserTitled && info.titleSource === 'user') return false
     const next: JsonRecord = { ...info, ...patch, $type: nsid.info }
+    // A field the patch sets to undefined is removed from the record.
+    for (const [key, value] of Object.entries(patch)) if (value === undefined) delete next[key]
     await this.put(this.conversationUri(skey), nsid.info, 'self', next)
     if (patch.title !== undefined) await this.writeRef(skey, { title: patch.title })
     else await this.touchRef(skey)

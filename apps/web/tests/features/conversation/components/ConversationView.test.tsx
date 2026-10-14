@@ -1,4 +1,4 @@
-import { act, screen } from '@testing-library/react'
+import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -64,7 +64,7 @@ function fakeStore(messages: ReturnType<typeof msg>[], state: HandoverState = 'a
     worker: {
       getConversation: vi.fn(async (skey: string) => ({
         skey,
-        info: { title: 'Tiles' },
+        info: { title: 'Tiles' } as Record<string, unknown> | null,
         messages: data.messages,
       })),
       refreshConversation: vi.fn(async () => {}),
@@ -444,6 +444,77 @@ describe('ConversationView errors', () => {
     await screen.findByRole('button', { name: 'Tiles' })
     const init = (writes(fetch)[0] as [string, RequestInit])[1]
     expect(JSON.parse(String(init.body))).toEqual({ title: 'Floors' })
+  })
+
+  /** A store whose chat has the given instructions. */
+  const instructed = (systemPrompt: string) => {
+    const store = fakeStore([user('u', 'question')])
+    store.worker.getConversation.mockImplementation(async (skey: string) => ({
+      skey,
+      info: { title: 'Tiles', systemPrompt },
+      messages: store.data.messages,
+    }))
+    return store
+  }
+
+  it("edits the chat's instructions from the More menu, starting from the stored ones", async () => {
+    const fetch = vi.fn(async () => Response.json({}))
+    stubFetch(fetch)
+    await renderWith(instructed('Be brief'), <ConversationView skey="s1" />)
+    await fromMenu('Instructions')
+    const field = screen.getByRole('textbox', { name: 'Instructions for this chat' })
+    expect(field).toHaveValue('Be brief')
+    expect(field).toHaveFocus()
+    await userEvent.clear(field)
+    await userEvent.type(field, '  Use metric units ')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(screen.queryByRole('group', { name: 'Instructions' })).toBeNull())
+    const [url, init] = writes(fetch)[0] as [string, RequestInit]
+    expect(url).toBe('/api/conversations/s1')
+    expect(init.method).toBe('PATCH')
+    expect(JSON.parse(String(init.body))).toEqual({ systemPrompt: 'Use metric units' })
+  })
+
+  it('clears the instructions when saved empty, and keeps the panel open on a failure', async () => {
+    const fetch = vi.fn(async () =>
+      Response.json({ error: 'InvalidRecord', message: 'Too long' }, { status: 400 }),
+    )
+    stubFetch(fetch)
+    await renderWith(instructed('Be brief'), <ConversationView skey="s1" />)
+    await fromMenu('Instructions')
+    await userEvent.clear(screen.getByRole('textbox', { name: 'Instructions for this chat' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Too long')
+    expect(screen.getByRole('group', { name: 'Instructions' })).toBeInTheDocument()
+    const init = (writes(fetch)[0] as [string, RequestInit])[1]
+    expect(JSON.parse(String(init.body))).toEqual({ systemPrompt: '' })
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('group', { name: 'Instructions' })).toBeNull()
+  })
+
+  it('only closes the panel when the instructions are saved unchanged', async () => {
+    const fetch = vi.fn(async () => Response.json({}))
+    stubFetch(fetch)
+    await renderWith(instructed('Be brief'), <ConversationView skey="s1" />)
+    await fromMenu('Instructions')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Instructions for this chat' }), ' ')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(screen.queryByRole('group', { name: 'Instructions' })).toBeNull()
+    expect(writes(fetch)).toEqual([])
+  })
+
+  it("doesn't offer the instructions until the chat's info record has loaded", async () => {
+    const store = fakeStore([])
+    // A chat this device hasn't downloaded yet, while the PDS is still answering.
+    store.worker.getConversation.mockImplementation(async (skey: string) => ({
+      skey,
+      info: null,
+      messages: [],
+    }))
+    store.worker.refreshConversation.mockImplementation(() => new Promise(() => {}))
+    await renderWith(store, <ConversationView skey="s1" />)
+    await userEvent.click(await screen.findByRole('button', { name: 'More' }))
+    expect(screen.getByRole('button', { name: 'Instructions' })).toBeDisabled()
   })
 
   it("shows a failed sync in the conversation's one alert, until a later stop succeeds", async () => {

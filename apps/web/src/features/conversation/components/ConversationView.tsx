@@ -44,6 +44,9 @@ export function ConversationView(props: Props) {
   // The messages are on their way until the local copy answers, or, when it has none, until the
   // PDS has. While another tab holds the copy, the banner over the page says why instead.
   const waiting = isLoading || (messages.length === 0 && refreshing)
+  // Every chat has an info record from its creation, so until it arrives, from the local copy or
+  // the PDS, the chat's title and instructions are unknown rather than empty.
+  const info = conversation?.info ?? null
   // The messages there when the chat first loaded, which show at once. Only later ones fade in.
   const [opened, setOpened] = useState<Set<string> | null>(null)
   if (opened === null && conversation) setOpened(new Set(messages.map((m) => m.rkey)))
@@ -102,13 +105,11 @@ export function ConversationView(props: Props) {
     >
       <ConversationHeader
         skey={props.skey}
-        title={
-          waiting && !conversation
-            ? undefined
-            : ((conversation?.info?.title as string | undefined) ?? 'New chat')
-        }
+        title={waiting && !info ? undefined : ((info?.title as string | undefined) ?? 'New chat')}
+        instructions={info ? ((info.systemPrompt as string | undefined) ?? '') : undefined}
         outline={outlineOf(branch)}
         onRename={actions.rename}
+        onSetInstructions={actions.setInstructions}
         onSync={actions.sync}
       />
       <ErrorAlert error={actions.error ?? loadError} />

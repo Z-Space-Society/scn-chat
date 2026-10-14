@@ -2,7 +2,14 @@ import { noop } from '@tanstack/react-query'
 import { type ReactNode, useRef, useState } from 'react'
 import { cn } from '../../../shared/cn.ts'
 import { useAppForm } from '../../../shared/form.tsx'
-import { ListIcon, MoreIcon, PencilIcon, ShareIcon, SyncIcon } from '../../../shared/icons.tsx'
+import {
+  ListIcon,
+  MoreIcon,
+  PencilIcon,
+  ShareIcon,
+  SlidersIcon,
+  SyncIcon,
+} from '../../../shared/icons.tsx'
 import { Button } from '../../../shared/ui/Button.tsx'
 import { MenuItem } from '../../../shared/ui/MenuItem.tsx'
 import { floating } from '../../../shared/ui/menu.ts'
@@ -11,6 +18,7 @@ import { useDismiss } from '../../../shared/useDismiss.ts'
 import { useMe } from '../../auth/session.ts'
 import { SharePanel } from '../../sharing/components/SharePanel.tsx'
 import type { OutlineEntry } from '../lib/outline.ts'
+import { InstructionsPanel } from './InstructionsPanel.tsx'
 import { PromptStack } from './PromptStack.tsx'
 
 interface Props {
@@ -19,22 +27,26 @@ interface Props {
   title: string | undefined
   /** The user's messages on the branch on screen, to jump between. */
   outline: OutlineEntry[]
+  /** The chat's own instructions, empty when it has none, or nothing until its info record loads. */
+  instructions: string | undefined
   /** Rename the conversation, resolving once the new title is saved. Its caller shows a failure. */
   onRename: (title: string) => Promise<unknown>
+  /** Save the chat's instructions, resolving once they are saved. Its caller shows a failure. */
+  onSetInstructions: (instructions: string) => Promise<unknown>
   onSync: () => void
 }
 
 /** What opens under the header, or the jump stack over the whole chat. One at a time. */
-type Panel = 'jump' | 'share' | 'menu' | 'rename' | null
+type Panel = 'jump' | 'share' | 'menu' | 'rename' | 'instructions' | null
 
 /** Panels that close when the reader presses elsewhere. Forms stay open until closed. */
 const light: Panel[] = ['jump', 'menu']
 
 /**
  * The conversation's title bar, which stays out of the way of the reading: the title, which renames
- * the chat when clicked, then a quiet toolbar of Jump to, Share, and a menu holding rename and sync.
- * It spans the whole panel with no edge of its own, and the panel's color fades out below it, so
- * the messages pass under it softly.
+ * the chat when clicked, then a quiet toolbar of Jump to, Share, and a menu holding rename, the
+ * chat's instructions, and sync. It spans the whole panel with no edge of its own, and the panel's
+ * color fades out below it, so the messages pass under it softly.
  */
 export function ConversationHeader(props: Props) {
   const me = useMe()
@@ -111,10 +123,25 @@ export function ConversationHeader(props: Props) {
       {panel === 'share' && (
         <SharePanel skey={props.skey} ownerDid={me.did} onClose={close} className={dropdown} />
       )}
+      {panel === 'instructions' && props.instructions !== undefined && (
+        <InstructionsPanel
+          instructions={props.instructions}
+          onSave={(instructions) => props.onSetInstructions(instructions).then(close, noop)}
+          onCancel={close}
+          className={dropdown}
+        />
+      )}
       {panel === 'menu' && (
         <div className={cn(floating, dropdown, 'flex w-44 flex-col gap-0.5')}>
           <MenuItem onClick={() => setPanel('rename')}>
             <PencilIcon /> Rename
+          </MenuItem>
+          {/* The instructions can't be edited before they are known. */}
+          <MenuItem
+            disabled={props.instructions === undefined}
+            onClick={() => setPanel('instructions')}
+          >
+            <SlidersIcon /> Instructions
           </MenuItem>
           <MenuItem
             onClick={() => {
