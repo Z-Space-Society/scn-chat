@@ -57,7 +57,7 @@ export interface AutoEffort {
 }
 
 /** The effort levels as options, after the option for no level, each marked with its timer pie. */
-export const effortOptions = (auto: AutoEffort): SelectOption[] => [
+const effortOptions = (auto: AutoEffort): SelectOption[] => [
   { value: '', label: auto.label, detail: auto.detail, icon: <TimerPie time={0} open /> },
   ...STEPS.map((step) => ({
     value: step.level,
@@ -75,6 +75,8 @@ interface Props {
   'aria-label'?: string
   /** What the option for no level is called where it shows, and who decides then. */
   auto: AutoEffort
+  /** Whether the button is quiet text in a toolbar, as in the composer. */
+  quiet?: boolean
   className?: string
 }
 
@@ -90,6 +92,7 @@ export function EffortSelect(props: Props) {
       aria-label={props['aria-label']}
       title="Thinking effort: how long the model thinks before it answers"
       heading="Thinking effort"
+      quiet={props.quiet}
       className={props.className}
       options={effortOptions(props.auto)}
       value={props.value}

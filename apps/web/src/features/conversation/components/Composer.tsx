@@ -20,6 +20,7 @@ import { useAppForm } from '../../../shared/form.tsx'
 import { CloseIcon, PaperclipIcon, PencilIcon, SendIcon, StopIcon } from '../../../shared/icons.tsx'
 import { Button } from '../../../shared/ui/Button.tsx'
 import { conversationRefreshKey } from '../../../store/react.tsx'
+import { EffortSelect } from '../../models/components/EffortSelect.tsx'
 import { ModelSelect } from '../../models/components/ModelSelect.tsx'
 import { useModels } from '../../models/hooks/useModels.ts'
 import { lastEffort, rememberEffort } from '../../models/last-effort.ts'
@@ -369,7 +370,7 @@ export function Composer({ ref, ...props }: ComposerProps) {
               models={models}
               value={chosenModel}
               onChange={(next) => form.setFieldValue('model', next)}
-              title={reasons ? 'Model and thinking effort' : 'Model'}
+              title="Model"
               none={
                 fallback === null
                   ? { label: 'Choose a model', selectable: false }
@@ -378,19 +379,19 @@ export function Composer({ ref, ...props }: ComposerProps) {
                       selectable: true,
                     }
               }
-              effort={
-                reasons
-                  ? {
-                      value: chosenEffort,
-                      onChange: (next) => {
-                        form.setFieldValue('effort', next)
-                        rememberEffort(next)
-                      },
-                      auto: { label: 'Default', detail: 'As set in Preferences' },
-                    }
-                  : undefined
-              }
             />
+            {reasons && (
+              <EffortSelect
+                aria-label="Thinking effort"
+                quiet
+                value={chosenEffort}
+                onChange={(next) => {
+                  form.setFieldValue('effort', next)
+                  rememberEffort(next)
+                }}
+                auto={{ label: 'Default', detail: 'As set in Preferences' }}
+              />
+            )}
             {props.onStop ? (
               <Button
                 tone="danger"

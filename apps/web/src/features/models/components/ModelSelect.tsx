@@ -1,10 +1,8 @@
 import type { ModelRef } from '@scn-chat/lexicons'
-import { cn } from '../../../shared/cn.ts'
 import { ChevronDownIcon } from '../../../shared/icons.tsx'
 import { Select, type SelectOption } from '../../../shared/ui/Select.tsx'
 import { SkeletonText } from '../../../shared/ui/Skeleton.tsx'
 import { type ModelOption, modelRef, sameModel } from '../models.ts'
-import { type AutoEffort, effortOptions } from './EffortSelect.tsx'
 
 const keyOf = (m: ModelRef) => `${m.provider}/${m.id}`
 
@@ -15,22 +13,11 @@ interface None {
   selectable: boolean
 }
 
-/** A thinking effort chosen from the model's list, in a submenu of its own. */
-interface Effort {
-  /** The chosen level, or "" for none. */
-  value: string
-  onChange: (value: string) => void
-  /** What the option for no level is called, and who decides then. */
-  auto: AutoEffort
-}
-
 interface Props {
   models: ModelOption[]
   value: ModelRef | null
   onChange: (model: ModelRef | null) => void
   none?: None
-  /** An effort to choose in a submenu after the models, for a model that reasons. The button then shows both names. */
-  effort?: Effort
   id?: string
   'aria-label'?: string
   title?: string
@@ -53,14 +40,6 @@ export function ModelSelect(props: Props) {
     ...props.models.map((m) => ({ value: keyOf(m), label: m.name })),
   ]
   const key = value ? keyOf(value) : ''
-  const effort = props.effort
-  const efforts = effort ? effortOptions(effort.auto) : []
-  // Thinking off needs no word on the button, which then names the model alone.
-  const chosenEffort =
-    effort && effort.value !== 'none'
-      ? efforts.find((option) => option.value === effort.value)
-      : undefined
-  const modelLabel = options.find((option) => option.value === key)?.label
   if (props.loading)
     return (
       <Select
@@ -92,27 +71,6 @@ export function ModelSelect(props: Props) {
         const model = props.models.find((m) => keyOf(m) === next)
         props.onChange(model ? modelRef(model) : null)
       }}
-      submenu={
-        effort && {
-          label: 'Thinking effort',
-          options: efforts,
-          value: effort.value,
-          onChange: effort.onChange,
-        }
-      }
-    >
-      {chosenEffort && (
-        // The model's thinking effort, after its name on the same button, as quiet as the name.
-        <>
-          <span className={cn('flex-1 truncate', !modelLabel && 'text-muted')}>
-            {modelLabel ?? props.none?.label}
-          </span>
-          <span className="inline-flex items-center gap-1.25 whitespace-nowrap in-[[data-quiet][aria-expanded=true]]:text-muted in-[[data-quiet]]:text-muted-quiet text-muted before:content-['·']">
-            {chosenEffort.label}
-          </span>
-          <ChevronDownIcon className="size-3.25 in-[[data-quiet]]:text-muted-quiet text-muted" />
-        </>
-      )}
-    </Select>
+    />
   )
 }

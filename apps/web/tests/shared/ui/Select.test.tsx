@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
@@ -26,35 +26,6 @@ function Fruit(props: FruitProps) {
       onChange={(next) => {
         setValue(next)
         props.onChange?.(next)
-      }}
-    />
-  )
-}
-
-const sizes: SelectOption[] = [
-  { value: 's', label: 'Small' },
-  { value: 'm', label: 'Medium' },
-  { value: 'l', label: 'Large' },
-]
-
-/** A fruit, and its size in a submenu. */
-function FruitAndSize(props: FruitProps) {
-  const [value, setValue] = useState('a')
-  const [size, setSize] = useState('m')
-  return (
-    <Select
-      aria-label="Fruit"
-      options={options}
-      value={value}
-      onChange={setValue}
-      submenu={{
-        label: 'Size',
-        options: sizes,
-        value: size,
-        onChange: (next) => {
-          setSize(next)
-          props.onChange?.(next)
-        },
       }}
     />
   )
@@ -134,41 +105,6 @@ describe('Select', () => {
     )
     await userEvent.click(box())
     await userEvent.click(screen.getByRole('button', { name: 'Elsewhere' }))
-    expect(screen.queryByRole('listbox')).toBeNull()
-  })
-  it('opens a submenu from its row, which names what is chosen there', async () => {
-    const onChange = vi.fn()
-    render(<FruitAndSize onChange={onChange} />)
-    await userEvent.click(box())
-    expect(screen.queryByRole('listbox', { name: 'Size' })).toBeNull()
-    expect(screen.getByRole('option', { name: 'SizeMedium' })).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('option', { name: 'SizeMedium' }))
-    const submenu = screen.getByRole('listbox', { name: 'Size' })
-    expect(activeName()).toBe('Medium')
-    await userEvent.click(within(submenu).getByRole('option', { name: 'Large' }))
-    expect(onChange).toHaveBeenCalledWith('l')
-    expect(screen.queryByRole('listbox')).toBeNull()
-    expect(box()).toHaveTextContent('Apple')
-  })
-
-  it('moves into a submenu with the arrow toward it, and back with the one away', async () => {
-    const onChange = vi.fn()
-    render(<FruitAndSize onChange={onChange} />)
-    box().focus()
-    await userEvent.keyboard('{ArrowDown}{End}')
-    expect(activeName()).toBe('SizeMedium')
-    await userEvent.keyboard('{ArrowRight}')
-    expect(activeName()).toBe('Medium')
-    await userEvent.keyboard('{ArrowDown}{ArrowDown}')
-    expect(activeName()).toBe('Large')
-    await userEvent.keyboard('{ArrowLeft}')
-    expect(screen.queryByRole('listbox', { name: 'Size' })).toBeNull()
-    expect(activeName()).toBe('SizeMedium')
-    await userEvent.keyboard('{Enter}{Home}{Escape}')
-    expect(screen.queryByRole('listbox', { name: 'Size' })).toBeNull()
-    expect(screen.getByRole('listbox', { name: 'Fruit' })).toBeInTheDocument()
-    await userEvent.keyboard('{ArrowRight}{Home}{Enter}')
-    expect(onChange).toHaveBeenCalledWith('s')
     expect(screen.queryByRole('listbox')).toBeNull()
   })
 })

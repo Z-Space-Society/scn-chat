@@ -1,8 +1,8 @@
 import { type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '../cn.ts'
-import { ChevronDownIcon, ChevronRightIcon } from '../icons.tsx'
-import { usePlacement, useSidePlacement } from '../usePlacement.ts'
+import { ChevronDownIcon } from '../icons.tsx'
+import { usePlacement } from '../usePlacement.ts'
 import { field } from './controls.tsx'
 import { floating, menuRow } from './menu.ts'
 
@@ -14,15 +14,6 @@ export interface SelectOption {
   /** A small picture before the label, in the list and on the button when chosen. */
   icon?: ReactNode
   disabled?: boolean
-}
-
-/** A further choice with its own value, in a list of its own opened from a row after a select's options. */
-export interface SelectSubmenu {
-  /** What the row says it chooses, such as "Thinking effort". It also names the list. */
-  label: string
-  options: SelectOption[]
-  value: string
-  onChange: (value: string) => void
 }
 
 interface Props {
@@ -39,11 +30,6 @@ interface Props {
   disabled?: boolean
   /** A quiet title at the top of the open list, saying what the options choose. */
   heading?: string
-  /**
-   * A further choice, so one button sets two values: a row after the options, naming it and what
-   * is chosen, that opens its options in a list beside this one.
-   */
-  submenu?: SelectSubmenu
   /** What the button says while no option holds the value, such as "Choose a model". */
   placeholder?: string
   /** What the button shows in place of the chosen option and its arrow, such as an icon. */
@@ -79,61 +65,31 @@ const last = (options: SelectOption[]) => step(options, options.length, -1)
  * A choice among options: a button that opens a list of them. It follows the select-only combobox
  * pattern, so focus stays on the button and the arrow keys, Home, End, Enter, Space, Escape, and
  * typed letters work as in a native select. The list renders into the body, so no panel clips it,
- * and opens above the button when there is no room below. A submenu opens beside the list from its
- * row, on hover, on a click, or with the arrow key toward it, and closes with the one away from it.
+ * and opens above the button when there is no room below.
  */
 export function Select(props: Props) {
   const listId = useId()
   const button = useRef<HTMLButtonElement>(null)
   const list = useRef<HTMLDivElement>(null)
-  const row = useRef<HTMLDivElement>(null)
-  const side = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(-1)
-  // The submenu's active option while it is open, or -1 for none yet; null while it is closed.
-  const [subActive, setSubActive] = useState<number | null>(null)
   const position = usePlacement(open, button, list)
-  const sidePosition = useSidePlacement(subActive !== null, row, side)
   const typed = useRef({ text: '', at: 0 })
-  const submenu = props.submenu
-  // The submenu's row follows the options, and the keys move to it as to one more option.
-  const rowIndex = submenu ? props.options.length : -1
-  const rows: SelectOption[] = submenu
-    ? [...props.options, { value: '', label: submenu.label }]
-    : props.options
-  const chosen = props.options.findIndex((option) => option.value === props.value)
-  const subChosen = submenu?.options.findIndex((option) => option.value === submenu.value) ?? -1
+  const options = props.options
+  const chosen = options.findIndex((option) => option.value === props.value)
   const optionId = (index: number) => `${listId}-${index}`
-  const subOptionId = (index: number) => `${listId}-sub-${index}`
 
   /** Open the list on this option, or else the chosen one. */
   const show = (at?: number) => {
-    setActive(at ?? (chosen >= 0 ? chosen : first(rows)))
-    setSubActive(null)
+    setActive(at ?? (chosen >= 0 ? chosen : first(options)))
     setOpen(true)
   }
-  const close = () => {
-    setOpen(false)
-    setSubActive(null)
-  }
-  /** Open the submenu on its chosen option, or else its first. */
-  const showSubmenu = () => {
-    if (!submenu) return
-    setActive(rowIndex)
-    setSubActive(subChosen >= 0 ? subChosen : first(submenu.options))
-  }
+  const close = () => setOpen(false)
   const choose = (index: number) => {
-    if (index === rowIndex) return showSubmenu()
-    const option = props.options[index]
+    const option = options[index]
     if (!option || option.disabled) return
     close()
     if (option.value !== props.value) props.onChange(option.value)
-  }
-  const chooseSub = (index: number) => {
-    const option = submenu?.options[index]
-    if (!submenu || !option || option.disabled) return
-    close()
-    if (option.value !== submenu.value) submenu.onChange(option.value)
   }
 
   /** Move to the next option starting with what was typed, as a native select does. */
@@ -141,9 +97,7 @@ export function Select(props: Props) {
     const now = Date.now()
     const text = now - typed.current.at < TYPEAHEAD_MS ? typed.current.text + key : key
     typed.current = { text: text.toLowerCase(), at: now }
-    const inSubmenu = submenu && subActive !== null
-    const options = inSubmenu ? submenu.options : rows
-    const from = inSubmenu ? subActive : open ? active : chosen
+    const from = open ? active : chosen
     const order = options.map((_, i) => (from + 1 + i) % options.length)
     // A repeated letter steps through the options starting with it.
     const prefix = [...text].every((c) => c === text[0]) ? text[0] : text
@@ -152,8 +106,7 @@ export function Select(props: Props) {
       return option && !option.disabled && option.label.toLowerCase().startsWith(prefix ?? '')
     })
     if (match === undefined) return
-    if (inSubmenu) setSubActive(match)
-    else if (open) setActive(match)
+    if (open) setActive(match)
     else show(match)
   }
 
@@ -166,43 +119,13 @@ export function Select(props: Props) {
       } else if (event.key.length === 1) search(event.key)
       return
     }
-    // The submenu opens toward the end of the line, so its arrow keys follow the reading direction.
-    const rtl = button.current && getComputedStyle(button.current).direction === 'rtl'
-    const into = rtl ? 'ArrowLeft' : 'ArrowRight'
-    const back = rtl ? 'ArrowRight' : 'ArrowLeft'
-    if (submenu && subActive !== null) {
-      const options = submenu.options
-      const moves: Record<string, () => number> = {
-        ArrowDown: () => step(options, subActive, 1),
-        ArrowUp: () => (subActive < 0 ? last(options) : step(options, subActive, -1)),
-        Home: () => first(options),
-        End: () => last(options),
-        PageDown: () => last(options),
-        PageUp: () => first(options),
-      }
-      const move = moves[event.key]
-      if (move) {
-        event.preventDefault()
-        setSubActive(move())
-      } else if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault()
-        chooseSub(subActive)
-      } else if (event.key === 'Escape' || event.key === back) {
-        // Only the submenu closes, back to its row in the list.
-        event.preventDefault()
-        event.stopPropagation()
-        setSubActive(null)
-      } else if (event.key === 'Tab') close()
-      else if (event.key.length === 1) search(event.key)
-      return
-    }
     const moves: Record<string, () => number> = {
-      ArrowDown: () => step(rows, active, 1),
-      ArrowUp: () => step(rows, active, -1),
-      Home: () => first(rows),
-      End: () => last(rows),
-      PageDown: () => last(rows),
-      PageUp: () => first(rows),
+      ArrowDown: () => step(options, active, 1),
+      ArrowUp: () => step(options, active, -1),
+      Home: () => first(options),
+      End: () => last(options),
+      PageDown: () => last(options),
+      PageUp: () => first(options),
     }
     const move = moves[event.key]
     if (move) {
@@ -211,9 +134,6 @@ export function Select(props: Props) {
     } else if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
       choose(active)
-    } else if (event.key === into && active === rowIndex) {
-      event.preventDefault()
-      showSubmenu()
     } else if (event.key === 'Escape') {
       // Only the list closes, not a panel the select sits in.
       event.preventDefault()
@@ -223,45 +143,14 @@ export function Select(props: Props) {
     else if (event.key.length === 1) search(event.key)
   }
 
-  const activeId =
-    subActive !== null && subActive >= 0
-      ? subOptionId(subActive)
-      : active >= 0
-        ? optionId(active)
-        : undefined
+  const activeId = active >= 0 ? optionId(active) : undefined
+  // Only when the active option changes, since the list re-renders as it scrolls, and scrolling
+  // back to the active option then would undo the scroll.
   useEffect(() => {
     if (open && activeId) document.getElementById(activeId)?.scrollIntoView?.({ block: 'nearest' })
-  })
+  }, [open, activeId])
 
-  /** One option as a row of a list. */
-  const optionRow = (
-    option: SelectOption,
-    id: string,
-    selected: boolean,
-    isActive: boolean,
-    onMove: () => void,
-    onClick: () => void,
-  ) => (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: the button owns the keyboard.
-    // biome-ignore lint/a11y/useFocusableInteractive: options are reached through the button's aria-activedescendant.
-    <div
-      key={option.value}
-      id={id}
-      role="option"
-      aria-selected={selected}
-      aria-disabled={option.disabled || undefined}
-      data-active={isActive || undefined}
-      className={optionClass}
-      onMouseMove={() => !option.disabled && onMove()}
-      onClick={onClick}
-    >
-      {option.icon}
-      <span className="min-w-0 truncate">{option.label}</span>
-      {option.detail && <span className={cn(detailClass, 'ps-6')}>{option.detail}</span>}
-    </div>
-  )
-
-  const label = props.options[chosen]?.label ?? props.placeholder ?? ''
+  const label = options[chosen]?.label ?? props.placeholder ?? ''
   return (
     <>
       <button
@@ -292,7 +181,7 @@ export function Select(props: Props) {
       >
         {props.children ?? (
           <>
-            {props.options[chosen]?.icon}
+            {options[chosen]?.icon}
             <span className={cn('flex-1 truncate', chosen < 0 && 'text-muted')}>{label}</span>
             <ChevronDownIcon
               className={cn('size-3.25 text-muted', props.quiet && 'text-muted-quiet')}
@@ -302,88 +191,45 @@ export function Select(props: Props) {
       </button>
       {open &&
         createPortal(
-          <>
-            <div
-              ref={list}
-              id={listId}
-              role="listbox"
-              aria-label={props['aria-label']}
-              className={listClass}
-              style={position}
-              // Keep focus on the button, which owns the keyboard while the list is open.
-              onMouseDown={(event) => event.preventDefault()}
-            >
-              {/* The list's name already says this to screen readers, so it is only seen. */}
-              {props.heading && (
-                <div
-                  className="px-2.25 py-0.75 font-medium text-caption text-muted leading-[1.4]"
-                  aria-hidden
-                >
-                  {props.heading}
-                </div>
-              )}
-              {props.options.map((option, i) =>
-                optionRow(
-                  option,
-                  optionId(i),
-                  i === chosen,
-                  i === active,
-                  () => {
-                    setActive(i)
-                    setSubActive(null)
-                  },
-                  () => choose(i),
-                ),
-              )}
-              {submenu && (
-                // biome-ignore lint/a11y/useSemanticElements: a listbox holds groups of options, not fieldsets.
-                <div role="group" className="flex flex-col">
-                  {/* biome-ignore lint/a11y/useKeyWithClickEvents: the button owns the keyboard. */}
-                  {/* biome-ignore lint/a11y/useFocusableInteractive: reached through the button's aria-activedescendant. */}
-                  <div
-                    ref={row}
-                    id={optionId(rowIndex)}
-                    role="option"
-                    aria-selected={false}
-                    className={optionClass}
-                    data-active={active === rowIndex || undefined}
-                    onMouseMove={() => {
-                      setActive(rowIndex)
-                      if (subActive === null) setSubActive(-1)
-                    }}
-                    onClick={showSubmenu}
-                  >
-                    <span className="min-w-0 truncate">{submenu.label}</span>
-                    <span className={cn(detailClass, 'ps-4')}>
-                      {submenu.options[subChosen]?.label}
-                    </span>
-                    <ChevronRightIcon className="-ms-0.75 size-3.25 text-muted" />
-                  </div>
-                </div>
-              )}
-            </div>
-            {submenu && subActive !== null && (
+          <div
+            ref={list}
+            id={listId}
+            role="listbox"
+            aria-label={props['aria-label']}
+            className={listClass}
+            style={position}
+            // Keep focus on the button, which owns the keyboard while the list is open.
+            onMouseDown={(event) => event.preventDefault()}
+          >
+            {/* The list's name already says this to screen readers, so it is only seen. */}
+            {props.heading && (
               <div
-                ref={side}
-                role="listbox"
-                aria-label={submenu.label}
-                className={listClass}
-                style={sidePosition}
-                onMouseDown={(event) => event.preventDefault()}
+                className="px-2.25 py-0.75 font-medium text-caption text-muted leading-[1.4]"
+                aria-hidden
               >
-                {submenu.options.map((option, i) =>
-                  optionRow(
-                    option,
-                    subOptionId(i),
-                    i === subChosen,
-                    i === subActive,
-                    () => setSubActive(i),
-                    () => chooseSub(i),
-                  ),
-                )}
+                {props.heading}
               </div>
             )}
-          </>,
+            {options.map((option, i) => (
+              // biome-ignore lint/a11y/useKeyWithClickEvents: the button owns the keyboard.
+              // biome-ignore lint/a11y/useFocusableInteractive: options are reached through the button's aria-activedescendant.
+              <div
+                key={option.value}
+                id={optionId(i)}
+                role="option"
+                aria-selected={i === chosen}
+                aria-disabled={option.disabled || undefined}
+                data-active={i === active || undefined}
+                className={optionClass}
+                onMouseMove={() => !option.disabled && setActive(i)}
+                onClick={() => choose(i)}
+              >
+                {option.icon}
+                <span className="min-w-0 truncate">{option.label}</span>
+                {option.detail && <span className={cn(detailClass, 'ps-6')}>{option.detail}</span>}
+              </div>
+            ))}
+          </div>,
           document.body,
         )}
     </>

@@ -1,5 +1,5 @@
 import type { ModelRef } from '@scn-chat/lexicons'
-import { fireEvent, screen, within } from '@testing-library/react'
+import { fireEvent, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { act, createRef, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -38,14 +38,14 @@ const serve = (
   defaultModel: ModelRef | null = { provider: 'p', id: 'smart' },
 ) => stubFetch(handler, { '/api/models': { models, defaultModel } })
 
-/** Open the model menu, then its effort submenu, and pick a level in it by its name. */
+/** Open the effort select and pick a level by its name. */
 async function pickEffort(name: string) {
-  await userEvent.click(screen.getByLabelText('Model'))
-  await userEvent.click(screen.getByRole('option', { name: /^Thinking effort/ }))
-  const efforts = screen.getByRole('listbox', { name: 'Thinking effort' })
+  await userEvent.click(screen.getByLabelText('Thinking effort'))
   // An option's name is its label, then its note.
-  await userEvent.click(within(efforts).getByRole('option', { name: new RegExp(`^${name}`) }))
+  await userEvent.click(screen.getByRole('option', { name: new RegExp(`^${name}`) }))
 }
+
+const effortSelect = () => screen.queryByRole('combobox', { name: 'Thinking effort' })
 
 /** Wait until the model list offers the models above. */
 const modelsLoaded = () =>
@@ -62,22 +62,14 @@ beforeEach(() => void serve())
 afterEach(() => vi.unstubAllGlobals())
 
 describe('Composer', () => {
-  it('offers effort in the model menu only for reasoning models', async () => {
-    /** Whether the open model menu has a thinking effort submenu, read by opening and closing it. */
-    const offersEffort = async () => {
-      await userEvent.click(screen.getByLabelText('Model'))
-      const found = screen.queryByRole('option', { name: /^Thinking effort/ }) !== null
-      await userEvent.keyboard('{Escape}')
-      return found
-    }
+  it('offers effort beside the model only for reasoning models', async () => {
     await renderComposer(<Composer skey="s" onSent={() => {}} />)
-    expect(await offersEffort()).toBe(false)
+    expect(effortSelect()).toBeNull()
     await choose(screen.getByLabelText('Model'), 'Smart')
-    expect(screen.getByLabelText('Model')).toHaveTextContent('SmartDefault')
-    expect(await offersEffort()).toBe(true)
+    expect(screen.getByLabelText('Model')).toHaveTextContent(/^Smart$/)
+    expect(effortSelect()).toHaveTextContent('Default')
     await choose(screen.getByLabelText('Model'), 'Basic')
-    expect(screen.getByLabelText('Model')).toHaveTextContent(/^Basic$/)
-    expect(await offersEffort()).toBe(false)
+    expect(effortSelect()).toBeNull()
   })
 
   it('names the model the default falls back to', async () => {
@@ -87,13 +79,6 @@ describe('Composer', () => {
     )
   })
 
-  it('names the model alone while thinking is off', async () => {
-    await renderComposer(<Composer skey="s" onSent={() => {}} />)
-    await choose(screen.getByLabelText('Model'), 'Smart')
-    await pickEffort('Off')
-    expect(screen.getByLabelText('Model')).toHaveTextContent(/^Smart$/)
-  })
-
   it('starts on the effort last chosen on this device', async () => {
     const first = await renderComposer(<Composer skey="s" onSent={() => {}} />)
     await choose(screen.getByLabelText('Model'), 'Smart')
@@ -101,7 +86,7 @@ describe('Composer', () => {
     first.unmount()
     await renderComposer(<Composer skey="s" onSent={() => {}} />)
     await choose(screen.getByLabelText('Model'), 'Smart')
-    expect(screen.getByLabelText('Model')).toHaveTextContent('High')
+    expect(effortSelect()).toHaveTextContent('High')
   })
 
   it('stops offering images for models without vision', async () => {
