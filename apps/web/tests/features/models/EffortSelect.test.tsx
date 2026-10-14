@@ -30,7 +30,11 @@ describe('EffortSelect', () => {
     render(<Effort />)
     expect(button()).toHaveTextContent('Auto thinking')
     await userEvent.click(button())
-    expect(screen.getByRole('listbox')).toHaveTextContent(/^Thinking effort/)
+    // The heading sits over the options.
+    const heading = screen.getByText('Thinking effort')
+    expect(heading.compareDocumentPosition(screen.getByRole('listbox'))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
     const rows = screen.getAllByRole('option').map((option) => {
       // An option's label, then its note, when it has one.
       const [label, detail] = option.querySelectorAll(':scope > span')

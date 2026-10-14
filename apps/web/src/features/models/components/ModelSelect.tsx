@@ -37,7 +37,8 @@ export function ModelSelect(props: Props) {
     ...(value && !offered
       ? [{ value: keyOf(value), label: `Unavailable: ${keyOf(value)}`, disabled: true }]
       : []),
-    ...props.models.map((m) => ({ value: keyOf(m), label: m.name })),
+    // A search finds a model by its ID or provider too, as when its name says less.
+    ...props.models.map((m) => ({ value: keyOf(m), label: m.name, keywords: keyOf(m) })),
   ]
   const key = value ? keyOf(value) : ''
   if (props.loading)
@@ -67,6 +68,7 @@ export function ModelSelect(props: Props) {
       options={options}
       value={key}
       placeholder={props.none?.label}
+      searchLabel="Search models"
       onChange={(next) => {
         const model = props.models.find((m) => keyOf(m) === next)
         props.onChange(model ? modelRef(model) : null)

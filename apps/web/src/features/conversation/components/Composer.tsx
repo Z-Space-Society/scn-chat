@@ -18,6 +18,7 @@ import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
 import { messageOf } from '../../../shared/errors.ts'
 import { useAppForm } from '../../../shared/form.tsx'
 import { CloseIcon, PaperclipIcon, PencilIcon, SendIcon, StopIcon } from '../../../shared/icons.tsx'
+import { touchOnly } from '../../../shared/touch.ts'
 import { Button } from '../../../shared/ui/Button.tsx'
 import { conversationRefreshKey } from '../../../store/react.tsx'
 import { EffortSelect } from '../../models/components/EffortSelect.tsx'
@@ -78,9 +79,6 @@ const asQuote = (text: string) =>
 /** What the attach button takes: any type an ingester reads, and images when the model sees them. */
 const acceptedTypes = (types: { images: string[]; files: string[] }, images: boolean) =>
   [...(images ? types.images : []), ...types.files].join(',')
-
-/** A device that can't hover, like a phone, whose on-screen Enter is for new lines. */
-const touchOnly = () => window.matchMedia?.('(hover: none)').matches === true
 
 /** A round button at the toolbar's end or start, nesting in the composer's corner. */
 const round = 'inline-grid size-composer-button flex-none place-items-center rounded-full p-0'
