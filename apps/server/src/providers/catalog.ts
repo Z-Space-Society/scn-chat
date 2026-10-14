@@ -82,7 +82,7 @@ export class ModelCatalog {
   async modelsFor(did: string): Promise<{ models: ListedModel[]; defaultModel?: ModelRef }> {
     const [admin, credentials] = await Promise.all([
       this.adminModelsFor(did),
-      listCredentials(this.deps.db, did),
+      listCredentials(this.deps.db, this.deps.box, did),
     ])
     return { models: this.listed(did, admin, credentials), defaultModel: defaultOf(admin) }
   }

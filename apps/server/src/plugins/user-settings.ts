@@ -15,20 +15,45 @@ export class InvalidPluginSettingsError extends Error {
 
 export { secretKeys }
 
-async function readRaw(db: Db, box: SecretBox, did: string, pluginId: string) {
+/**
+ * The stored settings. Secrets no current or retired key can decrypt read as unset, with the
+ * ciphertext kept in `unreadable` so a restored key in `SECRET_KEYS_OLD` brings them back.
+ */
+async function readRaw(
+  db: Db,
+  box: SecretBox,
+  did: string,
+  pluginId: string,
+): Promise<{
+  values: Record<string, unknown>
+  secrets: Record<string, unknown>
+  unreadable: string | null
+}> {
   const row = await db
     .selectFrom('plugin_user_settings')
     .select(['values_json', 'secrets_encrypted'])
     .where('did', '=', did)
     .where('plugin_id', '=', pluginId)
     .executeTakeFirst()
-  if (!row) return { values: {}, secrets: {} }
-  return {
-    values: JSON.parse(row.values_json) as Record<string, unknown>,
-    secrets: row.secrets_encrypted
-      ? (JSON.parse(box.decrypt(row.secrets_encrypted)) as Record<string, unknown>)
-      : {},
-  }
+  const values = row ? (JSON.parse(row.values_json) as Record<string, unknown>) : {}
+  if (!row?.secrets_encrypted) return { values, secrets: {}, unreadable: null }
+  const decrypted = box.tryDecrypt(row.secrets_encrypted)
+  if (decrypted === undefined) return { values, secrets: {}, unreadable: row.secrets_encrypted }
+  return { values, secrets: JSON.parse(decrypted) as Record<string, unknown>, unreadable: null }
+}
+
+/** A user's validated settings for a plugin, and whether its stored secrets can't be decrypted. */
+export async function readUserSettingsState(
+  db: Db,
+  box: SecretBox,
+  did: string,
+  plugin: Plugin,
+): Promise<{ settings: unknown; secretsUnreadable: boolean }> {
+  if (!plugin.userSettings) return { settings: {}, secretsUnreadable: false }
+  const { values, secrets, unreadable } = await readRaw(db, box, did, plugin.id)
+  const result = plugin.userSettings.safeParse({ ...values, ...secrets })
+  if (!result.success) throw new InvalidPluginSettingsError(plugin.id, result.error.message)
+  return { settings: result.data, secretsUnreadable: unreadable !== null }
 }
 
 /** A user's validated settings for a plugin, with defaults when none are stored. */
@@ -38,14 +63,13 @@ export async function readUserSettings(
   did: string,
   plugin: Plugin,
 ): Promise<unknown> {
-  if (!plugin.userSettings) return {}
-  const { values, secrets } = await readRaw(db, box, did, plugin.id)
-  const result = plugin.userSettings.safeParse({ ...values, ...secrets })
-  if (!result.success) throw new InvalidPluginSettingsError(plugin.id, result.error.message)
-  return result.data
+  return (await readUserSettingsState(db, box, did, plugin)).settings
 }
 
-/** Validate and store a user's settings. A missing or empty secret keeps the stored one. */
+/**
+ * Validate and store a user's settings. A missing or empty secret keeps the stored one, and
+ * undecryptable secrets are kept until the user enters one.
+ */
 export async function writeUserSettings(
   db: Db,
   box: SecretBox,
@@ -68,9 +92,11 @@ export async function writeUserSettings(
   const secrets = Object.fromEntries(
     Object.entries(parsed).filter(([key]) => secretFields.includes(key)),
   )
+  const entered = Object.values(secrets).some((value) => value !== undefined && value !== '')
+  const encrypted = secretFields.length > 0 ? box.encrypt(JSON.stringify(secrets)) : null
   const row = {
     values_json: JSON.stringify(values),
-    secrets_encrypted: secretFields.length > 0 ? box.encrypt(JSON.stringify(secrets)) : null,
+    secrets_encrypted: stored.unreadable && !entered ? stored.unreadable : encrypted,
     updated_at: new Date().toISOString(),
   }
   await db

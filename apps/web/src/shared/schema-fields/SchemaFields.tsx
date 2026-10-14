@@ -26,6 +26,8 @@ export interface Secrets {
   fields: string[]
   /** The secret fields with a value already saved, which a blank input keeps. */
   stored?: string[]
+  /** The saved secrets can't be decrypted, as after the server's `SECRET_KEY` was lost. */
+  unreadable?: boolean
   /** Offer to clear stored secrets, for forms that support it. */
   clearing?: { cleared: string[]; onClear: (key: string, clear: boolean) => void }
 }
@@ -115,7 +117,7 @@ function SchemaField(props: SchemaFieldProps) {
   if (!kind) return <SettingRow label={label} description="Unsupported setting type" />
   const secret = kind === 'text' && (props.secrets?.fields ?? []).includes(props.name)
   const stored = secret && (props.secrets?.stored ?? []).includes(props.name)
-  const note = stored ? 'Leave blank to keep the saved value.' : undefined
+  const note = secret ? secretNote(stored, props.secrets?.unreadable) : undefined
   return (
     <SettingRow
       label={label}
@@ -234,12 +236,21 @@ function SchemaInput(props: SchemaInputProps): ReactNode {
   }
 }
 
+/** What a secret field says about its saved value. */
+function secretNote(stored: boolean, unreadable = false) {
+  if (unreadable) return "The saved value can't be read anymore. Enter it again."
+  if (stored) return 'Leave blank to keep the saved value.'
+  return undefined
+}
+
 /** A text input, or a password input with an optional Clear for a secret. */
 function TextInput(props: SchemaInputProps) {
   const clearing = props.secrets?.clearing
   const cleared = (clearing?.cleared ?? []).includes(props.name)
   const secret = (props.secrets?.fields ?? []).includes(props.name)
   const stored = secret && (props.secrets?.stored ?? []).includes(props.name)
+  // Unreadable secrets can be cleared too, so an optional one needn't be entered again.
+  const clearable = stored || (secret && props.secrets?.unreadable)
   const input = (
     <input
       id={props.id}
@@ -255,7 +266,7 @@ function TextInput(props: SchemaInputProps) {
   return (
     <span className="flex w-full items-center gap-3">
       {input}
-      {stored && clearing && (
+      {clearable && clearing && (
         <label className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap text-muted text-small">
           <input
             type="checkbox"

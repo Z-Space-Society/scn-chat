@@ -64,7 +64,7 @@ Credentials are stored in a `provider_credential` table: ID, owner DID, provider
 
 ### Secret encryption
 
-`apps/server/src/secrets.ts` encrypts API keys and secret plugin settings with AES-256-GCM from `node:crypto`. The key is a 32-byte value in the `SECRET_KEY` environment variable, base64 encoded, and startup fails without it. Each value is stored as `v1:<keyId>:<iv>:<tag>:<ciphertext>`, where the key ID is the first eight hex characters of the key's SHA-256. Values encrypted with a retired key stay readable while that key is listed in `SECRET_KEYS_OLD`, a comma-separated list, so the key can be rotated later without a migration. The version prefix lets the scheme itself change later. Keys are never logged, never returned by the API, and shown in the UI only as their last four characters.
+`apps/server/src/secrets.ts` encrypts API keys and secret plugin settings with AES-256-GCM from `node:crypto`. The key is a 32-byte value in the `SECRET_KEY` environment variable, base64 encoded, and startup fails without it. Each value is stored as `v1:<keyId>:<iv>:<tag>:<ciphertext>`, where the key ID is the first eight hex characters of the key's SHA-256. Values encrypted with a retired key stay readable while that key is listed in `SECRET_KEYS_OLD`, a comma-separated list, so the key can be rotated later without a migration. The version prefix lets the scheme itself change later. Keys are never logged, never returned by the API, and shown in the UI only as their last four characters. A value that neither `SECRET_KEY` nor a key in `SECRET_KEYS_OLD` can decrypt, as after a lost `SECRET_KEY`, never fails a page or startup: it reads as unset, and the UI asks for it again. For a user credential, the list flags it as `keyUnreadable`, found from its key ID without decrypting, the API keys page says it can't be read and to add it again, and a turn that uses it ends with an error saying the same. For secret plugin settings and options, see the plugins and admin-plugins specs.
 
 ### Private network guard
 
@@ -147,6 +147,7 @@ The provider data is stored in the `providerData` field of reasoning, text, and 
 - [ ] A hostname that resolves to a public address when checked and a private one when connecting is still refused.
 - [ ] Redirects from a user endpoint are not followed.
 - [ ] A value encrypted with a key in `SECRET_KEYS_OLD` still decrypts, and new values use `SECRET_KEY`.
+- [ ] A credential whose key no current or retired key can decrypt is listed with `keyUnreadable`, and a turn using it ends with an error asking the user to add the key again.
 - [ ] A user endpoint's model references use the user's slug.
 - [ ] Each lexicon effort value maps to the AI SDK reasoning value in the table.
 - [ ] Reasoning from a different provider than the current turn's is not replayed.

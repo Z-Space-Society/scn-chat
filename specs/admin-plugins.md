@@ -36,7 +36,7 @@ plugin_instance (
 )
 ```
 
-- **Secrets.** Top-level option fields marked `.meta({ secret: true })` are stored in `secrets_encrypted`, with the same `SecretBox` as user keys. The API never returns them. It returns the names of the secret fields that have a value. On save, a blank or missing secret keeps the stored value, and a field listed in `clearSecrets` is removed. Every shipped plugin marks its `apiKey` option as secret.
+- **Secrets.** Top-level option fields marked `.meta({ secret: true })` are stored in `secrets_encrypted`, with the same `SecretBox` as user keys. The API never returns them. It returns the names of the secret fields that have a value. On save, a blank or missing secret keeps the stored value, and a field listed in `clearSecrets` is removed. Every shipped plugin marks its `apiKey` option as secret. Secrets that no current or retired key can decrypt read as unset, so the server still starts and the plugin loads or fails as it would without them. The API reports `secretsUnreadable` for that instance, and its secret fields say their saved value can't be read. The ciphertext is written back unchanged until the admin enters a secret or ticks Clear on any secret field, which discards it.
 - **Order.** `position` is the load order, which decides hook order as the plugins spec describes.
 - **Disabled instances** keep their options and aren't loaded.
 - **Plugin IDs.** The factory decides the plugin's ID, as it does today, and some plugins derive it from their options, like `openai-compatible-<id>`. User settings, tool switches, provider IDs in model references, and user credentials all key on those IDs, so an edit that would change an instance's plugin ID is refused with "This change would rename the plugin from X to Y. Add a new instance instead."
@@ -170,6 +170,7 @@ Instances and secrets:
 - [ ] Adding an instance with invalid options returns 400 with issues pointing at the fields.
 - [ ] Secret options are stored encrypted and never returned, and the API names the secret fields that are set.
 - [ ] A blank secret on save keeps the stored value, and `clearSecrets` removes it.
+- [ ] Instance secrets no key can decrypt don't stop startup or the admin page, are reported as `secretsUnreadable`, and are kept until replaced or cleared.
 - [ ] An edit that would change the plugin ID is refused.
 - [ ] A second instance of a package without `multipleInstances` is refused, and one with it can be added again.
 - [ ] A disabled instance isn't loaded and keeps its options.

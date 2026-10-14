@@ -13,6 +13,16 @@ export class CredentialInputError extends Error {
   }
 }
 
+/** A stored key no current or retired `SECRET_KEY` can decrypt, which the user must add again. */
+export class UnreadableCredential extends Error {
+  constructor(label: string) {
+    super(
+      `Your saved key for ${label} can't be read anymore. Add it again under Settings, API keys.`,
+    )
+    this.name = 'UnreadableCredential'
+  }
+}
+
 export type CredentialSummary = {
   id: string
   providerId: string
@@ -22,6 +32,8 @@ export type CredentialSummary = {
   slug: string | null
   baseUrl: string | null
   keyHint: string
+  /** The stored key can't be decrypted, and must be added again. */
+  keyUnreadable: boolean
   models: ModelInfo[]
 }
 
@@ -36,7 +48,7 @@ type Row = {
   api_key_encrypted: string
 }
 
-const summarize = (row: Row): CredentialSummary => ({
+const summarize = (row: Row, box: SecretBox): CredentialSummary => ({
   id: row.id,
   providerId: row.provider_id,
   modelProvider: row.slug ? `${USER_PROVIDER_PREFIX}${row.slug}` : row.provider_id,
@@ -44,6 +56,7 @@ const summarize = (row: Row): CredentialSummary => ({
   slug: row.slug,
   baseUrl: row.base_url,
   keyHint: row.key_hint,
+  keyUnreadable: !box.hasKeyFor(row.api_key_encrypted),
   models: JSON.parse(row.models_json) as ModelInfo[],
 })
 
@@ -65,8 +78,12 @@ async function rows(db: Db, did: string): Promise<Row[]> {
     .execute()
 }
 
-export async function listCredentials(db: Db, did: string): Promise<CredentialSummary[]> {
-  return (await rows(db, did)).map(summarize)
+export async function listCredentials(
+  db: Db,
+  box: SecretBox,
+  did: string,
+): Promise<CredentialSummary[]> {
+  return (await rows(db, did)).map((row) => summarize(row, box))
 }
 
 export type NewCredential = {
@@ -116,14 +133,14 @@ export async function saveCredential(
     : existing.find((r) => r.provider_id === provider.id && !r.slug)
   if (replace) {
     await db.updateTable('provider_credential').set(row).where('id', '=', replace.id).execute()
-    return summarize({ ...replace, ...row })
+    return summarize({ ...replace, ...row }, box)
   }
   const id = newTid()
   await db
     .insertInto('provider_credential')
     .values({ id, owner_did: did, created_at: now, ...row })
     .execute()
-  return summarize({ id, ...row })
+  return summarize({ id, ...row }, box)
 }
 
 export async function deleteCredential(db: Db, did: string, id: string): Promise<boolean> {
@@ -147,8 +164,11 @@ export async function credentialFor(
     ? all.find((r) => r.slug === ref.provider.slice(USER_PROVIDER_PREFIX.length))
     : all.find((r) => r.provider_id === ref.provider && !r.slug)
   if (!row) return undefined
-  const summary = summarize(row)
+  const summary = summarize(row, box)
   const info = summary.models.find((model) => model.id === ref.id)
   if (!info) return undefined
-  return { summary, info, apiKey: box.decrypt(row.api_key_encrypted) }
+  const apiKey = box.tryDecrypt(row.api_key_encrypted)
+  if (apiKey === undefined)
+    throw new UnreadableCredential(summary.name ?? summary.slug ?? summary.providerId)
+  return { summary, info, apiKey }
 }

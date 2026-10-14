@@ -6,6 +6,7 @@ import {
   deleteCredential,
   listCredentials,
   saveCredential,
+  UnreadableCredential,
 } from '../../src/providers/user-credentials.ts'
 import { SecretBox } from '../../src/secrets.ts'
 import { dialects } from '../helpers/db.ts'
@@ -28,7 +29,7 @@ describe.each(dialects)('user credentials on $name', ({ create }) => {
       apiKey: 'sk-live-abcd1234',
       models: [],
     })
-    const [credential] = await listCredentials(db, did)
+    const [credential] = await listCredentials(db, box, did)
     expect(credential).toMatchObject({ providerId: 'fake', modelProvider: 'fake', keyHint: '1234' })
     expect(JSON.stringify(credential)).not.toContain('sk-live')
     const row = await db
@@ -44,7 +45,7 @@ describe.each(dialects)('user credentials on $name', ({ create }) => {
     const { provider } = fakeProvider()
     await saveCredential(db, box, did, provider, { apiKey: 'old-key-1111', models: [] })
     await saveCredential(db, box, did, provider, { apiKey: 'new-key-2222', models: [] })
-    expect((await listCredentials(db, did)).map((c) => c.keyHint)).toEqual(['2222'])
+    expect((await listCredentials(db, box, did)).map((c) => c.keyHint)).toEqual(['2222'])
     await db.destroy()
   })
 
@@ -86,6 +87,21 @@ describe.each(dialects)('user credentials on $name', ({ create }) => {
     await db.destroy()
   })
 
+  it('flags a key no current or retired key can decrypt, and refuses to use it', async () => {
+    const db = await setup()
+    await saveCredential(db, box, did, fakeProvider().provider, {
+      apiKey: 'sk-live-abcd1234',
+      models: [{ id: 'm1', name: 'M1', capabilities: caps }],
+    })
+    const lost = new SecretBox(Buffer.alloc(32, 6))
+    expect((await listCredentials(db, box, did))[0]?.keyUnreadable).toBe(false)
+    expect((await listCredentials(db, lost, did))[0]?.keyUnreadable).toBe(true)
+    await expect(
+      credentialFor(db, lost, did, { provider: 'fake', id: 'm1' }),
+    ).rejects.toBeInstanceOf(UnreadableCredential)
+    await db.destroy()
+  })
+
   it('deletes only the owner credential', async () => {
     const db = await setup()
     const saved = await saveCredential(db, box, did, fakeProvider().provider, {
@@ -94,7 +110,7 @@ describe.each(dialects)('user credentials on $name', ({ create }) => {
     })
     expect(await deleteCredential(db, 'did:plc:bob', saved.id)).toBe(false)
     expect(await deleteCredential(db, did, saved.id)).toBe(true)
-    expect(await listCredentials(db, did)).toEqual([])
+    expect(await listCredentials(db, box, did)).toEqual([])
     await db.destroy()
   })
 })

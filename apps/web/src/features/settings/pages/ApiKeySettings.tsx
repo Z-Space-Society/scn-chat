@@ -129,14 +129,7 @@ function ApiKeyRow(props: ApiKeyRowProps) {
           credential.baseUrl ? `${props.provider} · ${credential.baseUrl}` : props.provider
         }
       />
-      <code
-        title="The key's last four characters"
-        className="rounded-badge bg-surface px-1.75 py-0.5 text-caption text-muted tracking-key"
-      >
-        <span aria-hidden="true">••••</span>
-        <span className="sr-only">ending </span>
-        {credential.keyHint}
-      </code>
+      <KeyHint credential={credential} />
       <ConfirmButton
         label="Delete key"
         question="Delete this key?"
@@ -144,6 +137,32 @@ function ApiKeyRow(props: ApiKeyRowProps) {
         onConfirm={props.onDelete}
       />
     </Item>
+  )
+}
+
+interface KeyHintProps {
+  credential: Credential
+}
+
+/** The key's last four characters, or that it can't be read and must be added again. */
+function KeyHint(props: KeyHintProps) {
+  if (props.credential.keyUnreadable)
+    return (
+      <span className="text-danger text-small">
+        {props.credential.baseUrl
+          ? "Can't be read. Delete it and add it again."
+          : "Can't be read. Add it again."}
+      </span>
+    )
+  return (
+    <code
+      title="The key's last four characters"
+      className="rounded-badge bg-surface px-1.75 py-0.5 text-caption text-muted tracking-key"
+    >
+      <span aria-hidden="true">••••</span>
+      <span className="sr-only">ending </span>
+      {props.credential.keyHint}
+    </code>
   )
 }
 

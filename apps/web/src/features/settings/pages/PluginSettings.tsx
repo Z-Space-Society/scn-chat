@@ -155,7 +155,11 @@ function PluginSchema(props: PluginFieldsetProps) {
         <SchemaFields
           schema={schema as Schema}
           values={field.state.value}
-          secrets={{ fields: props.plugin.secretFields, stored: props.plugin.secretsSet }}
+          secrets={{
+            fields: props.plugin.secretFields,
+            stored: props.plugin.secretsSet,
+            unreadable: props.plugin.secretsUnreadable,
+          }}
           onChange={(key, value) => field.handleChange((current) => ({ ...current, [key]: value }))}
         />
       )}

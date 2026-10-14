@@ -96,6 +96,7 @@ export class PluginAdmin {
         options: instance.options,
         secretFields: secretKeys(installed?.optionsSchema),
         secretsSet: Object.keys(instance.secrets),
+        secretsUnreadable: Boolean(instance.unreadableSecrets),
         schema: installed ? optionsJsonSchema(installed) : null,
         pluginId: status?.state === 'loaded' ? status.pluginId : null,
         name: status?.state === 'loaded' ? status.name : null,
@@ -147,7 +148,13 @@ export class PluginAdmin {
       instance.secrets,
       change.clearSecrets,
     )
-    instances[index] = { ...instance, ...split, enabled: change.enabled ?? instance.enabled }
+    instances[index] = {
+      ...instance,
+      ...split,
+      enabled: change.enabled ?? instance.enabled,
+      // Clearing any secret discards the ones that can't be decrypted.
+      unreadableSecrets: change.clearSecrets?.length ? undefined : instance.unreadableSecrets,
+    }
     await this.apply(instances, id, adminDid)
   }
 

@@ -42,9 +42,29 @@ export class SecretBox {
     if (!key) throw new SecretDecryptError(`no key with id ${id}`)
     const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(iv, 'base64url'))
     decipher.setAuthTag(Buffer.from(tag, 'base64url'))
-    return Buffer.concat([
-      decipher.update(Buffer.from(ciphertext, 'base64url')),
-      decipher.final(),
-    ]).toString('utf8')
+    try {
+      return Buffer.concat([
+        decipher.update(Buffer.from(ciphertext, 'base64url')),
+        decipher.final(),
+      ]).toString('utf8')
+    } catch {
+      throw new SecretDecryptError('the value fails authentication')
+    }
+  }
+
+  /** Whether a value was encrypted with a key this box holds, checked without decrypting it. */
+  hasKeyFor(value: string): boolean {
+    const [version, id] = value.split(':')
+    return version === VERSION && id !== undefined && this.keys.has(id)
+  }
+
+  /** Decrypt, or undefined when no current or retired key can, as after a lost `SECRET_KEY`. */
+  tryDecrypt(value: string): string | undefined {
+    try {
+      return this.decrypt(value)
+    } catch (err) {
+      if (err instanceof SecretDecryptError) return undefined
+      throw err
+    }
   }
 }

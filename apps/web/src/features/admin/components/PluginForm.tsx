@@ -81,6 +81,7 @@ export function PluginForm(props: Props) {
                         secrets={{
                           fields: props.instance.secretFields,
                           stored: props.instance.secretsSet,
+                          unreadable: props.instance.secretsUnreadable,
                           clearing: {
                             cleared: cleared.state.value,
                             onClear: (key, clear) =>

@@ -7,12 +7,15 @@ import {
   clearUserSettings,
   InvalidPluginSettingsError,
   readUserSettings,
+  readUserSettingsState,
   writeUserSettings,
 } from '../../src/plugins/user-settings.ts'
 import { SecretBox } from '../../src/secrets.ts'
 import { dialects } from '../helpers/db.ts'
 
 const box = new SecretBox(Buffer.alloc(32, 7))
+/** The same server after its `SECRET_KEY` was replaced and the old one lost. */
+const newBox = new SecretBox(Buffer.alloc(32, 8))
 const did = 'did:plc:alice'
 const schema = z.object({
   engine: z.string().default('duckduckgo'),
@@ -67,6 +70,34 @@ describe.each(dialects)('plugin user settings on $name', ({ create }) => {
     await expect(readUserSettings(db, box, did, plugin)).rejects.toBeInstanceOf(
       InvalidPluginSettingsError,
     )
+    await db.destroy()
+  })
+
+  it('reads secrets no key can decrypt as unset, and keeps them until one is entered', async () => {
+    const db = await setup()
+    await writeUserSettings(db, box, did, plugin, { engine: 'kagi', apiKey: 'sk-secret' })
+    expect(await readUserSettingsState(db, newBox, did, plugin)).toEqual({
+      settings: { engine: 'kagi', apiKey: '' },
+      secretsUnreadable: true,
+    })
+    await writeUserSettings(db, newBox, did, plugin, { engine: 'brave', apiKey: '' })
+    // The old key, restored, still reads the kept secret.
+    expect(
+      await readUserSettings(
+        db,
+        new SecretBox(Buffer.alloc(32, 8), [Buffer.alloc(32, 7)]),
+        did,
+        plugin,
+      ),
+    ).toEqual({
+      engine: 'brave',
+      apiKey: 'sk-secret',
+    })
+    await writeUserSettings(db, newBox, did, plugin, { engine: 'brave', apiKey: 'sk-new' })
+    expect(await readUserSettingsState(db, newBox, did, plugin)).toEqual({
+      settings: { engine: 'brave', apiKey: 'sk-new' },
+      secretsUnreadable: false,
+    })
     await db.destroy()
   })
 

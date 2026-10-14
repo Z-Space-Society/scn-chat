@@ -11,7 +11,7 @@ import type { PluginHost } from './host.ts'
 import {
   clearUserSettings,
   InvalidPluginSettingsError,
-  readUserSettings,
+  readUserSettingsState,
   secretKeys,
   writeUserSettings,
 } from './user-settings.ts'
@@ -42,21 +42,32 @@ export function pluginRoutes(deps: PluginRoutesDeps) {
   /** The plugin's settings form and the user's values, with secrets blanked. */
   const settingsOf = async (plugin: Plugin, did: string) => {
     if (!plugin.userSettings)
-      return { schema: null, secretFields: [], values: {}, secretsSet: [], error: null }
+      return {
+        schema: null,
+        secretFields: [],
+        values: {},
+        secretsSet: [],
+        secretsUnreadable: false,
+        error: null,
+      }
     const schema = plugin.userSettings as z.ZodObject<z.ZodRawShape>
     const secrets = secretKeys(schema)
     const base = { schema: z.toJSONSchema(schema), secretFields: secrets }
     try {
-      const values = (await readUserSettings(deps.db, deps.box, did, plugin)) as Record<
-        string,
-        unknown
-      >
+      const state = await readUserSettingsState(deps.db, deps.box, did, plugin)
+      const values = state.settings as Record<string, unknown>
       const secretsSet = secrets.filter((key) => Boolean(values[key]))
       for (const key of secrets) values[key] = ''
-      return { ...base, values, secretsSet, error: null }
+      return {
+        ...base,
+        values,
+        secretsSet,
+        secretsUnreadable: state.secretsUnreadable,
+        error: null,
+      }
     } catch (err) {
       if (!(err instanceof InvalidPluginSettingsError)) throw err
-      return { ...base, values: {}, secretsSet: [], error: err.message }
+      return { ...base, values: {}, secretsSet: [], secretsUnreadable: false, error: err.message }
     }
   }
 

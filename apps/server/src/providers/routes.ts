@@ -97,7 +97,7 @@ export function providerRoutes(deps: ProviderRoutesDeps) {
       }
     })
     .get('/credentials', async (c) =>
-      c.json({ credentials: await listCredentials(deps.db, signedInUser(c).did) }),
+      c.json({ credentials: await listCredentials(deps.db, deps.box, signedInUser(c).did) }),
     )
     .post('/credentials', async (c) => {
       const body = await jsonBody(c, newCredential)

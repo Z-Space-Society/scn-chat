@@ -29,6 +29,18 @@ describe('SecretBox', () => {
     const box = new SecretBox(keyA)
     const parts = box.encrypt('secret').split(':')
     parts[4] = Buffer.from('tampered').toString('base64url')
-    expect(() => box.decrypt(parts.join(':'))).toThrow()
+    expect(() => box.decrypt(parts.join(':'))).toThrow(SecretDecryptError)
+  })
+
+  it('reads an undecryptable value as undefined with tryDecrypt', () => {
+    const value = new SecretBox(keyA).encrypt('x')
+    expect(new SecretBox(keyB).tryDecrypt(value)).toBeUndefined()
+    expect(new SecretBox(keyA).tryDecrypt(value)).toBe('x')
+  })
+
+  it('tells whether it holds the key for a value without decrypting it', () => {
+    const value = new SecretBox(keyA).encrypt('x')
+    expect(new SecretBox(keyB).hasKeyFor(value)).toBe(false)
+    expect(new SecretBox(keyB, [keyA]).hasKeyFor(value)).toBe(true)
   })
 })

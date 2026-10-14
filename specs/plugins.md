@@ -109,7 +109,7 @@ The hook runner is a small typed module in the server, about 80 lines, that hand
 
 ### Per-user settings
 
-Per-user settings are stored in a `plugin_user_settings` table: DID, plugin ID, JSON value, and a separate encrypted JSON value for secret fields. Values are validated against the plugin's schema on read. Invalid stored values fail loudly and are not silently reset. The settings page shows the validation error for that plugin with a reset button, which calls `DELETE /api/plugins/:id/settings` and clears the user's stored values for it. The web UI renders a settings form from `z.toJSONSchema(userSettings)`, as the web-ui spec describes. Secret fields are encrypted with the same key and scheme as BYO API keys, described in the providers spec.
+Per-user settings are stored in a `plugin_user_settings` table: DID, plugin ID, JSON value, and a separate encrypted JSON value for secret fields. Values are validated against the plugin's schema on read. Invalid stored values fail loudly and are not silently reset. The settings page shows the validation error for that plugin with a reset button, which calls `DELETE /api/plugins/:id/settings` and clears the user's stored values for it. The web UI renders a settings form from `z.toJSONSchema(userSettings)`, as the web-ui spec describes. Secret fields are encrypted with the same key and scheme as BYO API keys, described in the providers spec. Stored secrets that no current or retired key can decrypt read as unset rather than failing, and the API reports `secretsUnreadable` for that plugin, so each secret field says its saved value can't be read and to enter it again. The stored ciphertext is kept until the user enters a secret or resets the plugin's settings, so restoring the lost key in `SECRET_KEYS_OLD` brings it back.
 
 ## Scope Boundaries
 
@@ -148,5 +148,6 @@ Per-user settings are stored in a `plugin_user_settings` table: DID, plugin ID, 
 - [ ] A throwing action is logged and does not affect the turn or later actions.
 - [ ] Per-user settings round-trip through storage, with secret fields stored encrypted and returned decrypted.
 - [ ] Stored per-user settings that fail validation raise an error instead of being reset.
+- [ ] Per-user secrets no key can decrypt read as unset with `secretsUnreadable`, and are kept until the user enters a secret.
 - [ ] Deleting a plugin's settings clears the user's stored values, so the schema defaults apply.
 - [ ] `ctx.conversations.updateInfo` writes through the storage layer under the user's DID.
