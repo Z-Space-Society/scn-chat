@@ -3,10 +3,11 @@ import { type ComponentProps, type ReactNode, useId } from 'react'
 import { cn } from './cn.ts'
 import { Button } from './ui/Button.tsx'
 import { field as fieldClass, Switch } from './ui/controls.tsx'
+import { Select, type SelectOption } from './ui/Select.tsx'
 
 const { fieldContext, formContext, useFieldContext, useFormContext } = createFormHookContexts()
 
-type Controlled<Element extends 'input' | 'textarea' | 'select'> = Omit<
+type Controlled<Element extends 'input' | 'textarea'> = Omit<
   ComponentProps<Element>,
   'name' | 'value' | 'checked' | 'onChange' | 'onBlur'
 >
@@ -112,29 +113,32 @@ function SwitchField(props: SwitchFieldProps) {
   )
 }
 
-interface SelectFieldProps extends Controlled<'select'>, LabelProps {
-  /** The options. */
-  children: ReactNode
+interface SelectFieldProps extends LabelProps {
+  options: SelectOption[]
+  id?: string
+  'aria-label'?: string
+  className?: string
+  disabled?: boolean
+  /** What the button says while no option holds the value, such as "Choose a provider". */
+  placeholder?: string
 }
 
-/** A select bound to a string field. */
+/** The app's select bound to a string field. */
 function SelectField(props: SelectFieldProps) {
   const field = useFieldContext<string>()
-  const { label, children, ...select } = props
+  const { label, ...select } = props
   const generatedId = useId()
   const id = select.id ?? generatedId
   const control = (
-    <select
+    <Select
       {...select}
       id={id}
-      className={cn(fieldClass, select.className)}
-      name={field.name}
       value={field.state.value}
-      onChange={(e) => field.handleChange(e.target.value)}
-      onBlur={field.handleBlur}
-    >
-      {children}
-    </select>
+      onChange={(value) => {
+        field.handleChange(value)
+        field.handleBlur()
+      }}
+    />
   )
   if (label === undefined) return control
   return (

@@ -183,6 +183,8 @@ function AddApiKeyForm() {
   const listed = listModels.data?.models ?? []
   const add = useMutation({
     mutationFn: (draft: KeyDraft) => {
+      // The select can't be required as a native one can, so the form says it here.
+      if (!draft.providerId) throw new Error('Choose a provider.')
       const typed = draft.models
         .split(',')
         .map((id) => id.trim())
@@ -223,14 +225,11 @@ function AddApiKeyForm() {
           <form.AppField name="providerId" listeners={clearsListed}>
             {(field) => (
               <Field label="Provider" htmlFor="key-provider">
-                <field.SelectField id="key-provider" required>
-                  <option value="">Choose a provider</option>
-                  {providers.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </field.SelectField>
+                <field.SelectField
+                  id="key-provider"
+                  placeholder="Choose a provider"
+                  options={providers.map((p) => ({ value: p.id, label: p.name }))}
+                />
               </Field>
             )}
           </form.AppField>

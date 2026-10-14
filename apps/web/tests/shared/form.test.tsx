@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { useAppForm } from '../../src/shared/form.tsx'
+import { choose } from '../helpers/select.ts'
 
 interface Props {
   onSubmit: (value: { name: string; bio: string; public: boolean; plan: string }) => void
@@ -24,10 +25,13 @@ function Example(props: Props) {
         </form.AppField>
         <form.AppField name="plan">
           {(field) => (
-            <field.SelectField label="Plan">
-              <option value="free">Free</option>
-              <option value="paid">Paid</option>
-            </field.SelectField>
+            <field.SelectField
+              label="Plan"
+              options={[
+                { value: 'free', label: 'Free' },
+                { value: 'paid', label: 'Paid' },
+              ]}
+            />
           )}
         </form.AppField>
         <form.SubmitButton>Save</form.SubmitButton>
@@ -44,7 +48,7 @@ describe('the form kit', () => {
     await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Ada')
     await user.type(screen.getByLabelText('Bio'), 'Counts things')
     await user.click(screen.getByLabelText('Public'))
-    await user.selectOptions(screen.getByLabelText('Plan'), 'paid')
+    await choose(screen.getByRole('combobox', { name: 'Plan' }), 'Paid')
     await user.click(screen.getByRole('button', { name: 'Save' }))
     expect(onSubmit).toHaveBeenCalledWith({
       name: 'Ada',

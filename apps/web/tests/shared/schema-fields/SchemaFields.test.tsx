@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { SchemaFields } from '../../../src/shared/schema-fields/SchemaFields.tsx'
+import { choose } from '../../helpers/select.ts'
 
 const schema = {
   properties: {
@@ -27,7 +28,7 @@ describe('SchemaFields', () => {
         onChange={() => {}}
       />,
     )
-    expect(screen.getByRole('combobox')).toHaveValue('kagi')
+    expect(screen.getByRole('combobox')).toHaveTextContent('kagi')
     expect(screen.getByLabelText('apiKey')).toHaveAttribute('type', 'password')
     expect(screen.getByLabelText('apiKey')).toHaveAttribute('placeholder', 'Saved')
     expect(screen.getByText('Leave blank to keep the saved value.')).toBeInTheDocument()
@@ -39,7 +40,7 @@ describe('SchemaFields', () => {
   it('reports each change with its field name', async () => {
     const onChange = vi.fn()
     render(<SchemaFields schema={schema} values={{}} onChange={onChange} />)
-    await userEvent.selectOptions(screen.getByRole('combobox'), 'duckduckgo')
+    await choose(screen.getByRole('combobox'), 'duckduckgo')
     await userEvent.click(screen.getByRole('checkbox'))
     expect(onChange.mock.calls).toEqual([
       ['engine', 'duckduckgo'],

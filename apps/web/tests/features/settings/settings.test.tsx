@@ -205,8 +205,7 @@ describe('Settings API keys', () => {
         }),
     })
     await renderPage('/api-keys')
-    await screen.findByRole('option', { name: 'OpenAI' })
-    await userEvent.selectOptions(screen.getByLabelText('Provider'), 'openai')
+    await choose(await screen.findByRole('combobox', { name: 'Provider' }), 'OpenAI')
     await userEvent.type(screen.getByLabelText('API key'), 'sk-test')
     await userEvent.click(screen.getByRole('button', { name: 'Add key' }))
     await vi.waitFor(() => expect(screen.getByLabelText('API key')).toHaveValue(''))
@@ -218,7 +217,9 @@ describe('Settings API keys', () => {
       apiKey: 'sk-test',
       models: [],
     })
-    expect(screen.getByLabelText('Provider')).toHaveValue('')
+    expect(screen.getByRole('combobox', { name: 'Provider' })).toHaveTextContent(
+      'Choose a provider',
+    )
   })
   it('drops the models loaded for one provider when another is chosen', async () => {
     const fetch = stubServer({
@@ -233,12 +234,11 @@ describe('Settings API keys', () => {
         Response.json({ models: [{ id: 'gpt', name: 'GPT', capabilities: caps }] }),
     })
     await renderPage('/api-keys')
-    await screen.findByRole('option', { name: 'OpenAI' })
-    await userEvent.selectOptions(screen.getByLabelText('Provider'), 'openai')
+    await choose(await screen.findByRole('combobox', { name: 'Provider' }), 'OpenAI')
     await userEvent.type(screen.getByLabelText('API key'), 'sk-test')
     await userEvent.click(screen.getByRole('button', { name: 'Load models' }))
     expect(await screen.findByText('1 model loaded')).toBeInTheDocument()
-    await userEvent.selectOptions(screen.getByLabelText('Provider'), 'mistral')
+    await choose(screen.getByRole('combobox', { name: 'Provider' }), 'Mistral')
     expect(screen.queryByText('1 model loaded')).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Add key' }))
     await vi.waitFor(() => expect(screen.getByLabelText('API key')).toHaveValue(''))
@@ -369,7 +369,7 @@ describe('Settings plugins', () => {
     })
     await renderPage('/plugins')
     const fetchGroup = await screen.findByRole('group', { name: 'web-fetch' })
-    await userEvent.selectOptions(screen.getByRole('combobox'), 'kagi')
+    await choose(screen.getByRole('combobox'), 'kagi')
     await userEvent.click(fetchGroup.querySelector('input[type="checkbox"]') as HTMLElement)
     expect(puts(fetch)).toEqual([])
     const saveButtons = screen.getAllByRole('button', { name: 'Save' })

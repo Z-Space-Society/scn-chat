@@ -3,6 +3,7 @@ import { cn } from '../cn.ts'
 import { splitLines } from '../lines.ts'
 import type { Issue } from '../response.ts'
 import { field, Switch } from '../ui/controls.tsx'
+import { Select } from '../ui/Select.tsx'
 import { dividedRows, SettingRow } from '../ui/SettingsPage.tsx'
 import { applyRule, type FieldRule } from './field-rules.ts'
 
@@ -167,19 +168,17 @@ function SchemaInput(props: SchemaInputProps): ReactNode {
   switch (props.kind) {
     case 'select':
       return (
-        <select
+        <Select
           id={props.id}
-          className={cn(field, 'min-w-52')}
+          className="min-w-52"
           disabled={props.disabled}
           value={String(props.value ?? '')}
-          onChange={(e) => change(e.target.value)}
-        >
-          {(props.property.enum ?? []).map((option) => (
-            <option key={String(option)} value={String(option)}>
-              {String(option)}
-            </option>
-          ))}
-        </select>
+          options={(props.property.enum ?? []).map((option) => ({
+            value: String(option),
+            label: String(option),
+          }))}
+          onChange={change}
+        />
       )
     case 'switch':
       return (
