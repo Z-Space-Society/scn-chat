@@ -30,10 +30,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       // Applies the light or dark, and the sidebar's collapse, chosen on this device before the
       // first paint.
       { children: themeScript + sidebarScript },
-      // In development, React Scan outlines components as they render. It hooks into React
-      // through the devtools global before React loads, so it runs as a plain script ahead of
-      // the app.
-      ...(import.meta.env.DEV ? [{ src: '/node_modules/react-scan/dist/auto.global.js' }] : []),
+      // With `pnpm dev --scan`, React Scan outlines components as they render. It hooks into
+      // React through the devtools global before React loads, so it runs as a plain script ahead
+      // of the app.
+      ...(import.meta.env.REACT_SCAN
+        ? [{ src: '/node_modules/react-scan/dist/auto.global.js' }]
+        : []),
     ],
   }),
   shellComponent: Shell,

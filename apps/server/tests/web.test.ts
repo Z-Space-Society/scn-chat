@@ -31,7 +31,7 @@ const me = (changes: Record<string, unknown> = {}) => ({
 describe('server-rendered pages', () => {
   let dev: DevWeb
   beforeAll(async () => {
-    dev = await loadDevWeb(new Server())
+    dev = await loadDevWeb(new Server(), { reactScan: false })
   }, 120_000)
   afterAll(() => dev?.close())
 

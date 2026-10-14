@@ -57,7 +57,7 @@ Phase 1:
 
 ### Start the app
 
- 1. Run `pnpm dev`
+ 1. Run `pnpm dev`, or `pnpm dev --scan` to also load React Scan, which outlines components as they render.
  2. Open http://127.0.0.1:3000 and sign in with your ATProto handle.
  3. Open Settings > Admin to add your plugins and models, and choose who else can sign in.
 

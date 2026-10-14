@@ -36,7 +36,7 @@ const START_SERVER_ENTRY = 'virtual:tanstack-start-server-entry'
  * Vite's module graph. Importing the entry ourselves, rather than letting Start install its dev
  * middleware, is what lets each request carry its context.
  */
-export async function loadDevWeb(http: Server): Promise<DevWeb> {
+export async function loadDevWeb(http: Server, options: { reactScan: boolean }): Promise<DevWeb> {
   const { createServer, isRunnableDevEnvironment } = await import('vite')
   const vite = await createServer({
     root: webRoot,
@@ -44,6 +44,8 @@ export async function loadDevWeb(http: Server): Promise<DevWeb> {
     configLoader: 'runner',
     appType: 'custom',
     server: { middlewareMode: true, hmr: { server: http } },
+    // `pnpm dev --scan` loads React Scan in the browser, from the root route's head.
+    define: { 'import.meta.env.REACT_SCAN': JSON.stringify(options.reactScan) },
   })
   const ssr = vite.environments.ssr
   if (!ssr || !isRunnableDevEnvironment(ssr))

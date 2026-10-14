@@ -23,7 +23,10 @@ const installed = await findInstalledPlugins(
 
 // In development Vite serves the web app from source, sharing this HTTP server for HMR.
 const http = createHttpServer()
-const dev = config.nodeEnv === 'production' ? undefined : await loadDevWeb(http)
+const dev =
+  config.nodeEnv === 'production'
+    ? undefined
+    : await loadDevWeb(http, { reactScan: process.argv.includes('--scan') })
 
 const server = await createServer({
   config,
