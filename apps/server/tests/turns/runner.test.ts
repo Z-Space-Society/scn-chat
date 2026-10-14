@@ -38,6 +38,69 @@ async function sendUser(
   )
 }
 
+const text = (value: string) => ({ $type: `${nsid.defs}#textPart`, text: value })
+
+describe('TurnRunner.send and regenerate', () => {
+  it('writes a user message without asking for a reply, and starts none', async () => {
+    const h = await turnsHarness()
+    const { skey } = await h.chats.createConversation()
+    const { rkey, started } = await h.runner.send(h.account, skey, { parts: [text('note')] })
+    expect(started).toBeNull()
+    const messages = await h.messages(skey)
+    expect([...messages.keys()]).toEqual([rkey])
+    expect(messages.get(rkey)).not.toHaveProperty('generation')
+  })
+
+  it('writes a user message asking for its first reply, under its parent, and starts it', async () => {
+    const h = await turnsHarness()
+    const { skey } = await h.chats.createConversation()
+    const { rkey, started } = await h.runner.send(h.account, skey, {
+      parts: [text('hi')],
+      parent: '3ppppppppppp1',
+      generation: { effort: 'low' },
+    })
+    expect(started).toEqual({ status: 'claimed', replyRkey: `${rkey}.r0` })
+    await h.runner.idle()
+    const messages = await h.messages(skey)
+    expect(messages.get(rkey)).toMatchObject({
+      role: 'user',
+      parent: '3ppppppppppp1',
+      generation: { effort: 'low', attempt: 0 },
+    })
+    expect(messages.get(`${rkey}.r0`)?.status).toBe('complete')
+  })
+
+  it('asks again with the next attempt and the new model or effort, keeping the rest', async () => {
+    const h = await turnsHarness()
+    const model = { provider: 'fake', id: 'default-model' }
+    const { skey } = await h.chats.createConversation()
+    const { rkey } = await h.runner.send(h.account, skey, {
+      parts: [text('hi')],
+      generation: { model, effort: 'low' },
+    })
+    await h.runner.idle()
+    const started = await h.runner.regenerate(h.account, skey, rkey, { effort: 'high' })
+    expect(started).toEqual({ status: 'claimed', replyRkey: `${rkey}.r1` })
+    await h.runner.idle()
+    const messages = await h.messages(skey)
+    expect(messages.get(rkey)?.generation).toEqual({ model, effort: 'high', attempt: 1 })
+    expect(messages.get(`${rkey}.r0`)?.status).toBe('complete')
+    expect(messages.get(`${rkey}.r1`)?.status).toBe('complete')
+  })
+
+  it("regenerates nothing for a message that is missing or not the user's", async () => {
+    const h = await turnsHarness()
+    const { skey } = await h.chats.createConversation()
+    const { rkey } = await h.runner.send(h.account, skey, {
+      parts: [text('hi')],
+      generation: {},
+    })
+    await h.runner.idle()
+    expect(await h.runner.regenerate(h.account, skey, '3nnnnnnnnnnn1', {})).toBeNull()
+    expect(await h.runner.regenerate(h.account, skey, `${rkey}.r0`, {})).toBeNull()
+  })
+})
+
 describe('TurnRunner.start', () => {
   it('claims with a pending reply at <key>.r0, then writes the finished reply', async () => {
     const h = await turnsHarness()
@@ -705,6 +768,33 @@ describe('TurnRunner.recover', () => {
     expect(all.get('ours.r0')).toMatchObject({ status: 'error', error: 'interrupted' })
     expect(all.get('theirs.r0')?.status).toBe('pending')
     expect(await h.db.selectFrom('turn_claim').selectAll().execute()).toEqual([])
+  })
+
+  it('clears the claim of a reply that no longer matches its lexicon, leaving the reply', async () => {
+    const h = await turnsHarness()
+    const { skey, uri } = await h.chats.createConversation()
+    await h.chats.createMessage(skey, 'ours.r0', {
+      $type: nsid.message,
+      role: 'assistant',
+      content: textContent(''),
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    } as never)
+    // Another client broke the record after the claim, so it no longer has content.
+    const broken = { $type: nsid.message, role: 'assistant', status: 'pending', createdAt: 'x' }
+    await h.db
+      .updateTable('local_record')
+      .set({ value_json: JSON.stringify(broken) })
+      .where('rkey', '=', 'ours.r0')
+      .execute()
+    await h.db
+      .insertInto('turn_claim')
+      .values({ conversation_uri: uri, reply_rkey: 'ours.r0', owner_did: ALICE, claimed_at: 'now' })
+      .execute()
+    await h.runner.recover()
+    expect(await h.db.selectFrom('turn_claim').selectAll().execute()).toEqual([])
+    const stored = await h.external.getRecord(uri, nsid.message, 'ours.r0')
+    expect(stored?.value).toEqual(broken)
   })
 
   it('keeps the claim of a reply it could not mark, so the next restart tries again', async () => {

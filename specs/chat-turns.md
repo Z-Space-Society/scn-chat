@@ -18,11 +18,13 @@ This is the core of the app. It has to honor the direct-write conventions in `le
 { parent?: string; parts: Part[]; generation?: { model?: ModelRef; effort?: Effort; tools?: string[] } }
 ```
 
-`parts` are text parts plus the attachment parts returned by the attachments API. The server builds the user message record, with a new TID key, `role: "user"`, the parent, `content` as `plainContent`, the generation request with `attempt` 0, and `createdAt`. It writes the record with `createMessage`, then calls `startTurn` when a generation request is present. The response returns the user message key and the reply key.
+`parts` are text parts plus the attachment parts returned by the attachments API. The route checks the body and calls the runner's `send`, which builds the user message record, with a new TID key, `role: "user"`, the parent, `content` as `plainContent`, the generation request with `attempt` 0, and `createdAt`. It writes the record with `createMessage`, then starts the turn when a generation request is present. The response returns the user message key and the reply key.
+
+The rules of the request convention, which every client follows, live in `turns/request.ts`: building a user message that asks for a reply, asking again with the next attempt, the reply key `<key>.r<attempt>`, and reading what a record asks for. The runner reads every record's request through it, including a record that failed validation, which it answers with an error.
 
 An edit is a new message with the same parent as the one being edited. The web UI sends it through this same route.
 
-`POST /api/conversations/:skey/messages/:rkey/regenerate` with an optional `model` and `effort` rewrites the user message with `putMessage`. It raises `generation.attempt` by one and applies the new model and effort. Then it calls `startTurn`.
+`POST /api/conversations/:skey/messages/:rkey/regenerate` with an optional `model` and `effort` calls the runner's `regenerate`, which reads the user message through `ChatService.getMessage`, checked against its lexicon, and rewrites it with `putMessage`. It raises `generation.attempt` by one and applies the new model and effort. Then it starts the turn. A message that is missing or isn't the user's answers 404.
 
 `POST /api/conversations/:skey/messages/:rkey/cancel` aborts the running generation for that reply key, if this server is running it.
 
@@ -79,7 +81,7 @@ Other parts are ignored. When a stream part carries `providerMetadata`, it is JS
 - **Cancelled.** The abort signal fired. Status `cancelled`, with the partial parts kept.
 - **Too large.** If the final record's JSON is over 900 KB, the largest tool result outputs are uploaded as blobs and referenced from each part's `outputBlob`, and `output` keeps a short summary. If the record is still too large, the turn ends with status `error`.
 
-On startup, the server rewrites any `pending` reply in its own `turn_claim` table as `error` with the message "interrupted", then clears the table. Pending replies claimed by other deployments are never touched.
+On startup, the server rewrites any `pending` reply in its own `turn_claim` table as `error` with the message "interrupted", then clears the table. Pending replies claimed by other deployments are never touched. A claimed reply that no longer matches its lexicon is left as it is, and its claim cleared, since rewriting it would only write another invalid record.
 
 ### Streaming to the web UI
 

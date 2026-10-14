@@ -16,8 +16,8 @@ import { isToolEnabled, readToolChoices } from '../plugins/user-tools.ts'
 import { mapEffort } from '../providers/effort.ts'
 import { safeErrorMessage } from '../safe-error.ts'
 import type { ChatService } from '../storage/chat-service.ts'
-import { RecordExists } from '../storage/record-store.ts'
-import { type JsonRecord, parseSpaceUri } from '../storage/records.ts'
+import { InvalidStoredRecord, RecordExists } from '../storage/record-store.ts'
+import { type JsonRecord, newTid, parseSpaceUri } from '../storage/records.ts'
 import type { ChatServices } from '../storage/services.ts'
 import type { SyncEventBus, SyncEvents } from '../sync/events.ts'
 import { encode, PartAccumulator } from './accumulator.ts'
@@ -30,6 +30,7 @@ import {
   timeZoneOf,
   toModelMessages,
 } from './prompt.ts'
+import { askAgain, type Generation, generationOf, replyKey, userMessage } from './request.ts'
 import type { StreamHub } from './stream-hub.ts'
 import { wrapUntrusted } from './untrusted.ts'
 
@@ -67,7 +68,6 @@ export type StartResult = {
 
 const MAX_RECORD_BYTES = 900_000
 const defs = (name: string) => `${nsid.defs}#${name}`
-const replyKey = (userRkey: string, attempt: number) => `${userRkey}.r${attempt}`
 
 type QueuedTurn = { skey: string; userRkey: string; replyRkey: string; attempt: number }
 
@@ -167,19 +167,53 @@ export class TurnRunner {
   }
 
   /** Start the turn a user message asks for, if it still needs one. */
+  /**
+   * Write a user message to a conversation, and start its reply when it asks for one. The message
+   * gets a new key, which the result gives with the reply's start, if any.
+   */
+  async send(
+    account: Account,
+    skey: string,
+    message: { parts: JsonRecord[]; parent?: string; generation?: Omit<Generation, 'attempt'> },
+  ): Promise<{ rkey: string; started: StartResult | null }> {
+    const chats = this.deps.services.forAccount(account)
+    const rkey = newTid()
+    await chats.createMessage(
+      skey,
+      rkey,
+      userMessage({ ...message, createdAt: new Date(this.now()).toISOString() }),
+    )
+    const started = message.generation ? await this.start(account.did, skey, rkey) : null
+    return { rkey, started }
+  }
+
+  /**
+   * Ask for another reply to a user message, raising its attempt, with a different model or effort
+   * if given, and start it. Null when the conversation has no such user message.
+   */
+  async regenerate(
+    account: Account,
+    skey: string,
+    userRkey: string,
+    overrides: { model?: ModelRef; effort?: string },
+  ): Promise<StartResult | null> {
+    const chats = this.deps.services.forAccount(account)
+    const existing = await chats.getMessage(skey, userRkey)
+    if (existing?.role !== 'user') return null
+    await chats.putMessage(skey, userRkey, askAgain(existing, overrides))
+    return this.start(account.did, skey, userRkey)
+  }
+
   async start(did: string, skey: string, userRkey: string): Promise<StartResult> {
     if (!(await this.deps.hasAccess(did))) {
       this.deps.logger.info({ did, skey }, 'skipping a turn for a user without access')
       return { status: 'skipped' }
     }
     const loaded = await this.load(did, skey)
-    const userMessage = loaded.messages.get(userRkey)
-    const record = userMessage?.record as unknown as JsonRecord | undefined
-    const generation = record?.generation as
-      | { model?: ModelRef; effort?: string; attempt?: number; tools?: string[] }
-      | undefined
-    if (record?.role !== 'user' || !generation) return { status: 'skipped' }
-    const attempt = generation.attempt ?? 0
+    const record = loaded.messages.get(userRkey)?.record as unknown as JsonRecord | undefined
+    const generation = record && generationOf(record)
+    if (!generation) return { status: 'skipped' }
+    const { attempt } = generation
     const replyRkey = replyKey(userRkey, attempt)
     if (loaded.messages.has(replyRkey)) return { status: 'exists', replyRkey }
     const conversationUri = loaded.chats.conversationUri(skey)
@@ -573,13 +607,11 @@ export class TurnRunner {
 
   /** Reply with an error to a user message that failed validation. */
   async answerInvalid(event: SyncEvents['message:invalid'][0]): Promise<void> {
-    const raw = event.raw
-    if (raw.role !== 'user' || !raw.generation || typeof raw.generation !== 'object') return
-    const attempt = Number((raw.generation as { attempt?: unknown }).attempt ?? 0)
-    if (!Number.isInteger(attempt)) return
+    const generation = generationOf(event.raw)
+    if (!generation) return
     const chats = this.deps.services.forAccount(await this.account(event.did))
     try {
-      await chats.createMessage(event.skey, replyKey(event.rkey, attempt), {
+      await chats.createMessage(event.skey, replyKey(event.rkey, generation.attempt), {
         $type: nsid.message,
         role: 'assistant',
         parent: event.rkey,
@@ -622,14 +654,14 @@ export class TurnRunner {
       try {
         const chats = this.deps.services.forAccount(await this.account(claim.owner_did))
         const skey = chats.skeyOf(claim.conversation_uri)
-        const reply = await chats.store.getRecord(
-          claim.conversation_uri,
-          nsid.message,
-          claim.reply_rkey,
-        )
-        if (reply?.value.status === 'pending') {
+        const reply = await chats.getMessage(skey, claim.reply_rkey).catch((err) => {
+          // A reply that no longer matches its lexicon can't be marked, so its claim just goes.
+          if (err instanceof InvalidStoredRecord) return null
+          throw err
+        })
+        if (reply?.status === 'pending') {
           await chats.putMessage(skey, claim.reply_rkey, {
-            ...reply.value,
+            ...reply,
             status: 'error',
             error: 'interrupted',
           })

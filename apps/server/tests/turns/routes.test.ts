@@ -29,7 +29,7 @@ async function setup(options: Parameters<typeof turnsHarness>[0] = {}) {
     db: h.db,
     logger: h.logger,
     auth: authDeps(h.db, { oauth }),
-    turns: { services: h.services, runner: h.runner, hub: h.hub },
+    turns: { runner: h.runner, hub: h.hub },
   })
   const cookie = sessionCookie(await app.request('/oauth/callback?code=a&state=b', loginCookie))
   const post = async (path: string, body: object = {}) => {
@@ -57,13 +57,6 @@ describe('POST /api/conversations/:skey/messages', () => {
     expect((await messages(skey)).get(String(res.body.replyRkey))?.status).toBe('complete')
   })
 
-  it('writes only the user message without a generation request', async () => {
-    const { post, skey, messages } = await setup()
-    const res = await post(`/conversations/${skey}/messages`, { parts: [text('note to self')] })
-    expect(res.body.replyRkey).toBeNull()
-    expect((await messages(skey)).size).toBe(1)
-  })
-
   it('refuses assistant parts or an empty message', async () => {
     const { post, skey } = await setup()
     expect((await post(`/conversations/${skey}/messages`, { parts: [] })).status).toBe(400)
@@ -83,8 +76,8 @@ describe('POST /api/conversations/:skey/messages', () => {
 })
 
 describe('regenerate and cancel', () => {
-  it('raises the attempt and writes the next reply', async () => {
-    const { post, skey, runner, messages } = await setup()
+  it("answers with the next reply, or 404 for a message that is not the user's", async () => {
+    const { post, skey, runner } = await setup()
     const sent = await post(`/conversations/${skey}/messages`, {
       parts: [text('hi')],
       generation: {},
@@ -93,10 +86,12 @@ describe('regenerate and cancel', () => {
     const res = await post(`/conversations/${skey}/messages/${sent.body.rkey}/regenerate`, {
       effort: 'high',
     })
-    expect(res.body.replyRkey).toBe(`${sent.body.rkey}.r1`)
-    await runner.idle()
-    const user = (await messages(skey)).get(String(sent.body.rkey))
-    expect(user?.generation).toMatchObject({ attempt: 1, effort: 'high' })
+    expect(res).toEqual({
+      status: 200,
+      body: { replyRkey: `${sent.body.rkey}.r1`, status: 'claimed' },
+    })
+    const reply = await post(`/conversations/${skey}/messages/${sent.body.replyRkey}/regenerate`)
+    expect(reply.status).toBe(404)
   })
 
   it('cancels a running reply', async () => {

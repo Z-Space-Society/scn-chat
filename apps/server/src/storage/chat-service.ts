@@ -187,6 +187,11 @@ export class ChatService {
     return record
   }
 
+  /** One message, checked against its lexicon, or null when there is none. */
+  async getMessage(skey: string, rkey: string): Promise<JsonRecord | null> {
+    return (await this.getValid(this.conversationUri(skey), nsid.message, rkey))?.value ?? null
+  }
+
   async getInfo(skey: string): Promise<JsonRecord | null> {
     return (await this.getValid(this.conversationUri(skey), nsid.info, 'self'))?.value ?? null
   }

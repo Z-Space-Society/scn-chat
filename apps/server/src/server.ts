@@ -254,7 +254,7 @@ export async function createServer(deps: ServerDeps) {
       guardedFetch,
       logger,
     },
-    turns: { services, runner, hub },
+    turns: { runner, hub },
     blobs: { services, ingesters: () => runtime().host.ingesters, logger },
     sharing,
     sync: {
