@@ -1,15 +1,13 @@
-import type { ModelRef } from '@scn-chat/lexicons'
 import { useMutation } from '@tanstack/react-query'
 import { api, json, read } from '../../../shared/api.ts'
-import { lastError } from '../../../shared/errors.ts'
 import { useRefreshConversation } from '../../../store/react.tsx'
 
 /**
- * Rename, set the chat's instructions, sync, stop a reply, and regenerate one, each refreshing the
- * conversation from the PDS once it is done. `error` is the error of whichever ran last, for the
+ * Rename, set the chat's instructions, and sync, each refreshing the conversation from the PDS once
+ * it is done. Turns are the chat's, in `useChat`. `outcome` is how whichever ran last went, for the
  * conversation's one alert.
  */
-export function useConversationActions(skey: string, onRegenerated: (replyRkey: string) => void) {
+export function useConversationActions(skey: string) {
   const refreshConversation = useRefreshConversation()
   const refresh = () => refreshConversation(skey)
 
@@ -23,46 +21,12 @@ export function useConversationActions(skey: string, onRegenerated: (replyRkey: 
     mutationFn: () => read(api.chats.conversations[':skey'].sync.$post({ param: { skey } })),
     onSuccess: refresh,
   })
-  const stopping = useMutation({
-    mutationFn: async (replyRkey: string) => {
-      const { cancelled } = await read(
-        api.turns.conversations[':skey'].messages[':rkey'].cancel.$post({
-          param: { skey, rkey: replyRkey },
-        }),
-      )
-      if (!cancelled)
-        throw new Error('This reply may already be finishing. Sync this chat to see it.')
-    },
-    onSuccess: refresh,
-  })
-  const regenerating = useMutation({
-    mutationFn: async (draft: { parent: string | null; model: ModelRef | null }) => {
-      if (!draft.parent)
-        throw new Error("Couldn't regenerate this reply. Sync this chat, then try again.")
-      const result = await read(
-        api.turns.conversations[':skey'].messages[':rkey'].regenerate.$post(
-          { param: { skey, rkey: draft.parent } },
-          json(draft.model ? { model: draft.model } : {}),
-        ),
-      )
-      if (!result.replyRkey)
-        throw new Error("Couldn't regenerate this reply. Sync this chat, then try again.")
-      return result.replyRkey
-    },
-    onSuccess: (replyRkey) => {
-      onRegenerated(replyRkey)
-      return refresh()
-    },
-  })
+  const last = syncing.submittedAt > patching.submittedAt ? syncing : patching
 
   return {
     rename: (title: string) => patching.mutateAsync({ title }),
     setInstructions: (systemPrompt: string) => patching.mutateAsync({ systemPrompt }),
     sync: () => syncing.mutate(),
-    stop: (replyRkey: string) => stopping.mutate(replyRkey),
-    regenerate: (parent: string | null, model: ModelRef | null) =>
-      regenerating.mutate({ parent, model }),
-    regenerating: regenerating.isPending,
-    error: lastError(patching, syncing, stopping, regenerating),
+    outcome: { error: last.error, submittedAt: last.submittedAt },
   }
 }

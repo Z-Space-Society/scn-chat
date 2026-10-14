@@ -1,19 +1,17 @@
 import { useRef, useState } from 'react'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
+import { lastError } from '../../../shared/errors.ts'
 import { JumpDownIcon, RetryIcon } from '../../../shared/icons.tsx'
 import { Button } from '../../../shared/ui/Button.tsx'
 import { useDocumentTitle } from '../../../shared/useDocumentTitle.ts'
-import { useConversation } from '../../../store/react.tsx'
 import { useMe } from '../../auth/session.ts'
 import { useModels } from '../../models/hooks/useModels.ts'
-import { useBranch } from '../hooks/useBranch.ts'
+import { useChat } from '../chat.ts'
 import { useConversationActions } from '../hooks/useConversationActions.ts'
 import { useFileDrop } from '../hooks/useFileDrop.ts'
-import { useScrollToFocus } from '../hooks/useScrollToFocus.ts'
 import { type Following, useAtBottom, useStickToBottom } from '../hooks/useStickToBottom.ts'
 import { blobUrlFor } from '../lib/blob-url.ts'
 import { outlineOf } from '../lib/outline.ts'
-import { useReplyFollower } from '../reply-follower.ts'
 import { BranchComposer } from './BranchComposer.tsx'
 import { BranchView } from './BranchView.tsx'
 import type { ComposerHandle } from './Composer.tsx'
@@ -30,61 +28,42 @@ interface Props {
 
 /** A conversation: its header, the branch on screen with replies streaming in, and the composer. */
 export function ConversationView(props: Props) {
+  // Every turn ends at the bottom of the branch, so the view follows it there.
+  const chat = useChat(props.skey, { onTurnStarted: () => stick.pin() })
   // While another tab holds the local copy, the banner over the page says why it is waiting.
-  const { conversation, waiting, empty, error: loadError } = useConversation(props.skey)
+  const { info, messages, branch, waiting, running } = chat
   const me = useMe()
   const { models } = useModels()
+  const actions = useConversationActions(props.skey)
   // The user message being edited, by rkey, so the composer reads it from the conversation.
   const [editingRkey, setEditingRkey] = useState<string | null>(null)
-  const messages = conversation?.messages ?? []
   // Every chat has an info record from its creation, so until it arrives, from the local copy or
   // the PDS, the chat's title and instructions are unknown rather than empty.
-  const info = conversation?.info ?? null
   const title = waiting && !info ? undefined : ((info?.title as string | undefined) ?? 'New chat')
   useDocumentTitle(title)
   // The messages there when the chat first loaded, which show at once. Only later ones fade in.
   const [opened, setOpened] = useState<Set<string> | null>(null)
-  if (opened === null && conversation) setOpened(new Set(messages.map((m) => m.rkey)))
-  const { follow } = useReplyFollower(props.skey, messages)
+  if (opened === null && chat.loaded) setOpened(new Set(messages.map((m) => m.rkey)))
 
-  const { focus, branch, pick } = useBranch(messages)
   // Opening the conversation on a message scrolls to that message instead.
   // The callback ref apart, since React Compiler takes what holds a ref for one.
-  const { content: stickContent, ...stick } = useStickToBottom(!focus)
+  const { content: stickContent, ...stick } = useStickToBottom(!chat.focus)
   const composer = useRef<ComposerHandle>(null)
   const drop = useFileDrop(composer)
-  const { stayOn } = useScrollToFocus(
-    focus,
-    branch.some((step) => step.message.rkey === focus),
-  )
-  /** Focus a message without scrolling to it, as when switching siblings. */
-  const choose = (rkey: string) => {
-    stayOn(rkey)
-    pick(rkey)
-  }
-  const actions = useConversationActions(props.skey, (replyRkey) => {
-    choose(replyRkey)
-    follow(replyRkey)
-  })
   const editing = messages.find((m) => m.rkey === editingRkey)
-  const leaf = branch.at(-1)?.message
   // The reply composer stops a reply running at the end of the branch, in place of sending.
-  const running = !editing && leaf?.record.status === 'pending' ? leaf.rkey : null
+  const stoppable = editing ? null : running
   const operations: ConversationOperations = {
     edit: setEditingRkey,
     quote: (text) => composer.current?.quote(text),
-    running,
-    regenerate: actions.regenerate,
-    stop: actions.stop,
+    running: stoppable,
+    regenerate: chat.regenerate,
+    stop: chat.stop,
     models,
     storedIn:
       me.storageMode === 'space'
         ? "This chat's space on your PDS"
         : "This server's local storage, since your PDS doesn't support spaces yet",
-  }
-  const sent = (message: { replyRkey: string | null }) => {
-    stick.pin()
-    if (message.replyRkey) follow(message.replyRkey)
   }
 
   const blobUrl = blobUrlFor(`/api/conversations/${props.skey}`)
@@ -106,13 +85,13 @@ export function ConversationView(props: Props) {
         onSetInstructions={actions.setInstructions}
         onSync={actions.sync}
       />
-      <ErrorAlert error={actions.error ?? loadError} />
+      <ErrorAlert error={lastError(actions.outcome, chat.outcome) ?? chat.loadError} />
       {waiting && <ConversationSkeleton />}
-      {empty && <EmptyConversation onStart={(text) => composer.current?.fill(text)} />}
+      {chat.empty && <EmptyConversation onStart={(text) => composer.current?.fill(text)} />}
       <BranchView
         branch={branch}
         blobUrl={blobUrl}
-        onPick={choose}
+        onPick={chat.pick}
         pending={(message) => (
           <ReplyStream skey={props.skey} rkey={message.rkey} blobUrl={blobUrl} />
         )}
@@ -130,9 +109,9 @@ export function ConversationView(props: Props) {
           <Button
             size="small"
             className="mt-2.5"
-            busy={actions.regenerating}
+            busy={chat.regenerating}
             onClick={() =>
-              actions.regenerate((message.record.parent as string | undefined) ?? null, null)
+              chat.regenerate((message.record.parent as string | undefined) ?? null, null)
             }
           >
             <RetryIcon className="size-3.75 text-muted" />
@@ -142,18 +121,13 @@ export function ConversationView(props: Props) {
         arrived={(message) => !opened?.has(message.rkey)}
       />
       <BranchComposer
-        skey={props.skey}
         branch={branch}
         editing={editing}
         ref={composer}
         above={<JumpToLatest stick={stick} />}
-        onStop={running ? () => actions.stop(running) : undefined}
-        onSent={sent}
-        onEdited={(message) => {
-          setEditingRkey(null)
-          choose(message.rkey)
-          sent(message)
-        }}
+        send={chat.send}
+        onStop={stoppable ? () => chat.stop(stoppable) : undefined}
+        onEdited={() => setEditingRkey(null)}
         onCancelEdit={() => setEditingRkey(null)}
         waiting={waiting}
       />

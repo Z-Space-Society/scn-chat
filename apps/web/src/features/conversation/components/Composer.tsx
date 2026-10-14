@@ -13,7 +13,6 @@ import {
   useRef,
   useState,
 } from 'react'
-import { api, json, read } from '../../../shared/api.ts'
 import { cn } from '../../../shared/cn.ts'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
 import { messageOf } from '../../../shared/errors.ts'
@@ -21,13 +20,13 @@ import { useAppForm } from '../../../shared/form.tsx'
 import { CloseIcon, PencilIcon } from '../../../shared/icons.tsx'
 import { touchOnly } from '../../../shared/touch.ts'
 import { Button } from '../../../shared/ui/Button.tsx'
-import { useRefreshConversation } from '../../../store/react.tsx'
 import { EffortSelect } from '../../models/components/EffortSelect.tsx'
 import { ModelSelect } from '../../models/components/ModelSelect.tsx'
 import { useModels } from '../../models/hooks/useModels.ts'
 import { lastEffort, rememberEffort } from '../../models/last-effort.ts'
 import { sameModel } from '../../models/models.ts'
 import { attachmentTypesQuery } from '../attachment-types.ts'
+import type { OutgoingMessage } from '../chat.ts'
 import { useAttachments } from '../hooks/useAttachments.ts'
 import { useAutoGrow } from '../hooks/useAutoGrow.ts'
 import { restoreDraft, takeDraft } from '../lib/composer-handoff.ts'
@@ -46,8 +45,9 @@ import {
 } from './composer-parts.tsx'
 
 export interface ComposerProps {
-  /** The chat to send to. Without one, sending the first message creates the chat. */
-  skey?: string
+  /** Send the message, which the composer clears once this resolves. */
+  send: (message: OutgoingMessage) => Promise<unknown>
+  /** The message this one answers, if any. */
   parent?: string
   /**
    * Whether the chat's messages are still on their way, so it isn't known yet whether the message
@@ -57,7 +57,6 @@ export interface ComposerProps {
   /** The model of the nearest completed reply above `parent`, which the server falls back to. */
   inherited?: ModelRef | null
   initialText?: string
-  onSent: (sent: { skey: string; rkey: string; replyRkey: string | null }) => void
   /** Stop editing an earlier message, offered by the note that says the composer is editing, and on Escape. */
   onCancel?: () => void
   /** Stop the reply running at the end of the branch, offered in place of Send until it ends. */
@@ -116,16 +115,6 @@ export function Composer({ ref, ...props }: ComposerProps) {
     setQuotes((current) => current.filter((quote) => !dropped.includes(quote)))
   const { models, loading: modelsLoading, fallback, noModels } = useModels(props.inherited ?? null)
   const queryClient = useQueryClient()
-  const refreshConversation = useRefreshConversation()
-  // The chat created by a first message, kept so trying again after a failed send reuses it.
-  const created = useRef<string | null>(null)
-  /** The chat to send to, created on the first message when there is none yet. */
-  const target = async () => {
-    if (props.skey) return props.skey
-    if (created.current === null)
-      created.current = (await read(api.chats.conversations.$post())).skey
-    return created.current
-  }
 
   // This composer's sends, so the cache can tell whether one is on its way.
   const sendKey = ['send', useId()]
@@ -145,21 +134,11 @@ export function Composer({ ref, ...props }: ComposerProps) {
         ...(draft.model ? { model: draft.model } : {}),
         ...(effort ? { effort } : {}),
       }
-      const skey = await target()
-      const sent = await read(
-        api.turns.conversations[':skey'].messages.$post(
-          { param: { skey } },
-          json({ parent: props.parent, parts, generation }),
-        ),
-      )
+      await props.send({ parent: props.parent, parts, generation })
       form.setFieldValue('text', '')
       dropQuotes(quoted)
       attachments.drop(attached)
-      props.onSent({ skey, rkey: sent.rkey, replyRkey: sent.replyRkey })
-      return skey
     },
-    // Refreshing picks up the sent message without waiting for the stream.
-    onSuccess: (skey) => refreshConversation(skey),
   })
   const form = useAppForm({
     // The effort starts where the last message on this device left it.

@@ -23,7 +23,7 @@ function Loading(props: LoadingProps) {
   const [stage, setStage] = useState(0)
   advance = () => setStage((current) => current + 1)
   if (stage < 2) return <ComposerFrame key={stage} waiting={false} />
-  return props.composer ?? <Composer onSent={() => {}} />
+  return props.composer ?? <Composer send={async () => {}} />
 }
 
 const box = () => screen.getByLabelText<HTMLTextAreaElement>('Message')
@@ -82,7 +82,7 @@ describe('ComposerFrame', () => {
   })
 
   it('leaves its draft to a composer that starts empty, not one editing a message', async () => {
-    const editing = <Composer initialText="Earlier" onCancel={() => {}} onSent={() => {}} />
+    const editing = <Composer initialText="Earlier" onCancel={() => {}} send={async () => {}} />
     await renderAt(<Loading composer={editing} />)
     await userEvent.type(box(), 'Hello')
     act(() => advance())

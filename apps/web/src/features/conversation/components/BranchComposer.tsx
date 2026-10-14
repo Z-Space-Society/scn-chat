@@ -1,19 +1,17 @@
 import type { ReactNode, Ref } from 'react'
 import { messageText } from '../../../store/core.ts'
+import type { OutgoingMessage } from '../chat.ts'
 import { type BranchMessage, type BranchStep, inheritedModel } from '../lib/branch.ts'
-import { Composer, type ComposerHandle, type ComposerProps } from './Composer.tsx'
-
-type Sent = Parameters<ComposerProps['onSent']>[0]
+import { Composer, type ComposerHandle } from './Composer.tsx'
 
 interface Props {
-  skey: string
   branch: BranchStep[]
   /** The user message being edited, if any. */
   editing: BranchMessage | undefined
-  /** A reply was sent under the branch's last message. */
-  onSent: (sent: Sent) => void
+  /** Send a message to the conversation, as a reply or an edit. */
+  send: (message: OutgoingMessage) => Promise<unknown>
   /** An edit was sent, as a new sibling of the edited message. */
-  onEdited: (sent: Sent) => void
+  onEdited: () => void
   onCancelEdit: () => void
   /** Whether the chat's messages are still on their way. */
   waiting: boolean
@@ -35,11 +33,13 @@ export function BranchComposer({ ref, ...props }: Props) {
         key={`edit-${props.editing.rkey}`}
         ref={ref}
         above={props.above}
-        skey={props.skey}
         parent={parent}
         inherited={inheritedModel(props.branch, parent)}
         initialText={messageText(props.editing.record)}
-        onSent={props.onEdited}
+        send={async (message) => {
+          await props.send(message)
+          props.onEdited()
+        }}
         onCancel={props.onCancelEdit}
       />
     )
@@ -51,11 +51,10 @@ export function BranchComposer({ ref, ...props }: Props) {
       ref={ref}
       above={props.above}
       onStop={props.onStop}
-      skey={props.skey}
       parent={leaf}
       waiting={props.waiting}
       inherited={inheritedModel(props.branch, leaf)}
-      onSent={props.onSent}
+      send={props.send}
     />
   )
 }
