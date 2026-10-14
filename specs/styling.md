@@ -80,7 +80,7 @@ Spacing literals from `design-reference` snap to the nearest quarter step of the
 - Each animation carries its own `motion-reduce:` override.
 - Content on its way shows a skeleton in its own shape, built from `Skeleton` and `SkeletonText` inside `Loading`, never the words "Loading…". `breathe` stays for live work, such as a reply streaming or a chat syncing. A control busy with what it was asked to do takes `busy`, which keeps its label and turns a spinner before it.
 - `hover:` already applies only where the device can hover, so no `(hover: hover)` query is written by hand. What hover reveals shows from the start under the `touch:` variant, for devices that can't hover.
-- Logical properties (`ps-*`, `me-*`, `start-*`) wherever a side matters, so the layout mirrors for right-to-left text.
+- Logical properties (`ps-*`, `me-*`, `start-*`) wherever a side matters, so the layout mirrors for right-to-left text. A text field with a button inside it, like the composer's Clear, takes `[unicode-bidi:plaintext]` rather than `dir="auto"`, so each paragraph runs in the direction of its text while the field's sides, and the room it keeps for the button, follow the page.
 - Variants in a component use `cva`, and a component that takes a `className` merges it with `cn()`.
 
 ### Shared UI

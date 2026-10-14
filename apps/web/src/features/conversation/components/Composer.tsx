@@ -278,7 +278,6 @@ export function Composer({ ref, ...props }: ComposerProps) {
                 <field.TextAreaField
                   ref={box}
                   aria-label="Message"
-                  dir="auto"
                   placeholder={props.parent ? 'Reply' : 'Ask anything'}
                   onPaste={(e) => {
                     // Copied text can carry a picture of itself, as from an office app, so it pastes
@@ -303,9 +302,11 @@ export function Composer({ ref, ...props }: ComposerProps) {
                       props.onCancel()
                     }
                   }}
+                  // Each paragraph runs in the direction of its own text, while the box keeps the
+                  // page's, so Clear's room stays on Clear's side in right-to-left text too.
                   className={cn(
                     part,
-                    'block max-h-composer-max min-h-13.5 w-full resize-none rounded-none border-y-0 px-4.5 pt-3.5 pb-1.5 text-[max(var(--input-floor),var(--text-body))] text-ink-strong [field-sizing:content] focus-visible:border-line-strong focus-visible:ring-0',
+                    'block max-h-composer-max min-h-13.5 w-full resize-none rounded-none border-y-0 px-4.5 pt-3.5 pb-1.5 text-[max(var(--input-floor),var(--text-body))] text-ink-strong [field-sizing:content] [unicode-bidi:plaintext] focus-visible:border-line-strong focus-visible:ring-0',
                   )}
                 />
               </>
