@@ -62,9 +62,9 @@ After this spec, `.env` holds everything outside the database:
 | `NODE_ENV` | `development` | |
 | `DATABASE_URL` | `sqlite:./data/scn-chat.sqlite` | |
 | `SECRET_KEY`, `SECRET_KEYS_OLD` | | Encryption, as today |
-| `OAUTH_PRIVATE_KEYS` | | Required in production, as today |
+| `OAUTH_PRIVATE_KEYS` | | Required in production, unless `PUBLIC_URL` is loopback |
 | `ADMIN_DIDS` | | Required, from [[admin]] |
-| `PUBLIC_URL` | `http://127.0.0.1:3000` | Must be HTTPS in production |
+| `PUBLIC_URL` | `http://127.0.0.1:3000` | Must be HTTPS or loopback in production |
 | `PORT` | `3000` | |
 | `DATA_DIR` | `./data` | |
 | `LOG_LEVEL` | `info` | |

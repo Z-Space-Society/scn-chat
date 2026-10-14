@@ -1,5 +1,6 @@
 import { isValidDid } from '@atproto/syntax'
 import { z } from 'zod'
+import { isLoopbackUrl } from './auth/oauth-client.ts'
 
 export class ConfigError extends Error {
   /** The environment variables at fault. */
@@ -102,9 +103,12 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   const values = result.data
   if (values.NODE_ENV === 'production') {
     const problems: [string, string][] = []
-    if (!values.PUBLIC_URL.startsWith('https://'))
-      problems.push(['PUBLIC_URL', 'must be HTTPS in production'])
-    if (values.OAUTH_PRIVATE_KEYS.length === 0)
+    // A loopback URL runs the production build on this machine, with the loopback client that
+    // needs no keys. Anything else is a deployment.
+    const local = isLoopbackUrl(values.PUBLIC_URL)
+    if (!local && !values.PUBLIC_URL.startsWith('https://'))
+      problems.push(['PUBLIC_URL', 'must be HTTPS or loopback in production'])
+    if (!local && values.OAUTH_PRIVATE_KEYS.length === 0)
       problems.push(['OAUTH_PRIVATE_KEYS', 'is required in production'])
     if (values.OAUTH_SCOPE_MODE === 'raw')
       problems.push(['OAUTH_SCOPE_MODE', 'raw is for local development only'])

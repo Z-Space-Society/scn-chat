@@ -11,6 +11,7 @@
     "dev": "pnpm --filter @scn-chat/server dev",
     "build": "pnpm --filter @scn-chat/web build",
     "start": "pnpm --filter @scn-chat/server start",
+    "preview": "pnpm build && pnpm start",
     "test": "vitest run",
     "typecheck": "pnpm -r --parallel typecheck",
     "lint": "biome check .",

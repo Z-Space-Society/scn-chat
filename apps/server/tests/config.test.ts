@@ -77,4 +77,14 @@ describe('loadConfig', () => {
       }),
     ).toEqual(['OAUTH_PRIVATE_KEYS', 'OAUTH_SCOPE_MODE', 'PUBLIC_URL'])
   })
+
+  it('runs the production build on a loopback URL without keys', () => {
+    const config = loadConfig({
+      ...env,
+      NODE_ENV: 'production',
+      PUBLIC_URL: 'http://127.0.0.1:3000',
+    })
+    expect(config.publicUrl).toBe('http://127.0.0.1:3000')
+    expect(config.oauthPrivateKeys).toEqual([])
+  })
 })

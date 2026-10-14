@@ -114,6 +114,7 @@ Vitest runs every package from the root config. Tests live in a `tests/` directo
 | `pnpm dev` | Runs the server with `node --watch`, serving the web app through Vite in the same process |
 | `pnpm build` | Builds the web app |
 | `pnpm start` | Runs the server in production mode, serving the built web app |
+| `pnpm preview` | Builds, then runs `pnpm start` on this machine |
 | `pnpm test` | Runs all tests once |
 | `pnpm typecheck` | Type checks every package |
 | `pnpm lint` | Lints and checks formatting with Biome |

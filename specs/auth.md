@@ -15,7 +15,7 @@ An atproto account is the only identity SCN Chat uses, for spaces and fallback u
 `apps/server/src/auth/client.ts` creates one `NodeOAuthClient`:
 
 - **Production.** A confidential client with `token_endpoint_auth_method: "private_key_jwt"`, `dpop_bound_access_tokens: true`, and a keyset of ES256 keys from `@atproto/jwk-jose`. The client ID is `${PUBLIC_URL}/oauth-client-metadata.json`. The server publishes the metadata at that path and the public keys at `/oauth/jwks.json`. `PUBLIC_URL` must be HTTPS.
-- **Development.** When `PUBLIC_URL` is a loopback address, the server uses `buildAtprotoLoopbackClientMetadata` instead. Loopback clients are always public, so development sessions last two weeks at most.
+- **Loopback.** When `PUBLIC_URL` is a loopback address, in development or a local production build, the server uses `buildAtprotoLoopbackClientMetadata` instead. Loopback clients are always public, so their sessions last two weeks at most.
 
 The OAuth state and session stores are `oauth_state` and `oauth_session` tables, each with a key, a JSON value, and an updated timestamp. Sessions are keyed by DID.
 
