@@ -150,7 +150,7 @@ describe('App', () => {
     const assign = vi.fn()
     vi.stubGlobal('location', { ...window.location, assign })
     const router = renderApp('/chat/abc')
-    expect(await screen.findByRole('status')).toHaveTextContent('This server is invite-only.')
+    expect(await screen.findByText('This server is invite-only.')).toHaveAttribute('role', 'status')
     expect(router.state.location.pathname).toBe('/login')
     expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Sign out' }))
@@ -161,7 +161,7 @@ describe('App', () => {
   it('sends a viewer from the settings to the login page', async () => {
     signedIn({ access: 'viewer', accessMessage: 'This server is invite-only.' })
     const router = renderApp('/settings')
-    expect(await screen.findByRole('status')).toHaveTextContent('This server is invite-only.')
+    expect(await screen.findByText('This server is invite-only.')).toHaveAttribute('role', 'status')
     expect(router.state.location.pathname).toBe('/login')
     expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()

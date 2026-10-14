@@ -1,9 +1,8 @@
 import { type ReactNode, useEffect, useState } from 'react'
-import { cn } from '../../../shared/cn.ts'
 import { ArrowRightIcon } from '../../../shared/icons.tsx'
 import { Button } from '../../../shared/ui/Button.tsx'
-import { field } from '../../../shared/ui/controls.tsx'
 import { Logo } from '../../../shared/ui/Logo.tsx'
+import { HandleField } from '../components/HandleField.tsx'
 
 interface Props {
   appName: string
@@ -19,7 +18,7 @@ interface Props {
 
 /**
  * The sign-in form, which signs in through the server's OAuth flow: one quiet column with the
- * app's logo, its description, and a handle field.
+ * app's logo, its description, and a handle field that suggests accounts.
  */
 export function LoginPage(props: Props) {
   const [redirecting, setRedirecting] = useState(false)
@@ -55,34 +54,12 @@ export function LoginPage(props: Props) {
           <label htmlFor="identifier" className="font-medium text-ink-strong text-small">
             Sign in with your handle or DID
           </label>
-          {/* The @ sits inside the field, since that's how people write a handle. */}
-          <div className="relative">
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute start-3.25 top-1/2 -translate-y-1/2 text-muted"
-            >
-              @
-            </span>
-            <input
-              id="identifier"
-              name="identifier"
-              placeholder="alice.bsky.social"
-              autoComplete="username"
-              // A handle is a domain name, which phone keyboards would otherwise capitalize and correct.
-              autoCapitalize="off"
-              autoCorrect="off"
-              spellCheck={false}
-              // biome-ignore lint/a11y/noAutofocus: signing in is all this page does.
-              autoFocus
-              required
-              aria-invalid={props.error ? true : undefined}
-              aria-describedby={props.error ? 'identifier-error' : undefined}
-              className={cn(
-                field,
-                'h-10.5 w-full ps-7.5 aria-invalid:border-danger aria-invalid:focus-visible:border-danger aria-invalid:focus-visible:ring-danger-soft',
-              )}
-            />
-          </div>
+          <HandleField
+            id="identifier"
+            name="identifier"
+            invalid={Boolean(props.error)}
+            describedBy={props.error ? 'identifier-error' : undefined}
+          />
           {props.error && (
             <p
               id="identifier-error"

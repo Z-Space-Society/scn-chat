@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
-import { type ReactNode, useContext, useState } from 'react'
+import { type ReactNode, useContext } from 'react'
 import { Skeleton, SkeletonText } from '../../../shared/ui/Skeleton.tsx'
 import { profileQuery } from '../queries.ts'
 import { MeContext } from '../session.ts'
+import { Avatar } from './Avatar.tsx'
 
 interface Props {
   /** A small mark on the avatar's corner, such as a status dot. */
@@ -45,41 +46,6 @@ export function AccountCard(props: Props) {
           <small className="truncate text-caption text-muted">{handle}</small>
         )}
       </span>
-    </span>
-  )
-}
-
-interface AvatarProps {
-  src: string | null
-  name: string
-}
-
-const avatar = 'size-8 flex-none rounded-small'
-
-/**
- * The avatar's thumbnail from Bluesky's CDN, or the name's first letter when there is none or it
- * fails to load, as it does for an account the CDN hasn't indexed. Bluesky isn't told which page
- * asked for it.
- */
-function Avatar(props: AvatarProps) {
-  const [failed, setFailed] = useState(false)
-  if (props.src && !failed)
-    return (
-      <img
-        src={props.src}
-        alt=""
-        referrerPolicy="no-referrer"
-        onError={() => setFailed(true)}
-        // The picture keeps its size, with a hairline in a shade of its own colors drawn inside.
-        className={`${avatar} object-cover outline-1 outline-image-edge -outline-offset-1`}
-      />
-    )
-  return (
-    <span
-      aria-hidden="true"
-      className={`${avatar} grid place-items-center border border-line bg-raised font-semibold text-muted text-small`}
-    >
-      {props.name.replace(/^@/, '').charAt(0).toUpperCase()}
     </span>
   )
 }

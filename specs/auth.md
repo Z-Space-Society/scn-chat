@@ -35,6 +35,15 @@ Before the lexicons are published, setting `OAUTH_SCOPE_MODE` to `raw` lets a PD
 
 A PDS without spaces drops space scopes silently instead of refusing them, so login always succeeds. The check in step 4 is how the server tells the two kinds of PDS apart.
 
+### Handle search
+
+The sign-in field suggests accounts as the user types a handle, from Bluesky's public `app.bsky.actor.searchActorsTypeahead` at `public.api.bsky.app`, which the browser calls itself, without a referrer, after a 150 ms pause in typing. It asks for five accounts matching what was typed, without a leading `@`, and skips anything with a `:` or `/`, such as a DID or a PDS URL. Like the profile, the method is Bluesky's, so `features/auth/queries.ts` names it itself.
+
+- Each suggestion shows the account's avatar thumbnail, display name, and handle. Picking one, by click or with the arrow keys and Enter, puts its handle in the field without signing in, and its avatar takes the @'s place until the field is edited. Enter with nothing picked signs in with what was typed.
+- The panel under the field shows skeleton rows once a first search has taken the theme's quiet wait, 400 ms, so a quick answer never flashes them. A later search keeps the last accounts in view, with a spinner in the field after the same wait.
+- No match says "No accounts found. You can still type your full handle.", and a failed search says it couldn't search, with the same hint. Screen readers hear how many accounts were found.
+- Accounts with the handle `handle.invalid` are left out. Only accounts Bluesky has indexed appear, so a handle Bluesky doesn't know still signs in when typed in full.
+
 ### Storage mode
 
 The `account` table holds the DID, current handle, PDS URL, storage mode (`space` or `local`), the `background_sync` setting from the chat-storage spec (default true), and creation, last-login, and last-activity times.
@@ -139,4 +148,6 @@ A `pnpm keys` script prints a fresh `OAUTH_PRIVATE_KEYS` value and a `SECRET_KEY
 - [ ] `getPdsClient` throws `SessionExpired` when the OAuth session cannot be restored.
 - [ ] Logout clears the web session and keeps the OAuth session, and logout everywhere revokes it.
 - [ ] `GET /api/me` includes the user's roles.
+- [x] The sign-in field suggests accounts from Bluesky's typeahead for a typed handle, never for a DID or URL, and picking one fills in its handle and avatar without submitting.
+- [x] A slow search shows skeletons after the quiet wait, and an empty or failed one says so with a hint to type the full handle.
 - [x] `GET /api/me/profile` reads the display name and avatar thumbnail from the user's profile record, and answers with nulls when there is none or their PDS can't be reached.

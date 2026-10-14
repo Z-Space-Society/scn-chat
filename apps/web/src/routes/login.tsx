@@ -21,7 +21,13 @@ export const Route = createFileRoute('/login')({
       { name: 'robots', content: 'index, follow' },
       { property: 'og:url', content: loaderData?.url },
     ],
-    links: [{ rel: 'canonical', href: loaderData?.url }],
+    links: [
+      { rel: 'canonical', href: loaderData?.url },
+      // The handle field searches Bluesky's typeahead, a cross-origin fetch, and shows avatars from
+      // its image CDN, so the first search doesn't wait on new connections.
+      { rel: 'preconnect', href: 'https://public.api.bsky.app', crossOrigin: 'anonymous' },
+      { rel: 'preconnect', href: 'https://cdn.bsky.app' },
+    ],
   }),
   component: Login,
 })
