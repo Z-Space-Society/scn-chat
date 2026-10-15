@@ -423,7 +423,7 @@ describe('MessageView', () => {
         }}
       />,
     )
-    expect(screen.getByText('Stopped before it finished.')).toBeInTheDocument()
+    expect(screen.getByText('Stopped')).toBeInTheDocument()
   })
 
   it('shows images inline and files by name', () => {

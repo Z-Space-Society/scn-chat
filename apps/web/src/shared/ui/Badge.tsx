@@ -2,8 +2,8 @@ import type { ReactNode } from 'react'
 import { cn } from '../cn.ts'
 
 interface BadgeProps {
-  /** Green for what is live or good, red for what failed, grey otherwise. */
-  tone?: 'good' | 'danger'
+  /** Green for what is live or good, amber for what needs noticing, red for what failed, grey otherwise. */
+  tone?: 'good' | 'warning' | 'danger'
   title?: string
   className?: string
   children: ReactNode
@@ -17,6 +17,7 @@ export function Badge(props: BadgeProps) {
       className={cn(
         'inline-flex items-center whitespace-nowrap rounded-badge bg-hover px-1.75 py-px font-semibold text-caption text-muted',
         props.tone === 'good' && 'bg-accent-soft text-accent-strong',
+        props.tone === 'warning' && 'bg-highlight text-highlight-ink',
         props.tone === 'danger' && 'bg-danger-soft text-danger',
         props.className,
       )}

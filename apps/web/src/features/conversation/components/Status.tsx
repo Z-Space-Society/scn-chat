@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
-import { AlertIcon } from '../../../shared/icons.tsx'
+import { AlertIcon, StopIcon } from '../../../shared/icons.tsx'
+import { Badge } from '../../../shared/ui/Badge.tsx'
 
-/** A quiet line about a reply, such as that it stopped or waits its turn. */
+/** A quiet line about a reply, such as that it waits its turn or lost its stream. */
 export const statusLine = 'text-muted text-ui'
 
 interface Props {
@@ -31,7 +32,15 @@ export function Status(props: Props) {
         </div>
       )
     case 'cancelled':
-      return <p className={statusLine}>Stopped before it finished.</p>
+      // A small amber badge with the Stop button's square, tucked under where the reply broke off.
+      return (
+        <p className="mt-2.5">
+          <Badge tone="warning" className="gap-1">
+            <StopIcon className="size-2.5" />
+            Stopped
+          </Badge>
+        </p>
+      )
     default:
       return null
   }
