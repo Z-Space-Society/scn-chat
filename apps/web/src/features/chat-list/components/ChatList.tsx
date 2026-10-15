@@ -1,4 +1,4 @@
-import { useNavigate, useParams, useSearch } from '@tanstack/react-router'
+import { useNavigate, useParams, useRouter, useSearch } from '@tanstack/react-router'
 import {
   lazy,
   type RefObject,
@@ -90,10 +90,12 @@ export function ChatList() {
   const scroll = useRef<HTMLDivElement>(null)
   const end = useLoadMore(scroll, list.hasNextPage && !list.isFetchingNextPage, list.fetchNextPage)
 
-  // The same for every row, so a row rerenders only when its own chat changes.
+  // The same for every row, so a row rerenders only when its own chat changes. Which chat is open
+  // is read when one is deleted, so opening another chat leaves the callback, and the rows, alone.
+  const router = useRouter()
   const changed = syncIndex
   const deleted = (skey: string) => {
-    if (skey === current) void navigate({ to: '/' })
+    if (isOpen(router, skey)) void navigate({ to: '/' })
   }
 
   // Closing the search clears it, so the chats show again.
@@ -103,7 +105,8 @@ export function ChatList() {
   }
 
   const signOut = useSignOut()
-  const syncing = useSyncNow()
+  // The function alone, which stays the same, rather than the mutation, which changes as it runs.
+  const { mutate: signOutNow } = signOut
   const error = lastError(signOut) ?? loadError ?? (searching ? found.error : null)
 
   return (
@@ -191,14 +194,38 @@ export function ChatList() {
       )}
       {/* Who is signed in, at the foot, with a dot on the avatar for how current the chats are. */}
       <footer className="relative flex items-center pt-1">
-        <AccountMenu
-          badge={<SyncDot syncing={syncing} />}
-          status={<SyncPanel syncing={syncing} />}
-          onSignOut={() => signOut.mutate()}
-        />
+        <Account onSignOut={() => signOutNow()} />
       </footer>
     </>
   )
+}
+
+interface AccountProps {
+  onSignOut: () => void
+}
+
+/**
+ * Who is signed in, with a dot on the avatar for how current the chats are. Apart from the list
+ * and holding its own sync, so a change to the chats leaves the account alone.
+ */
+function Account(props: AccountProps) {
+  const syncing = useSyncNow()
+  return (
+    <AccountMenu
+      badge={<SyncDot syncing={syncing} />}
+      status={<SyncPanel syncing={syncing} />}
+      onSignOut={props.onSignOut}
+    />
+  )
+}
+
+/**
+ * Whether a chat is the one open, read from the router's state when asked. Outside the component,
+ * so React Compiler keeps what calls it on the router, which stays the same, rather than on its
+ * state, which changes with every navigation.
+ */
+function isOpen(router: ReturnType<typeof useRouter>, skey: string): boolean {
+  return router.state.matches.some((match) => (match.params as { skey?: string }).skey === skey)
 }
 
 interface ChatRowsProps {
