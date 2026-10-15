@@ -50,7 +50,7 @@ The server process runs Hono, and Hono runs Start, so the server and plugins sta
 
 | Route | Screen | Server-rendered |
 |---|---|---|
-| `/login` | The app's logo and description over a handle field, which suggests accounts as the auth spec says, and Continue, with the app's name as a heading only screen readers hear, which goes to `/oauth/login`, which drops a leading `@` from the handle. Continue says it is redirecting to the PDS until the page is left, and a viewer's Sign out is a quiet link under the form | Yes |
+| `/login` | The app's logo and description over a handle field, which suggests accounts as the auth spec says, and Continue, with the app's name as a heading only screen readers hear, which goes to `/oauth/login`, which drops a leading `@` from the handle. Continue reads "Signing in…" with a spinner in place of its arrow until the page is left, and a viewer's Sign out is a quiet link under the form | Yes |
 | `/` | Chat list sidebar, and a new chat | No |
 | `/chat/:skey` | Chat list sidebar and a conversation | No |
 | `/shared/:ownerDid/:skey` | A shared conversation, read-only | No |
@@ -106,7 +106,7 @@ The root route's `beforeLoad` asks `/api/me` who is signed in, through the query
   - The composer's and Preferences' model selects hold a line in place of the name until the models load.
   - The sharing panel, the shared page, which the server also sends as its skeleton, settings and admin pages, the users list, and the Sync page's background switch each show their own shapes.
 
-  A button busy with what it was asked, such as Save, Load models, or Sign in's Continue, keeps its label with a spinner before it.
+  A button busy with what it was asked, such as Save or Load models, keeps its label with a spinner before it. Sign in's Continue is the exception: it reads "Signing in…" and drops its arrow, since it is leaving the page.
 - **Admin.** The admin specs describe each section. `features/admin/pages/` mirrors `features/settings/pages/`: a layout for the sidebar, which groups the sections under People, Features, and App, each with an icon, links back to the chats and to the account settings, marks the current section, a plugin's page counting as Plugins, and one file per section. Sections are built like the settings ones, with tables and lists in cards, in the same column width as every other section. A page opened from another, such as a role's or a plugin's, has a link back above its title. Removing a role, a plugin, or a model, and revoking a key, asks to confirm in place first. Suspending a user first asks for a reason, seen only by admins. Status, such as a plugin's or whether an account is suspended, shows as a badge. A form that edits stored values starts from them, and starts over when they change after a save. A failed save shows its message, and the field issues the server returns show beside their fields.
 
 ### Schema forms

@@ -60,7 +60,8 @@ describe('LoginPage', () => {
     fireEvent.submit(container.querySelector('form') as HTMLFormElement)
     expect(screen.getByRole('button')).toBeDisabled()
     expect(screen.getByRole('button')).toHaveAttribute('aria-busy', 'true')
-    expect(screen.getByRole('button')).toHaveTextContent('Continue')
+    expect(screen.getByRole('button')).toHaveTextContent('Signing in…')
+    expect(screen.getByRole('button').querySelectorAll('svg')).toHaveLength(1)
   })
 })
 

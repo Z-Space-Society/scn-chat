@@ -70,7 +70,9 @@ export function LoginPage(props: Props) {
             </p>
           )}
           <Button type="submit" busy={redirecting} className="mt-2.5 h-10.5">
-            Continue <ArrowRightIcon />
+            {/* Once submitted it is leaving for the PDS, so the arrow gives way to Button's spinner. */}
+            {redirecting ? 'Signing in…' : 'Continue'}
+            {!redirecting && <ArrowRightIcon />}
           </Button>
           {props.next && <input type="hidden" name="next" value={props.next} />}
         </form>
