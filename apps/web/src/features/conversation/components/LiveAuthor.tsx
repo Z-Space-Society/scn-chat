@@ -11,10 +11,14 @@ function useSecondsSince(since: unknown): number | undefined {
   const [seconds, setSeconds] = useState(() => (start === undefined ? 0 : secondsSince(start)))
   useEffect(() => {
     if (start === undefined) return
-    setSeconds(secondsSince(start))
-    // Checked often so each second shows as it passes. Only a new second rerenders.
-    const timer = setInterval(() => setSeconds(secondsSince(start)), 250)
-    return () => clearInterval(timer)
+    let timer: ReturnType<typeof setTimeout>
+    // Wakes just after each whole second since the start, so each shows as it passes.
+    const tick = () => {
+      setSeconds(secondsSince(start))
+      timer = setTimeout(tick, 1000 - ((Date.now() - start) % 1000) + 10)
+    }
+    tick()
+    return () => clearTimeout(timer)
   }, [start])
   return start === undefined ? undefined : seconds
 }

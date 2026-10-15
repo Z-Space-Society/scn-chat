@@ -59,6 +59,8 @@ export function useStepClock(
     const start = started.get(id)
     if (start === undefined || durations.has(id)) return
     durations.set(id, Date.now() - start)
+    // The duration is all a finished step needs, so its start goes.
+    started.delete(id)
     for (const listener of listeners) listener()
   }, [id, running])
 
