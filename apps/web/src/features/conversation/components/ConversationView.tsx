@@ -32,6 +32,9 @@ export function ConversationView(props: Props) {
   const chat = useChat(props.skey, { onTurnStarted: () => stick.pin() })
   // While another tab holds the local copy, the banner over the page says why it is waiting.
   const { info, messages, branch, waiting, running } = chat
+  // Called apart from `chat`, which changes with every update, so the callbacks every message gets
+  // stay the same and an unchanged message doesn't render again.
+  const { regenerate, regenerating, stop } = chat
   const me = useMe()
   const { models } = useModels()
   const actions = useConversationActions(props.skey)
@@ -56,8 +59,8 @@ export function ConversationView(props: Props) {
   const operations: ConversationOperations = {
     edit: setEditingRkey,
     quote: (text) => composer.current?.quote(text),
-    regenerate: chat.regenerate,
-    stop: chat.stop,
+    regenerate,
+    stop,
     models,
     storedIn:
       me.storageMode === 'space'
@@ -109,9 +112,9 @@ export function ConversationView(props: Props) {
             <Button
               size="small"
               className="mt-2.5"
-              busy={chat.regenerating}
+              busy={regenerating}
               onClick={() =>
-                chat.regenerate((message.record.parent as string | undefined) ?? null, null)
+                regenerate((message.record.parent as string | undefined) ?? null, null)
               }
             >
               <RetryIcon className="size-3.75 text-muted" />
@@ -127,7 +130,7 @@ export function ConversationView(props: Props) {
         ref={composer}
         above={<JumpToLatest stick={stick} />}
         send={chat.send}
-        onStop={stoppable ? () => chat.stop(stoppable) : undefined}
+        onStop={stoppable ? () => stop(stoppable) : undefined}
         onEdited={() => setEditingRkey(null)}
         onCancelEdit={() => setEditingRkey(null)}
         waiting={waiting}
