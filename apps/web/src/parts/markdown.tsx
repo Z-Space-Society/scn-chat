@@ -101,29 +101,42 @@ function MarkdownImage(props: MarkdownImageProps) {
 type Highlighter = typeof import('./highlight.ts')
 
 let loading: Promise<Highlighter> | null = null
+/** The highlighter once it has loaded, so a block can highlight before it is first drawn. */
+let loaded: Highlighter | null = null
 
 /** Shiki and the theme, loaded the first time a code block renders. */
 function loadHighlighter() {
-  if (!loading) loading = import('./highlight.ts')
+  if (!loading)
+    loading = import('./highlight.ts').then((module) => {
+      loaded = module
+      return module
+    })
   return loading
 }
 
 /**
  * The code's tokens once its language's grammar loads, or null to show it plain. Code still
- * streaming highlights as it grows.
+ * streaming highlights as it grows. Once Shiki and the grammar have loaded, as when a reply's
+ * record replaces its stream, a block is highlighted from its first frame rather than drawn plain
+ * and then again in color.
  */
 function useHighlight(code: string, language: string, incomplete: boolean) {
-  const [result, setResult] = useState<TokensResult | null>(null)
+  const [result, setResult] = useState<TokensResult | null>(() =>
+    loaded && language ? loaded.highlight(code, language, incomplete) : null,
+  )
   useLayoutEffect(() => {
     if (!language) return
     let live = true
     const show = (next: TokensResult) => {
       if (live) setResult(next)
     }
-    void loadHighlighter().then((module) => {
+    const run = (module: Highlighter) => {
       const ready = module.highlight(code, language, incomplete, show)
       if (ready) show(ready)
-    })
+    }
+    // Before the browser paints, when Shiki is here already.
+    if (loaded) run(loaded)
+    else void loadHighlighter().then(run)
     return () => {
       live = false
     }

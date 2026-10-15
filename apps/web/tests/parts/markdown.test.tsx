@@ -35,6 +35,18 @@ describe('Markdown', () => {
     expect(container.querySelector('.code-block')).toHaveTextContent('const a = 1')
   })
 
+  it('colors code from its first render once its language has loaded', async () => {
+    const first = render(<Markdown text={'```ts\nconst a = 1\n```'} />)
+    await waitFor(() =>
+      expect(first.container.querySelector('.code-block .line > span')).toBeTruthy(),
+    )
+    first.unmount()
+    const { container } = render(<Markdown text={'```ts\nconst a = 1\n```'} />)
+    expect(container.querySelector('.code-block .line > span')).toHaveStyle({
+      color: 'var(--color-code-token-keyword)',
+    })
+  })
+
   it('shows code in a language it does not know as plain text', async () => {
     const { container } = render(<Markdown text={'```nonsense\nsome words\n```'} />)
     await waitFor(() =>
