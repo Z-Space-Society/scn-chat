@@ -116,13 +116,14 @@ function loadHighlighter() {
 
 /**
  * The code's tokens once its language's grammar loads, or null to show it plain. Code still
- * streaming highlights as it grows. Once Shiki and the grammar have loaded, as when a reply's
- * record replaces its stream, a block is highlighted from its first frame rather than drawn plain
- * and then again in color.
+ * streaming highlights as it grows. Finished code Shiki has highlighted before is colored from its
+ * block's first frame, as when a reply's record replaces its stream, rather than drawn plain and
+ * then again in color. Other code is highlighted a moment after it first draws, since Shiki
+ * answers through a promise even once its grammar has loaded.
  */
 function useHighlight(code: string, language: string, incomplete: boolean) {
   const [result, setResult] = useState<TokensResult | null>(() =>
-    loaded && language ? loaded.highlight(code, language, incomplete) : null,
+    loaded && language && !incomplete ? loaded.highlighted(code, language) : null,
   )
   useLayoutEffect(() => {
     if (!language) return

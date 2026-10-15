@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { requireUser, signedInUser } from '../auth/routes.ts'
-import { BLOB_CACHE_CONTROL, IMAGE_TYPES } from '../blobs/routes.ts'
+import { IMAGE_TYPES, setBlobHeaders } from '../blobs/routes.ts'
 import { jsonBody } from '../body.ts'
 import type { AppEnv } from '../env.ts'
 import { SharedNotFound, ShareInputError, type SharingService } from './service.ts'
@@ -67,10 +67,7 @@ export function sharingRoutes(sharing: SharingService) {
         )
         const type = c.req.query('type')
         const mimeType = type && IMAGE_TYPES.has(type) ? type : 'application/octet-stream'
-        c.header('content-type', mimeType)
-        c.header('x-content-type-options', 'nosniff')
-        c.header('cache-control', BLOB_CACHE_CONTROL)
-        if (!IMAGE_TYPES.has(mimeType)) c.header('content-disposition', 'attachment')
+        setBlobHeaders(c, mimeType)
         return c.body(bytes as unknown as ArrayBuffer)
       } catch (err) {
         if (err instanceof SharedNotFound) return c.json({ error: 'NotFound' }, 404)

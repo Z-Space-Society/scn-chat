@@ -314,13 +314,13 @@ interface ThoughtProps {
  * goes.
  */
 function Thought(props: ThoughtProps) {
-  const step = useOpened()
+  const body = useOpened()
   return (
     <details
       data-step="reasoning"
       data-current={props.current || undefined}
       className="group/step details-unfold"
-      onToggle={step.onToggle}
+      onToggle={body.onToggle}
     >
       <summary className={cn(summary, 'gap-1 truncate py-0.5 group-open/step:text-ink')}>
         <Chevron group="step" />
@@ -330,7 +330,7 @@ function Thought(props: ThoughtProps) {
         </span>
         {props.elapsed !== undefined && <Elapsed seconds={props.elapsed} />}
       </summary>
-      {step.opened && (
+      {body.opened && (
         <Markdown
           text={props.text}
           streaming={props.current}
@@ -375,13 +375,13 @@ function ToolStep(props: ToolStepProps) {
   const { call, result } = props.step
   const entry = toolEntry(call.tool as string)
   const status = props.status
-  const step = useOpened()
+  const body = useOpened()
   return (
     <details
       data-step="tool"
       data-state={status}
       className="group/step details-unfold"
-      onToggle={step.onToggle}
+      onToggle={body.onToggle}
     >
       <summary className={cn(summary, 'gap-1 truncate py-0.5 group-open/step:text-ink')}>
         <Chevron group="step" />
@@ -411,7 +411,7 @@ function ToolStep(props: ToolStepProps) {
         )}
         {props.elapsed !== undefined && <Elapsed seconds={props.elapsed} />}
       </summary>
-      {step.opened && (
+      {body.opened && (
         <entry.View
           call={call}
           result={result}

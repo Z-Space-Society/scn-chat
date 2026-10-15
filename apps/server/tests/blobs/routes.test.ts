@@ -95,6 +95,7 @@ describe.each(['space', 'local'] as const)('attachments for a %s account', (mode
     expect(res.status).toBe(200)
     expect(res.headers.get('x-content-type-options')).toBe('nosniff')
     expect(res.headers.get('cache-control')).toBe('private, max-age=31536000, immutable')
+    expect(res.headers.get('vary')).toBe('Cookie')
     expect(new Uint8Array(await res.arrayBuffer())).toEqual(new Uint8Array([137, 80, 78, 71]))
   })
 

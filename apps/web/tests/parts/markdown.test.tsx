@@ -35,7 +35,7 @@ describe('Markdown', () => {
     expect(container.querySelector('.code-block')).toHaveTextContent('const a = 1')
   })
 
-  it('colors code from its first render once its language has loaded', async () => {
+  it('colors finished code from its first render once the same code has been highlighted', async () => {
     const first = render(<Markdown text={'```ts\nconst a = 1\n```'} />)
     await waitFor(() =>
       expect(first.container.querySelector('.code-block .line > span')).toBeTruthy(),

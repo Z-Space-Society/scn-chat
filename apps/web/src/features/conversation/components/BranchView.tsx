@@ -2,6 +2,7 @@ import { memo, type ReactNode } from 'react'
 import type { BlobUrl } from '../../../parts/types.ts'
 import type { BranchMessage, BranchStep } from '../lib/branch.ts'
 import { MessageView } from './MessageView.tsx'
+import type { Siblings } from './SiblingPicker.tsx'
 
 /** What the conversation gives every message on the branch. */
 interface RowOptions {
@@ -49,14 +50,9 @@ export function BranchView(props: Props) {
   )
 }
 
-interface RowProps extends RowOptions {
+/** Its versions as numbers and keys, apart, so `memo` compares each on its own. */
+interface RowProps extends RowOptions, Omit<Siblings, 'onPick'> {
   message: BranchMessage
-  /** Its place among its versions, and how many there are. */
-  index: number
-  count: number
-  /** The versions on either side, by rkey. */
-  previous?: string
-  next?: string
 }
 
 /**

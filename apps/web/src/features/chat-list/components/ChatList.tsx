@@ -91,11 +91,12 @@ export function ChatList() {
   const end = useLoadMore(scroll, list.hasNextPage && !list.isFetchingNextPage, list.fetchNextPage)
 
   // The same for every row, so a row rerenders only when its own chat changes. Which chat is open
-  // is read when one is deleted, so opening another chat leaves the callback, and the rows, alone.
+  // is asked of the router when one is deleted, a call React Compiler keeps on the router, which
+  // stays the same, so opening another chat leaves the callback, and the rows, alone.
   const router = useRouter()
   const changed = syncIndex
   const deleted = (skey: string) => {
-    if (isOpen(router, skey)) void navigate({ to: '/' })
+    if (router.matchRoute({ to: '/chat/$skey', params: { skey } })) void navigate({ to: '/' })
   }
 
   // Closing the search clears it, so the chats show again.
@@ -194,7 +195,7 @@ export function ChatList() {
       )}
       {/* Who is signed in, at the foot, with a dot on the avatar for how current the chats are. */}
       <footer className="relative flex items-center pt-1">
-        <Account onSignOut={() => signOutNow()} />
+        <Account onSignOut={signOutNow} />
       </footer>
     </>
   )
@@ -217,15 +218,6 @@ function Account(props: AccountProps) {
       onSignOut={props.onSignOut}
     />
   )
-}
-
-/**
- * Whether a chat is the one open, read from the router's state when asked. Outside the component,
- * so React Compiler keeps what calls it on the router, which stays the same, rather than on its
- * state, which changes with every navigation.
- */
-function isOpen(router: ReturnType<typeof useRouter>, skey: string): boolean {
-  return router.state.matches.some((match) => (match.params as { skey?: string }).skey === skey)
 }
 
 interface ChatRowsProps {

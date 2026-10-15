@@ -2,6 +2,7 @@ import { act, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   formatSeconds,
+  KEPT_STEPS,
   resetStepClocks,
   stepDuration,
   useStepClock,
@@ -38,6 +39,18 @@ describe('useStepClock', () => {
     rerender(<Clock id="r:a" running={false} />)
     expect(screen.getByText('{"duration":3}')).toBeInTheDocument()
     expect(stepDuration('r:a')).toBe(3)
+  })
+
+  it('keeps the times of the latest steps only, forgetting the oldest first', () => {
+    vi.useFakeTimers({ now: 0 })
+    const { rerender } = render(<Clock id="r:0" running />)
+    for (let i = 0; i <= KEPT_STEPS; i++) {
+      rerender(<Clock id={`r:${i}`} running />)
+      rerender(<Clock id={`r:${i}`} running={false} />)
+    }
+    expect(stepDuration('r:0')).toBeUndefined()
+    expect(stepDuration('r:1')).toBe(0)
+    expect(stepDuration(`r:${KEPT_STEPS}`)).toBe(0)
   })
 
   it('knows nothing of a step only seen finished, or without an id', () => {

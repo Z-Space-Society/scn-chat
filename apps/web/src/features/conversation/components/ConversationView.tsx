@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { createContext, useContext, useRef, useState } from 'react'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
 import { lastError } from '../../../shared/errors.ts'
 import { JumpDownIcon, RetryIcon } from '../../../shared/icons.tsx'
@@ -32,9 +32,10 @@ export function ConversationView(props: Props) {
   const chat = useChat(props.skey, { onTurnStarted: () => stick.pin() })
   // While another tab holds the local copy, the banner over the page says why it is waiting.
   const { info, messages, branch, waiting, running } = chat
-  // Called apart from `chat`, which changes with every update, so the callbacks every message gets
-  // stay the same and an unchanged message doesn't render again.
-  const { regenerate, regenerating, stop } = chat
+  // Its functions apart from `chat`, which changes with every update. React Compiler keeps a
+  // callback that calls `chat.regenerate(...)` on all of `chat`, so the callbacks every message gets
+  // would change with it and render every message again. The rest are taken out alike.
+  const { regenerate, regenerating, stop, pick, send } = chat
   const me = useMe()
   const { models } = useModels()
   const actions = useConversationActions(props.skey)
@@ -91,51 +92,68 @@ export function ConversationView(props: Props) {
       {waiting && <ConversationSkeleton />}
       {chat.empty && <EmptyConversation onStart={(text) => composer.current?.fill(text)} />}
       <RunningReply.Provider value={stoppable}>
-        <BranchView
-          branch={branch}
-          blobUrl={blobUrl}
-          onPick={chat.pick}
-          pending={(message) => (
-            <ReplyStream skey={props.skey} rkey={message.rkey} blobUrl={blobUrl} />
-          )}
-          live={(message) => (
-            <LiveAuthor
-              skey={props.skey}
-              rkey={message.rkey}
-              model={(message.record.model as { id?: string } | undefined)?.id ?? 'Assistant'}
-              since={message.record.createdAt}
-            />
-          )}
-          actions={(message) => <MessageActions message={message} operations={operations} />}
-          // A failed reply tries again with the same model.
-          retry={(message) => (
-            <Button
-              size="small"
-              className="mt-2.5"
-              busy={regenerating}
-              onClick={() =>
-                regenerate((message.record.parent as string | undefined) ?? null, null)
-              }
-            >
-              <RetryIcon className="size-3.75 text-muted" />
-              Try again
-            </Button>
-          )}
-          arrived={(message) => !opened?.has(message.rkey)}
-        />
+        <Regenerating.Provider value={regenerating}>
+          <BranchView
+            branch={branch}
+            blobUrl={blobUrl}
+            onPick={pick}
+            pending={(message) => (
+              <ReplyStream skey={props.skey} rkey={message.rkey} blobUrl={blobUrl} />
+            )}
+            live={(message) => (
+              <LiveAuthor
+                skey={props.skey}
+                rkey={message.rkey}
+                model={(message.record.model as { id?: string } | undefined)?.id ?? 'Assistant'}
+                since={message.record.createdAt}
+              />
+            )}
+            actions={(message) => <MessageActions message={message} operations={operations} />}
+            // A failed reply tries again with the same model.
+            retry={(message) => (
+              <TryAgain
+                onClick={() =>
+                  regenerate((message.record.parent as string | undefined) ?? null, null)
+                }
+              />
+            )}
+            arrived={(message) => !opened?.has(message.rkey)}
+          />
+        </Regenerating.Provider>
       </RunningReply.Provider>
       <BranchComposer
         branch={branch}
         editing={editing}
         ref={composer}
         above={<JumpToLatest stick={stick} />}
-        send={chat.send}
+        send={send}
         onStop={stoppable ? () => stop(stoppable) : undefined}
         onEdited={() => setEditingRkey(null)}
         onCancelEdit={() => setEditingRkey(null)}
         waiting={waiting}
       />
     </section>
+  )
+}
+
+/**
+ * Whether a regeneration is on its way, for the Try again buttons. A context, apart from the
+ * callback every message gets, so starting or ending one rerenders only those buttons.
+ */
+const Regenerating = createContext(false)
+
+interface TryAgainProps {
+  onClick: () => void
+}
+
+/** A failed reply's Try again, busy while a regeneration is on its way. */
+function TryAgain(props: TryAgainProps) {
+  const busy = useContext(Regenerating)
+  return (
+    <Button size="small" className="mt-2.5" busy={busy} onClick={props.onClick}>
+      <RetryIcon className="size-3.75 text-muted" />
+      Try again
+    </Button>
   )
 }
 

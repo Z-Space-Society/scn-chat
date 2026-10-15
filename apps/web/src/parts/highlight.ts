@@ -36,6 +36,27 @@ const theme = createCssVariablesTheme({
 
 const plugin = createCodePlugin({ themes: [theme, theme] })
 
+/** How many finished blocks' tokens `highlighted` keeps, the least recently used forgotten first. */
+const KEPT_BLOCKS = 200
+const recent = new Map<string, TokensResult>()
+
+function remember(key: string, result: TokensResult) {
+  recent.delete(key)
+  recent.set(key, result)
+  if (recent.size > KEPT_BLOCKS) recent.delete(recent.keys().next().value as string)
+}
+
+/**
+ * The tokens of finished code highlighted lately, or null, without starting any work, so a block
+ * can be colored from its first frame when its code was highlighted before.
+ */
+export function highlighted(code: string, language: string): TokensResult | null {
+  const key = `${language}\n${code}`
+  const result = recent.get(key)
+  if (result) remember(key, result)
+  return result ?? null
+}
+
 /**
  * Highlight code in a language, returning the tokens at once when they are ready, or null and
  * calling `done` with them once its grammar loads. Code still streaming is highlighted from where
@@ -47,7 +68,11 @@ export function highlight(
   incomplete: boolean,
   done?: (result: TokensResult) => void,
 ): TokensResult | null {
-  return plugin.highlight(
+  const keep = (result: TokensResult) => {
+    if (!incomplete) remember(`${language}\n${code}`, result)
+    return result
+  }
+  const ready = plugin.highlight(
     // A language Shiki doesn't know shows as plain text.
     {
       code,
@@ -55,6 +80,7 @@ export function highlight(
       isIncomplete: incomplete,
       themes: [theme, theme],
     },
-    done,
+    (result) => done?.(keep(result)),
   )
+  return ready && keep(ready)
 }

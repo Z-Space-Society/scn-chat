@@ -15,36 +15,57 @@ export async function* replyEvents(url: string, signal: AbortSignal): AsyncGener
   const source = new EventSource(url)
   let failure: unknown
   let batch: ReplyEvent[] = []
-  let frame: number | null = null
+  // Cancels the flush waiting to send the batch, if one is.
+  let unschedule: (() => void) | null = null
+  // Once the stream has ended or been cancelled, nothing more is sent.
+  let done = false
   const events = new ReadableStream<ReplyEvent[]>({
     start(controller) {
       const flush = () => {
-        if (frame !== null) cancelAnimationFrame(frame)
-        frame = null
-        if (batch.length) controller.enqueue(batch)
+        unschedule?.()
+        unschedule = null
+        if (batch.length && !done) controller.enqueue(batch)
         batch = []
+      }
+      // On the next frame, or after a moment where frames don't run, as in a hidden tab, so a
+      // reply streamed in the background still reaches its views, and their step clocks.
+      const schedule = () => {
+        if (unschedule) return
+        const frame = requestAnimationFrame(flush)
+        const timer = setTimeout(flush, 100)
+        unschedule = () => {
+          cancelAnimationFrame(frame)
+          clearTimeout(timer)
+        }
       }
       // A failure closes the stream rather than erroring it, which would drop the events not yet read.
       const end = (error?: unknown) => {
+        if (done) return
         failure = error
         source.close()
         flush()
+        done = true
         controller.close()
       }
       for (const type of ['part-start', 'delta', 'part', 'queued', 'status'] as const)
         source.addEventListener(type, (event) => {
+          if (done) return
           try {
             batch.push({ type, ...JSON.parse((event as MessageEvent).data) } as ReplyEvent)
           } catch (error) {
             return end(error)
           }
           if (type === 'status') return end()
-          frame ??= requestAnimationFrame(flush)
+          schedule()
         })
       source.onerror = () => end(new Error('The reply stream dropped'))
     },
     cancel() {
-      if (frame !== null) cancelAnimationFrame(frame)
+      done = true
+      unschedule?.()
+      unschedule = null
+      batch = []
+      source.close()
     },
   })
   const reader = events.getReader()

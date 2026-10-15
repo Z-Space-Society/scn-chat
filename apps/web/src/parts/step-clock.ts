@@ -14,6 +14,15 @@ export function formatSeconds(seconds: number): string {
  */
 const started = new Map<string, number>()
 const durations = new Map<string, number>()
+
+/** How many steps each map keeps, so a long session's times stay bounded. */
+export const KEPT_STEPS = 500
+
+/** Keep a step's time, forgetting the oldest kept once there are more than `KEPT_STEPS`. */
+function keep(times: Map<string, number>, id: string, ms: number) {
+  times.set(id, ms)
+  if (times.size > KEPT_STEPS) times.delete(times.keys().next().value as string)
+}
 // Told each time a duration is recorded, so summaries of finished steps update.
 const listeners = new Set<() => void>()
 
@@ -49,7 +58,7 @@ export function useStepClock(
   const duration = useStepDurations(() => (id ? stepDuration(id) : undefined))
   useEffect(() => {
     if (!id || !running) return
-    if (!started.has(id)) started.set(id, Date.now())
+    if (!started.has(id)) keep(started, id, Date.now())
     setNow(Date.now())
     const timer = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(timer)
@@ -58,7 +67,7 @@ export function useStepClock(
     if (!id || running) return
     const start = started.get(id)
     if (start === undefined || durations.has(id)) return
-    durations.set(id, Date.now() - start)
+    keep(durations, id, Date.now() - start)
     // The duration is all a finished step needs, so its start goes.
     started.delete(id)
     for (const listener of listeners) listener()

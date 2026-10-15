@@ -1,5 +1,5 @@
 import { nsid } from '@scn-chat/lexicons'
-import { Hono } from 'hono'
+import { type Context, Hono } from 'hono'
 import { requireUser, signedInUser } from '../auth/routes.ts'
 import type { AppEnv } from '../env.ts'
 import type { Logger } from '../logger.ts'
@@ -9,14 +9,23 @@ import { BlobNotFound } from './store.ts'
 
 export const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
 export const MAX_IMAGE_BYTES = 20_000_000
-/**
- * A blob's URL names its CID, so its bytes never change. Private, since only the signed-in viewer
- * may read it.
- */
-export const BLOB_CACHE_CONTROL = 'private, max-age=31536000, immutable'
 export const MAX_FILE_BYTES = 50_000_000
 export const MAX_EXTRACTED_BYTES = 20_000_000
 const MAX_NAME_LENGTH = 1024
+
+/**
+ * The headers a served blob goes out with: its type, never sniffed, and a download for anything
+ * but an image. Its URL names its CID, so its bytes never change and the browser keeps them. The
+ * cache is private, since only the signed-in viewer may read it, and varies by cookie, so another
+ * account signed in on the same browser asks the server again rather than reading it.
+ */
+export function setBlobHeaders(c: Context, mimeType: string): void {
+  c.header('content-type', mimeType)
+  c.header('x-content-type-options', 'nosniff')
+  c.header('cache-control', 'private, max-age=31536000, immutable')
+  c.header('vary', 'Cookie')
+  if (!IMAGE_TYPES.has(mimeType)) c.header('content-disposition', 'attachment')
+}
 
 /** Read a request body, bail when we hit `limit`. */
 async function readLimited(
@@ -135,10 +144,7 @@ export function blobRoutes(deps: BlobRoutesDeps) {
           c.req.query('type') && IMAGE_TYPES.has(String(c.req.query('type')))
             ? String(c.req.query('type'))
             : blob.mimeType
-        c.header('content-type', mimeType)
-        c.header('x-content-type-options', 'nosniff')
-        c.header('cache-control', BLOB_CACHE_CONTROL)
-        if (!IMAGE_TYPES.has(mimeType)) c.header('content-disposition', 'attachment')
+        setBlobHeaders(c, mimeType)
         return c.body(blob.bytes as unknown as ArrayBuffer)
       } catch (err) {
         if (err instanceof BlobNotFound) return c.json({ error: 'NotFound' }, 404)
