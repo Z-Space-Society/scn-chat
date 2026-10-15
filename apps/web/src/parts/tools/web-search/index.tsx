@@ -55,11 +55,12 @@ interface ResultListProps {
 
 /** The results, folded after the first seven under a quiet button that shows the rest. */
 function ResultList(props: ResultListProps) {
-  const fold = useFold(props.results)
+  // The ref apart, since React Compiler takes what holds a ref for one, and leaves this uncompiled.
+  const { list, ...fold } = useFold(props.results)
   const id = useId()
   return (
     <>
-      <ul id={id} ref={fold.list} className="mt-2 mb-1 flex flex-col gap-2.5">
+      <ul id={id} ref={list} className="mt-2 mb-1 flex flex-col gap-2.5">
         {fold.shown.map((result, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: results have no identity beyond their place, and a URL can repeat.
           <li key={i} className="min-w-0">

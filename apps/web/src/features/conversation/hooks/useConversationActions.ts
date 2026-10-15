@@ -22,11 +22,15 @@ export function useConversationActions(skey: string) {
     onSuccess: refresh,
   })
   const last = syncing.submittedAt > patching.submittedAt ? syncing : patching
+  // The mutations' own functions, which stay the same, so the actions do too, rather than changing
+  // with every state either mutation passes through.
+  const { mutateAsync: patch } = patching
+  const { mutate: sync } = syncing
 
   return {
-    rename: (title: string) => patching.mutateAsync({ title }),
-    setInstructions: (systemPrompt: string) => patching.mutateAsync({ systemPrompt }),
-    sync: () => syncing.mutate(),
+    rename: (title: string) => patch({ title }),
+    setInstructions: (systemPrompt: string) => patch({ systemPrompt }),
+    sync: () => sync(),
     outcome: { error: last.error, submittedAt: last.submittedAt },
   }
 }

@@ -127,7 +127,8 @@ describe('ChatList', () => {
     expect(await screen.findByText('Tiles')).toBeInTheDocument()
     await userEvent.type(await openSearch(), 'blue')
     expect(await screen.findByText('Paint')).toBeInTheDocument()
-    expect(screen.queryByText('Tiles')).toBeNull()
+    // The list stays mounted, hidden, so closing the search brings it back as it was.
+    expect(screen.getByText('Tiles')).not.toBeVisible()
     expect(screen.getByRole('status')).toHaveTextContent('Still downloading 2 chats.')
     expect(store.worker.search).toHaveBeenLastCalledWith('blue')
     expect(fetch).not.toHaveBeenCalled()

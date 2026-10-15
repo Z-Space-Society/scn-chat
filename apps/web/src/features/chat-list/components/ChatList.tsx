@@ -1,5 +1,6 @@
 import { useNavigate, useParams, useRouter, useSearch } from '@tanstack/react-router'
 import {
+  Activity,
   lazy,
   type RefObject,
   Suspense,
@@ -163,7 +164,7 @@ export function ChatList() {
         </label>
       )}
       <ErrorAlert error={error} className="px-row-inset text-small" />
-      {searching ? (
+      {searching && (
         <Suspense fallback={<SearchSkeleton />}>
           <SearchResults
             query={typed}
@@ -176,7 +177,10 @@ export function ChatList() {
             }}
           />
         </Suspense>
-      ) : (
+      )}
+      {/* Hidden rather than unmounted while a search shows, so closing it brings the chats back as
+          they were, rather than mounting every row again. */}
+      <Activity mode={searching ? 'hidden' : 'visible'}>
         <div ref={scroll} className={sidebarScroll}>
           {/* At once, as it takes over from the frame's. */}
           {loading && <ChatRowsSkeleton heading immediate label="Loading chats" />}
@@ -192,7 +196,7 @@ export function ChatList() {
           {list.hasNextPage && <div ref={end} />}
           {list.isFetchingNextPage && <ChatRowsSkeleton rows={3} label="Loading more chats" />}
         </div>
-      )}
+      </Activity>
       {/* Who is signed in, at the foot, with a dot on the avatar for how current the chats are. */}
       <footer className="relative flex items-center pt-1">
         <Account onSignOut={signOutNow} />

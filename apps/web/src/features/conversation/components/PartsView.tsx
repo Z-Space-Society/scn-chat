@@ -74,7 +74,8 @@ interface SourcesProps {
  * badge that shows them, which then closes them again.
  */
 function Sources(props: SourcesProps) {
-  const fold = useFold(props.sources)
+  // The ref apart, since React Compiler takes what holds a ref for one, and leaves this uncompiled.
+  const { list, ...fold } = useFold(props.sources)
   const id = useId()
   return (
     <section aria-label="Sources" className="mt-3.5">
@@ -82,7 +83,7 @@ function Sources(props: SourcesProps) {
         {plural(props.sources.length, { one: '# source', other: '# sources' })}
       </p>
       {/* A flex item is no list item, so the badges count themselves. */}
-      <ol id={id} ref={fold.list} className="flex flex-wrap gap-1.5 [counter-reset:source]">
+      <ol id={id} ref={list} className="flex flex-wrap gap-1.5 [counter-reset:source]">
         {fold.shown.map((part) => {
           const View = viewFor(part)
           return (

@@ -4,7 +4,6 @@ import { memo, type ReactNode, useRef, useState } from 'react'
 import { api, json, read } from '../../../shared/api.ts'
 import { cn } from '../../../shared/cn.ts'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
-import { lastError } from '../../../shared/errors.ts'
 import { useAppForm } from '../../../shared/form.tsx'
 import { MoreIcon, PencilIcon, TagIcon, TrashIcon } from '../../../shared/icons.tsx'
 import { Button } from '../../../shared/ui/Button.tsx'
@@ -46,74 +45,48 @@ export const ChatItem = memo(function ChatItem(props: Props) {
   const [mode, setMode] = useState<Mode>('idle')
   const skey = props.chat.skey
   const title = props.chat.title || 'New chat'
-
-  const patch = (body: { title?: string; tags?: string[] }) =>
-    read(api.chats.conversations[':skey'].$patch({ param: { skey } }, json(body)))
+  const cancel = () => setMode('idle')
+  // Done once the change is saved, then brought into the local copy.
   const changed = async () => {
     setMode('idle')
     await props.onChanged()
   }
-  const renaming = useMutation({
-    mutationFn: (text: string) => patch({ title: text.trim() }),
-    onSuccess: changed,
-  })
-  const tagging = useMutation({
-    mutationFn: (text: string) => patch({ tags: parseTags(text) }),
-    onSuccess: changed,
-  })
-  const deleting = useMutation({
-    mutationFn: () => read(api.chats.conversations[':skey'].$delete({ param: { skey } })),
-    onSuccess: async () => {
-      props.onDeleted(skey)
-      await props.onChanged()
-    },
-  })
-  const error = <ErrorAlert error={lastError(renaming, tagging, deleting)} className={alert} />
-  const cancel = () => setMode('idle')
 
   if (mode === 'rename')
     return (
-      <EditCard error={error}>
-        <EditForm
-          label="Title"
-          placeholder="Title"
-          text={props.chat.title ?? ''}
-          onSave={(text) => renaming.mutateAsync(text).catch(noop)}
-          onCancel={cancel}
-        />
-      </EditCard>
+      <EditChat
+        skey={skey}
+        label="Title"
+        placeholder="Title"
+        text={props.chat.title ?? ''}
+        toChange={(text) => ({ title: text.trim() })}
+        onSaved={changed}
+        onCancel={cancel}
+      />
     )
   if (mode === 'tags')
     return (
-      <EditCard error={error}>
-        <EditForm
-          label="Tags, separated by commas"
-          placeholder="work, travel"
-          text={props.chat.tags.join(', ')}
-          onSave={(text) => tagging.mutateAsync(text).catch(noop)}
-          onCancel={cancel}
-        />
-      </EditCard>
+      <EditChat
+        skey={skey}
+        label="Tags, separated by commas"
+        placeholder="work, travel"
+        text={props.chat.tags.join(', ')}
+        toChange={(text) => ({ tags: parseTags(text) })}
+        onSaved={changed}
+        onCancel={cancel}
+      />
     )
   if (mode === 'delete')
     return (
-      <EditCard error={error}>
-        {/* The PDS holds the only copy, so deleting is for good. */}
-        <p className="mb-2 text-ink">Delete “{title}” for good?</p>
-        <div className="flex gap-1.5">
-          <Button
-            tone="danger"
-            size="small"
-            disabled={deleting.isPending}
-            onClick={() => deleting.mutate()}
-          >
-            Delete chat
-          </Button>
-          <Button size="small" onClick={cancel}>
-            Cancel
-          </Button>
-        </div>
-      </EditCard>
+      <DeleteChat
+        skey={skey}
+        title={title}
+        onDeleted={async () => {
+          props.onDeleted(skey)
+          await props.onChanged()
+        }}
+        onCancel={cancel}
+      />
     )
 
   return (
@@ -150,7 +123,6 @@ export const ChatItem = memo(function ChatItem(props: Props) {
           onPick={setMode}
         />
       </div>
-      {error}
     </li>
   )
 })
@@ -221,6 +193,81 @@ function MoreButton(props: MoreProps) {
         </div>
       )}
     </>
+  )
+}
+
+interface EditChatProps {
+  skey: string
+  label: string
+  placeholder: string
+  /** What the field starts from. */
+  text: string
+  /** The change to the chat the typed text makes. */
+  toChange: (text: string) => { title?: string; tags?: string[] }
+  onSaved: () => Promise<void>
+  onCancel: () => void
+}
+
+/**
+ * Renaming or tagging a chat, as a card in its place. The card holds its own save, so a row that
+ * isn't being changed holds none.
+ */
+function EditChat(props: EditChatProps) {
+  const saving = useMutation({
+    mutationFn: (text: string) =>
+      read(
+        api.chats.conversations[':skey'].$patch(
+          { param: { skey: props.skey } },
+          json(props.toChange(text)),
+        ),
+      ),
+    onSuccess: props.onSaved,
+  })
+  return (
+    <EditCard error={<ErrorAlert error={saving.error} className={alert} />}>
+      <EditForm
+        label={props.label}
+        placeholder={props.placeholder}
+        text={props.text}
+        onSave={(text) => saving.mutateAsync(text).catch(noop)}
+        onCancel={props.onCancel}
+      />
+    </EditCard>
+  )
+}
+
+interface DeleteChatProps {
+  skey: string
+  title: string
+  onDeleted: () => Promise<void>
+  onCancel: () => void
+}
+
+/** Confirming a chat's delete, as a card in its place, holding the delete itself. */
+function DeleteChat(props: DeleteChatProps) {
+  const deleting = useMutation({
+    mutationFn: () =>
+      read(api.chats.conversations[':skey'].$delete({ param: { skey: props.skey } })),
+    onSuccess: props.onDeleted,
+  })
+  return (
+    <EditCard error={<ErrorAlert error={deleting.error} className={alert} />}>
+      {/* The PDS holds the only copy, so deleting is for good. */}
+      <p className="mb-2 text-ink">Delete “{props.title}” for good?</p>
+      <div className="flex gap-1.5">
+        <Button
+          tone="danger"
+          size="small"
+          disabled={deleting.isPending}
+          onClick={() => deleting.mutate()}
+        >
+          Delete chat
+        </Button>
+        <Button size="small" onClick={props.onCancel}>
+          Cancel
+        </Button>
+      </div>
+    </EditCard>
   )
 }
 

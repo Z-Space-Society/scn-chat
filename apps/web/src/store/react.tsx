@@ -111,6 +111,8 @@ export function useConversations(tag: string | null = null): {
     initialPageParam: null as ChatCursor | null,
     getNextPageParam: (page) => page.next ?? undefined,
     enabled: active,
+    // Picking a tag keeps the rows shown until its chats arrive, rather than a skeleton between.
+    placeholderData: keepPreviousData,
   })
   return {
     conversations: query.data?.pages.flatMap((page) => page.chats) ?? [],

@@ -6,6 +6,13 @@ const DAY = 86_400_000
 /** The start of the local day containing `date`. */
 const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate())
 
+/**
+ * Month headings, made once, since making a formatter for each of hundreds of older chats on every
+ * change to the list costs more than the rest of the grouping.
+ */
+const monthOnly = new Intl.DateTimeFormat(undefined, { month: 'long' })
+const monthAndYear = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' })
+
 /** The heading for a chat last updated at `updated`, seen from `now`, in local time. */
 export function dateLabel(updated: Date, now: Date): string {
   const days = Math.round((startOfDay(now).getTime() - startOfDay(updated).getTime()) / DAY)
@@ -13,10 +20,7 @@ export function dateLabel(updated: Date, now: Date): string {
   if (days === 1) return 'Yesterday'
   if (days < 7) return 'Previous 7 days'
   if (days < 30) return 'Previous 30 days'
-  return updated.toLocaleDateString(undefined, {
-    month: 'long',
-    year: updated.getFullYear() === now.getFullYear() ? undefined : 'numeric',
-  })
+  return (updated.getFullYear() === now.getFullYear() ? monthOnly : monthAndYear).format(updated)
 }
 
 /** Group chats, already newest first, under date headings in the same order. */

@@ -83,7 +83,7 @@ export function ConversationView(props: Props) {
         skey={props.skey}
         title={title}
         instructions={info ? ((info.systemPrompt as string | undefined) ?? '') : undefined}
-        outline={outlineOf(branch)}
+        outline={() => outlineOf(branch)}
         onRename={actions.rename}
         onSetInstructions={actions.setInstructions}
         onSync={actions.sync}

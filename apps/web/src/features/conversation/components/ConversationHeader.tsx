@@ -25,8 +25,11 @@ interface Props {
   skey: string
   /** The chat's title, or nothing while it is on its way. */
   title: string | undefined
-  /** The user's messages on the branch on screen, to jump between. */
-  outline: OutlineEntry[]
+  /**
+   * The user's messages on the branch on screen, to jump between, built only while the jump stack
+   * is open rather than on every message.
+   */
+  outline: () => OutlineEntry[]
   /** The chat's own instructions, empty when it has none, or nothing until its info record loads. */
   instructions: string | undefined
   /** Rename the conversation, resolving once the new title is saved. Its caller shows a failure. */
@@ -105,7 +108,7 @@ export function ConversationHeader(props: Props) {
           <MoreIcon />
         </ToolButton>
       </div>
-      {panel === 'jump' && <PromptStack entries={props.outline} onClose={close} />}
+      {panel === 'jump' && <PromptStack entries={props.outline()} onClose={close} />}
       {panel === 'share' && (
         <SharePanel skey={props.skey} ownerDid={me.did} onClose={close} className={dropdown} />
       )}
