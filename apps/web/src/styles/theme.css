@@ -171,11 +171,15 @@
   --color-code-token-inserted: var(--color-code-token-string);
   --color-code-token-deleted: light-dark(oklch(0.52 0.19 25), oklch(0.72 0.15 25));
 
+  /* The system's own fonts, so the app loads none: its sans, then each platform's emoji, and its
+     mono. */
   --font-ui:
-    ui-sans-serif, system-ui, -apple-system, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue",
-    sans-serif;
+    system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
   --font-prose: var(--font-ui);
-  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --font-mono:
+    ui-monospace, "SF Mono", SFMono-Regular, Menlo, "Cascadia Mono", Consolas, "Liberation Mono",
+    "DejaVu Sans Mono", monospace;
   --default-font-family: var(--font-ui);
   --default-mono-font-family: var(--font-mono);
 
