@@ -8,7 +8,7 @@ import {
 import { useState } from 'react'
 import { refreshConversation, useRefreshConversation } from '../../store/react.tsx'
 import type { BranchMessage } from './lib/branch.ts'
-import { addEvent, noParts, type ReplyParts, replyEvents } from './lib/reply-stream.ts'
+import { addEvents, noParts, type ReplyParts, replyEvents } from './lib/reply-stream.ts'
 
 /*
  * The reply follower: it follows each pending reply in the open conversation until its final
@@ -30,13 +30,13 @@ const streamQuery = (skey: string, rkey: string) =>
     queryFn: streamedQuery({
       streamFn: async function* ({ client, signal }) {
         const url = `/api/conversations/${skey}/messages/${rkey}/stream`
-        for await (const event of replyEvents(url, signal)) {
-          yield event
-          if (event.type === 'status' && FINISHED.has(event.status))
+        for await (const events of replyEvents(url, signal)) {
+          yield events
+          if (events.some((event) => event.type === 'status' && FINISHED.has(event.status)))
             void refreshConversation(client, skey)
         }
       },
-      reducer: addEvent,
+      reducer: addEvents,
       initialValue: noParts,
     }),
     // A stream runs once. Leaving the conversation drops it, and coming back follows again.

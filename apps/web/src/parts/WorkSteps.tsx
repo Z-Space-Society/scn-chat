@@ -1,4 +1,4 @@
-import { memo, type ReactNode } from 'react'
+import { memo, type ReactNode, type SyntheticEvent, useState } from 'react'
 import { cn } from '../shared/cn.ts'
 import { ChevronDownIcon, ChevronRightIcon } from '../shared/icons.tsx'
 import { action } from '../shared/ui/actions.ts'
@@ -282,6 +282,22 @@ const StepView = memo(
     sameStep(prev.step, next.step),
 )
 
+/**
+ * Whether a step has been opened, so its body renders only once someone looks: a closed thought
+ * would otherwise parse every token streaming into it, and a closed tool step would hold all a tool
+ * returned. The body still unfolds, since it arrives while the step grows from nothing. Once
+ * opened, it stays, so closing folds it away rather than emptying it.
+ */
+function useOpened() {
+  const [opened, setOpened] = useState(false)
+  return {
+    opened,
+    onToggle: (event: SyntheticEvent<HTMLDetailsElement>) => {
+      if (event.currentTarget.open) setOpened(true)
+    },
+  }
+}
+
 interface ThoughtProps {
   text: string
   /** Whether the model is still thinking it. */
@@ -298,11 +314,13 @@ interface ThoughtProps {
  * goes.
  */
 function Thought(props: ThoughtProps) {
+  const step = useOpened()
   return (
     <details
       data-step="reasoning"
       data-current={props.current || undefined}
       className="group/step details-unfold"
+      onToggle={step.onToggle}
     >
       <summary className={cn(summary, 'gap-1 truncate py-0.5 group-open/step:text-ink')}>
         <Chevron group="step" />
@@ -312,11 +330,13 @@ function Thought(props: ThoughtProps) {
         </span>
         {props.elapsed !== undefined && <Elapsed seconds={props.elapsed} />}
       </summary>
-      <Markdown
-        text={props.text}
-        streaming={props.current}
-        className="mt-0.75 mb-1 text-muted leading-[1.6] [font-size:inherit] [&>*>:first-child]:mt-0 [&>*>:last-child]:mb-0 [&_strong]:text-ink"
-      />
+      {step.opened && (
+        <Markdown
+          text={props.text}
+          streaming={props.current}
+          className="mt-0.75 mb-1 text-muted leading-[1.6] [font-size:inherit] [&>*>:first-child]:mt-0 [&>*>:last-child]:mb-0 [&_strong]:text-ink"
+        />
+      )}
     </details>
   )
 }
@@ -355,8 +375,14 @@ function ToolStep(props: ToolStepProps) {
   const { call, result } = props.step
   const entry = toolEntry(call.tool as string)
   const status = props.status
+  const step = useOpened()
   return (
-    <details data-step="tool" data-state={status} className="group/step details-unfold">
+    <details
+      data-step="tool"
+      data-state={status}
+      className="group/step details-unfold"
+      onToggle={step.onToggle}
+    >
       <summary className={cn(summary, 'gap-1 truncate py-0.5 group-open/step:text-ink')}>
         <Chevron group="step" />
         {entry.code ? (
@@ -385,13 +411,15 @@ function ToolStep(props: ToolStepProps) {
         )}
         {props.elapsed !== undefined && <Elapsed seconds={props.elapsed} />}
       </summary>
-      <entry.View
-        call={call}
-        result={result}
-        status={status}
-        record={props.record}
-        blobUrl={props.blobUrl}
-      />
+      {step.opened && (
+        <entry.View
+          call={call}
+          result={result}
+          status={status}
+          record={props.record}
+          blobUrl={props.blobUrl}
+        />
+      )}
     </details>
   )
 }

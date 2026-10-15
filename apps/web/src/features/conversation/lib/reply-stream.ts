@@ -6,31 +6,45 @@ import type { Part } from '../../../parts/types.ts'
 export type ReplyEvent = HubEvent
 
 /**
- * A reply's events from its stream endpoint. It ends after the status event, and throws if the
- * connection drops or sends an event it can't parse first. The connection closes when it ends or
- * the signal aborts.
+ * A reply's events from its stream endpoint, in batches of those that arrived within one animation
+ * frame, so a reply streaming a word at a time rerenders at most once a frame. It ends after the
+ * status event, which is sent with its batch at once, and throws if the connection drops or sends
+ * an event it can't parse first. The connection closes when it ends or the signal aborts.
  */
-export async function* replyEvents(url: string, signal: AbortSignal): AsyncGenerator<ReplyEvent> {
+export async function* replyEvents(url: string, signal: AbortSignal): AsyncGenerator<ReplyEvent[]> {
   const source = new EventSource(url)
   let failure: unknown
-  const events = new ReadableStream<ReplyEvent>({
+  let batch: ReplyEvent[] = []
+  let frame: number | null = null
+  const events = new ReadableStream<ReplyEvent[]>({
     start(controller) {
+      const flush = () => {
+        if (frame !== null) cancelAnimationFrame(frame)
+        frame = null
+        if (batch.length) controller.enqueue(batch)
+        batch = []
+      }
       // A failure closes the stream rather than erroring it, which would drop the events not yet read.
       const end = (error?: unknown) => {
         failure = error
         source.close()
+        flush()
         controller.close()
       }
       for (const type of ['part-start', 'delta', 'part', 'queued', 'status'] as const)
         source.addEventListener(type, (event) => {
           try {
-            controller.enqueue({ type, ...JSON.parse((event as MessageEvent).data) } as ReplyEvent)
+            batch.push({ type, ...JSON.parse((event as MessageEvent).data) } as ReplyEvent)
           } catch (error) {
             return end(error)
           }
-          if (type === 'status') end()
+          if (type === 'status') return end()
+          frame ??= requestAnimationFrame(flush)
         })
       source.onerror = () => end(new Error('The reply stream dropped'))
+    },
+    cancel() {
+      if (frame !== null) cancelAnimationFrame(frame)
     },
   })
   const reader = events.getReader()
@@ -77,6 +91,10 @@ export function addEvent(reply: ReplyParts, event: ReplyEvent): ReplyParts {
     }
   }
 }
+
+/** The reply with a batch of events added. */
+export const addEvents = (reply: ReplyParts, events: ReplyEvent[]): ReplyParts =>
+  events.reduce(addEvent, reply)
 
 /** The reply with one part replaced. A part arriving means the turn has left the queue. */
 function setPart(reply: ReplyParts, index: number, part: Part): ReplyParts {

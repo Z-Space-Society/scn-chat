@@ -65,12 +65,29 @@ describe('MessageView', () => {
     expect(within(thought).queryByRole('button')).toBeNull()
   })
 
+  it("renders a step's body only once it has been opened, and keeps it once closed", async () => {
+    const { container } = render(<MessageView blobUrl={blobUrl} record={working} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Thought · lookup' }))
+    const thought = container.querySelector('[data-step=reasoning]') as HTMLDetailsElement
+    const tool = container.querySelector('[data-step=tool]') as HTMLDetailsElement
+    expect(thought.children).toHaveLength(1)
+    expect(tool.querySelector('pre')).toBeNull()
+    const row = tool.querySelector('summary') as HTMLElement
+    await userEvent.click(row)
+    expect(tool.open).toBe(true)
+    expect(tool.querySelectorAll('pre')).toHaveLength(2)
+    await userEvent.click(row)
+    expect(tool.open).toBe(false)
+    expect(tool.querySelectorAll('pre')).toHaveLength(2)
+  })
+
   it('pairs a tool call with its result, showing the input at a glance and both in full', async () => {
     const { container } = render(<MessageView blobUrl={blobUrl} record={working} />)
     await userEvent.click(screen.getByRole('button', { name: 'Thought · lookup' }))
     const tool = container.querySelector('[data-step=tool]') as HTMLDetailsElement
     expect(tool.querySelector('summary')).toHaveTextContent('lookup "tiles"')
     expect(tool.dataset.state).toBe('done')
+    await openToolSteps(container)
     const shown = Array.from(tool.querySelectorAll('pre')).map((pre) => pre.textContent)
     expect(shown).toEqual(['{\n  "query": "tiles"\n}', '{\n  "hits": 2\n}'])
   })
@@ -487,10 +504,17 @@ async function openSteps(parts: object[], status = 'complete') {
   const view = render(<MessageView blobUrl={blobUrl} record={record} />)
   const footer = view.container.querySelector('footer') as HTMLElement
   await userEvent.click(within(footer).getByRole('button'))
+  await openToolSteps(view.container)
   return view
 }
 const toolSteps = (container: HTMLElement) =>
   Array.from(container.querySelectorAll<HTMLDetailsElement>('[data-step=tool]'))
+
+/** Open each tool step, whose view renders only once it has been opened. */
+async function openToolSteps(container: HTMLElement) {
+  for (const step of toolSteps(container))
+    await userEvent.click(step.querySelector('summary') as HTMLElement)
+}
 
 describe('tool views', () => {
   it('shows every call still waiting for its result in a streaming reply as running', () => {
@@ -604,6 +628,7 @@ describe('tool views', () => {
     const live = render(
       <StreamingReply reply={{ ...noParts, parts: [search] }} blobUrl={blobUrl} />,
     )
+    await openToolSteps(live.container)
     expect(toolSteps(live.container)[0]).toHaveTextContent('Searching…')
     live.unmount()
     const { container } = await openSteps([search, result('a', { results: [] })])
