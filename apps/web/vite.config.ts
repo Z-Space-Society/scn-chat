@@ -50,9 +50,18 @@ export default defineConfig({
     babel({ presets: [reactCompilerPreset()] }),
     precompress(),
   ],
-  // Streamdown's HTML plugin, which markdown.tsx never uses, stays out of the build.
+  // Streamdown's HTML plugin and Shiki's wasm engine, which the app never uses, stay out of the build.
   resolve: {
-    alias: { 'rehype-raw': fileURLToPath(new URL('src/parts/no-raw.ts', import.meta.url)) },
+    alias: [
+      {
+        find: 'rehype-raw',
+        replacement: fileURLToPath(new URL('src/parts/no-raw.ts', import.meta.url)),
+      },
+      {
+        find: /^shiki\/wasm$/,
+        replacement: fileURLToPath(new URL('src/parts/no-wasm.ts', import.meta.url)),
+      },
+    ],
   },
   optimizeDeps: {
     // There is no index.html to scan, so scan every route up front. Otherwise a dependency found
