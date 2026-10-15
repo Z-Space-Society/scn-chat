@@ -1,6 +1,7 @@
 import { cjk } from '@streamdown/cjk'
 import {
   type ComponentProps,
+  type MouseEvent,
   memo,
   type ReactNode,
   useEffect,
@@ -267,6 +268,18 @@ function TableBlock(props: ComponentProps<'table'>) {
  * The components that Markdown node names render as, every one of ours. Each block of prose takes
  * its direction from its own text, so a reply can mix scripts.
  */
+/**
+ * Follows a link within the text, such as a footnote and its way back, inside the same text, since
+ * every reply numbers its footnotes from one and a plain jump would land in the first reply's.
+ */
+function jumpInText(event: MouseEvent<HTMLAnchorElement>) {
+  const id = decodeURIComponent(event.currentTarget.hash.slice(1))
+  const target = event.currentTarget.closest('.markdown')?.querySelector(`[id="${CSS.escape(id)}"]`)
+  if (!target) return
+  event.preventDefault()
+  target.scrollIntoView({ block: 'center' })
+}
+
 export const markdownComponents: Components = {
   p: ({ node: _node, ...props }) => <p {...props} dir="auto" />,
   li: ({ node: _node, ...props }) => <li {...props} dir="auto" />,
@@ -293,6 +306,11 @@ export const markdownComponents: Components = {
   // A link still being written has no address yet, so it reads as its text until it does.
   a: ({ node: _node, href, ...props }) => {
     if (!href || href.startsWith('streamdown:')) return <span>{props.children}</span>
+    // Streamdown's hardening gives every link a new tab, so a link within the text drops it.
+    if (href.startsWith('#')) {
+      const { target: _target, rel: _rel, ...inText } = props
+      return <a {...inText} href={href} onClick={jumpInText} />
+    }
     return <a {...props} href={href} target="_blank" rel="noreferrer" />
   },
   inlineCode: ({ node: _node, ...props }) => <code {...props} />,

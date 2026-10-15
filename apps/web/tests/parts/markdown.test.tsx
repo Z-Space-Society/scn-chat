@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Markdown } from '../../src/parts/markdown.tsx'
@@ -108,6 +108,24 @@ describe('Markdown', () => {
     expect(screen.getByRole('button', { name: 'Copied' })).toHaveFocus()
     // The menu closed once it had copied.
     expect(screen.queryByRole('button', { name: 'TSV' })).toBeNull()
+  })
+
+  it('jumps to a footnote within its own text, not in a new tab', async () => {
+    const user = userEvent.setup()
+    const scrolled: Element[] = []
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled.push(this)
+    }
+    const text = 'Tile[^1].\n\n[^1]: Porcelain.'
+    const first = render(<Markdown text={text} />)
+    const { container } = render(<Markdown text={text} />)
+    const link = within(container).getByRole('link', { name: '1' })
+    expect(link).not.toHaveAttribute('target')
+    await user.click(link)
+    // Both texts number their footnotes from one, so the jump stays in the text it was clicked in.
+    expect(scrolled).toHaveLength(1)
+    expect(container.contains(scrolled[0] ?? null)).toBe(true)
+    expect(first.container.contains(scrolled[0] ?? null)).toBe(false)
   })
 
   it('downloads a table as CSV from its Download menu', async () => {
