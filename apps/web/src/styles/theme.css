@@ -144,9 +144,13 @@
   --color-danger-border: light-dark(oklch(0.895 0.083 25), oklch(0.348 0.111 25));
   /* A softer red for the detail under a red heading, still clearing 4.5:1 on the panel. */
   --color-danger-muted: color-mix(in srgb, var(--color-danger) 90%, var(--color-panel));
-  /* Pale amber for selected text and search matches, with amber-brown ink. */
+  /* Pale amber for search matches and notices, with amber-brown ink. */
   --color-highlight: light-dark(oklch(0.973 0.052 75), oklch(0.288 0.072 75));
   --color-highlight-ink: light-dark(oklch(0.534 0.141 75), oklch(0.894 0.11 75));
+  /* A calm blue behind selected text, a hue nothing else in the app means anything by, so a
+     selection never reads as a match, a notice, or the green of an action. The text keeps its own
+     ink: body text clears 7:1 on it and muted text 4.5:1, in both modes. */
+  --color-selection: light-dark(oklch(0.91 0.06 250), oklch(0.345 0.09 258));
   /* A search match: a faint tint in the text's own ink. In light it is half the highlight, so a
      list of matches stays quiet. In dark it is the whole highlight, since half all but vanishes. */
   --color-match: light-dark(

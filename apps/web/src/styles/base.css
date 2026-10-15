@@ -32,7 +32,7 @@
   }
 
   ::selection {
-    background: var(--color-highlight);
+    background: var(--color-selection);
     color: inherit;
   }
 
