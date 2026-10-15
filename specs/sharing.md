@@ -41,7 +41,7 @@ Both routes return 403 with a message saying sharing needs a spaces PDS when the
 
 A refused credential (`UserNotAuthorized`), a missing space (`SpaceNotFound`), or a deleted one (`SpaceDeleted`) all return 404. A private conversation's existence is therefore not revealed. Viewer credentials are not cached, so revoking access takes effect on the viewer's next page load.
 
-Attachments in a shared conversation are fetched the same way, with `getBlob` and the viewer's credential, through `GET /api/shared/:ownerDid/:skey/blobs/:cid`.
+Attachments in a shared conversation are fetched the same way, with `getBlob` and the viewer's credential, through `GET /api/shared/:ownerDid/:skey/blobs/:cid`, with the same headers as the owner's blob route, so a viewer who loses access keeps only what their browser already cached.
 
 ### Web UI
 

@@ -9,6 +9,11 @@ import { BlobNotFound } from './store.ts'
 
 export const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
 export const MAX_IMAGE_BYTES = 20_000_000
+/**
+ * A blob's URL names its CID, so its bytes never change. Private, since only the signed-in viewer
+ * may read it.
+ */
+export const BLOB_CACHE_CONTROL = 'private, max-age=31536000, immutable'
 export const MAX_FILE_BYTES = 50_000_000
 export const MAX_EXTRACTED_BYTES = 20_000_000
 const MAX_NAME_LENGTH = 1024
@@ -132,6 +137,7 @@ export function blobRoutes(deps: BlobRoutesDeps) {
             : blob.mimeType
         c.header('content-type', mimeType)
         c.header('x-content-type-options', 'nosniff')
+        c.header('cache-control', BLOB_CACHE_CONTROL)
         if (!IMAGE_TYPES.has(mimeType)) c.header('content-disposition', 'attachment')
         return c.body(blob.bytes as unknown as ArrayBuffer)
       } catch (err) {
