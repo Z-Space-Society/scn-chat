@@ -19,7 +19,7 @@ import { ConversationHeader } from './ConversationHeader.tsx'
 import { ConversationSkeleton } from './ConversationSkeleton.tsx'
 import { EmptyConversation } from './EmptyConversation.tsx'
 import { LiveAuthor } from './LiveAuthor.tsx'
-import { type ConversationOperations, MessageActions } from './message-actions.tsx'
+import { type ConversationOperations, MessageActions, RunningReply } from './message-actions.tsx'
 import { ReplyStream } from './ReplyStream.tsx'
 
 interface Props {
@@ -56,7 +56,6 @@ export function ConversationView(props: Props) {
   const operations: ConversationOperations = {
     edit: setEditingRkey,
     quote: (text) => composer.current?.quote(text),
-    running: stoppable,
     regenerate: chat.regenerate,
     stop: chat.stop,
     models,
@@ -88,38 +87,40 @@ export function ConversationView(props: Props) {
       <ErrorAlert error={lastError(actions.outcome, chat.outcome) ?? chat.loadError} />
       {waiting && <ConversationSkeleton />}
       {chat.empty && <EmptyConversation onStart={(text) => composer.current?.fill(text)} />}
-      <BranchView
-        branch={branch}
-        blobUrl={blobUrl}
-        onPick={chat.pick}
-        pending={(message) => (
-          <ReplyStream skey={props.skey} rkey={message.rkey} blobUrl={blobUrl} />
-        )}
-        live={(message) => (
-          <LiveAuthor
-            skey={props.skey}
-            rkey={message.rkey}
-            model={(message.record.model as { id?: string } | undefined)?.id ?? 'Assistant'}
-            since={message.record.createdAt}
-          />
-        )}
-        actions={(message) => <MessageActions message={message} operations={operations} />}
-        // A failed reply tries again with the same model.
-        retry={(message) => (
-          <Button
-            size="small"
-            className="mt-2.5"
-            busy={chat.regenerating}
-            onClick={() =>
-              chat.regenerate((message.record.parent as string | undefined) ?? null, null)
-            }
-          >
-            <RetryIcon className="size-3.75 text-muted" />
-            Try again
-          </Button>
-        )}
-        arrived={(message) => !opened?.has(message.rkey)}
-      />
+      <RunningReply.Provider value={stoppable}>
+        <BranchView
+          branch={branch}
+          blobUrl={blobUrl}
+          onPick={chat.pick}
+          pending={(message) => (
+            <ReplyStream skey={props.skey} rkey={message.rkey} blobUrl={blobUrl} />
+          )}
+          live={(message) => (
+            <LiveAuthor
+              skey={props.skey}
+              rkey={message.rkey}
+              model={(message.record.model as { id?: string } | undefined)?.id ?? 'Assistant'}
+              since={message.record.createdAt}
+            />
+          )}
+          actions={(message) => <MessageActions message={message} operations={operations} />}
+          // A failed reply tries again with the same model.
+          retry={(message) => (
+            <Button
+              size="small"
+              className="mt-2.5"
+              busy={chat.regenerating}
+              onClick={() =>
+                chat.regenerate((message.record.parent as string | undefined) ?? null, null)
+              }
+            >
+              <RetryIcon className="size-3.75 text-muted" />
+              Try again
+            </Button>
+          )}
+          arrived={(message) => !opened?.has(message.rkey)}
+        />
+      </RunningReply.Provider>
       <BranchComposer
         branch={branch}
         editing={editing}

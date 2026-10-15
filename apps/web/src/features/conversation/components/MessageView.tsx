@@ -88,9 +88,7 @@ export function MessageView(props: MessageViewProps) {
         )}
       >
         <Author record={record} live={props.live} />
-        {props.siblings && props.siblings.messages.length > 1 && (
-          <SiblingPicker siblings={props.siblings} />
-        )}
+        {props.siblings && props.siblings.count > 1 && <SiblingPicker siblings={props.siblings} />}
       </header>
       <PartsView parts={parts} record={record} blobUrl={props.blobUrl} scope={props.rkey} />
       {record.status === 'pending' && props.pending}

@@ -1,10 +1,10 @@
-import type { ReactNode } from 'react'
+import { memo, type ReactNode } from 'react'
 import type { BlobUrl } from '../../../parts/types.ts'
 import type { BranchMessage, BranchStep } from '../lib/branch.ts'
 import { MessageView } from './MessageView.tsx'
 
-interface Props {
-  branch: BranchStep[]
+/** What the conversation gives every message on the branch. */
+interface RowOptions {
   blobUrl: BlobUrl
   /** Show another version of a message, by its rkey. */
   onPick: (rkey: string) => void
@@ -20,25 +20,71 @@ interface Props {
   arrived?: (message: BranchMessage) => boolean
 }
 
+interface Props extends RowOptions {
+  branch: BranchStep[]
+}
+
 /** The messages on the branch on screen, each with its versions, and the id `m-<rkey>`. */
 export function BranchView(props: Props) {
   return (
     <>
-      {props.branch.map(({ message, siblings, index }) => (
-        <MessageView
-          key={message.rkey}
-          id={`m-${message.rkey}`}
-          rkey={message.rkey}
-          record={message.record}
-          pending={message.record.status === 'pending' ? props.pending?.(message) : undefined}
-          live={message.record.status === 'pending' ? props.live?.(message) : undefined}
+      {props.branch.map((step) => (
+        <BranchRow
+          key={step.message.rkey}
+          message={step.message}
+          index={step.index}
+          count={step.siblings.length}
+          previous={step.siblings[step.index - 1]?.rkey}
+          next={step.siblings[step.index + 1]?.rkey}
           blobUrl={props.blobUrl}
-          siblings={{ messages: siblings, index, onPick: props.onPick }}
-          actions={props.actions?.(message)}
-          retry={message.record.status === 'error' ? props.retry?.(message) : undefined}
-          arrived={props.arrived?.(message)}
+          onPick={props.onPick}
+          pending={props.pending}
+          live={props.live}
+          actions={props.actions}
+          retry={props.retry}
+          arrived={props.arrived}
         />
       ))}
     </>
   )
 }
+
+interface RowProps extends RowOptions {
+  message: BranchMessage
+  /** Its place among its versions, and how many there are. */
+  index: number
+  count: number
+  /** The versions on either side, by rkey. */
+  previous?: string
+  next?: string
+}
+
+/**
+ * One message on the branch. It renders again only when its own record or its place among its
+ * versions changes, since the local copy keeps an unchanged message the same object, so a message
+ * arriving or a reply finishing doesn't render every other message again.
+ */
+const BranchRow = memo(function BranchRow(props: RowProps) {
+  const message = props.message
+  const status = message.record.status
+  return (
+    <MessageView
+      id={`m-${message.rkey}`}
+      rkey={message.rkey}
+      record={message.record}
+      pending={status === 'pending' ? props.pending?.(message) : undefined}
+      live={status === 'pending' ? props.live?.(message) : undefined}
+      blobUrl={props.blobUrl}
+      siblings={{
+        index: props.index,
+        count: props.count,
+        previous: props.previous,
+        next: props.next,
+        onPick: props.onPick,
+      }}
+      actions={props.actions?.(message)}
+      retry={status === 'error' ? props.retry?.(message) : undefined}
+      arrived={props.arrived?.(message)}
+    />
+  )
+})

@@ -1,5 +1,5 @@
 import type { ModelRef } from '@scn-chat/lexicons'
-import type { ComponentType } from 'react'
+import { type ComponentType, createContext, useContext } from 'react'
 import { PencilIcon, RetryIcon } from '../../../shared/icons.tsx'
 import { action, iconAction } from '../../../shared/ui/actions.ts'
 import { CopyButton } from '../../../shared/ui/CopyButton.tsx'
@@ -23,9 +23,14 @@ export interface ConversationOperations {
   storedIn: string
   /** Quote text into the composer. */
   quote?: (text: string) => void
-  /** The reply running at the end of the branch, which the composer offers to stop instead. */
-  running?: string | null
 }
+
+/**
+ * The reply running at the end of the branch, by rkey, which the composer offers to stop instead.
+ * A context, apart from the operations, so a reply starting or finishing rerenders only the stop
+ * actions rather than every message's actions.
+ */
+export const RunningReply = createContext<string | null>(null)
 
 export interface MessageActionProps {
   message: BranchMessage
@@ -85,8 +90,9 @@ function RegenerateAction(props: MessageActionProps) {
 }
 
 function StopAction(props: MessageActionProps) {
+  const running = useContext(RunningReply)
   if (isUser(props.message) || !isPending(props.message)) return null
-  if (props.message.rkey === props.operations.running) return null
+  if (props.message.rkey === running) return null
   return (
     <button
       type="button"

@@ -1,10 +1,13 @@
 import { ChevronLeftIcon, ChevronRightIcon } from '../../../shared/icons.tsx'
-import type { BranchMessage } from '../lib/branch.ts'
 
 /** A message's alternative versions, and which one is shown. */
 export interface Siblings {
-  messages: BranchMessage[]
+  /** The place of the one shown, and how many there are. */
   index: number
+  count: number
+  /** The versions on either side, by rkey. */
+  previous?: string
+  next?: string
   /** Show another version, by its rkey. */
   onPick: (rkey: string) => void
 }
@@ -19,27 +22,27 @@ const arrow =
 
 /** Arrows to step between alternative versions of a message, around a count that keeps its width. */
 export function SiblingPicker(props: Props) {
-  const previous = props.siblings.messages[props.siblings.index - 1]
-  const next = props.siblings.messages[props.siblings.index + 1]
+  const previous = props.siblings.previous
+  const next = props.siblings.next
   return (
     <span className="inline-flex items-center gap-0.5 text-caption text-muted">
       <button
         type="button"
         aria-label="Previous version"
         disabled={!previous}
-        onClick={() => previous && props.siblings.onPick(previous.rkey)}
+        onClick={() => previous && props.siblings.onPick(previous)}
         className={arrow}
       >
         <ChevronLeftIcon className="size-3.5" />
       </button>
       <span className="min-w-6.5 text-center tabular-nums">
-        {props.siblings.index + 1}/{props.siblings.messages.length}
+        {props.siblings.index + 1}/{props.siblings.count}
       </span>
       <button
         type="button"
         aria-label="Next version"
         disabled={!next}
-        onClick={() => next && props.siblings.onPick(next.rkey)}
+        onClick={() => next && props.siblings.onPick(next)}
         className={arrow}
       >
         <ChevronRightIcon className="size-3.5" />

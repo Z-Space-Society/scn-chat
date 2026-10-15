@@ -456,11 +456,7 @@ describe('MessageView', () => {
       <MessageView
         blobUrl={blobUrl}
         record={{ role: 'assistant', content: { $type: d('plainContent'), parts: [] } }}
-        siblings={{
-          messages: ['a', 'b', 'c'].map((rkey) => ({ rkey, record: {} })),
-          index: 1,
-          onPick,
-        }}
+        siblings={{ index: 1, count: 3, previous: 'a', next: 'c', onPick }}
       />,
     )
     expect(screen.getByText('2/3')).toBeInTheDocument()

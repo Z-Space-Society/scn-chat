@@ -90,6 +90,9 @@ export function useChat(skey: string, options: ChatOptions = {}) {
       return refresh(skey)
     },
   })
+  // The stable functions alone, so what calls them stays the same from render to render.
+  const { mutate: stop } = stopping
+  const { mutate: regenerate } = regenerating
   const leaf = branch.at(-1)?.message
   // The later of the two, so a later success clears an earlier failure.
   const outcome = [stopping, regenerating].reduce((a, b) => (b.submittedAt > a.submittedAt ? b : a))
@@ -114,10 +117,9 @@ export function useChat(skey: string, options: ChatOptions = {}) {
     running: leaf?.record.status === 'pending' ? leaf.rkey : null,
     send,
     /** Ask again for the reply to a user message, by its key, with a model or the same one. */
-    regenerate: (parent: string | null, model: ModelRef | null) =>
-      regenerating.mutate({ parent, model }),
+    regenerate: (parent: string | null, model: ModelRef | null) => regenerate({ parent, model }),
     regenerating: regenerating.isPending,
-    stop: (replyRkey: string) => stopping.mutate(replyRkey),
+    stop: (replyRkey: string) => stop(replyRkey),
     /** How the last regeneration or stop went, for the conversation's one alert. */
     outcome: { error: outcome.error, submittedAt: outcome.submittedAt },
   }

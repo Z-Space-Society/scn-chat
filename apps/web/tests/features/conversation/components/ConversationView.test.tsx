@@ -5,12 +5,30 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MeContext } from '../../../../src/features/auth/session.ts'
 import { BusyBanner } from '../../../../src/features/conversation/components/BusyBanner.tsx'
 import { ConversationView } from '../../../../src/features/conversation/components/ConversationView.tsx'
+import type * as messageView from '../../../../src/features/conversation/components/MessageView.tsx'
 import type { StoreClient } from '../../../../src/store/client.ts'
 import type { HandoverState } from '../../../../src/store/handover.ts'
 import { StoreProvider } from '../../../../src/store/react.tsx'
 import { FakeEventSource, stubEventSource } from '../../../helpers/event-source.ts'
 import { stubFetch, writes } from '../../../helpers/fetch.ts'
 import { renderAt } from '../../../helpers/router.tsx'
+
+/** How often each message has rendered, by rkey. */
+const messageRenders = vi.hoisted(() => new Map<string, number>())
+vi.mock(
+  '../../../../src/features/conversation/components/MessageView.tsx',
+  async (importOriginal) => {
+    const actual = await importOriginal<typeof messageView>()
+    return {
+      ...actual,
+      MessageView: (props: messageView.MessageViewProps) => {
+        const rkey = props.rkey ?? ''
+        messageRenders.set(rkey, (messageRenders.get(rkey) ?? 0) + 1)
+        return actual.MessageView(props)
+      },
+    }
+  },
+)
 
 const d = (name: string) => `network.sharedcomputer.chat.defs#${name}`
 const text = (value: string) => ({
@@ -295,6 +313,25 @@ describe('ConversationView', () => {
     await vi.waitFor(() => expect(fetch).toHaveBeenCalled())
     // It glides there, to where the last screen of the conversation shows.
     await vi.waitFor(() => expect(scroller.scrollTop).toBe(600))
+  })
+
+  it('renders again only the message that changed when a reply finishes', async () => {
+    const first = [user('u', 'question'), reply('u.r0', 'answer', 'u')]
+    const store = fakeStore([
+      ...first,
+      user('v', 'again', 'u.r0'),
+      reply('v.r0', '', 'v', 'pending'),
+    ])
+    await renderWith(store, <ConversationView skey="s1" />)
+    await screen.findByText('again')
+    await act(async () => {})
+    messageRenders.clear()
+    act(() =>
+      store.update([...store.data.messages.slice(0, 3), reply('v.r0', 'second answer', 'v')]),
+    )
+    await screen.findByText('second answer')
+    expect(messageRenders.get('v.r0')).toBeGreaterThan(0)
+    for (const rkey of ['u', 'u.r0', 'v']) expect(messageRenders.get(rkey)).toBeUndefined()
   })
 
   it('syncs and shows a message written from another client', async () => {
