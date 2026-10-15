@@ -8,11 +8,11 @@ This in an AI assistant chat app that uses the users' spaces-enabled PDS as a so
 
 ## The web app
 
-The web app uses Hono server, listing on port 3000 by default. It runs [TanStack Start](https://tanstack.com/start) inside of the Hono process.
+The web app uses Hono server, listening on port 3000 by default. It runs [TanStack Start](https://tanstack.com/start) inside of the Hono process. When the app runs on your own machine with a loopback `PUBLIC_URL` and the port is taken, the server moves to the next free port and `PUBLIC_URL` with it. A deployment keeps its port, since a reverse proxy points at it.
 
 Code is grouped by feature in `src/features/`, and `src/routes/` maps each URL to a feature's page.
 
-Each route's loader fetches the server data its page needs, and the page reads it with `useSuspenseQuery`, so a page renders with its data and a failed load shows inside the page's layout with a Retry. Chats are the exception: they come from the browser's local copy in `src/store/`, not from loaders. Message parts are drawn by the views in `src/parts/`, looked up by part type, and tool calls by the views in `src/parts/tools/`, looked up by tool name, and `src/shared/` holds what features share, like the form kit in `form.tsx` that every form is built with.
+Each route's loader fetches the server data its page needs, and the page reads it with `useSuspenseQuery`, so a page renders with its data and a failed load shows inside the page's layout with a Retry. Chats are the exception: they come from the browser's local copy in `src/store/`, not from loaders. Features reach that copy only through the store's hooks, such as `useRefreshConversation` and `useSyncIndex`, never its worker. The open conversation is `useChat` in `features/conversation/chat.ts`, shaped like the AI SDK's `useChat` but without a message list of its own: its messages come from the local copy, and the reply follower in `reply-follower.ts` shows each pending reply's stream until its record arrives. Message parts are drawn by the views in `src/parts/`, looked up by part type, and tool calls by the views in `src/parts/tools/`, looked up by tool name, and `src/shared/` holds what features share, like the form kit in `form.tsx` that every form is built with.
 
 The look comes from one file of design tokens, `src/styles/theme.css`, and each component styles itself with Tailwind utilities that can only name those tokens, since the theme clears Tailwind's own palette and scales. A look used in more than one place is a component in `src/shared/ui/`, such as `Button` or the settings page kit. Light and dark follow the system, or a choice kept on the device in Preferences. Replies render through Streamdown, with code highlighted in the theme's colors. The styling spec has the rules.
 
@@ -27,9 +27,9 @@ The goal is to keep users in control of their own chat data. The server should n
 ## Sending a message
 
 1. The web app posts the message to `POST /api/conversations/:skey/messages` (`apps/server/src/turns/routes.ts`).
-2. The server writes the user's `message` record to the PDS and asks for a reply by setting the `generation` field.
-3. When the server sees the request, it writes a `pending` AI-assistant record with a key derived from the user message to prevent two servers or two tabs answering the same request.
-4. The task runner sends the reply as a stream using the [Vercel AI SDK](https://github.com/vercel/ai). Nothing is written to the PDS until the assistant response is streaming.
+2. The route calls the turn runner's `send` (`apps/server/src/turns/runner.ts`), which writes the user's `message` record to the PDS and asks for a reply by setting the `generation` field. The convention every client follows to ask for a reply lives in `turns/request.ts`.
+3. When the server sees the request, it writes a `pending` AI-assistant record with a key derived from the user message, `<key>.r<attempt>`, with a create-only call, to prevent two servers or two tabs answering the same request.
+4. The runner generates the reply with the [Vercel AI SDK](https://github.com/vercel/ai), smoothed to a word at a time, and streams it to the browser over server-sent events. Nothing more is written to the PDS while it streams.
 5. When the model finishes its response it overwrites the pending record with the completed reply. `turn:after` hooks are then run which is where the `titles` plugin can write the chat title.
 
 See [specs/chat-turns.md](../specs/chat-turns.md) for more details.
@@ -50,6 +50,8 @@ All chat storage is routed through our `RecordStore` interface that's a represen
 
 - `SpaceRecordStore` calls the user's PDS.
 - `LocalRecordStore` uses the server's database, for users whose PDS doesn't support spaces.
+
+Blobs, such as attachments and large tool output, follow the same split, with `SpaceBlobStore` and `LocalBlobStore`. Each user's `ChatService` (`apps/server/src/storage/chat-service.ts`) sits on top of their record store and blob store and implements the chat operations, such as creating a conversation or writing a message. `createChatServices` is the one place that picks the spaces or local backends, so removing the fallback means deleting its two adapters and that choice.
 
 ### Choosing the storage mode
 

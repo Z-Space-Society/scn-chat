@@ -210,7 +210,7 @@ See [`plugins/pdf-text`](../plugins/pdf-text/src/index.ts) as an example.
 
 If `userSettings` is configured users will see a settings form for the plugin on the settings page, generated from the defined zod schema.
 
-- **Secrets:** Mark a field with `.meta({ secret: true })` to store it encrypted.
+- **Secrets:** Mark a field with `.meta({ secret: true })` to store it encrypted. A secret the server can no longer decrypt, as after a lost `SECRET_KEY`, reads as unset, and the form asks the user to enter it again, so handle a missing secret. Top-level fields of `optionsSchema` can be secret too, and behave the same way in the admin area.
 - **Labels and units:** `.meta({ title, description })` names a field and says what it is for, and a number's `.meta({ unit })`, such as `'seconds'`, shows after its field. A string with `.meta({ multiline: true })` is a textarea.
 - **Conditional fields:** Add a [JSON Forms rule](https://jsonforms.io/docs/uischema/rules) to a field with `.meta({ rule })` to show, hide, enable, or disable it based on another field's value. Conditions support `const`, `enum`, `not`, and `minLength`.
 - **Reading settings:** `ctx.userSettings(user)` returns the user's settings.
