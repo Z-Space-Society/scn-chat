@@ -75,7 +75,7 @@ interface SourcesProps {
  */
 function Sources(props: SourcesProps) {
   return (
-    <section aria-label="Sources" className="mt-3.5">
+    <section aria-label="Sources" className="my-3.5">
       <details data-sources className="group/sources details-unfold">
         <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-small bg-well px-2.25 py-1 font-medium text-caption text-ink transition-colors duration-(--dur-feedback) hover:bg-accent-soft [&::-webkit-details-marker]:hidden">
           <LinkIcon className="size-3.5 flex-none text-muted" />
