@@ -426,7 +426,7 @@ describe('MessageView', () => {
     expect(screen.getByText('Stopped')).toBeInTheDocument()
   })
 
-  it('shows images inline and files by name', () => {
+  it('shows images inline', () => {
     render(
       <MessageView
         blobUrl={blobUrl}
@@ -440,14 +440,92 @@ describe('MessageView', () => {
                 image: { ref: { $link: 'img1' }, mimeType: 'image/png' },
                 alt: 'a cat',
               },
-              { $type: d('filePart'), file: { ref: { $link: 'pdf1' } }, name: 'report.pdf' },
             ],
           },
         }}
       />,
     )
     expect(screen.getByAltText('a cat')).toHaveAttribute('src', '/blob/img1')
-    expect(screen.getByRole('link', { name: 'report.pdf' })).toHaveAttribute('href', '/blob/pdf1')
+  })
+
+  it('shows a file as a card with its kind and size, opening a PDF in a new tab and downloading anything else', () => {
+    render(
+      <MessageView
+        blobUrl={(cid, type) => `/blob/${cid}${type ? `?type=${type}` : ''}`}
+        record={{
+          role: 'user',
+          content: {
+            $type: d('plainContent'),
+            parts: [
+              {
+                $type: d('filePart'),
+                file: { ref: { $link: 'pdf1' }, mimeType: 'application/pdf', size: 184_000 },
+                name: 'report.pdf',
+              },
+              {
+                $type: d('filePart'),
+                file: { ref: { $link: 'doc1' }, mimeType: 'text/markdown', size: 820 },
+                name: 'notes.md',
+              },
+              {
+                $type: d('filePart'),
+                file: { ref: { $link: 'pdf2' }, mimeType: 'application/pdf', size: 2_400_000 },
+              },
+            ],
+          },
+        }}
+      />,
+    )
+    const pdf = screen.getByRole('link', { name: /report\.pdf/ })
+    expect(pdf).toHaveAttribute('href', '/blob/pdf1?type=application/pdf')
+    expect(pdf).toHaveAttribute('target', '_blank')
+    expect(pdf).toHaveTextContent('PDF · 180 KB')
+    const notes = screen.getByRole('link', { name: /notes\.md/ })
+    expect(notes).toHaveAttribute('href', '/blob/doc1')
+    expect(notes).toHaveAttribute('download', 'notes.md')
+    expect(notes).not.toHaveAttribute('target')
+    expect(notes).toHaveTextContent('MD · 820 B')
+    expect(screen.getByRole('link', { name: /Attached file/ })).toHaveTextContent('PDF · 2.3 MB')
+  })
+
+  it('gathers files side by side into rows, keeping an image between them in its place', () => {
+    const file = (cid: string, name: string) => ({
+      $type: d('filePart'),
+      file: { ref: { $link: cid }, mimeType: 'application/pdf', size: 1000 },
+      name,
+    })
+    render(
+      <MessageView
+        blobUrl={blobUrl}
+        record={{
+          role: 'user',
+          content: {
+            $type: d('plainContent'),
+            parts: [
+              file('a', 'a.pdf'),
+              file('b', 'b.pdf'),
+              {
+                $type: d('imagePart'),
+                image: { ref: { $link: 'img1' }, mimeType: 'image/png' },
+                alt: 'a cat',
+              },
+              file('c', 'c.pdf'),
+            ],
+          },
+        }}
+      />,
+    )
+    const rows = screen.getAllByRole('list', { name: 'Files' })
+    expect(
+      rows.map((row) =>
+        within(row)
+          .getAllByRole('link')
+          .map((link) => link.title),
+      ),
+    ).toEqual([['a.pdf', 'b.pdf'], ['c.pdf']])
+    expect(rows[0]?.compareDocumentPosition(screen.getByAltText('a cat'))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
   })
 
   it('switches between siblings', () => {

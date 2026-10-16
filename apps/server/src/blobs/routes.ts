@@ -8,23 +8,26 @@ import type { ChatServices } from '../storage/services.ts'
 import { BlobNotFound } from './store.ts'
 
 export const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
+/** The types a browser shows in place rather than saves: images, and PDFs in its own viewer. */
+export const INLINE_TYPES = new Set([...IMAGE_TYPES, 'application/pdf'])
 export const MAX_IMAGE_BYTES = 20_000_000
 export const MAX_FILE_BYTES = 50_000_000
 export const MAX_EXTRACTED_BYTES = 20_000_000
 const MAX_NAME_LENGTH = 1024
 
 /**
- * The headers a served blob goes out with: its type, never sniffed, and a download for anything
- * but an image. Its URL names its CID, so its bytes never change and the browser keeps them. The
- * cache is private, since only the signed-in viewer may read it, and varies by cookie, so another
- * account signed in on the same browser asks the server again rather than reading it.
+ * The headers a served blob goes out with: its type, never sniffed, shown in place when the
+ * browser can show it, an image or a PDF in its own viewer, and a download otherwise. Its URL
+ * names its CID, so its bytes never change and the browser keeps them. The cache is private,
+ * since only the signed-in viewer may read it, and varies by cookie, so another account signed in
+ * on the same browser asks the server again rather than reading it.
  */
 export function setBlobHeaders(c: Context, mimeType: string): void {
   c.header('content-type', mimeType)
   c.header('x-content-type-options', 'nosniff')
   c.header('cache-control', 'private, max-age=31536000, immutable')
   c.header('vary', 'Cookie')
-  if (!IMAGE_TYPES.has(mimeType)) c.header('content-disposition', 'attachment')
+  c.header('content-disposition', INLINE_TYPES.has(mimeType) ? 'inline' : 'attachment')
 }
 
 /** Read a request body, bail when we hit `limit`. */
@@ -141,7 +144,7 @@ export function blobRoutes(deps: BlobRoutesDeps) {
       try {
         const blob = await chats.readBlob(c.req.param('skey'), c.req.param('cid'))
         const mimeType =
-          c.req.query('type') && IMAGE_TYPES.has(String(c.req.query('type')))
+          c.req.query('type') && INLINE_TYPES.has(String(c.req.query('type')))
             ? String(c.req.query('type'))
             : blob.mimeType
         setBlobHeaders(c, mimeType)

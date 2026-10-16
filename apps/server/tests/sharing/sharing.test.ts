@@ -307,6 +307,41 @@ describe('shared view', () => {
     expect(new Uint8Array(await res.arrayBuffer())).toEqual(new Uint8Array([7, 7]))
   })
 
+  it('opens a PDF in a shared conversation in the browser under the type the request names', async () => {
+    const h = await setup()
+    const upload = (await h.pds
+      .client('did:plc:alice')
+      .call({ $nsid: 'com.atproto.repo.uploadBlob' }, new Uint8Array([37, 80]) as never, {
+        encoding: 'application/pdf',
+      })) as { blob: { ref: { toString(): string } } }
+    const cid = upload.blob.ref.toString()
+    await h.chats.createMessage(h.skey, '3mmmmmmmmmmm2', {
+      $type: nsid.message,
+      role: 'user',
+      content: {
+        $type: `${nsid.defs}#plainContent`,
+        parts: [
+          {
+            $type: `${nsid.defs}#filePart`,
+            file: { $type: 'blob', ref: { $link: cid }, mimeType: 'application/pdf', size: 2 },
+            name: 'report.pdf',
+          },
+        ],
+      },
+      createdAt: new Date().toISOString(),
+    } as never)
+    await (await h.appFor('did:plc:alice')).put(`/conversations/${h.skey}/sharing`, {
+      mode: 'people',
+      members: [BOB],
+    })
+    const res = await (await h.appFor(BOB)).raw(
+      `/shared/did:plc:alice/${h.skey}/blobs/${cid}?type=application/pdf`,
+    )
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toBe('application/pdf')
+    expect(res.headers.get('content-disposition')).toBe('inline')
+  })
+
   it('returns 401 when signed out', async () => {
     const h = await spacesHarness()
     const app = createApp({

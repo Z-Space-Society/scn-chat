@@ -183,13 +183,34 @@ describe('blob route', () => {
     ).toBe(404)
   })
 
-  it('serves non-image blobs as downloads', async () => {
-    const { upload, app, cookie } = await setup('local')
+  it('serves a PDF inline under the type the request names, for the browser to open', async () => {
+    const { upload, chats, app, cookie } = await setup('space')
     const { body } = await upload(new TextEncoder().encode('%PDF body'), 'application/pdf')
+    const { skey } = await chats.createConversation()
+    await chats.createMessage(skey, '3mmmmmmmmmmm1', {
+      $type: 'network.sharedcomputer.chat.message',
+      role: 'user',
+      content: { $type: 'network.sharedcomputer.chat.defs#plainContent', parts: [body.part] },
+      createdAt: new Date().toISOString(),
+    } as never)
     const cid = (body.part!.file as { ref: { $link: string } }).ref.$link
-    const res = await app.request(`/api/conversations/3aaaaaaaaaaaa/blobs/${cid}`, {
+    const res = await app.request(`/api/conversations/${skey}/blobs/${cid}?type=application/pdf`, {
       headers: { cookie },
     })
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toBe('application/pdf')
+    expect(res.headers.get('content-disposition')).toBe('inline')
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff')
+  })
+
+  it('serves other files as downloads, whatever type the request names', async () => {
+    const { upload, app, cookie } = await setup('local')
+    const { body: pdf } = await upload(new TextEncoder().encode('%PDF body'), 'application/pdf')
+    const cid = (pdf.part!.extracted as { text: { ref: { $link: string } } }).text.ref.$link
+    const res = await app.request(`/api/conversations/3aaaaaaaaaaaa/blobs/${cid}?type=text/html`, {
+      headers: { cookie },
+    })
+    expect(res.headers.get('content-type')).toBe('text/plain')
     expect(res.headers.get('content-disposition')).toBe('attachment')
   })
 })

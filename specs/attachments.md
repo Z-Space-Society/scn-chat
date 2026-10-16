@@ -18,7 +18,7 @@ Vision and PDF support were on the original phase 1 list. Keeping the file bytes
 4. For non-image files, the matching ingester extracts text. The text is stored as a second `text/plain` blob.
 5. The response carries the part to put in the message: an `imagePart`, or a `filePart` with `name` and `extracted: { text, method }`.
 
-`GET /api/conversations/:skey/blobs/:cid` serves one of the signed-in owner's blobs, with its MIME type, `X-Content-Type-Options: nosniff`, `Cache-Control: private, max-age=31536000, immutable` since the URL names the blob's CID, `Vary: Cookie` so another account signed in on the same browser doesn't read it from the cache, and `Content-Disposition: attachment` for anything but images. For spaces users it calls `com.atproto.space.getBlob` for the conversation, and the PDS refuses any blob not referenced from a record in that space. The server passes that refusal on as 404, with no check of its own. For fallback users it serves the file from the owner's blob directory, or 404 when there is none. Shared conversations serve blobs through the sharing spec's route.
+`GET /api/conversations/:skey/blobs/:cid` serves one of the signed-in owner's blobs, with its MIME type, `X-Content-Type-Options: nosniff`, `Cache-Control: private, max-age=31536000, immutable` since the URL names the blob's CID, `Vary: Cookie` so another account signed in on the same browser doesn't read it from the cache, and `Content-Disposition: inline` for an image or a PDF, so the browser shows it, a PDF in its own viewer, and `attachment` for anything else. For spaces users it calls `com.atproto.space.getBlob` for the conversation, and the PDS refuses any blob not referenced from a record in that space. The server passes that refusal on as 404, with no check of its own. For fallback users it serves the file from the owner's blob directory, or 404 when there is none. Shared conversations serve blobs through the sharing spec's route.
 
 The web UI includes the returned parts in the message it sends. The server does not track which blobs a user uploaded. For spaces users, the PDS rejects a record that references a blob the account never uploaded, and for fallback users a blob either exists in the owner's directory or does not.
 
@@ -81,13 +81,14 @@ When the chat-turns spec builds the model's messages:
 - Fallback-mode blobs use the same CID scheme as a PDS, so migration to a spaces PDS keeps blob references valid.
 - Spaces users' blobs are fetched from their PDS on every turn that needs them, with no server-side cache, keeping the PDS the only store of their attachments.
 - A failed ingestion returns 422 with the ingester's message.
-- The blob routes take an optional `type` query parameter naming an image MIME type, because a PDS's `getBlob` does not report the type.
+- The blob routes take an optional `type` query parameter naming an image MIME type or `application/pdf`, because a PDS's `getBlob` does not report the type. Any other type it names is ignored, so a request can never have a blob served inline as, say, HTML.
 - Local blobs keep their MIME type and size in a small JSON file beside the bytes.
 
 ## Acceptance Criteria
 
 - [ ] Uploading a PNG returns an `imagePart` whose blob can be fetched back through the conversation's blob route once the message is sent.
 - [ ] The blob route returns 404 for a CID not referenced in the conversation, and for another user's conversation.
+- [ ] The blob route serves a PDF inline as `application/pdf` when the request names that type, and any other non-image file as a download.
 - [ ] Uploading a PDF with text returns a `filePart` with extracted text stored as a `text/plain` blob, with method `text`.
 - [ ] A PDF without a text layer fails with a message saying it has no text.
 - [ ] An unsupported MIME type is refused with 415.

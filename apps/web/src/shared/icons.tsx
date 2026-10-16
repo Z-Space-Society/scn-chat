@@ -469,6 +469,12 @@ const SoftArrowRight = createLucideIcon('soft-arrow-right', [
   ['path', { d: 'm13 7 5 5-5 5', key: 'head' }],
 ])
 
+/** An arrow up and out of the line, for what opens in a new tab, as short as the soft arrows. */
+const SoftArrowOut = createLucideIcon('soft-arrow-out', [
+  ['path', { d: 'M8 16 16 8', key: 'stem' }],
+  ['path', { d: 'M9.5 8H16v6.5', key: 'head' }],
+])
+
 /** A plus with shorter arms than Lucide's. */
 const SoftPlus = createLucideIcon('soft-plus', [['path', { d: 'M12 6v12M6 12h12', key: 'plus' }]])
 
@@ -520,6 +526,7 @@ export const ChevronRightIcon = icon(SoftChevronRight, { directional: true })
 export const MoreVerticalIcon = icon(RoundDotsVertical, { filled: true })
 export const ArrowRightIcon = icon(SoftArrowRight, { directional: true })
 export const ArrowLeftIcon = icon(SoftArrowLeft, { directional: true })
+export const ArrowOutIcon = icon(SoftArrowOut, { directional: true })
 export const CheckIcon = icon(SoftCheck)
 export const CopyIcon = icon(PuffyCopy)
 export const DownloadIcon = icon(Download)

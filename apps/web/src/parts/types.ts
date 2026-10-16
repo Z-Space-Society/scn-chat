@@ -11,6 +11,7 @@ export interface Part {
 export interface BlobRef {
   ref: { $link: string }
   mimeType: string
+  size?: number
 }
 
 /** The URL of a blob in the conversation, by its CID. */

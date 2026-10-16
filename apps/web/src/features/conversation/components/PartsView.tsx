@@ -1,6 +1,6 @@
 import { StepsView, viewFor } from '../../../parts/index.ts'
-import { groupParts } from '../../../parts/steps.ts'
-import type { BlobUrl, Part } from '../../../parts/types.ts'
+import { type Block, groupParts } from '../../../parts/steps.ts'
+import { type BlobUrl, kind, type Part } from '../../../parts/types.ts'
 import { ChevronDownIcon, LinkIcon } from '../../../shared/icons.tsx'
 import { plural } from '../../../shared/plural.ts'
 
@@ -15,10 +15,22 @@ interface Props {
   scope?: string
 }
 
+type ContentBlock = Extract<Block, { kind: 'content' }>
+
+const isFile = (block: Block | undefined) =>
+  block?.kind === 'content' && kind(block.part) === 'filePart'
+
+/** The run of files that starts at `start`. */
+function filesFrom(blocks: Block[], start: number): ContentBlock[] {
+  const end = blocks.findIndex((block, i) => i > start && !isFile(block))
+  return blocks.slice(start, end === -1 ? undefined : end) as ContentBlock[]
+}
+
 /**
  * A message's parts in the order they were made, each through its view. The model's work shows
  * only while it is going, gathered into steps, and gives way to the reply once the reply starts.
- * Sources follow behind a quiet count that opens onto them, one to a line, each naming its site.
+ * Files side by side share a row, which wraps toward the message's edge. Sources follow behind a
+ * quiet count that opens onto them, one to a line, each naming its site.
  */
 export function PartsView(props: Props) {
   const { blocks, sources } = groupParts(props.parts)
@@ -41,6 +53,28 @@ export function PartsView(props: Props) {
                 scope={props.scope}
               />
             </div>
+          )
+        }
+        if (isFile(block)) {
+          // A run of files is drawn whole by its first.
+          if (isFile(blocks[i - 1])) return null
+          return (
+            <ul
+              key={block.key}
+              aria-label="Files"
+              className="mb-1.5 flex flex-wrap in-data-[role=user]:justify-end gap-1.5"
+            >
+              {filesFrom(blocks, i).map((file) => {
+                const View = viewFor(file.part)
+                return (
+                  <li key={file.key} className="flex min-w-0">
+                    {View && (
+                      <View part={file.part} record={props.record} blobUrl={props.blobUrl} />
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
           )
         }
         const View = viewFor(block.part)
