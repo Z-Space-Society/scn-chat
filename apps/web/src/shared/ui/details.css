@@ -1,6 +1,10 @@
-/* Opening a <details> unfolds it rather than jumping, where the browser can. */
+/* Opening a <details> unfolds it rather than jumping, where the browser can. The content is its
+   own formatting context, so the margins at its edges stay inside the height that unfolds rather
+   than collapsing out through it, and closing doesn't settle short and then drop them at the end,
+   when the content is hidden. */
 @utility details-unfold {
   &::details-content {
+    display: flow-root;
     block-size: 0;
     overflow-y: clip;
     transition:
