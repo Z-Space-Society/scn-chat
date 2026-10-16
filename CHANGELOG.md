@@ -4,6 +4,8 @@ What changed in each release of SCN Chat, for the people who use it, run it, or 
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-16
+
 ### Added
 
 - A file attached to a message, such as a PDF, shows in the chat as the chip it was in the composer, with its name over its kind and size. A PDF opens in a new tab in the browser's own viewer, and any other file downloads under its name. Several files side by side share a row.
@@ -33,6 +35,7 @@ What changed in each release of SCN Chat, for the people who use it, run it, or 
 
 The first tagged release.
 
-[Unreleased]: https://github.com/Z-Space-Society/scn-chat/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/Z-Space-Society/scn-chat/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Z-Space-Society/scn-chat/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/Z-Space-Society/scn-chat/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Z-Space-Society/scn-chat/releases/tag/v0.1.0
