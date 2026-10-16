@@ -77,7 +77,7 @@ Other parts are ignored. When a stream part carries `providerMetadata`, it is JS
 ### Ending states
 
 - **Complete.** The stream finished normally. Status `complete`.
-- **Error.** The stream yielded an `error` part, or anything in the turn threw. Status `error`, with a short message from the error that never includes API keys or request headers. The partial parts are kept.
+- **Error.** The stream yielded an `error` part, or anything in the turn threw. Status `error`, with a short message from the error that never includes API keys or request headers. The partial parts are kept. A provider that turns a request away with a rate limit or a server error is retried five times, about a minute in all, or after the waits it asks for through `Retry-After`. If it is still rate limited after that, the message says the model provider is limiting requests, in plain words and without naming it. A key that has run out of credit or budget, which OpenAI reports as `insufficient_quota` and LiteLLM as `budget_exceeded`, is not retried. When it is the admin's shared key, the message says the shared key has reached its usage limit and to add their own key under Settings > API keys. When it is the user's own key, it says their key has run out and to add credit to its account or use another key. These messages never name the provider, since users may not know it.
 - **Cancelled.** The abort signal fired. Status `cancelled`, with the partial parts kept.
 - **Too large.** If the final record's JSON is over 900 KB, the largest tool result outputs are uploaded as blobs and referenced from each part's `outputBlob`, and `output` keeps a short summary. If the record is still too large, the turn ends with status `error`.
 
@@ -93,6 +93,7 @@ On startup, the server rewrites any `pending` reply in its own `turn_claim` tabl
 | `delta` | The part index and appended text |
 | `part` | A finished tool call, tool result, or source part |
 | `queued` | The turn is waiting for the rate limit |
+| `retrying` | The provider turned a request away and it will be tried again. The web UI says the provider is busy until the next part arrives |
 | `status` | The final status and error, if any |
 
 The stream closes after `status`. If this server is not running that reply, the stream sends one `status` event with the reply's stored status and closes. The web UI then reads the record through the conversation API. A buffer is dropped a minute after its turn ends.
@@ -149,6 +150,8 @@ The `turns` admin setting, from the admin-settings spec, holds `ratePerMinute`, 
 - [ ] Error and pending replies are left out of the prompt.
 - [ ] Stream parts map to lexicon parts as in the table, with tool input and output JSON-encoded.
 - [ ] A provider error ends the turn with status `error`, a message without secrets, and the partial parts.
+- [ ] A rate limited provider is retried with a `retrying` event each time.
+- [ ] A key out of credit or over its budget is not retried. On the admin's key the message tells the user to add their own key, and on their own key it does not.
 - [ ] Cancelling ends the turn with status `cancelled` and the partial parts.
 - [ ] A turn past the timeout is cancelled.
 - [ ] A final record over 900 KB moves the largest tool outputs into `outputBlob` blobs.

@@ -28,13 +28,19 @@ export function textReply(text: string, options: { whole?: boolean } = {}) {
   ]
 }
 
-/** A model that streams the given parts, recording each prompt it was sent. */
-export function scriptedModel(parts: unknown[], options: { delayMs?: number; fail?: Error } = {}) {
+/**
+ * A model that streams the given parts, recording each prompt it was sent. With `fail`, its calls
+ * throw that error, only the first `failures` of them if given.
+ */
+export function scriptedModel(
+  parts: unknown[],
+  options: { delayMs?: number; fail?: Error; failures?: number } = {},
+) {
   const prompts: unknown[] = []
   const model = new MockLanguageModelV4({
     doStream: async (call) => {
       prompts.push(call.prompt)
-      if (options.fail) throw options.fail
+      if (options.fail && prompts.length <= (options.failures ?? Infinity)) throw options.fail
       return {
         stream: simulateReadableStream({
           chunks: parts as never[],
@@ -118,9 +124,10 @@ export async function turnsHarness(
       'did:plc:admin',
     )
   }
+  const box = new SecretBox(Buffer.alloc(32, 8))
   const catalog = new ModelCatalog({
     db: h.db,
-    box: new SecretBox(Buffer.alloc(32, 8)),
+    box,
     providers,
     rolesOf: async () => ['user'],
     guardedFetch: fetch,
@@ -167,6 +174,8 @@ export async function turnsHarness(
     runner,
     hub,
     catalog,
+    box,
+    provider,
     plugins,
     settings,
     created,
