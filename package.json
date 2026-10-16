@@ -1,6 +1,6 @@
 {
   "name": "scn-chat",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.33.0",
@@ -22,7 +22,8 @@
     "codegen": "pnpm --filter @scn-chat/lexicons codegen",
     "publish-lexicons": "pnpm --filter @scn-chat/lexicons publish-lexicons",
     "migrate": "pnpm --filter @scn-chat/server migrate",
-    "keys": "pnpm --filter @scn-chat/server keys"
+    "keys": "pnpm --filter @scn-chat/server keys",
+    "release": "pnpm --filter @scn-chat/release release"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",

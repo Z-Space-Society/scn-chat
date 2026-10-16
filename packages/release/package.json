@@ -1,0 +1,9 @@
+{
+  "name": "@scn-chat/release",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p .",
+    "release": "node src/release-cli.ts"
+  }
+}

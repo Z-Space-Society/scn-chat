@@ -351,6 +351,8 @@ importers:
         specifier: 4.6.5
         version: 4.6.5
 
+  packages/release: {}
+
   plugins/anthropic:
     dependencies:
       '@ai-sdk/anthropic':
