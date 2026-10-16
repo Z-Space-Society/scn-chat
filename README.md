@@ -40,6 +40,12 @@ SCN Chat is an ATProto AI assistant chat interface allowing users to use their A
 - Web search for models without tool calling, by generating queries before the reply
 - Web fetch through external services such as Firecrawl or Tavily extract, for pages that need JavaScript
 - YouTube transcripts in web fetch
+- Tabs on the Jump to layer for the chat's sources, code blocks, images, and files, each jumping to its reply
+- A library of every image, file, and source across the user's chats, each linking back to its message
+- Continue in a new chat from a message, copying the branch up to it and linking back to where it came from
+- Compare the versions of a reply side by side, as columns, and keep the best one
+- A command palette for chats, messages, and actions, from the browser's local copy
+- Pinned chats, above Today in the chat list, through an optional field on the index entry
 
 ## Getting started
 
