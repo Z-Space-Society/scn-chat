@@ -22,23 +22,15 @@ The overview at the end of this file lists every spec and whether it is active, 
 
 ### Active
 
-- [[api-keys]]
-- [[cron]]
-- [[scn-member-registry]]
+- [[extending]]: the web app made easy to change in a fork, with tables of part and tool views, tool status and steps, message actions as a list with Copy, a Markdown seam with code block copy, smaller components, and a guide in `docs/extending.md`. Phase 3 of the web rebuild, partly built.
 
 ### Planned
-
-The last phase of the web rebuild, its spec written before the phase starts:
-
-- [[extending]]: the web app made easy to change in a fork, with tables of part and tool views, tool status and steps, message actions as a list with Copy, a Markdown seam with code block copy, smaller components, and a guide in `docs/extending.md`. Phase 3 of the web rebuild.
-
-Other features:
 
 - [[encrypted-conversations]]
 
 ### Completed
 
-Phase 1, initial build-out, implemented and tested, awaiting a check against a real spaces PDS:
+Phase 1, initial build-out, implemented and tested against real spaces PDSs:
 
 - [[foundation]]
 - [[plugins]]
@@ -58,6 +50,9 @@ After the initial build-out:
 - [[admin]]
 - [[admin-plugins]]
 - [[admin-settings]]
+- [[api-keys]]
+- [[cron]]
+- [[scn-member-registry]]
 - [[tool-views]]: tool calls shown as what they did, through a table of tool views with one derived status, starting with web search and web fetch. Split out of [[extending]].
 
 Phase 1 of the web rebuild:

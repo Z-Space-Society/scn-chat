@@ -1,6 +1,6 @@
 # Shared Computer Network AI Assistant Chat
 
-SCN Chat is an ATProto AI assistant chat interface allowing users to use their spaces capable PDS to host their chat history.
+SCN Chat is an ATProto AI assistant chat interface allowing users to use their AT Protocol spaces capable PDS to host their chat history.
 
 > **Status:** early development. atproto spaces are in alpha, so expect breaking changes and do not store anything sensitive.
 
@@ -14,8 +14,6 @@ SCN Chat is an ATProto AI assistant chat interface allowing users to use their s
 
 ## Features
 
-Phase 1:
-
 - One-on-one chat with streaming replies
 - Read-only sharing
 - Image attachments for vision models
@@ -24,6 +22,7 @@ Phase 1:
 - Chat history search
 - Web search and page fetch plugins
 - User and admin model configuration
+- Role management
 - Model and thinking effort chosen per message, with model search
 
 ## TODO
@@ -46,7 +45,7 @@ Phase 1:
 
 ### Requirements:
  - Node 22.18 or newer (Node 24 is recommended)
- - pnpm 10
+ - pnpm 10.33 or newer
  - An ATProto account to sign in with.
  - A spaces enabled PDS (currently optional)
 
