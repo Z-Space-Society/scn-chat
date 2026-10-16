@@ -31,6 +31,8 @@ export type ResolvedModel = {
   provider: ModelProvider
   model: LanguageModelV4
   capabilities: Capabilities
+  /** Whether the call runs on the user's own key or the admin's. */
+  source: 'admin' | 'user'
 }
 
 export type CatalogDeps = {
@@ -151,7 +153,7 @@ export class ModelCatalog {
         fetch: endpoint && !provider.allowPrivateNetworks ? this.deps.guardedFetch : undefined,
         session,
       })
-      return { ref, provider, model, capabilities: own.info.capabilities }
+      return { ref, provider, model, capabilities: own.info.capabilities, source: 'user' }
     }
     const admin = (await this.adminModelsFor(did)).find(
       (m) => m.provider === ref.provider && m.id === ref.id,
@@ -165,6 +167,7 @@ export class ModelCatalog {
       provider,
       model: provider.createModel({ modelId: ref.id, session }),
       capabilities: admin.capabilities,
+      source: 'admin',
     }
   }
 }

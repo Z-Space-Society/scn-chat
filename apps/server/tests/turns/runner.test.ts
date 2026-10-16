@@ -6,11 +6,13 @@ import {
   type ToolSource,
   type TurnContext,
 } from '@scn-chat/plugin-api'
+import { APICallError } from 'ai'
 import pino from 'pino'
 import { describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { loadPlugins } from '../../src/plugins/host.ts'
 import { writeToolChoice } from '../../src/plugins/user-tools.ts'
+import { saveCredential } from '../../src/providers/user-credentials.ts'
 import { safeErrorMessage } from '../../src/safe-error.ts'
 import { LocalRecordStore } from '../../src/storage/local-record-store.ts'
 import { ALICE, textContent, userMessage } from '../helpers/spaces.ts'
@@ -615,6 +617,107 @@ describe('TurnRunner.start', () => {
     await h.runner.idle()
     const reply = (await h.messages(skey)).get('3uuuuuuuuuuu1.r0')
     expect(reply).toMatchObject({ status: 'error', error: expect.stringContaining('ECONNREFUSED') })
+  })
+
+  // Provider errors as they arrive, asking for no wait so any retries run at once.
+  const providerError = (statusCode: number, error: Record<string, unknown>) => () =>
+    new APICallError({
+      message: String(error.message),
+      url: 'https://provider.test/v1/chat/completions',
+      requestBodyValues: {},
+      statusCode,
+      responseHeaders: { 'retry-after-ms': '0' },
+      responseBody: JSON.stringify({ error }),
+    })
+  const rateLimited = providerError(429, {
+    message: 'Rate limit reached for requests',
+    type: 'requests',
+    param: null,
+    code: 'rate_limit_exceeded',
+  })
+  const outOfCredit = providerError(429, {
+    message: 'You exceeded your current quota, please check your plan and billing details.',
+    type: 'insufficient_quota',
+    param: null,
+    code: 'insufficient_quota',
+  })
+  const overBudget = providerError(429, {
+    message: 'Budget has been exceeded! Current cost: 5.02, Max budget: 5.0',
+    type: 'budget_exceeded',
+    param: null,
+    code: '429',
+  })
+
+  /** Run one turn against a provider failing its first `failures` calls, on the admin key unless `ownKey`. */
+  async function failingTurn(
+    fail: () => APICallError,
+    options: { failures?: number; ownKey?: boolean } = {},
+  ) {
+    let calls: unknown[] = []
+    const h = await turnsHarness({
+      model: () => {
+        const scripted = scriptedModel(textReply('Hello'), {
+          fail: fail(),
+          failures: options.failures,
+        })
+        calls = scripted.prompts
+        return scripted.model
+      },
+    })
+    if (options.ownKey) {
+      await saveCredential(h.db, h.box, ALICE, h.provider, {
+        apiKey: 'sk-own-key',
+        models: [
+          {
+            id: 'default-model',
+            name: 'Default',
+            capabilities: { vision: true, reasoning: true, tools: true },
+          },
+        ],
+      })
+    }
+    const { skey } = await h.chats.createConversation()
+    await sendUser(h, skey, '3uuuuuuuuuuu1')
+    const events: string[] = []
+    h.hub.subscribe(h.runner.streamKey(ALICE, skey, '3uuuuuuuuuuu1.r0'), (event) =>
+      events.push(event.type),
+    )
+    await h.runner.start(ALICE, skey, '3uuuuuuuuuuu1')
+    await h.runner.idle()
+    return { reply: (await h.messages(skey)).get('3uuuuuuuuuuu1.r0'), events, calls: calls.length }
+  }
+
+  it('retries a rate limited provider past the AI SDK default until the reply comes through', async () => {
+    const { reply } = await failingTurn(rateLimited, { failures: 4 })
+    expect(reply?.status).toBe('complete')
+    expect(partsOf(reply)).toBe('Hello')
+  })
+
+  it('tells the stream before each retry of a rate limited provider', async () => {
+    const { events } = await failingTurn(rateLimited, { failures: 4 })
+    expect(events.slice(0, events.indexOf('part-start'))).toEqual([
+      'retrying',
+      'retrying',
+      'retrying',
+      'retrying',
+    ])
+  })
+
+  it('gives up at once on a key that is out of credit, without telling the stream to wait', async () => {
+    const { calls, events } = await failingTurn(outOfCredit)
+    expect(calls).toBe(1)
+    expect(events).not.toContain('retrying')
+  })
+
+  it('sends users to add their own key when the shared key is over its budget', async () => {
+    const { reply } = await failingTurn(overBudget)
+    expect(reply).toMatchObject({ status: 'error', error: expect.stringContaining('API keys') })
+  })
+
+  it('does not send users to add a key when their own key is out of credit', async () => {
+    const { reply } = await failingTurn(outOfCredit, { ownKey: true })
+    expect(reply?.status).toBe('error')
+    expect(reply?.error).not.toContain('API keys')
   })
 
   it('writes an error reply when the finished reply cannot be written but the error can', async () => {

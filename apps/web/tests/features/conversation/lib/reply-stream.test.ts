@@ -36,6 +36,15 @@ describe('addEvent', () => {
     )
   })
 
+  it('marks a turn waiting on its provider until the next part arrives', () => {
+    const started = addEvent(noParts, { type: 'part-start', index: 0, partType: 'textPart' })
+    const retrying = addEvent(started, { type: 'retrying' })
+    expect(retrying.retrying).toBe(true)
+    expect(
+      addEvent(retrying, { type: 'part-start', index: 1, partType: 'textPart' }).retrying,
+    ).toBe(false)
+  })
+
   it('keeps the final status', () => {
     expect(addEvent(noParts, { type: 'status', status: 'error' }).status).toBe('error')
   })

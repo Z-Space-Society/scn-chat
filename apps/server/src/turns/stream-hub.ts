@@ -3,6 +3,7 @@ import type { StreamEvent } from './accumulator.ts'
 export type HubEvent =
   | StreamEvent
   | { type: 'queued' }
+  | { type: 'retrying' }
   | { type: 'status'; status: string; error?: string }
 
 type Channel = { events: HubEvent[]; listeners: Set<(event: HubEvent) => void>; done: boolean }
