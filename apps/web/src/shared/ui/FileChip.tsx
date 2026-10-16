@@ -42,7 +42,9 @@ const thumbnail =
  * detail, and whatever ends it. It is drawn as a quote is, a well with the quote's corner, and
  * fills what holds it, a list item in the composer or a link in a message, which names it. Inside
  * a link it takes the tint of the sources chip on hover, and inside something marked uploading it
- * breathes.
+ * breathes. Its name and detail are both at medium weight, as a chip's label is, like the sources
+ * chip's, rather than regular like the details under a list item's name, so only the detail's
+ * grey sets the two lines apart.
  */
 export function FileChip(props: Props) {
   return (
@@ -58,9 +60,9 @@ export function FileChip(props: Props) {
           <FileIcon />
         </span>
       )}
-      <span className="flex min-w-0 flex-col leading-tight">
-        <span className="truncate font-medium text-ink-strong">{props.name}</span>
-        <span className="text-caption text-muted tabular-nums">{props.detail}</span>
+      <span className="flex min-w-0 flex-col font-medium leading-tight">
+        <span className="truncate text-ink-strong">{props.name}</span>
+        <span className="text-muted tabular-nums">{props.detail}</span>
       </span>
       {props.end}
     </span>
