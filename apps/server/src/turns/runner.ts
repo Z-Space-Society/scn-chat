@@ -13,7 +13,13 @@ import type { Logger } from '../logger.ts'
 import type { PluginHost } from '../plugins/host.ts'
 import type { PluginRuntime, RuntimeLease } from '../plugins/runtime.ts'
 import { isToolEnabled, readToolChoices } from '../plugins/user-tools.ts'
+import type { ResolvedModel } from '../providers/catalog.ts'
 import { mapEffort } from '../providers/effort.ts'
+import {
+  PROVIDER_RETRIES,
+  providerErrorMessage,
+  withProviderRetries,
+} from '../providers/retries.ts'
 import { safeErrorMessage } from '../safe-error.ts'
 import type { ChatService } from '../storage/chat-service.ts'
 import { InvalidStoredRecord, RecordExists } from '../storage/record-store.ts'
@@ -480,10 +486,11 @@ export class TurnRunner {
     }
     let status: 'complete' | 'error' | 'cancelled' = 'complete'
     let error: string | undefined
+    let resolved: ResolvedModel | undefined
     try {
       if (!model)
         throw new Error('No model selected. Choose a model or set a default in your preferences.')
-      const resolved = await catalog.resolve(did, model, conversationUri)
+      resolved = await catalog.resolve(did, model, conversationUri)
       const branch = branchTo(loaded.messages, userMessage.rkey)
       const requested = generation.tools
       if (requested?.length && !resolved.capabilities.tools)
@@ -519,7 +526,10 @@ export class TurnRunner {
         isUntrusted: (name) => this.isUntrusted(host, name),
       })
       const result = streamText({
-        model: resolved.model,
+        model: withProviderRetries(resolved.model, () =>
+          this.deps.hub.publish(key, { type: 'retrying' }),
+        ),
+        maxRetries: PROVIDER_RETRIES,
         instructions: prompt.instructions || undefined,
         messages,
         tools,
@@ -536,7 +546,7 @@ export class TurnRunner {
         const failure = accumulator.push(chunk)
         if (failure && status !== 'cancelled') {
           status = 'error'
-          error = safeErrorMessage(failure)
+          error = providerErrorMessage(failure, resolved)
         }
       }
       if (controller.signal.aborted && status === 'complete') status = 'cancelled'
@@ -544,7 +554,7 @@ export class TurnRunner {
       if (controller.signal.aborted) status = 'cancelled'
       else {
         status = 'error'
-        error = safeErrorMessage(err)
+        error = providerErrorMessage(err, resolved)
         this.deps.logger.warn({ err, did, skey, replyRkey }, 'turn ended with an error')
       }
     } finally {

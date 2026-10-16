@@ -15,7 +15,8 @@ const streaming = { role: 'assistant', status: 'pending' }
 
 /**
  * The reply streamed so far, step by step, shown until the reply's record arrives. Before anything
- * arrives the reply's header shows it waiting, so this only explains a wait for the rate limit.
+ * arrives the reply's header shows it waiting, so this only explains a wait for the rate limit or
+ * a busy provider.
  */
 export function StreamingReply(props: Props) {
   if (props.reply.queued)
@@ -23,12 +24,19 @@ export function StreamingReply(props: Props) {
       <p className={statusLine}>In line: you have started the most replies allowed this minute.</p>
     )
   return (
-    <PartsView
-      parts={props.reply.parts}
-      record={streaming}
-      live
-      blobUrl={props.blobUrl}
-      scope={props.rkey}
-    />
+    <>
+      <PartsView
+        parts={props.reply.parts}
+        record={streaming}
+        live
+        blobUrl={props.blobUrl}
+        scope={props.rkey}
+      />
+      {props.reply.retrying && (
+        <p role="status" className={statusLine}>
+          The model's provider is busy. Trying again…
+        </p>
+      )}
+    </>
   )
 }

@@ -372,6 +372,17 @@ describe('MessageView', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
+  it('announces a wait on a busy provider below what the reply streamed so far', () => {
+    const text = { $type: d('textPart'), text: 'Here' }
+    const { rerender } = render(
+      <StreamingReply reply={{ ...noParts, parts: [text], retrying: true }} blobUrl={blobUrl} />,
+    )
+    expect(screen.getByText('Here')).toBeVisible()
+    expect(screen.getByRole('status')).toBeInTheDocument()
+    rerender(<StreamingReply reply={{ ...noParts, parts: [text] }} blobUrl={blobUrl} />)
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
   it('shows a pending reply as its model waiting in the header', () => {
     const { container } = render(
       <MessageView

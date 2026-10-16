@@ -47,7 +47,7 @@ export async function* replyEvents(url: string, signal: AbortSignal): AsyncGener
         done = true
         controller.close()
       }
-      for (const type of ['part-start', 'delta', 'part', 'queued', 'status'] as const)
+      for (const type of ['part-start', 'delta', 'part', 'queued', 'retrying', 'status'] as const)
         source.addEventListener(type, (event) => {
           if (done) return
           try {
@@ -86,11 +86,16 @@ export async function* replyEvents(url: string, signal: AbortSignal): AsyncGener
 
 /**
  * A reply streamed so far: its parts in the shape of the final record, in the order the model
- * produced them, whether it waits for the rate limit, and the final status once sent.
+ * produced them, whether it waits for the rate limit or a busy provider, and the final status once sent.
  */
-export type ReplyParts = { parts: Part[]; queued: boolean; status: string | null }
+export type ReplyParts = {
+  parts: Part[]
+  queued: boolean
+  retrying: boolean
+  status: string | null
+}
 
-export const noParts: ReplyParts = { parts: [], queued: false, status: null }
+export const noParts: ReplyParts = { parts: [], queued: false, retrying: false, status: null }
 
 export function addEvent(reply: ReplyParts, event: ReplyEvent): ReplyParts {
   switch (event.type) {
@@ -98,6 +103,8 @@ export function addEvent(reply: ReplyParts, event: ReplyEvent): ReplyParts {
       return { ...reply, status: event.status }
     case 'queued':
       return { ...reply, queued: true }
+    case 'retrying':
+      return { ...reply, retrying: true }
     case 'part-start':
       return setPart(reply, event.index, { $type: `${nsid.defs}#${event.partType}`, text: '' })
     case 'part':
@@ -117,9 +124,9 @@ export function addEvent(reply: ReplyParts, event: ReplyEvent): ReplyParts {
 export const addEvents = (reply: ReplyParts, events: ReplyEvent[]): ReplyParts =>
   events.reduce(addEvent, reply)
 
-/** The reply with one part replaced. A part arriving means the turn has left the queue. */
+/** The reply with one part replaced. A part arriving means the turn is no longer waiting. */
 function setPart(reply: ReplyParts, index: number, part: Part): ReplyParts {
   const parts = [...reply.parts]
   parts[index] = part
-  return { ...reply, parts, queued: false }
+  return { ...reply, parts, queued: false, retrying: false }
 }
