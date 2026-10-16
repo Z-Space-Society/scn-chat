@@ -209,13 +209,56 @@ interface WorkListProps {
   scope?: string
 }
 
-/** A finished reply's steps, every block of them, as one numbered list. */
+/**
+ * A finished reply's steps down a quiet rail: no cards or numbers, just a light dot for each step,
+ * joined to the next by a short soft segment that stops shy of both dots. Each row draws the
+ * segment down to the next row's dot, so the rail follows a step that is open. A dot sits 14px
+ * into its row and 16.4px before it, which the segment is placed by.
+ */
+const rail = 'mt-2.5 flex flex-col gap-0.5 ps-6.5'
+const railRow = cn(
+  'relative py-0.5 pe-3 last:after:hidden',
+  'after:absolute after:-start-[1.0875rem] after:top-[1.375rem] after:-bottom-2 after:w-0.5 after:rounded-full after:bg-line',
+)
+
+interface RailDotProps {
+  step: Step
+  record: Record<string, unknown>
+}
+
+/**
+ * A step's light dot on the rail: green when its tool finished, red when it failed, and grey for
+ * a thought. A failed step also says so in its badge, so the dot is never the only sign.
+ */
+function RailDot(props: RailDotProps) {
+  const status = props.step.kind === 'tool' ? toolStatus(props.step.result, props.record) : null
+  return (
+    <span
+      aria-hidden="true"
+      className="absolute -start-6.5 top-0.75 z-1 flex h-5.5 w-[1.2rem] items-center justify-center"
+    >
+      <span
+        className={cn(
+          'size-2 rounded-full ring-3 ring-panel',
+          status === 'error' || status === 'incomplete'
+            ? 'bg-danger-border'
+            : status === 'done'
+              ? 'bg-accent-border'
+              : 'bg-author-dot',
+        )}
+      />
+    </span>
+  )
+}
+
+/** A finished reply's steps, every block of them, as one list down the rail. */
 export function WorkList(props: WorkListProps) {
   return (
     <div id={props.id} data-steps="work" className="mt-2 text-small">
-      <ol className={cn(timeline, 'mt-0')}>
+      <ol className={rail}>
         {props.steps.map((step) => (
-          <li key={step.key} className={stepRow}>
+          <li key={step.key} className={railRow}>
+            <RailDot step={step} record={props.record} />
             <StepView
               step={step}
               current={false}
