@@ -193,7 +193,7 @@ export function WorkButton(props: WorkButtonProps) {
       aria-expanded={props.open}
       aria-controls={props.open ? props.controls : undefined}
       onClick={props.onToggle}
-      className={cn(action, 'group/work pe-1.5')}
+      className={cn(action, 'group/work pe-1.5 font-medium')}
     >
       {label}
       <ChevronDownIcon className="size-3.25 transition-transform duration-(--dur-layout) ease-out group-aria-expanded/work:rotate-180 motion-reduce:transition-none" />
