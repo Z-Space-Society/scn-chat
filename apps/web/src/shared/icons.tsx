@@ -407,6 +407,16 @@ const RoundQuote = createLucideIcon('round-quote', [
 ])
 
 /**
+ * Lucide's link made puffy, to sit with the bubble letters of the logo: two wide, round halves
+ * tilted on the diagonal, joined by a short bar.
+ */
+const PuffyLink = createLucideIcon('puffy-link', [
+  ['path', { d: 'M10 16.5H8a4.5 4.5 0 0 1 0-9h2', key: 'left', transform: 'rotate(-45 12 12)' }],
+  ['path', { d: 'M14 7.5h2a4.5 4.5 0 0 1 0 9h-2', key: 'right', transform: 'rotate(-45 12 12)' }],
+  ['path', { d: 'M9.5 12h5', key: 'bar', transform: 'rotate(-45 12 12)' }],
+])
+
+/**
  * Lucide's pencil made puffy, to sit with the bubble letters of the logo: a wider barrel with a
  * round end and a rounded point, drawn upright and tilted.
  */
@@ -515,6 +525,7 @@ export const CopyIcon = icon(PuffyCopy)
 export const DownloadIcon = icon(Download)
 export const InfoIcon = icon(SoftInfo)
 export const QuoteIcon = icon(RoundQuote)
+export const LinkIcon = icon(PuffyLink)
 export const SlidersIcon = icon(SoftSliders)
 export const KeyIcon = icon(KeyRound)
 export const PuzzleIcon = icon(Puzzle)

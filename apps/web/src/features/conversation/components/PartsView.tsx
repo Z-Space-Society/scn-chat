@@ -1,7 +1,7 @@
 import { StepsView, viewFor } from '../../../parts/index.ts'
 import { groupParts } from '../../../parts/steps.ts'
 import type { BlobUrl, Part } from '../../../parts/types.ts'
-import { ChevronDownIcon } from '../../../shared/icons.tsx'
+import { ChevronDownIcon, LinkIcon } from '../../../shared/icons.tsx'
 import { plural } from '../../../shared/plural.ts'
 
 interface Props {
@@ -69,19 +69,21 @@ interface SourcesProps {
 }
 
 /**
- * A reply's sources behind their count, which opens onto a numbered list with one source to a
- * line. The list starts closed, so the sources stay out of the way of the reply.
+ * A reply's sources behind their count, a chip shaped like the rows it opens onto: a numbered
+ * list with one source to a line. The list starts closed, so the sources stay out of the way of
+ * the reply.
  */
 function Sources(props: SourcesProps) {
   return (
     <section aria-label="Sources" className="mt-3.5">
       <details data-sources className="group/sources details-unfold">
-        <summary className="-ms-1.5 inline-flex cursor-pointer list-none items-center gap-1 rounded-small px-1.5 py-0.5 text-caption text-muted transition-colors duration-(--dur-feedback) hover:bg-accent-soft hover:text-ink group-open/sources:text-ink [&::-webkit-details-marker]:hidden">
+        <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-small bg-well px-2.25 py-1 font-medium text-caption text-ink transition-colors duration-(--dur-feedback) hover:bg-accent-soft [&::-webkit-details-marker]:hidden">
+          <LinkIcon className="size-3.5 flex-none text-muted" />
           {plural(props.sources.length, { one: '# source', other: '# sources' })}
-          <ChevronDownIcon className="size-3.25 opacity-55 transition-transform duration-(--dur-layout) ease-out group-open/sources:rotate-180 motion-reduce:transition-none" />
+          <ChevronDownIcon className="size-3.25 flex-none opacity-55 transition-transform duration-(--dur-layout) ease-out group-open/sources:rotate-180 motion-reduce:transition-none" />
         </summary>
         {/* A flex item is no list item, so the rows count themselves. */}
-        <ol className="mt-1.5 flex flex-col gap-0.5 [counter-reset:source]">
+        <ol className="mt-2 flex flex-col gap-0.5 [counter-reset:source]">
           {props.sources.map((part) => {
             const View = viewFor(part)
             return (
