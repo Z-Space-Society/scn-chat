@@ -135,7 +135,7 @@ describe('MessageView', () => {
         }}
       />,
     )
-    expect(container.querySelector('details')).toBeNull()
+    expect(container.querySelector('details:not([data-sources])')).toBeNull()
     expect(screen.getByRole('button', { name: 'Thought' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Example' })).toHaveAttribute(
       'href',
@@ -187,42 +187,31 @@ describe('MessageView', () => {
     ).toEqual(['Exampleexample.com', 'other.org'])
   })
 
-  it('folds sources after the first seven behind a badge that shows the rest', async () => {
-    const sourcesOf = (count: number) =>
-      render(
-        <MessageView
-          blobUrl={blobUrl}
-          record={{
-            role: 'assistant',
-            status: 'complete',
-            content: {
-              $type: d('plainContent'),
-              parts: Array.from({ length: count }, (_, i) => ({
-                $type: d('sourcePart'),
-                url: `https://site${i + 1}.test/`,
-                title: `Source ${i + 1}`,
-              })),
-            },
-          }}
-        />,
-      )
-    const eight = sourcesOf(8)
-    let sources = screen.getByRole('region', { name: 'Sources' })
-    expect(within(sources).getAllByRole('listitem')).toHaveLength(8)
-    expect(within(sources).queryByRole('button')).toBeNull()
-    eight.unmount()
-
-    sourcesOf(10)
-    sources = screen.getByRole('region', { name: 'Sources' })
-    expect(sources).toHaveTextContent('10 sources')
-    expect(within(sources).getAllByRole('listitem')).toHaveLength(7)
-    const more = within(sources).getByRole('button', { name: '+3 more' })
-    expect(more).toHaveAttribute('aria-expanded', 'false')
-    await userEvent.click(more)
+  it('keeps its sources behind their count until it is opened', async () => {
+    render(
+      <MessageView
+        blobUrl={blobUrl}
+        record={{
+          role: 'assistant',
+          status: 'complete',
+          content: {
+            $type: d('plainContent'),
+            parts: Array.from({ length: 10 }, (_, i) => ({
+              $type: d('sourcePart'),
+              url: `https://site${i + 1}.test/`,
+              title: `Source ${i + 1}`,
+            })),
+          },
+        }}
+      />,
+    )
+    const sources = screen.getByRole('region', { name: 'Sources' })
+    const details = sources.querySelector('details')
+    expect(details).not.toHaveAttribute('open')
+    await userEvent.click(within(sources).getByText('10 sources'))
+    expect(details).toHaveAttribute('open')
     expect(within(sources).getAllByRole('listitem')).toHaveLength(10)
-    expect(within(sources).getByRole('link', { name: 'Source 8' })).toHaveFocus()
-    await userEvent.click(within(sources).getByRole('button', { name: 'Show less' }))
-    expect(within(sources).getAllByRole('listitem')).toHaveLength(7)
+    expect(within(sources).queryByRole('button')).toBeNull()
   })
 
   it("copies a code block's code", async () => {

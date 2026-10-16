@@ -1,8 +1,7 @@
-import { useId } from 'react'
-import { useFold } from '../../../parts/fold.ts'
 import { StepsView, viewFor } from '../../../parts/index.ts'
 import { groupParts } from '../../../parts/steps.ts'
 import type { BlobUrl, Part } from '../../../parts/types.ts'
+import { ChevronDownIcon } from '../../../shared/icons.tsx'
 import { plural } from '../../../shared/plural.ts'
 
 interface Props {
@@ -19,7 +18,7 @@ interface Props {
 /**
  * A message's parts in the order they were made, each through its view. The model's work shows
  * only while it is going, gathered into steps, and gives way to the reply once the reply starts.
- * Sources follow as numbered badges under a quiet count, each naming its site.
+ * Sources follow behind a quiet count that opens onto them, one to a line, each naming its site.
  */
 export function PartsView(props: Props) {
   const { blocks, sources } = groupParts(props.parts)
@@ -70,46 +69,32 @@ interface SourcesProps {
 }
 
 /**
- * A reply's sources as numbered badges under their count. Past seven, the rest fold behind a
- * badge that shows them, which then closes them again.
+ * A reply's sources behind their count, which opens onto a numbered list with one source to a
+ * line. The list starts closed, so the sources stay out of the way of the reply.
  */
 function Sources(props: SourcesProps) {
-  // The ref apart, since React Compiler takes what holds a ref for one, and leaves this uncompiled.
-  const { list, ...fold } = useFold(props.sources)
-  const id = useId()
   return (
     <section aria-label="Sources" className="mt-3.5">
-      <p className="mb-1.5 text-caption text-muted">
-        {plural(props.sources.length, { one: '# source', other: '# sources' })}
-      </p>
-      {/* A flex item is no list item, so the badges count themselves. */}
-      <ol id={id} ref={list} className="flex flex-wrap gap-1.5 [counter-reset:source]">
-        {fold.shown.map((part) => {
-          const View = viewFor(part)
-          return (
-            <li
-              key={part.url as string}
-              className="inline-flex max-w-88 items-baseline gap-1.5 rounded-small bg-surface px-2.25 py-0.5 text-caption transition-colors duration-(--dur-feedback) [counter-increment:source] before:text-muted before:tabular-nums before:content-[counter(source)] has-[a:hover]:bg-accent-soft"
-            >
-              {View && <View part={part} record={props.record} blobUrl={props.blobUrl} />}
-            </li>
-          )
-        })}
-        {/* The button sits among the badges, but it is not a source, so it is no list item. */}
-        {fold.folds && (
-          <li role="none" className="inline-flex">
-            <button
-              type="button"
-              aria-expanded={fold.open}
-              aria-controls={id}
-              onClick={fold.toggle}
-              className="cursor-pointer rounded-small px-2.25 py-0.5 text-caption text-muted transition-colors duration-(--dur-feedback) hover:bg-accent-soft hover:text-ink focus-visible:text-ink"
-            >
-              {fold.open ? 'Show less' : `+${fold.hidden} more`}
-            </button>
-          </li>
-        )}
-      </ol>
+      <details data-sources className="group/sources details-unfold">
+        <summary className="-ms-1.5 inline-flex cursor-pointer list-none items-center gap-1 rounded-small px-1.5 py-0.5 text-caption text-muted transition-colors duration-(--dur-feedback) hover:bg-accent-soft hover:text-ink group-open/sources:text-ink [&::-webkit-details-marker]:hidden">
+          {plural(props.sources.length, { one: '# source', other: '# sources' })}
+          <ChevronDownIcon className="size-3.25 opacity-55 transition-transform duration-(--dur-layout) ease-out group-open/sources:rotate-180 motion-reduce:transition-none" />
+        </summary>
+        {/* A flex item is no list item, so the rows count themselves. */}
+        <ol className="mt-1.5 flex flex-col gap-0.5 [counter-reset:source]">
+          {props.sources.map((part) => {
+            const View = viewFor(part)
+            return (
+              <li
+                key={part.url as string}
+                className="flex w-fit min-w-0 max-w-full items-baseline gap-1.5 rounded-small bg-well px-2.25 py-1 text-caption transition-colors duration-(--dur-feedback) [counter-increment:source] before:flex-none before:text-muted before:tabular-nums before:content-[counter(source)] has-[a:hover]:bg-accent-soft"
+              >
+                {View && <View part={part} record={props.record} blobUrl={props.blobUrl} />}
+              </li>
+            )
+          })}
+        </ol>
+      </details>
     </section>
   )
 }

@@ -4,8 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 export const foldAt = 7
 
 /**
- * A list of resources, such as a search's results or a reply's sources, cut to its first seven
- * items until opened. A list that would hide only one item shows it instead. Opening it moves focus
+ * A list of resources, such as a search's results, cut to its first seven items until opened. A list that would hide only one item shows it instead. Opening it moves focus
  * to the first link it showed, so the keyboard carries on from where the list was cut.
  */
 export function useFold<T>(items: T[]) {
