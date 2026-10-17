@@ -4,6 +4,8 @@ What changed in each release of SCN Chat, for the people who use it, run it, or 
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-16
+
 ### Changed
 
 - The line under a reply that is waiting, such as "The model's provider is busy. Trying again…" or "Lost the live stream. Checking for the reply…", is in medium weight and breathes as the model's name does while it waits, so it reads as something still going.
@@ -48,7 +50,8 @@ What changed in each release of SCN Chat, for the people who use it, run it, or 
 
 The first tagged release.
 
-[Unreleased]: https://github.com/Z-Space-Society/scn-chat/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Z-Space-Society/scn-chat/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/Z-Space-Society/scn-chat/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Z-Space-Society/scn-chat/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/Z-Space-Society/scn-chat/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Z-Space-Society/scn-chat/releases/tag/v0.1.0
