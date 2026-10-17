@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { AlertIcon, StopIcon } from '../../../shared/icons.tsx'
+import type { MessageRecord } from '../../../shared/message.ts'
 import { Badge } from '../../../shared/ui/Badge.tsx'
 
 /**
@@ -10,7 +11,7 @@ export const statusLine =
   'animate-breathe font-medium text-muted text-ui motion-reduce:animate-none'
 
 interface Props {
-  record: Record<string, unknown>
+  record: MessageRecord
   /** What a failed reply offers beside its error, such as a button to try again. */
   retry?: ReactNode
 }
@@ -26,9 +27,9 @@ export function Status(props: Props) {
           <AlertIcon className="mt-0.5" />
           <div className="min-w-0 flex-1">
             <strong className="font-medium">The reply failed</strong>
-            {Boolean(props.record.error) && (
+            {props.record.error && (
               <p className="mt-0.5 text-danger-muted [overflow-wrap:anywhere]">
-                {props.record.error as string}
+                {props.record.error}
               </p>
             )}
             {props.retry}

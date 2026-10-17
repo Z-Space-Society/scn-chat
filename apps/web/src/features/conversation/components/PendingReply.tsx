@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { formatSeconds } from '../../../parts/step-clock.ts'
 import type { BlobUrl } from '../../../parts/types.ts'
+import type { MessageRecord } from '../../../shared/message.ts'
 import { parseDate } from '../../../shared/time.ts'
 import type { ReplyParts } from '../lib/reply-stream.ts'
 import { useFollowedReply, useReplyStarted } from '../reply-follower.ts'
@@ -92,7 +93,7 @@ function LiveAuthor(props: LiveAuthorProps) {
 interface BodyProps {
   rkey?: string
   /** The pending record, which the part views read as the stream's. */
-  record: Record<string, unknown>
+  record: MessageRecord
   blobUrl: BlobUrl
 }
 
@@ -111,7 +112,7 @@ export function PendingBody(props: BodyProps) {
 interface StreamProps {
   skey: string
   rkey: string
-  record: Record<string, unknown>
+  record: MessageRecord
   blobUrl: BlobUrl
 }
 
@@ -139,7 +140,7 @@ function ReplyStream(props: StreamProps) {
 
 interface StreamingReplyProps {
   reply: ReplyParts
-  record: Record<string, unknown>
+  record: MessageRecord
   blobUrl: BlobUrl
   /** The reply's key, so its steps' times carry over to the finished record. */
   rkey?: string

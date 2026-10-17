@@ -9,13 +9,14 @@ import {
 } from '../../../src/features/conversation/reply-follower.ts'
 import { StoreProvider, useConversation } from '../../../src/store/react.tsx'
 import { FakeEventSource, lastSource, stubEventSource } from '../../helpers/event-source.ts'
+import { messageRecord } from '../../helpers/records.ts'
 import { renderAt } from '../../helpers/router.tsx'
 import { testStore } from '../../helpers/store.ts'
 
-const user: BranchMessage = { rkey: 'u', record: { role: 'user' } }
+const user: BranchMessage = { rkey: 'u', record: messageRecord({ role: 'user' }) }
 const reply = (status: string): BranchMessage => ({
   rkey: 'u.r0',
-  record: { role: 'assistant', parent: 'u', status },
+  record: messageRecord({ parent: 'u', status }),
 })
 
 let follow: (rkey: string) => void

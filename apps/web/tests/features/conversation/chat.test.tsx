@@ -6,6 +6,7 @@ import type { BranchMessage } from '../../../src/features/conversation/lib/branc
 import { StoreProvider } from '../../../src/store/react.tsx'
 import { FakeEventSource, stubEventSource } from '../../helpers/event-source.ts'
 import { stubFetch, writes } from '../../helpers/fetch.ts'
+import { messageRecord } from '../../helpers/records.ts'
 import { renderAt } from '../../helpers/router.tsx'
 import { testStore } from '../../helpers/store.ts'
 
@@ -15,11 +16,15 @@ const text = (value: string) => ({
 })
 const user = (rkey: string, parent?: string): BranchMessage => ({
   rkey,
-  record: { role: 'user', content: { parts: [text('q')] }, ...(parent ? { parent } : {}) },
+  record: messageRecord({
+    role: 'user',
+    content: { parts: [text('q')] },
+    ...(parent ? { parent } : {}),
+  }),
 })
 const reply = (rkey: string, parent: string, status = 'complete'): BranchMessage => ({
   rkey,
-  record: { role: 'assistant', parent, status, content: { parts: [] } },
+  record: messageRecord({ parent, status }),
 })
 
 let chat: ReturnType<typeof useChat>

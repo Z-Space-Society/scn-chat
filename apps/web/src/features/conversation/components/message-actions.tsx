@@ -1,6 +1,7 @@
 import type { ModelRef } from '@scn-chat/lexicons'
 import { type ComponentType, createContext, useContext } from 'react'
 import { PencilIcon, RetryIcon } from '../../../shared/icons.tsx'
+import { isPending } from '../../../shared/message.ts'
 import { action, iconAction } from '../../../shared/ui/actions.ts'
 import { CopyButton } from '../../../shared/ui/CopyButton.tsx'
 import { messageText } from '../../../store/core.ts'
@@ -44,8 +45,7 @@ export interface MessageAction {
 }
 
 const isUser = (message: BranchMessage) => message.record.role === 'user'
-const isPending = (message: BranchMessage) => message.record.status === 'pending'
-const parentOf = (message: BranchMessage) => (message.record.parent as string | undefined) ?? null
+const parentOf = (message: BranchMessage) => message.record.parent ?? null
 const rowsOf = (props: MessageActionProps) =>
   recordRows({
     rkey: props.message.rkey,
@@ -69,13 +69,13 @@ function EditAction(props: MessageActionProps) {
 }
 
 function CopyAction(props: MessageActionProps) {
-  if (isPending(props.message)) return null
+  if (isPending(props.message.record)) return null
   return <CopyButton text={messageText(props.message.record)} icon className={iconAction} />
 }
 
 /** Regenerate a finished reply with the same model. */
 function RegenerateAction(props: MessageActionProps) {
-  if (isUser(props.message) || isPending(props.message)) return null
+  if (isUser(props.message) || isPending(props.message.record)) return null
   return (
     <button
       type="button"
@@ -91,7 +91,7 @@ function RegenerateAction(props: MessageActionProps) {
 
 function StopAction(props: MessageActionProps) {
   const running = useContext(RunningReply)
-  if (isUser(props.message) || !isPending(props.message)) return null
+  if (isUser(props.message) || !isPending(props.message.record)) return null
   if (props.message.rkey === running) return null
   return (
     <button
@@ -112,7 +112,7 @@ function DetailsAction(props: MessageActionProps) {
 
 /** A finished reply's quote, regenerate with another model, and details. */
 function MoreAction(props: MessageActionProps) {
-  if (isUser(props.message) || isPending(props.message)) return null
+  if (isUser(props.message) || isPending(props.message.record)) return null
   return (
     <MoreActions
       elementId={`m-${props.message.rkey}`}

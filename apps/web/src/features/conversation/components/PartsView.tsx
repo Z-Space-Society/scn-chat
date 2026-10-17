@@ -2,12 +2,13 @@ import { StepsView, viewFor } from '../../../parts/index.ts'
 import { type Block, groupParts } from '../../../parts/steps.ts'
 import { type BlobUrl, kind, type Part } from '../../../parts/types.ts'
 import { ChevronDownIcon, LinkIcon } from '../../../shared/icons.tsx'
+import type { MessageRecord } from '../../../shared/message.ts'
 import { plural } from '../../../shared/plural.ts'
 
 interface Props {
   parts: Part[]
   /** The message the parts belong to, which each part's view gets. */
-  record: Record<string, unknown>
+  record: MessageRecord
   /** Whether the reply is still streaming, so its last block of steps is still going. */
   live?: boolean
   blobUrl: BlobUrl
@@ -98,7 +99,7 @@ export function PartsView(props: Props) {
 
 interface SourcesProps {
   sources: Part[]
-  record: Record<string, unknown>
+  record: MessageRecord
   blobUrl: BlobUrl
 }
 

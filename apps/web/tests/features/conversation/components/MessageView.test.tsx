@@ -4,17 +4,19 @@ import { describe, expect, it, vi } from 'vitest'
 import { MessageView } from '../../../../src/features/conversation/components/MessageView.tsx'
 import { StreamingReply } from '../../../../src/features/conversation/components/PendingReply.tsx'
 import { noParts } from '../../../../src/features/conversation/lib/reply-stream.ts'
+import { partsOf } from '../../../../src/shared/message.ts'
+import { messageRecord } from '../../../helpers/records.ts'
 
 const d = (name: string) => `network.sharedcomputer.chat.defs#${name}`
 const blobUrl = (cid: string) => `/blob/${cid}`
 /** A reply's record while it streams. */
-const streaming = {
+const streaming = messageRecord({
   role: 'assistant',
   status: 'pending',
   content: { $type: d('plainContent'), parts: [] },
-}
+})
 
-const working = {
+const working = messageRecord({
   role: 'assistant',
   status: 'complete',
   content: {
@@ -26,7 +28,7 @@ const working = {
       { $type: d('textPart'), text: 'Found it' },
     ],
   },
-}
+})
 
 describe('MessageView', () => {
   it('keeps the steps of a finished reply behind a footer button that opens them under it', async () => {
@@ -48,16 +50,16 @@ describe('MessageView', () => {
   })
 
   it('shows a thought as a row with a glimpse of its first line, which opens onto all of it', async () => {
-    const record = {
+    const record = messageRecord({
       ...working,
       content: {
         $type: d('plainContent'),
         parts: [
           { $type: d('reasoningPart'), text: '\n## **Planning** the `search`\n\nThen look closer' },
-          ...working.content.parts.slice(1),
+          ...partsOf(working).slice(1),
         ],
       },
-    }
+    })
     const { container } = render(<MessageView blobUrl={blobUrl} record={record} />)
     await userEvent.click(screen.getByRole('button', { name: 'Thought · lookup' }))
     const thought = container.querySelector('[data-step=reasoning]') as HTMLDetailsElement
@@ -102,7 +104,10 @@ describe('MessageView', () => {
     render(
       <MessageView
         blobUrl={blobUrl}
-        record={{ ...working, model: { provider: 'anthropic', id: 'claude-sonnet-5-5' } }}
+        record={messageRecord({
+          ...working,
+          model: { provider: 'anthropic', id: 'claude-sonnet-5-5' },
+        })}
       />,
     )
     expect(screen.getByText('claude-sonnet-5-5')).toBeInTheDocument()
@@ -128,7 +133,7 @@ describe('MessageView', () => {
     const { container } = render(
       <MessageView
         blobUrl={blobUrl}
-        record={{
+        record={messageRecord({
           role: 'assistant',
           status: 'complete',
           content: {
@@ -138,7 +143,7 @@ describe('MessageView', () => {
               { $type: d('sourcePart'), url: 'https://example.com', title: 'Example' },
             ],
           },
-        }}
+        })}
       />,
     )
     expect(container.querySelector('details:not([data-sources])')).toBeNull()
@@ -153,14 +158,14 @@ describe('MessageView', () => {
     render(
       <MessageView
         blobUrl={blobUrl}
-        record={{
+        record={messageRecord({
           role: 'assistant',
           status: 'complete',
           content: {
             $type: d('plainContent'),
             parts: [{ $type: d('sourcePart'), url: 'https://www.example.com/a/long/path?q=1' }],
           },
-        }}
+        })}
       />,
     )
     const link = screen.getByRole('link', { name: 'example.com' })
@@ -171,7 +176,7 @@ describe('MessageView', () => {
     render(
       <MessageView
         blobUrl={blobUrl}
-        record={{
+        record={messageRecord({
           role: 'assistant',
           status: 'complete',
           content: {
@@ -181,7 +186,7 @@ describe('MessageView', () => {
               { $type: d('sourcePart'), url: 'https://other.org/b' },
             ],
           },
-        }}
+        })}
       />,
     )
     const sources = screen.getByRole('region', { name: 'Sources' })
@@ -197,7 +202,7 @@ describe('MessageView', () => {
     render(
       <MessageView
         blobUrl={blobUrl}
-        record={{
+        record={messageRecord({
           role: 'assistant',
           status: 'complete',
           content: {
@@ -208,7 +213,7 @@ describe('MessageView', () => {
               title: `Source ${i + 1}`,
             })),
           },
-        }}
+        })}
       />,
     )
     const sources = screen.getByRole('region', { name: 'Sources' })
@@ -225,14 +230,14 @@ describe('MessageView', () => {
     render(
       <MessageView
         blobUrl={blobUrl}
-        record={{
+        record={messageRecord({
           role: 'assistant',
           status: 'complete',
           content: {
             $type: d('plainContent'),
             parts: [{ $type: d('textPart'), text: 'Run:\n\n```sh\npnpm dev\npnpm check\n```' }],
           },
-        }}
+        })}
       />,
     )
     await user.click(screen.getByRole('button', { name: 'Copy' }))
@@ -244,7 +249,7 @@ describe('MessageView', () => {
     const { container } = render(
       <MessageView
         blobUrl={blobUrl}
-        record={{
+        record={messageRecord({
           role: 'assistant',
           status: 'complete',
           content: {
@@ -256,7 +261,7 @@ describe('MessageView', () => {
               },
             ],
           },
-        }}
+        })}
       />,
     )
     expect(container.querySelector('.markdown strong')).toHaveTextContent('bold')
@@ -268,7 +273,7 @@ describe('MessageView', () => {
     const { container } = render(
       <MessageView
         blobUrl={blobUrl}
-        record={{
+        record={messageRecord({
           role: 'assistant',
           status: 'complete',
           content: {
@@ -280,7 +285,7 @@ describe('MessageView', () => {
               },
             ],
           },
-        }}
+        })}
       />,
     )
     expect(container.querySelector('img')).toBeNull()
@@ -291,14 +296,14 @@ describe('MessageView', () => {
     const { container } = render(
       <MessageView
         blobUrl={blobUrl}
-        record={{
+        record={messageRecord({
           role: 'assistant',
           status: 'complete',
           content: {
             $type: d('plainContent'),
             parts: [{ $type: d('textPart'), text: '![chart](https://example.com/c.png?q=secret)' }],
           },
-        }}
+        })}
       />,
     )
     expect(container.querySelector('img')).toBeNull()
@@ -314,10 +319,10 @@ describe('MessageView', () => {
     render(
       <MessageView
         blobUrl={blobUrl}
-        record={{
+        record={messageRecord({
           role: 'user',
           content: { $type: d('plainContent'), parts: [{ $type: d('textPart'), text: '**raw**' }] },
-        }}
+        })}
       />,
     )
     expect(screen.getByText('**raw**')).toBeInTheDocument()
@@ -327,13 +332,13 @@ describe('MessageView', () => {
     const { container } = render(
       <MessageView
         blobUrl={blobUrl}
-        record={{
+        record={messageRecord({
           role: 'user',
           content: {
             $type: d('plainContent'),
             parts: [{ $type: d('textPart'), text: '> quoted **bit**\n\nAbout this:' }],
           },
-        }}
+        })}
       />,
     )
     const quote = container.querySelector('article blockquote')
@@ -396,12 +401,14 @@ describe('MessageView', () => {
     const { container } = render(
       <MessageView
         blobUrl={blobUrl}
-        record={{
+        record={messageRecord({
           role: 'assistant',
           status: 'pending',
           model: { provider: 'anthropic', id: 'claude-sonnet-5-5' },
           content: { $type: d('plainContent'), parts: [] },
-        }}
+          // Just asked for, so it has waited no whole second yet.
+          createdAt: new Date().toISOString(),
+        })}
       />,
     )
     const header = container.querySelector('header') as HTMLElement
@@ -413,23 +420,23 @@ describe('MessageView', () => {
     const { rerender } = render(
       <MessageView
         blobUrl={blobUrl}
-        record={{
+        record={messageRecord({
           role: 'assistant',
           status: 'error',
           error: 'rate limited',
           content: { $type: d('plainContent'), parts: [] },
-        }}
+        })}
       />,
     )
     expect(screen.getByRole('alert')).toHaveTextContent('rate limited')
     rerender(
       <MessageView
         blobUrl={blobUrl}
-        record={{
+        record={messageRecord({
           role: 'assistant',
           status: 'cancelled',
           content: { $type: d('plainContent'), parts: [] },
-        }}
+        })}
       />,
     )
     expect(screen.getByText('Stopped')).toBeInTheDocument()
@@ -439,7 +446,7 @@ describe('MessageView', () => {
     render(
       <MessageView
         blobUrl={blobUrl}
-        record={{
+        record={messageRecord({
           role: 'user',
           content: {
             $type: d('plainContent'),
@@ -451,7 +458,7 @@ describe('MessageView', () => {
               },
             ],
           },
-        }}
+        })}
       />,
     )
     expect(screen.getByAltText('a cat')).toHaveAttribute('src', '/blob/img1')
@@ -461,7 +468,7 @@ describe('MessageView', () => {
     render(
       <MessageView
         blobUrl={(cid, type) => `/blob/${cid}${type ? `?type=${type}` : ''}`}
-        record={{
+        record={messageRecord({
           role: 'user',
           content: {
             $type: d('plainContent'),
@@ -482,7 +489,7 @@ describe('MessageView', () => {
               },
             ],
           },
-        }}
+        })}
       />,
     )
     const pdf = screen.getByRole('link', { name: /report\.pdf/ })
@@ -506,7 +513,7 @@ describe('MessageView', () => {
     render(
       <MessageView
         blobUrl={blobUrl}
-        record={{
+        record={messageRecord({
           role: 'user',
           content: {
             $type: d('plainContent'),
@@ -521,7 +528,7 @@ describe('MessageView', () => {
               file('c', 'c.pdf'),
             ],
           },
-        }}
+        })}
       />,
     )
     const rows = screen.getAllByRole('list', { name: 'Files' })
@@ -542,7 +549,10 @@ describe('MessageView', () => {
     render(
       <MessageView
         blobUrl={blobUrl}
-        record={{ role: 'assistant', content: { $type: d('plainContent'), parts: [] } }}
+        record={messageRecord({
+          role: 'assistant',
+          content: { $type: d('plainContent'), parts: [] },
+        })}
         siblings={{ index: 1, count: 3, previous: 'a', next: 'c', onPick }}
       />,
     )
@@ -555,7 +565,7 @@ describe('MessageView', () => {
     render(
       <MessageView
         blobUrl={blobUrl}
-        record={{ role: 'user', content: { $type: d('encryptedContent') } }}
+        record={messageRecord({ role: 'user', content: { $type: d('encryptedContent') } })}
       />,
     )
     expect(screen.getByText('This message is encrypted.')).toBeInTheDocument()
@@ -576,14 +586,14 @@ const result = (callId: string, output: unknown, more: Record<string, unknown> =
 })
 /** A finished reply that made these tool parts, with its steps opened from the footer. */
 async function openSteps(parts: object[], status = 'complete') {
-  const record = {
+  const record = messageRecord({
     role: 'assistant',
     status,
     content: {
       $type: d('plainContent'),
       parts: [...parts, { $type: d('textPart'), text: 'Done' }],
     },
-  }
+  })
   const view = render(<MessageView blobUrl={blobUrl} record={record} />)
   const footer = view.container.querySelector('footer') as HTMLElement
   await userEvent.click(within(footer).getByRole('button'))

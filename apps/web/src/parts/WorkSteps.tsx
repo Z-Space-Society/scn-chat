@@ -1,6 +1,7 @@
 import { memo, type ReactNode, type SyntheticEvent, useState } from 'react'
 import { cn } from '../shared/cn.ts'
 import { ChevronDownIcon, ChevronRightIcon } from '../shared/icons.tsx'
+import type { MessageRecord } from '../shared/message.ts'
 import { action } from '../shared/ui/actions.ts'
 import { Badge } from '../shared/ui/Badge.tsx'
 import { Markdown } from './markdown.tsx'
@@ -20,7 +21,7 @@ import type { BlobUrl } from './types.ts'
 interface Props {
   steps: Step[]
   /** The message the steps belong to, whose status tells a tool still running from one cut off. */
-  record: Record<string, unknown>
+  record: MessageRecord
   /** Whether the model is still working in this block, so its last step is the current one. */
   live: boolean
   blobUrl: BlobUrl
@@ -33,7 +34,7 @@ const clockId = (scope: string | undefined, step: Step) =>
   scope ? `${scope}:${step.key}` : undefined
 
 /** What the model is doing right now, from the last step it took. */
-function activity(step: Step | undefined, record: Record<string, unknown>): string {
+function activity(step: Step | undefined, record: MessageRecord): string {
   if (step?.kind === 'reasoning') return 'Thinking…'
   if (step?.kind === 'tool' && toolStatus(step.result, record) === 'running')
     return `${toolEntry(step.call.tool as string).activity}…`
@@ -41,7 +42,7 @@ function activity(step: Step | undefined, record: Record<string, unknown>): stri
 }
 
 /** Whether a step is still going: reasoning still streaming, or a tool waiting for its result. */
-const isRunning = (step: Step, current: boolean, record: Record<string, unknown>) =>
+const isRunning = (step: Step, current: boolean, record: MessageRecord) =>
   step.kind === 'reasoning' ? current : toolStatus(step.result, record) === 'running'
 
 const breathe = 'animate-breathe motion-reduce:animate-none'
@@ -83,7 +84,7 @@ function Elapsed(props: ElapsedProps) {
 
 interface ActivityProps {
   step: Step | undefined
-  record: Record<string, unknown>
+  record: MessageRecord
   scope?: string
 }
 
@@ -204,7 +205,7 @@ export function WorkButton(props: WorkButtonProps) {
 interface WorkListProps {
   id: string
   steps: Step[]
-  record: Record<string, unknown>
+  record: MessageRecord
   blobUrl: BlobUrl
   scope?: string
 }
@@ -223,7 +224,7 @@ const railRow = cn(
 
 interface RailDotProps {
   step: Step
-  record: Record<string, unknown>
+  record: MessageRecord
 }
 
 /**
@@ -276,7 +277,7 @@ export function WorkList(props: WorkListProps) {
 interface StepViewProps {
   step: Step
   current: boolean
-  record: Record<string, unknown>
+  record: MessageRecord
   blobUrl: BlobUrl
   /** The step's clock id, when its reply is known. */
   clock?: string
@@ -397,7 +398,7 @@ function ReasoningLabel(props: ReasoningLabelProps) {
 interface ToolStepProps {
   step: Extract<Step, { kind: 'tool' }>
   status: ToolStatus
-  record: Record<string, unknown>
+  record: MessageRecord
   blobUrl: BlobUrl
   /** Seconds the tool has been running, while it runs. */
   elapsed?: number

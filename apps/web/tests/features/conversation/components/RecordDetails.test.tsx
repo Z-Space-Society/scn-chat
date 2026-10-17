@@ -5,6 +5,7 @@ import {
   DetailsButton,
   recordRows,
 } from '../../../../src/features/conversation/components/RecordDetails.tsx'
+import { messageRecord } from '../../../helpers/records.ts'
 
 describe('RecordDetails', () => {
   it('shows what the record says about a reply, when it was written, and where it lives', async () => {
@@ -12,13 +13,12 @@ describe('RecordDetails', () => {
     const rows = recordRows({
       rkey: 'u.r0',
       storedIn: 'Your PDS',
-      record: {
-        role: 'assistant',
+      record: messageRecord({
         status: 'complete',
         model: { provider: 'anthropic', id: 'claude-sonnet-5-5' },
         usage: { inputTokens: 1200, outputTokens: 80 },
         createdAt,
-      },
+      }),
     })
     render(<DetailsButton rows={rows} />)
     await userEvent.click(screen.getByRole('button', { name: 'Details' }))

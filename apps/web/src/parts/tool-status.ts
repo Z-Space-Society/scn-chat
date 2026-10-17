@@ -1,3 +1,4 @@
+import { isPending, type MessageRecord } from '../shared/message.ts'
 import type { Part } from './types.ts'
 
 /** Where one tool call stands, which its row, badge, timer, and the live line all read. */
@@ -8,7 +9,7 @@ export type ToolStatus = 'running' | 'done' | 'error' | 'incomplete'
  * while its message is still being written, and incomplete once the message stopped, failed, or
  * finished without one.
  */
-export function toolStatus(result: Part | undefined, record: Record<string, unknown>): ToolStatus {
+export function toolStatus(result: Part | undefined, record: MessageRecord): ToolStatus {
   if (result) return result.isError ? 'error' : 'done'
-  return record.status === 'pending' ? 'running' : 'incomplete'
+  return isPending(record) ? 'running' : 'incomplete'
 }

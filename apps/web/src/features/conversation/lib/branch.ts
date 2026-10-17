@@ -1,6 +1,7 @@
 import type { ModelRef } from '@scn-chat/lexicons'
+import type { MessageRecord } from '../../../shared/message.ts'
 
-export type BranchMessage = { rkey: string; record: Record<string, unknown> }
+export type BranchMessage = { rkey: string; record: MessageRecord }
 
 const replyAttempt = (rkey: string) => Number(rkey.match(/\.r(\d+)$/)?.[1] ?? -1)
 
@@ -8,10 +9,7 @@ const replyAttempt = (rkey: string) => Number(rkey.match(/\.r(\d+)$/)?.[1] ?? -1
 function compare(a: BranchMessage, b: BranchMessage): number {
   const attempts = replyAttempt(a.rkey) - replyAttempt(b.rkey)
   if (attempts !== 0 && replyAttempt(a.rkey) >= 0 && replyAttempt(b.rkey) >= 0) return attempts
-  return (
-    (a.record.createdAt as string).localeCompare(b.record.createdAt as string) ||
-    a.rkey.localeCompare(b.rkey)
-  )
+  return a.record.createdAt.localeCompare(b.record.createdAt) || a.rkey.localeCompare(b.rkey)
 }
 
 /** Messages grouped by parent, each group oldest first. Messages without a known parent are roots. */
@@ -19,7 +17,7 @@ export function childrenByParent(messages: BranchMessage[]): Map<string | null, 
   const known = new Set(messages.map((m) => m.rkey))
   const groups = new Map<string | null, BranchMessage[]>()
   for (const message of messages) {
-    const recorded = message.record.parent as string | undefined
+    const recorded = message.record.parent
     const parent = recorded && known.has(recorded) ? recorded : null
     groups.set(parent, [...(groups.get(parent) ?? []), message])
   }
@@ -60,7 +58,7 @@ export function choicesFor(messages: BranchMessage[], rkey: string): Record<stri
   const byKey = new Map(messages.map((m) => [m.rkey, m]))
   const choices: Record<string, string> = {}
   for (let message = byKey.get(rkey); message; ) {
-    const recorded = message.record.parent as string | undefined
+    const recorded = message.record.parent
     const parent = recorded ? byKey.get(recorded) : undefined
     choices[parent ? parent.rkey : ''] = message.rkey
     message = parent
@@ -76,7 +74,7 @@ export function inheritedModel(
   for (let i = branch.findIndex((step) => step.message.rkey === parent); i >= 0; i--) {
     const { record } = (branch[i] as { message: BranchMessage }).message
     if (record.role === 'assistant' && record.status === 'complete' && record.model)
-      return record.model as ModelRef
+      return record.model
   }
   return null
 }

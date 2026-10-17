@@ -5,10 +5,11 @@ import {
   currentBranch,
   inheritedModel,
 } from '../../../../src/features/conversation/lib/branch.ts'
+import { messageRecord } from '../../../helpers/records.ts'
 
 const m = (rkey: string, parent?: string, createdAt = '2026-09-26T00:00:00Z') => ({
   rkey,
-  record: { parent, createdAt },
+  record: messageRecord({ parent, createdAt }),
 })
 
 describe('currentBranch', () => {
@@ -85,7 +86,9 @@ describe('choicesFor', () => {
 const smart = { provider: 'p', id: 'smart' }
 const fast = { provider: 'p', id: 'fast' }
 
-const step = (rkey: string, record: Record<string, unknown>) => ({ message: { rkey, record } })
+const step = (rkey: string, fields: Record<string, unknown>) => ({
+  message: { rkey, record: messageRecord(fields) },
+})
 const user = (rkey: string) => step(rkey, { role: 'user' })
 const reply = (rkey: string, model: object, status = 'complete') =>
   step(rkey, { role: 'assistant', status, model })

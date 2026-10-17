@@ -42,7 +42,7 @@ export function ConversationView(props: Props) {
   const [editingRkey, setEditingRkey] = useState<string | null>(null)
   // Every chat has an info record from its creation, so until it arrives, from the local copy or
   // the PDS, the chat's title and instructions are unknown rather than empty.
-  const title = waiting && !info ? undefined : ((info?.title as string | undefined) ?? 'New chat')
+  const title = waiting && !info ? undefined : (info?.title ?? 'New chat')
   useDocumentTitle(title)
   // The messages there when the chat first loaded, which show at once. Only later ones fade in.
   const [opened, setOpened] = useState<Set<string> | null>(null)
@@ -81,7 +81,7 @@ export function ConversationView(props: Props) {
       <ConversationHeader
         skey={props.skey}
         title={title}
-        instructions={info ? ((info.systemPrompt as string | undefined) ?? '') : undefined}
+        instructions={info ? (info.systemPrompt ?? '') : undefined}
         outline={() => outlineOf(branch)}
         onRename={actions.rename}
         onSetInstructions={actions.setInstructions}
@@ -100,11 +100,7 @@ export function ConversationView(props: Props) {
               actions={(message) => <MessageActions message={message} operations={operations} />}
               // A failed reply tries again with the same model.
               retry={(message) => (
-                <TryAgain
-                  onClick={() =>
-                    regenerate((message.record.parent as string | undefined) ?? null, null)
-                  }
-                />
+                <TryAgain onClick={() => regenerate(message.record.parent ?? null, null)} />
               )}
               arrived={(message) => !opened?.has(message.rkey)}
             />

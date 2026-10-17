@@ -2,6 +2,7 @@ import type { ModelRef } from '@scn-chat/lexicons'
 import { useMutation } from '@tanstack/react-query'
 import { useRef } from 'react'
 import { api, json, read } from '../../shared/api.ts'
+import { isPending } from '../../shared/message.ts'
 import { useConversation, useRefreshConversation } from '../../store/react.tsx'
 import { useBranch } from './hooks/useBranch.ts'
 import { useReplyFollower } from './reply-follower.ts'
@@ -114,7 +115,7 @@ export function useChat(skey: string, options: ChatOptions = {}) {
     /** Why the conversation couldn't be read, if it couldn't. */
     loadError: error,
     /** The reply running at the end of the branch, by key, if one is. */
-    running: leaf?.record.status === 'pending' ? leaf.rkey : null,
+    running: leaf && isPending(leaf.record) ? leaf.rkey : null,
     send,
     /** Ask again for the reply to a user message, by its key, with a model or the same one. */
     regenerate: (parent: string | null, model: ModelRef | null) => regenerate({ parent, model }),

@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react'
+import type { MessageRecord } from '../shared/message.ts'
 import type { ToolStatus } from './tool-status.ts'
 
 /** A message part as stored, in its lexicon's JSON form. */
@@ -20,7 +21,7 @@ export type BlobUrl = (cid: string, mimeType?: string) => string
 export interface PartViewProps {
   part: Part
   /** The message record the part belongs to. */
-  record: Record<string, unknown>
+  record: MessageRecord
   blobUrl: BlobUrl
   /** Whether the part is still being written, as the newest part of a reply that streams. */
   live?: boolean
@@ -37,7 +38,7 @@ export interface ToolViewProps {
   result: Part | undefined
   status: ToolStatus
   /** The message record the call belongs to. */
-  record: Record<string, unknown>
+  record: MessageRecord
   blobUrl: BlobUrl
 }
 

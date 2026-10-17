@@ -1,3 +1,4 @@
+import type { InfoRecord, MessageRecord } from '@scn-chat/lexicons'
 import { nsid } from '@scn-chat/lexicons/nsid'
 import { type SearchResult, search } from './search.ts'
 import type { SqlDb } from './sql.ts'
@@ -26,8 +27,9 @@ export type ChatPage = { chats: ChatListItem[]; next: ChatCursor | null }
 export type TagCount = { tag: string; count: number }
 /** How current the local copy is: when the chat index last synced, and chats left to download. */
 export type SyncStatus = { syncedAt: string | null; remaining: number }
-export type StoredMessage = { rkey: string; author: string; record: Json; cid: string }
-export type Conversation = { skey: string; info: Json | null; messages: StoredMessage[] }
+// The server sends only records valid against the lexicons, so the local copy holds them typed.
+export type StoredMessage = { rkey: string; author: string; record: MessageRecord; cid: string }
+export type Conversation = { skey: string; info: InfoRecord | null; messages: StoredMessage[] }
 
 export type IndexChanges = {
   conversations: (ConversationSummary & { cid: string })[]
@@ -196,10 +198,10 @@ export class StoreCore {
       .map((row) => ({
         rkey: row.rkey,
         author: row.author_did,
-        record: JSON.parse(row.record_json) as Json,
+        record: JSON.parse(row.record_json) as MessageRecord,
         cid: row.cid,
       }))
-    return { skey, info: info ? (JSON.parse(info.record_json) as Json) : null, messages }
+    return { skey, info: info ? (JSON.parse(info.record_json) as InfoRecord) : null, messages }
   }
 
   /** Fetch the chat index, or only its changes since the stored revision. */

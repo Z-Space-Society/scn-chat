@@ -8,6 +8,7 @@ What changed in each release of SCN Chat, for the people who use it, run it, or 
 
 - For forkers: a tab reaches the browser store through `StoreClient.calls`, which has every method of the store's logic, rather than `StoreClient.worker`. Web tests run components over the real store through `testStore` in `apps/web/tests/helpers/store.ts`, rather than hand-built fakes.
 - For forkers: a pending reply is drawn by `PendingReply.tsx` in the conversation feature, which `MessageView` uses while a record is pending, and which follows the conversation `FollowedConversation` names. `MessageView` and `BranchView` no longer take `pending` and `live` slots, and `LiveAuthor.tsx`, `ReplyStream.tsx`, and `StreamingReply.tsx` are gone.
+- For forkers: the web app's message records are typed as the lexicon's `MessageRecord`, from the local copy through `BranchMessage` to the part and tool views, and `src/shared/message.ts` holds what a status means (`isPending`, `isFinished`), a message's parts, and who wrote it.
 
 ## [0.2.1] - 2026-10-16
 

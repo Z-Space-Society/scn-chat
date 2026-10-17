@@ -6,6 +6,7 @@ import {
   useQuery,
 } from '@tanstack/react-query'
 import { useState } from 'react'
+import { isFinished, isPending } from '../../shared/message.ts'
 import { refreshConversation, useRefreshConversation } from '../../store/react.tsx'
 import type { BranchMessage } from './lib/branch.ts'
 import { addEvents, noParts, type ReplyParts, replyEvents } from './lib/reply-stream.ts'
@@ -16,9 +17,6 @@ import { addEvents, noParts, type ReplyParts, replyEvents } from './lib/reply-st
  * views read what has streamed with `useFollowedReply` and `useReplyStarted`, which never start a
  * stream themselves, so each delta rerenders only the views that show it.
  */
-
-/** Statuses after which the reply's record is final. Others mean another server runs the reply. */
-const FINISHED = new Set(['complete', 'error', 'cancelled'])
 
 const POLL_START_MS = 2_000
 const POLL_MAX_MS = 30_000
@@ -32,7 +30,7 @@ const streamQuery = (skey: string, rkey: string) =>
         const url = `/api/conversations/${skey}/messages/${rkey}/stream`
         for await (const events of replyEvents(url, signal)) {
           yield events
-          if (events.some((event) => event.type === 'status' && FINISHED.has(event.status)))
+          if (events.some((event) => event.type === 'status' && isFinished(event.status)))
             void refreshConversation(client, skey)
         }
       },
@@ -56,7 +54,7 @@ const endedStreams = (results: UseQueryResult[]) =>
  */
 export function useReplyFollower(skey: string, messages: BranchMessage[]) {
   const refresh = useRefreshConversation()
-  const pending = messages.filter((m) => m.record.status === 'pending').map((m) => m.rkey)
+  const pending = messages.filter((m) => isPending(m.record)).map((m) => m.rkey)
   const [followed, setFollowed] = useState<string[]>([])
   const follow = (rkey: string) =>
     setFollowed((current) => (current.includes(rkey) ? current : [...current, rkey]))
@@ -107,7 +105,8 @@ export interface FollowedReply {
 /** A followed reply as it streams, rerendering with each delta. */
 export function useFollowedReply(skey: string, rkey: string): FollowedReply {
   const { data, isError } = useQuery({ ...streamQuery(skey, rkey), enabled: false })
-  const elsewhere = Boolean(data?.status && !FINISHED.has(data.status))
+  // A status that isn't final means another server runs the reply.
+  const elsewhere = Boolean(data?.status && !isFinished(data.status))
   return {
     streamed: data ?? null,
     notLive: isError ? 'dropped' : elsewhere ? 'elsewhere' : null,

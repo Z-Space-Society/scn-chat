@@ -26,7 +26,7 @@ interface Props {
 // The ref is kept out of `props`, as in the composer, so React Compiler still memoizes this.
 export function BranchComposer({ ref, ...props }: Props) {
   if (props.editing) {
-    const parent = props.editing.record.parent as string | undefined
+    const parent = props.editing.record.parent
     return (
       <Composer
         // Editing another message starts the composer over from that message.

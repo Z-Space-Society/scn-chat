@@ -60,7 +60,7 @@ export const toolViews: Record<string, ToolEntry> = {
 export const StepsView: StepsView = Steps
 ```
 
-- **Part views** get `{ part, record, blobUrl }`: the part as stored, the message record it belongs to, and the function that builds a blob's URL. A part's type comes from its lexicon, in its JSON form.
+- **Part views** get `{ part, record, blobUrl }`: the part as stored, the message record it belongs to, typed as the lexicon's `MessageRecord`, and the function that builds a blob's URL. What a record's status means, its parts, and who wrote it come from `src/shared/message.ts`. A part's type comes from its lexicon, in its JSON form.
 - **Tool views**, their entries, the default view, and the tool status are [[tool-views]].
 - **Unknown kinds.** A part kind with no view is skipped, as now, so records written by newer clients still show what this one understands.
 - **What stays in `MessageView`.** It keeps the message's layout: the header and sibling controls, the `pending` slot for a pending reply's stream, the list of source links at the end, the status lines, and the actions. Only drawing parts moves into the tables.

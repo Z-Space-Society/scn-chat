@@ -1,14 +1,13 @@
-import type { ModelRef } from '@scn-chat/lexicons'
+import type { Usage } from '@scn-chat/lexicons'
 import { useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '../../../shared/cn.ts'
 import { InfoIcon } from '../../../shared/icons.tsx'
+import type { MessageRecord } from '../../../shared/message.ts'
 import { iconAction } from '../../../shared/ui/actions.ts'
 import { floating } from '../../../shared/ui/menu.ts'
 import { useDismiss } from '../../../shared/useDismiss.ts'
 import { usePlacement } from '../../../shared/usePlacement.ts'
-
-type Usage = { inputTokens?: number; outputTokens?: number; reasoningTokens?: number }
 
 const count = (n: number) => n.toLocaleString()
 
@@ -24,7 +23,7 @@ function usageLine(usage: Usage): string | null {
 interface RecordRowsProps {
   /** The message's record key. */
   rkey?: string
-  record: Record<string, unknown>
+  record: MessageRecord
   /** Where the record lives, such as the user's PDS. */
   storedIn?: string
 }
@@ -35,19 +34,16 @@ interface RecordRowsProps {
  */
 export function recordRows(props: RecordRowsProps): [string, string][] {
   const record = props.record
-  const model = (record.model ?? (record.generation as { model?: ModelRef } | undefined)?.model) as
-    | ModelRef
-    | undefined
-  const effort = record.effort ?? (record.generation as { effort?: string } | undefined)?.effort
-  const usage = record.usage ? usageLine(record.usage as Usage) : null
+  const model = record.model ?? record.generation?.model
+  const effort = record.effort ?? record.generation?.effort
+  const usage = record.usage ? usageLine(record.usage) : null
   const rows: [string, string][] = []
   if (model)
     rows.push([record.role === 'user' ? 'Asked for' : 'Model', `${model.provider} / ${model.id}`])
-  if (effort) rows.push(['Effort', String(effort)])
+  if (effort) rows.push(['Effort', effort])
   if (usage) rows.push(['Tokens', usage])
-  if (record.status) rows.push(['Status', String(record.status)])
-  if (record.createdAt)
-    rows.push(['Written', new Date(record.createdAt as string).toLocaleString()])
+  if (record.status) rows.push(['Status', record.status])
+  if (record.createdAt) rows.push(['Written', new Date(record.createdAt).toLocaleString()])
   if (props.rkey) rows.push(['Record key', props.rkey])
   if (props.storedIn) rows.push(['Stored in', props.storedIn])
   return rows
