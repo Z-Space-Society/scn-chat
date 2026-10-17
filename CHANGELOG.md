@@ -4,6 +4,8 @@ What changed in each release of SCN Chat, for the people who use it, run it, or 
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-16
+
 ### Fixed
 
 - A chat left open for a long time no longer keeps a copy of every reply it streamed in memory once the reply is saved.
@@ -61,7 +63,8 @@ What changed in each release of SCN Chat, for the people who use it, run it, or 
 
 The first tagged release.
 
-[Unreleased]: https://github.com/Z-Space-Society/scn-chat/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/Z-Space-Society/scn-chat/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/Z-Space-Society/scn-chat/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/Z-Space-Society/scn-chat/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Z-Space-Society/scn-chat/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/Z-Space-Society/scn-chat/compare/v0.1.0...v0.1.1
