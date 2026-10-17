@@ -7,6 +7,7 @@ What changed in each release of SCN Chat, for the people who use it, run it, or 
 ### Fixed
 
 - A chat left open for a long time no longer keeps a copy of every reply it streamed in memory once the reply is saved.
+- A long code block streaming into a reply uses about half the CPU it did, since each new character no longer re-renders and re-lays out every line above it.
 
 ### Changed
 

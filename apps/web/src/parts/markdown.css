@@ -115,6 +115,12 @@
       border-radius: var(--radius-card);
     }
 
+    /* Each line is a block of its own, so a line arriving lays out alone, rather than the browser
+       laying out the whole block again for each character a long one streams. */
+    & pre .line {
+      display: block;
+    }
+
     /* A formula holds the hidden MathML that screen readers read, which is placed absolutely, so it
        stays beside the formula rather than stretching the page to wherever the formula sits. */
     & .katex {

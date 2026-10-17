@@ -172,6 +172,41 @@ const Line = memo(function Line(props: LineProps) {
   )
 })
 
+/** How many lines a `LineGroup` holds. */
+const GROUP_SIZE = 32
+
+interface LineGroupProps {
+  lines: string[]
+  /** The lines' tokens, as far as the highlight has reached. */
+  tokens: (ThemedToken[] | undefined)[]
+  /** Whether the group ends the block, so its last line has no newline after it. */
+  last: boolean
+}
+
+const sameGroup = (a: LineGroupProps, b: LineGroupProps) =>
+  a.last === b.last &&
+  a.lines.length === b.lines.length &&
+  a.lines.every((line, i) => line === b.lines[i] && a.tokens[i] === b.tokens[i])
+
+/**
+ * A run of a block's lines, memoized on their text and tokens, so a streaming block rerenders only
+ * its last group as it grows, rather than every line it has, which made a long block's every new
+ * character cost more than the last.
+ */
+const LineGroup = memo(function LineGroup(props: LineGroupProps) {
+  return (
+    <>
+      {props.lines.map((line, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: lines have no identity beyond their place.
+        <span key={i} className="line">
+          <Line text={line} tokens={props.tokens[i]} />
+          {!(props.last && i === props.lines.length - 1) && '\n'}
+        </span>
+      ))}
+    </>
+  )
+}, sameGroup)
+
 interface CodeBlockProps {
   className?: string
   children?: ReactNode
@@ -189,19 +224,23 @@ function CodeBlock(props: CodeBlockProps) {
   const code = String(props.children ?? '').replace(/\n$/, '')
   const result = useHighlight(code, language, incomplete)
   const lines = code.split('\n')
+  const groups: ReactNode[] = []
+  for (let start = 0; start < lines.length; start += GROUP_SIZE) {
+    const end = start + GROUP_SIZE
+    groups.push(
+      <LineGroup
+        key={start}
+        lines={lines.slice(start, end)}
+        tokens={result?.tokens.slice(start, end) ?? []}
+        last={end >= lines.length}
+      />,
+    )
+  }
   return (
     <div className="code-block group/block relative" data-language={language || undefined}>
       {/* Code reads left to right whatever the text around it. */}
       <pre dir="ltr">
-        <code>
-          {lines.map((line, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: lines have no identity beyond their place.
-            <span key={i} className="line">
-              <Line text={line} tokens={result?.tokens[i]} />
-              {i < lines.length - 1 && '\n'}
-            </span>
-          ))}
-        </code>
+        <code>{groups}</code>
       </pre>
       {!incomplete && (
         <div className={blockActions}>
