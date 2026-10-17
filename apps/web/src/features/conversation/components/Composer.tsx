@@ -150,8 +150,7 @@ export function Composer({ ref, ...props }: ComposerProps) {
       // runs there is nothing finished to answer. The cache knows of a send at once, before the
       // composer rerenders, so a second Enter right after the first is caught too.
       const onItsWay = queryClient.isMutating({ mutationKey: sendKey }) > 0
-      if (onItsWay || props.onStop || props.waiting || blocked || attachments.uploading || empty)
-        return
+      if (!canSend || onItsWay || props.onStop) return
       attachments.clearError()
       sending.mutate(value)
     },
@@ -186,6 +185,9 @@ export function Composer({ ref, ...props }: ComposerProps) {
   const blocked = noModels || needsModel
   // Nothing to send: no text but spaces, no quotes, and no attachments.
   const empty = !hasText && quotes.length === 0 && attachments.attachments.length === 0
+  // Send is disabled, and submitting does nothing, for the same reasons, so a new reason not to
+  // send goes here rather than in either alone.
+  const canSend = !(empty || blocked || props.waiting || attachments.uploading || sending.isPending)
   const { data: types, error: typesError } = useQuery(attachmentTypesQuery)
   const accept = types && acceptedTypes(types, seesImages)
 
@@ -371,9 +373,7 @@ export function Composer({ ref, ...props }: ComposerProps) {
             ) : (
               <SendButton
                 title={props.onCancel ? 'Send as a new version' : 'Send'}
-                disabled={
-                  empty || blocked || props.waiting || attachments.uploading || sending.isPending
-                }
+                disabled={!canSend}
               />
             )}
           </ComposerToolbar>
