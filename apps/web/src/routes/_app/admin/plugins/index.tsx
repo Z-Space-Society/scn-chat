@@ -3,6 +3,7 @@ import { PluginsAdmin } from '../../../../features/admin/pages/PluginsAdmin.tsx'
 import { adminPluginsQuery } from '../../../../features/admin/queries.ts'
 
 export const Route = createFileRoute('/_app/admin/plugins/')({
+  staticData: { title: 'Plugins' },
   loader: ({ context }) => context.queryClient.query(adminPluginsQuery),
   component: PluginsAdmin,
 })

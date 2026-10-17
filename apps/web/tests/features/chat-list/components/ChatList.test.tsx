@@ -423,6 +423,18 @@ describe('ChatList sidebar', () => {
     expect(JSON.parse(String(tag[1].body))).toEqual({ tags: ['money', '2026'] })
   })
 
+  it("doesn't save an empty title, so the chat can still be titled for it", async () => {
+    const fetch = stubFetch(async () => Response.json({ ok: true }))
+    await renderSidebar()
+    await userEvent.click(screen.getByRole('button', { name: 'More for Taxes' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Rename' }))
+    const title = screen.getByRole('textbox', { name: 'Title' })
+    await userEvent.clear(title)
+    await userEvent.type(title, '   {Enter}')
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    expect(writes(fetch)).toHaveLength(0)
+  })
+
   it('deletes a chat after asking', async () => {
     const fetch = stubFetch(async () => Response.json({ ok: true }))
     const store = await renderSidebar()

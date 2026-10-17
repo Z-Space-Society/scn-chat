@@ -8,6 +8,7 @@ import {
 import { validateUserSearch } from '../../../shared/search-params.ts'
 
 export const Route = createFileRoute('/_app/admin/users')({
+  staticData: { title: 'Users' },
   validateSearch: validateUserSearch,
   loaderDeps: ({ search }) => ({ q: search.q ?? '' }),
   loader: ({ context, deps }) =>

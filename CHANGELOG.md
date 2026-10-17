@@ -7,6 +7,15 @@ What changed in each release of SCN Chat, for the people who use it, run it, or 
 ### Changed
 
 - The line under a reply that is waiting, such as "The model's provider is busy. Trying again…" or "Lost the live stream. Checking for the reply…", is in medium weight and breathes as the model's name does while it waits, so it reads as something still going.
+- Each settings and admin page has its own browser-tab title, such as "API keys · Settings" or "Users · Admin", rather than every page sharing "Settings" or "Admin".
+- Removing someone from a role asks to confirm first.
+
+### Fixed
+
+- Renaming a chat from the sidebar no longer saves an empty title, which kept the chat from ever being titled for you.
+- Password managers no longer fill your password into a plugin's or a key's secret field, where it would replace the saved secret.
+- Phone keyboards no longer capitalize or correct model IDs, handles, base URLs, and slugs as you type them in settings and admin.
+- Add user, Add member, Add model, and Create role stay busy until they finish, so a second click no longer sends them twice.
 
 ## [0.2.0] - 2026-10-16
 

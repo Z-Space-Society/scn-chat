@@ -1,9 +1,10 @@
-import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { noop, useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { api, json, read } from '../../../shared/api.ts'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
 import { lastError } from '../../../shared/errors.ts'
 import { useAppForm } from '../../../shared/form.tsx'
 import { Button } from '../../../shared/ui/Button.tsx'
+import { literalInput } from '../../../shared/ui/controls.tsx'
 import { Item, ItemList, ItemNames, ListLabel } from '../../../shared/ui/ItemList.tsx'
 import { cardAlert, inlineForm, SettingsGroup } from '../../../shared/ui/SettingsPage.tsx'
 import { adminInvitesQuery } from '../queries.ts'
@@ -23,8 +24,9 @@ export function Invites() {
   })
   const form = useAppForm({
     defaultValues: { identifier: '' },
+    // Returning the add keeps Add user busy until it lands. A failure shows under the form.
     onSubmit: ({ value, formApi }) =>
-      add.mutate(value.identifier, { onSuccess: () => formApi.reset() }),
+      add.mutateAsync(value.identifier).then(() => formApi.reset(), noop),
   })
   return (
     <SettingsGroup
@@ -35,7 +37,12 @@ export function Invites() {
         <form.Form className={inlineForm}>
           <form.AppField name="identifier">
             {(field) => (
-              <field.TextField aria-label="Add a user" placeholder="Handle or DID" required />
+              <field.TextField
+                aria-label="Add a user"
+                placeholder="Handle or DID"
+                {...literalInput}
+                required
+              />
             )}
           </form.AppField>
           <form.SubmitButton>Add user</form.SubmitButton>

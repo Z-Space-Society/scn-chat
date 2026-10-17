@@ -3,6 +3,7 @@ import { CronAdmin } from '../../../features/admin/pages/CronAdmin.tsx'
 import { adminCronQuery } from '../../../features/admin/queries.ts'
 
 export const Route = createFileRoute('/_app/admin/cron')({
+  staticData: { title: 'Cron' },
   loader: ({ context }) => context.queryClient.query(adminCronQuery),
   component: CronAdmin,
 })

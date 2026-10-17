@@ -1,4 +1,4 @@
-import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
+import { noop, useMutation, useSuspenseQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { api, json, read } from '../../../shared/api.ts'
 import { cn } from '../../../shared/cn.ts'
@@ -91,7 +91,8 @@ function NewRoleForm() {
   })
   const form = useAppForm({
     defaultValues: { name: '', description: '' },
-    onSubmit: ({ value }) => create.mutate(value),
+    // Returning the create keeps Create role busy until the role's page opens, so it can't be sent twice.
+    onSubmit: ({ value }) => create.mutateAsync(value).catch(noop),
   })
   return (
     <SettingsGroup

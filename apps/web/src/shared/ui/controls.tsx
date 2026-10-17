@@ -14,6 +14,27 @@ export const field =
  */
 export const monoField = 'font-mono text-[length:max(var(--input-floor),var(--text-small))]'
 
+/**
+ * For a field whose text is taken exactly, such as a handle, a URL, or a model ID, which phone
+ * keyboards would otherwise capitalize and correct.
+ */
+export const literalInput = {
+  autoCapitalize: 'off',
+  autoCorrect: 'off',
+  spellCheck: false,
+} as const
+
+/**
+ * For a secret's field. Password managers ignore autocomplete="off" on a password field and would
+ * fill in the user's own password, which would replace the saved secret.
+ */
+export const secretInput = {
+  ...literalInput,
+  autoComplete: 'new-password',
+  'data-1p-ignore': true,
+  'data-lpignore': true,
+} as const
+
 type InputProps = Omit<ComponentProps<'input'>, 'type'>
 
 /**

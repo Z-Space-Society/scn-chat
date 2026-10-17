@@ -4,6 +4,7 @@ import { adminModelsQuery, adminRolesQuery } from '../../../../../features/admin
 import { validateModelSearch } from '../../../../../shared/search-params.ts'
 
 export const Route = createFileRoute('/_app/admin/plugins/$id/model')({
+  staticData: { title: 'Models' },
   validateSearch: validateModelSearch,
   loader: ({ context }) =>
     Promise.all([

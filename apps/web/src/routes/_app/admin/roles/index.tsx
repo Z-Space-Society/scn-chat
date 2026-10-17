@@ -3,6 +3,7 @@ import { RolesAdmin } from '../../../../features/admin/pages/RolesAdmin.tsx'
 import { adminRolesQuery } from '../../../../features/admin/queries.ts'
 
 export const Route = createFileRoute('/_app/admin/roles/')({
+  staticData: { title: 'Roles' },
   loader: ({ context }) => context.queryClient.query(adminRolesQuery),
   component: RolesAdmin,
 })

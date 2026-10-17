@@ -8,6 +8,7 @@ import { useAppForm } from '../../../shared/form.tsx'
 import { KeyIcon, TrashIcon } from '../../../shared/icons.tsx'
 import { plural } from '../../../shared/plural.ts'
 import { Button } from '../../../shared/ui/Button.tsx'
+import { literalInput, secretInput } from '../../../shared/ui/controls.tsx'
 import { ItemList, LinkItem } from '../../../shared/ui/ItemList.tsx'
 import {
   ConfirmButton,
@@ -225,13 +226,7 @@ function AddApiKeyForm() {
           <form.AppField name="apiKey" listeners={clearsListed}>
             {(field) => (
               <Field label="API key" htmlFor="key-secret">
-                <field.TextField
-                  id="key-secret"
-                  type="password"
-                  autoComplete="off"
-                  spellCheck={false}
-                  required
-                />
+                <field.TextField id="key-secret" type="password" {...secretInput} required />
               </Field>
             )}
           </form.AppField>
@@ -253,7 +248,12 @@ function AddApiKeyForm() {
               <form.AppField name="baseUrl" listeners={clearsListed}>
                 {(field) => (
                   <Field label="Base URL" htmlFor="key-base-url">
-                    <field.TextField id="key-base-url" type="url" placeholder="https://host/v1" />
+                    <field.TextField
+                      id="key-base-url"
+                      type="url"
+                      placeholder="https://host/v1"
+                      {...literalInput}
+                    />
                   </Field>
                 )}
               </form.AppField>
@@ -264,7 +264,7 @@ function AddApiKeyForm() {
                     htmlFor="key-slug"
                     hint="Lowercase letters, numbers, and dashes. Your chats name this endpoint's models by it."
                   >
-                    <field.TextField id="key-slug" placeholder="my-endpoint" />
+                    <field.TextField id="key-slug" placeholder="my-endpoint" {...literalInput} />
                   </Field>
                 )}
               </form.AppField>
@@ -287,6 +287,7 @@ function AddApiKeyForm() {
                   <field.TextField
                     id="key-models"
                     placeholder="model-id, another-model"
+                    {...literalInput}
                     className="h-9.25 min-w-0 flex-1"
                   />
                   {provider?.listsModels && (

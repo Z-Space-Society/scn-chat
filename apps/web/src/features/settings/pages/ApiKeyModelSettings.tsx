@@ -9,7 +9,7 @@ import { formKey, useAppForm } from '../../../shared/form.tsx'
 import { ArrowLeftIcon, CloseIcon } from '../../../shared/icons.tsx'
 import { Button, IconButton } from '../../../shared/ui/Button.tsx'
 import { Checklist, ChecklistItem } from '../../../shared/ui/Checklist.tsx'
-import { field } from '../../../shared/ui/controls.tsx'
+import { field, literalInput } from '../../../shared/ui/controls.tsx'
 import { Item, ItemList, ItemNames } from '../../../shared/ui/ItemList.tsx'
 import {
   backLink,
@@ -264,6 +264,7 @@ function AddModels(props: AddModelsProps) {
         <input
           aria-label="Model ID"
           placeholder="Model ID"
+          {...literalInput}
           className={field}
           value={typed}
           onChange={(event) => setTyped(event.target.value)}

@@ -3,6 +3,7 @@ import { PluginAdmin } from '../../../../../features/admin/pages/PluginAdmin.tsx
 import { adminModelsQuery, adminPluginsQuery } from '../../../../../features/admin/queries.ts'
 
 export const Route = createFileRoute('/_app/admin/plugins/$id/')({
+  staticData: { title: 'Plugins' },
   loader: ({ context }) =>
     Promise.all([
       context.queryClient.query(adminPluginsQuery),

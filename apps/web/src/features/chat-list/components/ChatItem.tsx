@@ -59,6 +59,7 @@ export const ChatItem = memo(function ChatItem(props: Props) {
         label="Title"
         placeholder="Title"
         text={props.chat.title ?? ''}
+        required
         toChange={(text) => ({ title: text.trim() })}
         onSaved={changed}
         onCancel={cancel}
@@ -202,6 +203,8 @@ interface EditChatProps {
   placeholder: string
   /** What the field starts from. */
   text: string
+  /** Whether Save waits for something other than spaces, as a title does and tags don't. */
+  required?: boolean
   /** The change to the chat the typed text makes. */
   toChange: (text: string) => { title?: string; tags?: string[] }
   onSaved: () => Promise<void>
@@ -229,6 +232,7 @@ function EditChat(props: EditChatProps) {
         label={props.label}
         placeholder={props.placeholder}
         text={props.text}
+        required={props.required}
         onSave={(text) => saving.mutateAsync(text).catch(noop)}
         onCancel={props.onCancel}
       />
@@ -291,6 +295,7 @@ interface EditFormProps {
   placeholder: string
   /** What the field starts from. */
   text: string
+  required?: boolean
   /** Save the text, resolving once it is saved or has failed. Its caller shows a failure. */
   onSave: (text: string) => Promise<unknown>
   onCancel: () => void
@@ -318,7 +323,14 @@ function EditForm(props: EditFormProps) {
           )}
         </form.AppField>
         <div className="flex gap-1.5">
-          <form.SubmitButton size="small">Save</form.SubmitButton>
+          {/* An empty title isn't saved, since the chat would then never be titled for it. */}
+          <form.Subscribe selector={(state) => props.required && state.values.text.trim() === ''}>
+            {(empty) => (
+              <form.SubmitButton size="small" disabled={empty}>
+                Save
+              </form.SubmitButton>
+            )}
+          </form.Subscribe>
           <Button size="small" onClick={props.onCancel}>
             Cancel
           </Button>

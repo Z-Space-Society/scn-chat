@@ -4,6 +4,7 @@ import { PreferencesSettings } from '../../../features/settings/pages/Preference
 import { preferencesQuery } from '../../../features/settings/queries.ts'
 
 export const Route = createFileRoute('/_app/settings/')({
+  staticData: { title: 'Preferences' },
   // The models are optional: a failure to load them shows in the section.
   loader: ({ context }) =>
     Promise.all([

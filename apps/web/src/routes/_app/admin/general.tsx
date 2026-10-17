@@ -5,6 +5,7 @@ import { adminSettingsQuery } from '../../../features/admin/queries.ts'
 const sections: Section[] = [{ key: 'general' }, { key: 'sessions' }]
 
 export const Route = createFileRoute('/_app/admin/general')({
+  staticData: { title: 'General' },
   loader: ({ context }) => context.queryClient.query(adminSettingsQuery),
   component: () => (
     <SettingsAdmin

@@ -2,7 +2,7 @@ import { type ReactNode, useId, useState } from 'react'
 import { cn } from '../cn.ts'
 import { splitLines } from '../lines.ts'
 import type { Issue } from '../response.ts'
-import { field, Switch } from '../ui/controls.tsx'
+import { field, Switch, secretInput } from '../ui/controls.tsx'
 import { Select } from '../ui/Select.tsx'
 import { dividedRows, SettingRow } from '../ui/SettingsPage.tsx'
 import { applyRule, type FieldRule } from './field-rules.ts'
@@ -254,6 +254,7 @@ function TextInput(props: SchemaInputProps) {
     <input
       id={props.id}
       type={secret ? 'password' : 'text'}
+      {...(secret ? secretInput : undefined)}
       className={cn(field, secret && 'min-w-0 flex-1')}
       disabled={props.disabled || cleared}
       value={String((secret ? props.values[props.name] : props.value) ?? '')}

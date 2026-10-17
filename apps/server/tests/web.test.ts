@@ -101,8 +101,10 @@ describe('server-rendered pages', () => {
   it("keeps someone's own pages out of search engines, titled by page", async () => {
     const html = await (await requestAs(me(), '/settings')).text()
     expect(html).toContain('<meta name="robots" content="noindex"/>')
-    expect(html).toContain('<title>Settings · Test Chat</title>')
-    expect(html).toContain('<meta property="og:title" content="Settings · Test Chat"/>')
+    expect(html).toContain('<title>Preferences · Settings · Test Chat</title>')
+    expect(html).toContain(
+      '<meta property="og:title" content="Preferences · Settings · Test Chat"/>',
+    )
   })
 
   it.each(['/chat/abc', '/settings'])(

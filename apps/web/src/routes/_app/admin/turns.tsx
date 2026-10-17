@@ -12,6 +12,7 @@ const sections: Section[] = [
 ]
 
 export const Route = createFileRoute('/_app/admin/turns')({
+  staticData: { title: 'Turns' },
   loader: ({ context }) => context.queryClient.query(adminSettingsQuery),
   component: () => (
     <SettingsAdmin

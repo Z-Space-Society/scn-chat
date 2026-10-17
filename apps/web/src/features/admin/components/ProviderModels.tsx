@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query'
+import { noop, useMutation } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { api, json, read } from '../../../shared/api.ts'
 import { cn } from '../../../shared/cn.ts'
@@ -8,6 +8,7 @@ import { useAppForm } from '../../../shared/form.tsx'
 import { Badge } from '../../../shared/ui/Badge.tsx'
 import { Button } from '../../../shared/ui/Button.tsx'
 import { Checklist, ChecklistItem } from '../../../shared/ui/Checklist.tsx'
+import { literalInput } from '../../../shared/ui/controls.tsx'
 import { ItemList, LinkItem } from '../../../shared/ui/ItemList.tsx'
 import {
   cardAlert,
@@ -54,17 +55,17 @@ export function ProviderModels(props: Props) {
   })
   const listed = (list.data?.models ?? []).filter((model) => model.provider === props.provider.id)
   // A model a provider lists starts with the user role and the capabilities the list reports.
-  const offer = (
-    model: { id: string; name: string; capabilities: Capabilities },
-    options?: { onSuccess: () => void },
-  ) =>
-    add.mutate({ provider: props.provider.id, ...model, roles: ['user'], default: false }, options)
+  const offer = (model: { id: string; name: string; capabilities: Capabilities }) =>
+    add.mutateAsync({ provider: props.provider.id, ...model, roles: ['user'], default: false })
+  /** Whether that model is on its way in, so a second tick doesn't add it twice. */
+  const adding = (id: string) => add.isPending && add.variables?.id === id
   const offered = new Set(props.models.map((model) => model.id))
   const form = useAppForm({
     defaultValues: { id: '' },
+    // Returning the add keeps Add model busy until it lands. A failure shows under the form.
     onSubmit: ({ value, formApi }) => {
       const id = value.id.trim()
-      offer({ id, name: id, capabilities: noCapabilities }, { onSuccess: () => formApi.reset() })
+      return offer({ id, name: id, capabilities: noCapabilities }).then(() => formApi.reset(), noop)
     },
   })
   const name = props.provider.name
@@ -84,9 +85,13 @@ export function ProviderModels(props: Props) {
               <ChecklistItem
                 key={model.id}
                 checked={offered.has(model.id)}
-                disabled={offered.has(model.id) || !props.provider.hasAdminKey}
+                disabled={offered.has(model.id) || adding(model.id) || !props.provider.hasAdminKey}
                 onChange={() =>
-                  offer({ id: model.id, name: model.name, capabilities: model.capabilities })
+                  void offer({
+                    id: model.id,
+                    name: model.name,
+                    capabilities: model.capabilities,
+                  }).catch(noop)
                 }
               >
                 <ModelName model={model} />
@@ -101,13 +106,12 @@ export function ProviderModels(props: Props) {
                 <field.TextField
                   aria-label={`Model ID for ${name}`}
                   placeholder="Model ID"
+                  {...literalInput}
                   required
                 />
               )}
             </form.AppField>
-            <Button type="submit" disabled={!props.provider.hasAdminKey}>
-              Add model
-            </Button>
+            <form.SubmitButton disabled={!props.provider.hasAdminKey}>Add model</form.SubmitButton>
             {props.provider.listsModels && (
               <Button tone="quiet" busy={list.isPending} onClick={() => list.mutate()}>
                 Refresh model list

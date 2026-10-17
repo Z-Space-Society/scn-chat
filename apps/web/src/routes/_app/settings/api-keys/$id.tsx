@@ -3,6 +3,7 @@ import { ApiKeyModelSettings } from '../../../../features/settings/pages/ApiKeyM
 import { credentialsQuery, providersQuery } from '../../../../features/settings/queries.ts'
 
 export const Route = createFileRoute('/_app/settings/api-keys/$id')({
+  staticData: { title: 'API keys' },
   loader: ({ context }) =>
     Promise.all([
       context.queryClient.query(providersQuery),

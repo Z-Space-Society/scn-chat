@@ -55,10 +55,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   notFoundComponent: () => <Navigate to="/" replace />,
 })
 
-/** The deepest page's title, from its route's static data, before the app's name. */
+/**
+ * The page's titles from its routes' static data, deepest first, before the app's name, so a
+ * section names the area it is in, as "Sync · Settings" and "Sync · Admin" do.
+ */
 function pageTitle(matches: { staticData: { title?: string } }[], appName = '') {
-  const page = matches.findLast((match) => match.staticData.title)?.staticData.title
-  return page ? `${page} · ${appName}` : appName
+  const titles = matches.flatMap((match) => match.staticData.title ?? []).reverse()
+  return [...titles, appName].filter(Boolean).join(' · ')
 }
 
 interface Props {

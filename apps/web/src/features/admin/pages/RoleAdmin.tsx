@@ -1,4 +1,4 @@
-import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
+import { noop, useMutation, useSuspenseQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { api, json, read } from '../../../shared/api.ts'
 import { cn } from '../../../shared/cn.ts'
@@ -8,8 +8,7 @@ import { formKey, useAppForm } from '../../../shared/form.tsx'
 import { ArrowLeftIcon } from '../../../shared/icons.tsx'
 import { splitLines } from '../../../shared/lines.ts'
 import { Badge } from '../../../shared/ui/Badge.tsx'
-import { Button } from '../../../shared/ui/Button.tsx'
-import { monoField } from '../../../shared/ui/controls.tsx'
+import { literalInput, monoField } from '../../../shared/ui/controls.tsx'
 import { Item, ItemList, ItemMark, ItemNames } from '../../../shared/ui/ItemList.tsx'
 import {
   backLink,
@@ -214,8 +213,9 @@ function RoleMembers(props: RoleMembersProps) {
   })
   const form = useAppForm({
     defaultValues: { identifier: '' },
+    // Returning the add keeps Add member busy until it lands. A failure shows under the list.
     onSubmit: ({ value, formApi }) =>
-      addMember.mutate(value.identifier, { onSuccess: () => formApi.reset() }),
+      addMember.mutateAsync(value.identifier).then(() => formApi.reset(), noop),
   })
   const environmentAdmins = name === 'admin' ? props.environmentAdmins : []
   const empty = !props.role.members.length && !environmentAdmins.length
@@ -231,6 +231,7 @@ function RoleMembers(props: RoleMembersProps) {
               <field.TextField
                 aria-label={`Add a member to ${name}`}
                 placeholder="Handle or DID"
+                {...literalInput}
                 required
               />
             )}
@@ -278,9 +279,13 @@ function MemberList(props: MemberListProps) {
         <Item key={member.did}>
           <ItemMark initial>{member.handle?.slice(0, 1).toUpperCase()}</ItemMark>
           <ItemNames title={member.handle ?? member.did} description={memberNote(member)} />
-          <Button tone="quiet" onClick={() => props.onRemove(member.did)}>
-            Remove
-          </Button>
+          {/* Taking someone out of a role, admin above all, shouldn't be one slip away. */}
+          <ConfirmButton
+            quiet
+            label="Remove"
+            question={`Remove ${member.handle ?? member.did} from ${props.role.name}?`}
+            onConfirm={() => props.onRemove(member.did)}
+          />
         </Item>
       ))}
     </ItemList>
