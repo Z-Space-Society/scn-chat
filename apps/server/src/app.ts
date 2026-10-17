@@ -2,7 +2,9 @@ import { randomBytes } from 'node:crypto'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
 import { sql } from 'kysely'
+import { siteConfigRoutes } from './admin/config-routes.ts'
 import { type AdminRoutesDeps, adminRoutes } from './admin/routes.ts'
+import type { SiteConfig } from './admin/site-config.ts'
 import { requireApiKey } from './auth/api-keys.ts'
 import { SessionExpired } from './auth/pds.ts'
 import { ADMIN_ROLE } from './auth/roles.ts'
@@ -76,6 +78,7 @@ export type AppDeps = {
   sync?: SyncRoutesDeps
   admin?: AdminRoutesDeps
   cron?: Cron
+  siteConfig?: SiteConfig
 }
 
 export function createApp(deps: AppDeps) {
@@ -125,6 +128,8 @@ export function createApp(deps: AppDeps) {
         throw err
       }
     })
+  if (deps.siteConfig)
+    api.route('/admin/config', siteConfigRoutes({ db, logger, siteConfig: deps.siteConfig }))
 
   if (deps.auth) api.route('/', authApiRoutes(deps.auth))
   if (deps.plugins) api.route('/plugins', pluginRoutes(deps.plugins))

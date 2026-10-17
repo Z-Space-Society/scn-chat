@@ -11,3 +11,4 @@ coverage/
 .claude/settings.local.json
 data/
 .vscode
+site-config.json

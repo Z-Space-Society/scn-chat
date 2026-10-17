@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto'
 import type { ModelInfo } from '@scn-chat/plugin-api'
 import { InvalidBody } from '../body.ts'
 import type { Db } from '../db/index.ts'
@@ -64,6 +63,44 @@ function splitOptions(
   return { options, secrets }
 }
 
+const RANDOM_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** Rename instances still under the random IDs they were once added with to their plugin's ID. */
+export async function nameInstancesAfterPlugins(
+  db: Db,
+  box: SecretBox,
+  installed: InstalledPlugins,
+  logger: Logger,
+): Promise<void> {
+  const instances = await readInstances(db, box)
+  const taken = new Set(instances.map((instance) => instance.id))
+  for (const instance of instances) {
+    if (!RANDOM_ID.test(instance.id)) continue
+    let id: string
+    try {
+      id = instantiate(installed, instance).id
+    } catch (err) {
+      if (!(err instanceof PluginInstanceError)) throw err
+      logger.info(
+        { instance: instance.id, err },
+        "kept a plugin instance's random ID, since it doesn't load",
+      )
+      continue
+    }
+    if (taken.has(id)) {
+      logger.info(
+        { instance: instance.id, pluginId: id },
+        "kept a plugin instance's random ID, since its plugin ID is taken",
+      )
+      continue
+    }
+    await db.updateTable('plugin_instance').set({ id }).where('id', '=', instance.id).execute()
+    taken.delete(instance.id)
+    taken.add(id)
+    logger.info({ from: instance.id, to: id }, 'plugin instance renamed after its plugin')
+  }
+}
+
 /** Adding, changing, and removing plugin instances, each applied without a restart. */
 export class PluginAdmin {
   private readonly deps: PluginAdminDeps
@@ -124,64 +161,70 @@ export class PluginAdmin {
     })
   }
 
+  /** Add an instance, named after the plugin it makes. */
   async add(pkg: string, input: Record<string, unknown>, adminDid: string): Promise<string> {
     const installed = this.deps.installed.get(pkg)
     if (!installed) throw new InvalidBody(`The plugin package "${pkg}" isn't installed`)
-    const id = randomUUID()
-    const instances = await readInstances(this.deps.db, this.deps.box)
-    if (!installed.multiple && instances.some((instance) => instance.package === pkg))
-      throw new InvalidBody(`${pkg} is already added, and can only be added once`)
-    instances.push({ id, package: pkg, enabled: true, ...splitOptions(installed, input) })
-    await this.apply(instances, id, adminDid)
+    const draft = { id: 'new', package: pkg, enabled: true, ...splitOptions(installed, input) }
+    let id: string
+    try {
+      id = instantiate(this.deps.installed, draft).id
+    } catch (err) {
+      if (err instanceof PluginInstanceError) throw new InvalidBody(err.message, err.issues)
+      throw err
+    }
+    await this.change((instances) => {
+      if (!installed.multiple && instances.some((instance) => instance.package === pkg))
+        throw new InvalidBody(`${pkg} is already added, and can only be added once`)
+      if (instances.some((instance) => instance.id === id))
+        throw new InvalidBody(`An instance of the plugin ${id} is already added`)
+      return { proposed: [...instances, { ...draft, id }], changedId: id }
+    }, adminDid)
     return id
   }
 
   async update(id: string, change: InstanceChange, adminDid: string): Promise<void> {
-    const instances = await readInstances(this.deps.db, this.deps.box)
-    const index = instances.findIndex((instance) => instance.id === id)
-    const instance = instances[index]
-    if (!instance) throw new InstanceNotFound(id)
-    const installed = this.deps.installed.get(instance.package)
-    const split = splitOptions(
-      installed,
-      change.options ?? { ...instance.options },
-      instance.secrets,
-      change.clearSecrets,
-    )
-    instances[index] = {
-      ...instance,
-      ...split,
-      enabled: change.enabled ?? instance.enabled,
-      // Clearing any secret discards the ones that can't be decrypted.
-      unreadableSecrets: change.clearSecrets?.length ? undefined : instance.unreadableSecrets,
-    }
-    await this.apply(instances, id, adminDid)
+    await this.change((instances) => {
+      const index = instances.findIndex((instance) => instance.id === id)
+      const instance = instances[index]
+      if (!instance) throw new InstanceNotFound(id)
+      const installed = this.deps.installed.get(instance.package)
+      const split = splitOptions(
+        installed,
+        change.options ?? { ...instance.options },
+        instance.secrets,
+        change.clearSecrets,
+      )
+      const proposed = [...instances]
+      proposed[index] = {
+        ...instance,
+        ...split,
+        enabled: change.enabled ?? instance.enabled,
+        // Clearing any secret discards the ones that can't be decrypted.
+        unreadableSecrets: change.clearSecrets?.length ? undefined : instance.unreadableSecrets,
+      }
+      return { proposed, changedId: id }
+    }, adminDid)
   }
 
   async remove(id: string, adminDid: string): Promise<void> {
-    const instances = await readInstances(this.deps.db, this.deps.box)
-    if (!instances.some((instance) => instance.id === id)) throw new InstanceNotFound(id)
-    await this.apply(
-      instances.filter((instance) => instance.id !== id),
-      undefined,
-      adminDid,
-    )
+    await this.change((instances) => {
+      if (!instances.some((instance) => instance.id === id)) throw new InstanceNotFound(id)
+      return { proposed: instances.filter((instance) => instance.id !== id) }
+    }, adminDid)
   }
 
   async reorder(ids: string[], adminDid: string): Promise<void> {
-    const instances = await readInstances(this.deps.db, this.deps.box)
-    const byId = new Map(instances.map((instance) => [instance.id, instance]))
-    if (
-      ids.length !== instances.length ||
-      new Set(ids).size !== ids.length ||
-      ids.some((id) => !byId.has(id))
-    )
-      throw new InvalidBody('The new order must list every plugin instance once')
-    await this.apply(
-      ids.map((id) => byId.get(id) as PluginInstance),
-      undefined,
-      adminDid,
-    )
+    await this.change((instances) => {
+      const byId = new Map(instances.map((instance) => [instance.id, instance]))
+      if (
+        ids.length !== instances.length ||
+        new Set(ids).size !== ids.length ||
+        ids.some((id) => !byId.has(id))
+      )
+        throw new InvalidBody('The new order must list every plugin instance once')
+      return { proposed: ids.map((id) => byId.get(id) as PluginInstance) }
+    }, adminDid)
   }
 
   /**
@@ -225,10 +268,17 @@ export class PluginAdmin {
     }
   }
 
-  /** Build a runtime from the proposed instances, and switch to it unless it breaks something. */
-  private apply(proposed: PluginInstance[], changedId: string | undefined, adminDid: string) {
+  /**
+   * Read the instances under the lock, so changes never overwrite each other, then build a runtime
+   * from the proposed ones and switch to it unless it breaks something.
+   */
+  private change(
+    propose: (instances: PluginInstance[]) => { proposed: PluginInstance[]; changedId?: string },
+    adminDid: string,
+  ) {
     const { holder } = this.deps
     return holder.exclusive(async () => {
+      const { proposed, changedId } = propose(await readInstances(this.deps.db, this.deps.box))
       const current = holder.current()
       const candidate = await this.deps.build(proposed)
       try {

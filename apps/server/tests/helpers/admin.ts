@@ -1,5 +1,6 @@
 import pino from 'pino'
 import { vi } from 'vitest'
+import type { Db } from '../../src/db/index.ts'
 import { migrateToLatest } from '../../src/db/migrate.ts'
 import type { InstalledPlugins } from '../../src/plugins/installed.ts'
 import { createServer } from '../../src/server.ts'
@@ -10,9 +11,12 @@ import { installedFrom } from './plugins.ts'
 
 type Json = Record<string, unknown>
 
-/** A whole server with TEST_ADMIN as its admin, and helpers to call it as any DID. */
-export async function adminHarness(options: { installed?: InstalledPlugins } = {}) {
-  const db = createSqliteDb()
+/**
+ * A whole server with TEST_ADMIN as its admin, and helpers to call it as any DID. Pass `db` to
+ * share a database file with another process.
+ */
+export async function adminHarness(options: { installed?: InstalledPlugins; db?: Db } = {}) {
+  const db = options.db ?? createSqliteDb()
   await migrateToLatest(db)
   let signingIn = TEST_ADMIN
   const identity = fakeIdentity()
