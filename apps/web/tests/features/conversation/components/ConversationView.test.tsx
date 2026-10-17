@@ -6,9 +6,10 @@ import { MeContext } from '../../../../src/features/auth/session.ts'
 import { BusyBanner } from '../../../../src/features/conversation/components/BusyBanner.tsx'
 import { ConversationView } from '../../../../src/features/conversation/components/ConversationView.tsx'
 import type * as messageView from '../../../../src/features/conversation/components/MessageView.tsx'
+import { resetStepClocks } from '../../../../src/parts/step-clock.ts'
 import type { HandoverState } from '../../../../src/store/handover.ts'
 import { StoreProvider } from '../../../../src/store/react.tsx'
-import { FakeEventSource, stubEventSource } from '../../../helpers/event-source.ts'
+import { FakeEventSource, lastSource, stubEventSource } from '../../../helpers/event-source.ts'
 import { stubFetch, writes } from '../../../helpers/fetch.ts'
 import { renderAt } from '../../../helpers/router.tsx'
 import { type HeldMessage, type TestStore, testStore } from '../../../helpers/store.ts'
@@ -92,7 +93,10 @@ beforeEach(() => {
   stubFetch()
   stubEventSource()
 })
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.useRealTimers()
+  vi.unstubAllGlobals()
+})
 
 describe('ConversationView', () => {
   it('shows skeletons in place of the title and messages, and no placeholder, until the local copy answers', async () => {
@@ -297,6 +301,46 @@ describe('ConversationView', () => {
     await screen.findByText('second answer')
     expect(messageRenders.get('v.r0')).toBeGreaterThan(0)
     for (const rkey of ['u', 'u.r0', 'v']) expect(messageRenders.get(rkey)).toBeUndefined()
+  })
+
+  it('hands a streamed reply over to its record, keeping how long it thought', async () => {
+    resetStepClocks()
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const question = user('u', 'question')
+    const answer = (status: string, parts: Record<string, unknown>[]) =>
+      msg('u.r0', {
+        role: 'assistant',
+        parent: 'u',
+        status,
+        content: { $type: d('plainContent'), parts },
+        createdAt: '2026-09-26T00:00:01Z',
+      })
+    const store = storeWith([question, answer('pending', [])])
+    await renderWith(store, <ConversationView skey="s1" />)
+    await vi.waitFor(() =>
+      expect(lastSource()?.url).toBe('/api/conversations/s1/messages/u.r0/stream'),
+    )
+    act(() => lastSource().emit('part-start', { index: 0, partType: 'reasoningPart' }))
+    await act(async () => vi.advanceTimersByTimeAsync(3_000))
+    act(() => {
+      lastSource().emit('part-start', { index: 1, partType: 'textPart' })
+      lastSource().emit('delta', { index: 1, text: 'Use porcelain.' })
+    })
+    expect(await screen.findByText('Use porcelain.')).toBeInTheDocument()
+    // The finished record reaches the local copy, and the stream ends.
+    act(() =>
+      update(store, [
+        question,
+        answer('complete', [
+          { $type: d('reasoningPart'), text: 'Floors take wear.' },
+          { $type: d('textPart'), text: 'Use porcelain.' },
+        ]),
+      ]),
+    )
+    act(() => lastSource().emit('status', { status: 'complete' }))
+    expect(await screen.findByRole('button', { name: /^Thought for 3s/ })).toBeInTheDocument()
+    expect(screen.getAllByText('Use porcelain.')).toHaveLength(1)
+    expect(lastSource().closed).toBe(true)
   })
 
   it('syncs and shows a message written from another client', async () => {

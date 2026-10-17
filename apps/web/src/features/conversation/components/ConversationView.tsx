@@ -18,9 +18,8 @@ import type { ComposerHandle } from './Composer.tsx'
 import { ConversationHeader } from './ConversationHeader.tsx'
 import { ConversationSkeleton } from './ConversationSkeleton.tsx'
 import { EmptyConversation } from './EmptyConversation.tsx'
-import { LiveAuthor } from './LiveAuthor.tsx'
 import { type ConversationOperations, MessageActions, RunningReply } from './message-actions.tsx'
-import { ReplyStream } from './ReplyStream.tsx'
+import { FollowedConversation } from './PendingReply.tsx'
 
 interface Props {
   skey: string
@@ -91,36 +90,27 @@ export function ConversationView(props: Props) {
       <ErrorAlert error={lastError(actions.outcome, chat.outcome) ?? chat.loadError} />
       {waiting && <ConversationSkeleton />}
       {chat.empty && <EmptyConversation onStart={(text) => composer.current?.fill(text)} />}
-      <RunningReply.Provider value={stoppable}>
-        <Regenerating.Provider value={regenerating}>
-          <BranchView
-            branch={branch}
-            blobUrl={blobUrl}
-            onPick={pick}
-            pending={(message) => (
-              <ReplyStream skey={props.skey} rkey={message.rkey} blobUrl={blobUrl} />
-            )}
-            live={(message) => (
-              <LiveAuthor
-                skey={props.skey}
-                rkey={message.rkey}
-                model={(message.record.model as { id?: string } | undefined)?.id ?? 'Assistant'}
-                since={message.record.createdAt}
-              />
-            )}
-            actions={(message) => <MessageActions message={message} operations={operations} />}
-            // A failed reply tries again with the same model.
-            retry={(message) => (
-              <TryAgain
-                onClick={() =>
-                  regenerate((message.record.parent as string | undefined) ?? null, null)
-                }
-              />
-            )}
-            arrived={(message) => !opened?.has(message.rkey)}
-          />
-        </Regenerating.Provider>
-      </RunningReply.Provider>
+      <FollowedConversation.Provider value={props.skey}>
+        <RunningReply.Provider value={stoppable}>
+          <Regenerating.Provider value={regenerating}>
+            <BranchView
+              branch={branch}
+              blobUrl={blobUrl}
+              onPick={pick}
+              actions={(message) => <MessageActions message={message} operations={operations} />}
+              // A failed reply tries again with the same model.
+              retry={(message) => (
+                <TryAgain
+                  onClick={() =>
+                    regenerate((message.record.parent as string | undefined) ?? null, null)
+                  }
+                />
+              )}
+              arrived={(message) => !opened?.has(message.rkey)}
+            />
+          </Regenerating.Provider>
+        </RunningReply.Provider>
+      </FollowedConversation.Provider>
       <BranchComposer
         branch={branch}
         editing={editing}

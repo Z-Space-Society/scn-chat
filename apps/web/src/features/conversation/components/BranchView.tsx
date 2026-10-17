@@ -9,10 +9,6 @@ interface RowOptions {
   blobUrl: BlobUrl
   /** Show another version of a message, by its rkey. */
   onPick: (rkey: string) => void
-  /** What a pending message shows as it streams, such as its stream. */
-  pending?: (message: BranchMessage) => ReactNode
-  /** What a pending reply's header shows in place of its author, such as its live status. */
-  live?: (message: BranchMessage) => ReactNode
   /** The controls under a message. */
   actions?: (message: BranchMessage) => ReactNode
   /** What a failed reply offers beside its error, such as a button to try again. */
@@ -39,8 +35,6 @@ export function BranchView(props: Props) {
           next={step.siblings[step.index + 1]?.rkey}
           blobUrl={props.blobUrl}
           onPick={props.onPick}
-          pending={props.pending}
-          live={props.live}
           actions={props.actions}
           retry={props.retry}
           arrived={props.arrived}
@@ -62,14 +56,11 @@ interface RowProps extends RowOptions, Omit<Siblings, 'onPick'> {
  */
 const BranchRow = memo(function BranchRow(props: RowProps) {
   const message = props.message
-  const status = message.record.status
   return (
     <MessageView
       id={`m-${message.rkey}`}
       rkey={message.rkey}
       record={message.record}
-      pending={status === 'pending' ? props.pending?.(message) : undefined}
-      live={status === 'pending' ? props.live?.(message) : undefined}
       blobUrl={props.blobUrl}
       siblings={{
         index: props.index,
@@ -79,7 +70,7 @@ const BranchRow = memo(function BranchRow(props: RowProps) {
         onPick: props.onPick,
       }}
       actions={props.actions?.(message)}
-      retry={status === 'error' ? props.retry?.(message) : undefined}
+      retry={message.record.status === 'error' ? props.retry?.(message) : undefined}
       arrived={props.arrived?.(message)}
     />
   )

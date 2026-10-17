@@ -2,11 +2,17 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { MessageView } from '../../../../src/features/conversation/components/MessageView.tsx'
-import { StreamingReply } from '../../../../src/features/conversation/components/StreamingReply.tsx'
+import { StreamingReply } from '../../../../src/features/conversation/components/PendingReply.tsx'
 import { noParts } from '../../../../src/features/conversation/lib/reply-stream.ts'
 
 const d = (name: string) => `network.sharedcomputer.chat.defs#${name}`
 const blobUrl = (cid: string) => `/blob/${cid}`
+/** A reply's record while it streams. */
+const streaming = {
+  role: 'assistant',
+  status: 'pending',
+  content: { $type: d('plainContent'), parts: [] },
+}
 
 const working = {
   role: 'assistant',
@@ -338,48 +344,51 @@ describe('MessageView', () => {
 
   it('shows streamed text for a pending reply as Markdown', () => {
     const reply = { ...noParts, parts: [{ $type: d('textPart'), text: '*Hel*' }] }
-    render(
-      <MessageView
-        blobUrl={blobUrl}
-        pending={<StreamingReply reply={reply} blobUrl={blobUrl} />}
-        record={{
-          role: 'assistant',
-          status: 'pending',
-          content: { $type: d('plainContent'), parts: [] },
-        }}
-      />,
-    )
+    render(<StreamingReply reply={reply} record={streaming} blobUrl={blobUrl} />)
     expect(screen.getByText('Hel').tagName).toBe('EM')
-    expect(screen.queryByText(/Waiting for/)).toBeNull()
   })
 
   it('says what a streaming reply is doing right now', () => {
     const call = { $type: d('toolCallPart'), callId: 'c', tool: 'fetch', input: '"https://x.test"' }
     const { container, rerender } = render(
-      <StreamingReply reply={{ ...noParts, parts: [call] }} blobUrl={blobUrl} />,
+      <StreamingReply reply={{ ...noParts, parts: [call] }} record={streaming} blobUrl={blobUrl} />,
     )
     expect(container.querySelector('[data-steps] summary')).toHaveTextContent('Running fetch…')
     expect(container.querySelector('[data-step=tool]')).toHaveAttribute('data-state', 'running')
     // Once the reply starts, the work gives way to it.
     const text = { $type: d('textPart'), text: 'Here' }
-    rerender(<StreamingReply reply={{ ...noParts, parts: [call, text] }} blobUrl={blobUrl} />)
+    rerender(
+      <StreamingReply
+        reply={{ ...noParts, parts: [call, text] }}
+        record={streaming}
+        blobUrl={blobUrl}
+      />,
+    )
     expect(container.querySelector('[data-step=tool]')).not.toBeVisible()
     expect(screen.getByText('Here')).toBeVisible()
-    rerender(<StreamingReply reply={{ ...noParts, queued: true }} blobUrl={blobUrl} />)
+    rerender(
+      <StreamingReply reply={{ ...noParts, queued: true }} record={streaming} blobUrl={blobUrl} />,
+    )
     expect(screen.getByText(/In line/)).toBeInTheDocument()
     // Before anything arrives, the reply's header says it is waiting.
-    rerender(<StreamingReply reply={noParts} blobUrl={blobUrl} />)
+    rerender(<StreamingReply reply={noParts} record={streaming} blobUrl={blobUrl} />)
     expect(container).toBeEmptyDOMElement()
   })
 
   it('announces a wait on a busy provider below what the reply streamed so far', () => {
     const text = { $type: d('textPart'), text: 'Here' }
     const { rerender } = render(
-      <StreamingReply reply={{ ...noParts, parts: [text], retrying: true }} blobUrl={blobUrl} />,
+      <StreamingReply
+        reply={{ ...noParts, parts: [text], retrying: true }}
+        record={streaming}
+        blobUrl={blobUrl}
+      />,
     )
     expect(screen.getByText('Here')).toBeVisible()
     expect(screen.getByRole('status')).toBeInTheDocument()
-    rerender(<StreamingReply reply={{ ...noParts, parts: [text] }} blobUrl={blobUrl} />)
+    rerender(
+      <StreamingReply reply={{ ...noParts, parts: [text] }} record={streaming} blobUrl={blobUrl} />,
+    )
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
@@ -593,7 +602,9 @@ async function openToolSteps(container: HTMLElement) {
 describe('tool views', () => {
   it('shows every call still waiting for its result in a streaming reply as running', () => {
     const parts = [call('a', 'lookup', { q: 'one' }), call('b', 'lookup', { q: 'two' })]
-    const { container } = render(<StreamingReply reply={{ ...noParts, parts }} blobUrl={blobUrl} />)
+    const { container } = render(
+      <StreamingReply reply={{ ...noParts, parts }} record={streaming} blobUrl={blobUrl} />,
+    )
     expect(toolSteps(container).map((step) => step.dataset.state)).toEqual(['running', 'running'])
     expect(toolSteps(container).map((step) => step.querySelector('summary')?.textContent)).toEqual([
       expect.stringContaining('running'),
@@ -622,7 +633,11 @@ describe('tool views', () => {
   it('names a web search by what it did, on the live line, its row, and the summary', async () => {
     const search = call('a', 'web_search', { query: 'espresso grinders' })
     const live = render(
-      <StreamingReply reply={{ ...noParts, parts: [search] }} blobUrl={blobUrl} />,
+      <StreamingReply
+        reply={{ ...noParts, parts: [search] }}
+        record={streaming}
+        blobUrl={blobUrl}
+      />,
     )
     expect(live.container.querySelector('[data-steps] summary')).toHaveTextContent(
       'Searching the web…',
@@ -700,7 +715,11 @@ describe('tool views', () => {
   it('says a web search is searching while it runs, and when it found nothing', async () => {
     const search = call('a', 'web_search', { query: 'grinders' })
     const live = render(
-      <StreamingReply reply={{ ...noParts, parts: [search] }} blobUrl={blobUrl} />,
+      <StreamingReply
+        reply={{ ...noParts, parts: [search] }}
+        record={streaming}
+        blobUrl={blobUrl}
+      />,
     )
     await openToolSteps(live.container)
     expect(toolSteps(live.container)[0]).toHaveTextContent('Searching…')

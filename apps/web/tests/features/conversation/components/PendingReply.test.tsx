@@ -1,6 +1,6 @@
 import { act, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { WaitingAuthor } from '../../../../src/features/conversation/components/LiveAuthor.tsx'
+import { WaitingAuthor } from '../../../../src/features/conversation/components/PendingReply.tsx'
 
 afterEach(() => vi.useRealTimers())
 

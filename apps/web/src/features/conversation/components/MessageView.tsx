@@ -3,8 +3,8 @@ import { stepsOf } from '../../../parts/steps.ts'
 import type { BlobUrl, Part } from '../../../parts/types.ts'
 import { WorkButton, WorkList } from '../../../parts/WorkSteps.tsx'
 import { cn } from '../../../shared/cn.ts'
-import { WaitingAuthor } from './LiveAuthor.tsx'
 import { PartsView } from './PartsView.tsx'
+import { PendingAuthor, PendingBody } from './PendingReply.tsx'
 import { SiblingPicker, type Siblings } from './SiblingPicker.tsx'
 import { Status } from './Status.tsx'
 
@@ -13,10 +13,6 @@ export interface MessageViewProps {
   /** The message's record key, which its steps' times are kept by. */
   rkey?: string
   record: Record<string, unknown>
-  /** What a pending reply shows as it streams, such as its stream. */
-  pending?: ReactNode
-  /** What a pending reply's header shows in place of its author, such as its live status. */
-  live?: ReactNode
   blobUrl: BlobUrl
   siblings?: Siblings
   actions?: ReactNode
@@ -35,15 +31,16 @@ function author(record: Record<string, unknown>): string {
 }
 
 interface AuthorProps {
+  rkey?: string
   record: Record<string, unknown>
-  live?: ReactNode
 }
 
 /** Who wrote the message, or for a pending reply, its live status. */
 function Author(props: AuthorProps) {
   if (props.record.status !== 'pending') return <strong>{author(props.record)}</strong>
-  if (props.live) return props.live
-  return <WaitingAuthor model={author(props.record)} since={props.record.createdAt} />
+  return (
+    <PendingAuthor rkey={props.rkey} model={author(props.record)} since={props.record.createdAt} />
+  )
 }
 
 /**
@@ -57,7 +54,9 @@ export function MessageView(props: MessageViewProps) {
   const content = record.content as { $type: string; parts?: Part[] }
   const parts = content.parts ?? []
   const encrypted = content.$type.endsWith('#encryptedContent')
-  const steps = record.status === 'pending' ? [] : stepsOf(parts)
+  // A pending reply shows its stream until its finished record replaces it.
+  const pending = record.status === 'pending'
+  const steps = pending ? [] : stepsOf(parts)
   const user = record.role === 'user'
   const workId = useId()
   const [workOpen, setWorkOpen] = useState(false)
@@ -82,16 +81,16 @@ export function MessageView(props: MessageViewProps) {
           user
             ? '[&>strong]:hidden'
             : "[&>strong]:before:size-1.75 [&>strong]:before:rounded-full [&>strong]:before:bg-author-dot [&>strong]:before:content-['']",
-          record.status === 'pending' &&
+          pending &&
             '[&>strong]:before:animate-breathe [&>strong]:before:bg-accent-mark motion-reduce:[&>strong]:before:animate-none',
           record.status === 'error' && '[&>strong]:before:bg-danger',
         )}
       >
-        <Author record={record} live={props.live} />
+        <Author rkey={props.rkey} record={record} />
         {props.siblings && props.siblings.count > 1 && <SiblingPicker siblings={props.siblings} />}
       </header>
       <PartsView parts={parts} record={record} blobUrl={props.blobUrl} scope={props.rkey} />
-      {record.status === 'pending' && props.pending}
+      {pending && <PendingBody rkey={props.rkey} record={record} blobUrl={props.blobUrl} />}
       {encrypted && <p>This message is encrypted.</p>}
       <Status record={record} retry={props.retry} />
       {/* The actions sit by the message's edge, a reply's at the start and the user's at the end,

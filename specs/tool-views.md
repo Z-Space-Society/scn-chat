@@ -139,7 +139,7 @@ Tool output comes from the web. Tool views show it as text, never as HTML or Mar
 
 ## Acceptance Criteria
 
-Each is checked by rendering a reply through `MessageView`, or `StreamingReply` for a pending one, with tool call and result parts in its record.
+Each is checked by rendering a reply through `MessageView`, or `StreamingReply` in `PendingReply.tsx` for a pending one, with tool call and result parts in its record.
 
 - [x] A tool call and its result render once, together, through the tool's view, or the default view when the tool has none.
 - [x] A result with no matching call renders alone with the default view.
