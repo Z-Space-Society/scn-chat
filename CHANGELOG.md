@@ -4,6 +4,10 @@ What changed in each release of SCN Chat, for the people who use it, run it, or 
 
 ## [Unreleased]
 
+### Fixed
+
+- A chat left open for a long time no longer keeps a copy of every reply it streamed in memory once the reply is saved.
+
 ### Changed
 
 - For forkers: a tab reaches the browser store through `StoreClient.calls`, which has every method of the store's logic, rather than `StoreClient.worker`. Web tests run components over the real store through `testStore` in `apps/web/tests/helpers/store.ts`, rather than hand-built fakes.

@@ -1,42 +1,33 @@
 import { act, screen } from '@testing-library/react'
-import { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { BranchMessage } from '../../../src/features/conversation/lib/branch.ts'
+import { useChat } from '../../../src/features/conversation/chat.ts'
 import {
   useFollowedReply,
-  useReplyFollower,
   useReplyStarted,
 } from '../../../src/features/conversation/reply-follower.ts'
-import { StoreProvider, useConversation } from '../../../src/store/react.tsx'
+import { isPending } from '../../../src/shared/message.ts'
+import { StoreProvider } from '../../../src/store/react.tsx'
 import { FakeEventSource, lastSource, stubEventSource } from '../../helpers/event-source.ts'
+import { stubFetch } from '../../helpers/fetch.ts'
 import { messageRecord } from '../../helpers/records.ts'
 import { renderAt } from '../../helpers/router.tsx'
-import { testStore } from '../../helpers/store.ts'
+import { type HeldMessage, type TestStore, testStore } from '../../helpers/store.ts'
 
-const user: BranchMessage = { rkey: 'u', record: messageRecord({ role: 'user' }) }
-const reply = (status: string): BranchMessage => ({
-  rkey: 'u.r0',
+const user: HeldMessage = { rkey: 'u', record: messageRecord({ role: 'user' }) }
+const reply = (status: string, rkey = 'u.r0'): HeldMessage => ({
+  rkey,
   record: messageRecord({ parent: 'u', status }),
 })
 
-let follow: (rkey: string) => void
-let setMessages: (messages: BranchMessage[]) => void
+let chat: ReturnType<typeof useChat>
 const renders = { conversation: 0, header: 0 }
 
-interface ConversationProps {
-  messages: BranchMessage[]
-}
-
-/** The open conversation as the follower sees it: its replies, each with a header and its stream. */
-function Conversation(props: ConversationProps) {
+/** The open conversation as the follower sees it: its pending replies, each with a header and its stream. */
+function Conversation() {
   renders.conversation++
-  const [messages, set] = useState(props.messages)
-  setMessages = set
-  // The conversation's own refresh, which a finished reply sets off.
-  useConversation('s1')
-  follow = useReplyFollower('s1', messages).follow
-  return messages
-    .filter((message) => message.record.status === 'pending')
+  chat = useChat('s1')
+  return chat.messages
+    .filter((message) => isPending(message.record))
     .map((message) => (
       <article key={message.rkey}>
         <Header rkey={message.rkey} />
@@ -64,19 +55,25 @@ function Stream(props: ReplyProps) {
   )
 }
 
-async function open(messages: BranchMessage[]) {
-  // A store that holds no chats, the conversation's messages coming from the test.
+/** Open chat `s1`, holding `messages` on this device and the PDS. */
+async function open(messages: HeldMessage[]) {
   const store = testStore()
+  store.held('s1', { messages })
   const view = await renderAt(
     <StoreProvider store={store.client}>
-      <Conversation messages={messages} />
+      <Conversation />
     </StoreProvider>,
+    '/chat/s1',
   )
   // The conversation has loaded and refreshed, so only the follower can rerender it now.
   await vi.waitFor(() => expect(store.api.fetchKeys).toHaveBeenCalled())
   await act(async () => {})
   return { store, view }
 }
+
+/** The PDS now holds the reply as finished, for the next refresh to bring in. */
+const finish = (store: TestStore, status = 'complete', rkey = 'u.r0') =>
+  store.remote('s1', { messages: [user, reply(status, rkey)] })
 
 /** Stream a text part saying `text`, a delta at a time. */
 function streamText(text: string) {
@@ -98,7 +95,7 @@ afterEach(() => {
 })
 
 describe('reply follower', () => {
-  it("follows a pending reply's stream, and refreshes the conversation once it finishes", async () => {
+  it("follows a pending reply's stream, and brings in its record once it finishes", async () => {
     const { store } = await open([user, reply('pending')])
     await vi.waitFor(() => expect(lastSource()).toBeDefined())
     expect(lastSource().url).toBe('/api/conversations/s1/messages/u.r0/stream')
@@ -106,11 +103,11 @@ describe('reply follower', () => {
     streamText('Hello')
     expect(await screen.findByText('Hello')).toBeInTheDocument()
     expect(screen.getByRole('heading')).toHaveTextContent('Started')
-    store.api.fetchConversation.mockClear()
+    finish(store)
     act(() => lastSource().emit('status', { status: 'complete' }))
-    await vi.waitFor(() => expect(store.api.fetchConversation).toHaveBeenCalled())
+    // The refresh the finish sets off brings the final record, which ends the pending reply.
+    await vi.waitFor(() => expect(screen.queryByRole('heading')).toBeNull())
     expect(lastSource().closed).toBe(true)
-    expect(screen.queryByText(/Not live/)).toBeNull()
   })
 
   it('rerenders neither the conversation nor the header for the deltas after the reply starts', async () => {
@@ -126,13 +123,31 @@ describe('reply follower', () => {
     expect(renders).toEqual(before)
   })
 
-  it('follows a reply just sent, before its pending record arrives', async () => {
-    await open([user])
-    expect(lastSource()).toBeUndefined()
-    act(() => follow('u.r0'))
-    await vi.waitFor(() =>
-      expect(lastSource().url).toBe('/api/conversations/s1/messages/u.r0/stream'),
+  it('follows a reply just sent, before its pending record arrives, until its record is final', async () => {
+    stubFetch(async () =>
+      Response.json({ rkey: 'v', replyRkey: 'v.r0', status: 'claimed' }, { status: 201 }),
     )
+    const { store, view } = await open([user, reply('complete')])
+    expect(lastSource()).toBeUndefined()
+    await act(() => chat.send({ parent: 'u.r0', parts: [], generation: {} }))
+    await vi.waitFor(() =>
+      expect(lastSource().url).toBe('/api/conversations/s1/messages/v.r0/stream'),
+    )
+    const stream = () =>
+      view.queryClient.getQueryCache().find({ queryKey: ['reply-stream', 's1', 'v.r0'] })
+    expect(stream()).toBeDefined()
+    // Its record arrives finished, so what streamed of it goes.
+    act(() =>
+      store.held('s1', {
+        messages: [
+          user,
+          reply('complete'),
+          { rkey: 'v', record: messageRecord({ role: 'user', parent: 'u.r0' }) },
+          { rkey: 'v.r0', record: messageRecord({ parent: 'v', status: 'complete' }) },
+        ],
+      }),
+    )
+    await vi.waitFor(() => expect(stream()).toBeUndefined())
   })
 
   it('keeps what streamed when the stream drops, and polls with a backoff until the reply finishes', async () => {
@@ -147,9 +162,13 @@ describe('reply follower', () => {
     // Two seconds, then four more.
     await act(async () => vi.advanceTimersByTimeAsync(6_100))
     expect(store.api.fetchConversation).toHaveBeenCalledTimes(2)
-    act(() => setMessages([user, reply('complete')]))
+    // The next poll, eight seconds on, finds the reply finished, and polling stops.
+    finish(store)
+    await act(async () => vi.advanceTimersByTimeAsync(8_100))
+    expect(store.api.fetchConversation).toHaveBeenCalledTimes(3)
+    expect(screen.queryByRole('heading')).toBeNull()
     await act(async () => vi.advanceTimersByTimeAsync(30_000))
-    expect(store.api.fetchConversation).toHaveBeenCalledTimes(2)
+    expect(store.api.fetchConversation).toHaveBeenCalledTimes(3)
   })
 
   it('treats an event it cannot read as a dropped stream', async () => {

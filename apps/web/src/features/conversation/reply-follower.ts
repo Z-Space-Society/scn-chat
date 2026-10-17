@@ -58,7 +58,10 @@ export function useReplyFollower(skey: string, messages: BranchMessage[]) {
   const [followed, setFollowed] = useState<string[]>([])
   const follow = (rkey: string) =>
     setFollowed((current) => (current.includes(rkey) ? current : [...current, rkey]))
-  const rkeys = [...new Set([...pending, ...followed])]
+  // A reply followed since it was sent, until the local copy has its final record, which the
+  // conversation shows instead. Its stream then goes, and what streamed with it.
+  const final = new Set(messages.filter((m) => !isPending(m.record)).map((m) => m.rkey))
+  const rkeys = [...new Set([...pending, ...followed.filter((rkey) => !final.has(rkey))])]
   // Only whether each stream has ended, so a delta doesn't rerender the conversation.
   const ended = useQueries({
     queries: rkeys.map((rkey) => streamQuery(skey, rkey)),
