@@ -13,7 +13,8 @@
     "start:remote": "node src/tunnel-cli.ts --start",
     "migrate": "node src/migrate-cli.ts",
     "typecheck": "tsc --noEmit -p .",
-    "keys": "node src/keys-cli.ts"
+    "keys": "node src/keys-cli.ts",
+    "site-config": "node src/site-config-cli.ts"
   },
   "dependencies": {
     "@atproto/common-web": "0.0.0-spaces-alpha-20261001173819",

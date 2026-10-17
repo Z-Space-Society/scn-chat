@@ -23,7 +23,8 @@
     "publish-lexicons": "pnpm --filter @scn-chat/lexicons publish-lexicons",
     "migrate": "pnpm --filter @scn-chat/server migrate",
     "keys": "pnpm --filter @scn-chat/server keys",
-    "release": "pnpm --filter @scn-chat/release release"
+    "release": "pnpm --filter @scn-chat/release release",
+    "site-config": "pnpm --filter @scn-chat/server site-config"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",

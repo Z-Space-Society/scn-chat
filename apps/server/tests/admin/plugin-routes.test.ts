@@ -1,7 +1,12 @@
 import { definePlugin, type ModelProvider } from '@scn-chat/plugin-api'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
+import { migrateToLatest } from '../../src/db/migrate.ts'
+import { writeInstances } from '../../src/plugins/instances.ts'
+import { SecretBox } from '../../src/secrets.ts'
 import { adminHarness } from '../helpers/admin.ts'
+import { TEST_ADMIN, TEST_SECRET_KEY } from '../helpers/config.ts'
+import { createSqliteDb } from '../helpers/db.ts'
 import { installedFrom } from '../helpers/plugins.ts'
 
 const caps = { vision: true, reasoning: false, tools: true }
@@ -105,6 +110,53 @@ describe('plugin instances', () => {
       expect.objectContaining({ status: 'loaded', pluginId: 'prov-fake', secretsSet: ['apiKey'] }),
     ])
     expect(h.holder.current().host.providers.get('fake')?.hasAdminKey).toBe(true)
+  })
+
+  it('names each instance after the plugin it makes', async () => {
+    const h = await setup()
+    expect((await h.add({ id: 'one' })).body).toEqual({ id: 'prov-one' })
+    expect((await h.add({ id: 'two' })).body).toEqual({ id: 'prov-two' })
+  })
+
+  it('renames instances added under random IDs after their plugin at startup, keeping their secrets', async () => {
+    const random = '0b5e2a1c-7d44-4c1e-9a3f-2f6d8e9b1c00'
+    const broken = '9f1d3c2b-1a2b-4c3d-8e4f-5a6b7c8d9e0f'
+    const db = createSqliteDb()
+    await migrateToLatest(db)
+    await writeInstances(
+      db,
+      new SecretBox(Buffer.from(TEST_SECRET_KEY, 'base64')),
+      [
+        {
+          id: random,
+          package: 'provider-plugin',
+          enabled: true,
+          options: { id: 'fake' },
+          secrets: { apiKey: 'sk-admin' },
+        },
+        {
+          id: 'litellm',
+          package: 'provider-plugin',
+          enabled: true,
+          options: { id: 'other' },
+          secrets: {},
+        },
+        {
+          id: broken,
+          package: 'provider-plugin',
+          enabled: true,
+          options: { id: 'Not Valid' },
+          secrets: {},
+        },
+      ],
+      TEST_ADMIN,
+    )
+    const h = await adminHarness({ installed: fixtures().installed, db })
+    const { instances } = (await h.call('GET', '/admin/plugins')).body as {
+      instances: { id: string; secretsSet: string[] }[]
+    }
+    expect(instances.map((instance) => instance.id)).toEqual(['prov-fake', 'litellm', broken])
+    expect(instances[0]?.secretsSet).toEqual(['apiKey'])
   })
 
   it('refuses options that fail the schema, pointing at the field', async () => {

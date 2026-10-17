@@ -25,3 +25,42 @@
    ```
    */5 * * * * curl -fsS -X POST -H "Authorization: Bearer <key>" https://chat.example.com/api/cron
    ```
+
+## Config import/export
+
+All admin settings can be exported and imported via the CLI.
+
+1. Export the configuration:
+
+   ```
+   docker compose exec -T scn-chat node apps/server/src/site-config-cli.ts export > site-config.json
+   ```
+
+   The JSON file contains all admin settings, roles, plugins, and admin models. Secrets are not exported.
+
+2. Import the config:
+
+   ```
+   docker compose exec -T scn-chat node apps/server/src/site-config-cli.ts apply < site-config.json
+   ```
+
+   Changes take effect without a restart. If the import includes setting changes that will prevent the server from starting, the script will bail. Broken plugin settings that don't affect startup will still be imported with a warning.
+
+
+Applying the config is a full reset so any admin config that wasn't in the initial export will be cleared.
+
+- Secrets missing from the file are ignored / left unchanged on the server. To clear a secret, set it to `null`, such as `"secrets": { "tavilyApiKey": null }`.
+- A role in the JSON that leaves `members` unset will keep its members.
+- Plugin packages need to be added to `package.json` to be available in the site.
+
+For Ansible, template the file from your variables and Vault and apply it:
+
+```yaml
+- name: Apply the SCN Chat configuration
+  ansible.builtin.shell: >
+    docker compose exec -T scn-chat node apps/server/src/site-config-cli.ts apply < site-config.json
+  args:
+    chdir: /srv/scn-chat
+  register: site_config
+  changed_when: site_config.stdout != 'No changes.'
+```

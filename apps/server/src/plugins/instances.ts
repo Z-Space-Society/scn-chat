@@ -40,30 +40,38 @@ export async function writeInstances(
   instances: PluginInstance[],
   adminDid: string,
 ): Promise<void> {
+  await db.transaction().execute((tx) => replaceInstances(tx, box, instances, adminDid))
+}
+
+/** `writeInstances` within a transaction the caller holds. */
+export async function replaceInstances(
+  db: Db,
+  box: SecretBox,
+  instances: PluginInstance[],
+  adminDid: string,
+): Promise<void> {
   const now = new Date().toISOString()
-  await db.transaction().execute(async (tx) => {
-    const ids = instances.map((instance) => instance.id)
-    let removal = tx.deleteFrom('plugin_instance')
-    if (ids.length) removal = removal.where('id', 'not in', ids)
-    await removal.execute()
-    for (const [position, instance] of instances.entries()) {
-      const entered = Object.keys(instance.secrets).length > 0
-      const row = {
-        package: instance.package,
-        position,
-        enabled: instance.enabled ? 1 : 0,
-        options_json: JSON.stringify(instance.options),
-        secrets_encrypted: entered
-          ? box.encrypt(JSON.stringify(instance.secrets))
-          : (instance.unreadableSecrets ?? null),
-        updated_at: now,
-        updated_by: adminDid,
-      }
-      await tx
-        .insertInto('plugin_instance')
-        .values({ id: instance.id, created_at: now, ...row })
-        .onConflict((oc) => oc.column('id').doUpdateSet(row))
-        .execute()
+  const ids = instances.map((instance) => instance.id)
+  let removal = db.deleteFrom('plugin_instance')
+  if (ids.length) removal = removal.where('id', 'not in', ids)
+  await removal.execute()
+  for (const [position, instance] of instances.entries()) {
+    const entered = Object.keys(instance.secrets).length > 0
+    const row = {
+      package: instance.package,
+      position,
+      enabled: instance.enabled ? 1 : 0,
+      options_json: JSON.stringify(instance.options),
+      secrets_encrypted: entered
+        ? box.encrypt(JSON.stringify(instance.secrets))
+        : (instance.unreadableSecrets ?? null),
+      updated_at: now,
+      updated_by: adminDid,
     }
-  })
+    await db
+      .insertInto('plugin_instance')
+      .values({ id: instance.id, created_at: now, ...row })
+      .onConflict((oc) => oc.column('id').doUpdateSet(row))
+      .execute()
+  }
 }

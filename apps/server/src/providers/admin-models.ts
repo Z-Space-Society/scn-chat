@@ -104,6 +104,32 @@ export async function deleteAdminModel(db: Db, provider: string, id: string): Pr
   return result.numDeletedRows > 0n
 }
 
+/** Replace every model with this list, in this order, within a transaction the caller holds. */
+export async function replaceAdminModels(db: Db, models: AdminModel[], adminDid: string) {
+  const now = new Date().toISOString()
+  const keep = new Set(models.map((model) => `${model.provider}/${model.id}`))
+  for (const row of await db.selectFrom('admin_model').select(['provider', 'model_id']).execute()) {
+    if (keep.has(`${row.provider}/${row.model_id}`)) continue
+    await deleteAdminModel(db, row.provider, row.model_id)
+  }
+  for (const [position, model] of models.entries()) {
+    const row = {
+      name: model.name,
+      position,
+      capabilities_json: JSON.stringify(model.capabilities),
+      roles_json: JSON.stringify(model.roles),
+      is_default: model.default ? 1 : 0,
+      updated_at: now,
+      updated_by: adminDid,
+    }
+    await db
+      .insertInto('admin_model')
+      .values({ provider: model.provider, model_id: model.id, created_at: now, ...row })
+      .onConflict((oc) => oc.columns(['provider', 'model_id']).doUpdateSet(row))
+      .execute()
+  }
+}
+
 /** Put the models in this order. */
 export async function reorderAdminModels(db: Db, refs: { provider: string; id: string }[]) {
   await db.transaction().execute(async (tx) => {

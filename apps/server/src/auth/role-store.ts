@@ -1,6 +1,18 @@
 import { isValidDid } from '@atproto/syntax'
+import { z } from 'zod'
 import type { Db } from '../db/index.ts'
 import { ADMIN_ROLE } from './roles.ts'
+
+const ROLE_NAME = /^[a-z][a-z0-9-]*$/
+const HOSTNAME =
+  /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/
+
+export const roleName = z.string().regex(ROLE_NAME, `must match ${ROLE_NAME}`)
+
+/** PDS hosts or handle domains a role matches. */
+export const hostnames = z.array(
+  z.string().trim().toLowerCase().regex(HOSTNAME, 'must be a hostname, such as example.com'),
+)
 
 export type RoleMember = { did: string; addedAt: string; addedBy: string }
 
@@ -45,17 +57,26 @@ export async function roleExists(db: Db, name: string): Promise<boolean> {
 
 export async function createRole(db: Db, role: { name: string; description: string }) {
   if (await roleExists(db, role.name)) throw new RoleExists(role.name)
+  await insertRole(db, role)
+}
+
+/** Store a role, leaving one that already exists alone. */
+export async function insertRole(
+  db: Db,
+  role: { name: string; description?: string; pdsHosts?: string[]; handleDomains?: string[] },
+) {
   const now = new Date().toISOString()
   await db
     .insertInto('role')
     .values({
       name: role.name,
-      description: role.description,
-      pds_hosts_json: '[]',
-      handle_domains_json: '[]',
+      description: role.description ?? '',
+      pds_hosts_json: JSON.stringify(role.pdsHosts ?? []),
+      handle_domains_json: JSON.stringify(role.handleDomains ?? []),
       created_at: now,
       updated_at: now,
     })
+    .onConflict((oc) => oc.column('name').doNothing())
     .execute()
 }
 
@@ -79,10 +100,13 @@ export async function updateRole(
 }
 
 export async function deleteRole(db: Db, name: string): Promise<void> {
-  await db.transaction().execute(async (tx) => {
-    await tx.deleteFrom('role_member').where('role', '=', name).execute()
-    await tx.deleteFrom('role').where('name', '=', name).execute()
-  })
+  await db.transaction().execute((tx) => removeRole(tx, name))
+}
+
+/** `deleteRole` within a transaction the caller holds. */
+export async function removeRole(db: Db, name: string): Promise<void> {
+  await db.deleteFrom('role_member').where('role', '=', name).execute()
+  await db.deleteFrom('role').where('name', '=', name).execute()
 }
 
 export async function addMember(db: Db, role: string, did: string, addedBy: string) {

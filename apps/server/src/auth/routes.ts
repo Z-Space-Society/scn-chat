@@ -72,7 +72,7 @@ const isLocalPath = (path: string) => /^\/(?![/\\])/.test(path)
 const isSharePath = (path: string) => /^\/shared\/[^/]+\/[^/]+$/.test(path)
 
 /** API paths opened to API keys, which never use the session cookie. */
-const API_KEY_PATHS = [/^\/api\/cron$/]
+const API_KEY_PATHS = [/^\/api\/cron$/, /^\/api\/admin\/config$/]
 
 /** API paths a viewer may use. */
 const VIEWER_PATHS = [/^\/api\/me$/, /^\/api\/logout$/, /^\/api\/shared\//, /^\/api\/health$/]
