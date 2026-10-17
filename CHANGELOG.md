@@ -4,6 +4,10 @@ What changed in each release of SCN Chat, for the people who use it, run it, or 
 
 ## [Unreleased]
 
+### Changed
+
+- The line under a reply that is waiting, such as "The model's provider is busy. Trying again…" or "Lost the live stream. Checking for the reply…", is in medium weight and breathes as the model's name does while it waits, so it reads as something still going.
+
 ## [0.2.0] - 2026-10-16
 
 ### Added

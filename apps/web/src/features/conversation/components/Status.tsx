@@ -2,8 +2,12 @@ import type { ReactNode } from 'react'
 import { AlertIcon, StopIcon } from '../../../shared/icons.tsx'
 import { Badge } from '../../../shared/ui/Badge.tsx'
 
-/** A quiet line about a reply, such as that it waits its turn or lost its stream. */
-export const statusLine = 'text-muted text-ui'
+/**
+ * A quiet line about a reply, such as that it waits its turn or lost its stream. It breathes as
+ * the model's name does while the reply waits, since each is something still going.
+ */
+export const statusLine =
+  'animate-breathe font-medium text-muted text-ui motion-reduce:animate-none'
 
 interface Props {
   record: Record<string, unknown>
