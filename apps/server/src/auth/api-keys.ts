@@ -50,6 +50,11 @@ export async function listApiKeys(db: Db): Promise<ApiKeySummary[]> {
   }))
 }
 
+/** Return the list of API keys (label only) that are assigned to a given role. */
+export async function apiKeysHolding(db: Db, role: string): Promise<string[]> {
+  return (await listApiKeys(db)).filter((key) => key.roles.includes(role)).map((key) => key.label)
+}
+
 /** Returns false when there is no such key. */
 export async function revokeApiKey(db: Db, id: string): Promise<boolean> {
   const result = await db.deleteFrom('api_key').where('id', '=', id).executeTakeFirst()
@@ -87,6 +92,7 @@ export function requireApiKey(
       .where('id', '=', row.id)
       .execute()
     deps.logger.info({ path: c.req.path, key: row.label }, 'API key accepted')
+    c.set('apiKey', { id: row.id, label: row.label })
     await next()
   }
 }

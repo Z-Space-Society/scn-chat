@@ -26,7 +26,7 @@ A plugin package is installed when it is listed in the `dependencies` of the roo
 
 ```
 plugin_instance (
-  id text primary key,          -- random, from the server
+  id text primary key,          -- the plugin's ID, or one a site config chose
   package text,
   position integer,
   enabled integer,
@@ -38,6 +38,7 @@ plugin_instance (
 
 - **Secrets.** Top-level option fields marked `.meta({ secret: true })` are stored in `secrets_encrypted`, with the same `SecretBox` as user keys. The API never returns them. It returns the names of the secret fields that have a value. On save, a blank or missing secret keeps the stored value, and a field listed in `clearSecrets` is removed. Every shipped plugin marks its `apiKey` option as secret. Secrets that no current or retired key can decrypt read as unset, so the server still starts and the plugin loads or fails as it would without them. The API reports `secretsUnreadable` for that instance, and its secret fields say their saved value can't be read. The ciphertext is written back unchanged until the admin enters a secret or ticks Clear on any secret field, which discards it.
 - **Order.** `position` is the load order, which decides hook order as the plugins spec describes.
+- **Instance IDs.** An instance added in the admin area takes the ID of the plugin it makes, such as `web-search` or `openai-compatible-litellm`, and adding one whose plugin ID an instance already has is refused. Instances from before this, under random UUIDs, are renamed to their plugin's ID at startup, keeping their options and secrets. One whose options no longer load, or whose plugin ID another instance has, keeps its UUID, and the log says why. Nothing else stores instance IDs, so renaming is safe.
 - **Disabled instances** keep their options and aren't loaded.
 - **Plugin IDs.** The factory decides the plugin's ID, as it does today, and some plugins derive it from their options, like `openai-compatible-<id>`. User settings, tool switches, provider IDs in model references, and user credentials all key on those IDs, so an edit that would change an instance's plugin ID is refused with "This change would rename the plugin from X to Y. Add a new instance instead."
 - **Deleting** an instance leaves its users' settings and tool switches in place, so adding the same plugin back restores them.
