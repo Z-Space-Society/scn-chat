@@ -6,12 +6,12 @@ import { MeContext } from '../../../../src/features/auth/session.ts'
 import { BusyBanner } from '../../../../src/features/conversation/components/BusyBanner.tsx'
 import { ConversationView } from '../../../../src/features/conversation/components/ConversationView.tsx'
 import type * as messageView from '../../../../src/features/conversation/components/MessageView.tsx'
-import type { StoreClient } from '../../../../src/store/client.ts'
 import type { HandoverState } from '../../../../src/store/handover.ts'
 import { StoreProvider } from '../../../../src/store/react.tsx'
 import { FakeEventSource, stubEventSource } from '../../../helpers/event-source.ts'
 import { stubFetch, writes } from '../../../helpers/fetch.ts'
 import { renderAt } from '../../../helpers/router.tsx'
+import { type HeldMessage, type TestStore, testStore } from '../../../helpers/store.ts'
 
 /** How often each message has rendered, by rkey. */
 const messageRenders = vi.hoisted(() => new Map<string, number>())
@@ -35,12 +35,7 @@ const text = (value: string) => ({
   $type: d('plainContent'),
   parts: [{ $type: d('textPart'), text: value }],
 })
-const msg = (rkey: string, record: Record<string, unknown>) => ({
-  rkey,
-  author: 'did:plc:alice',
-  cid: `c-${rkey}`,
-  record,
-})
+const msg = (rkey: string, record: Record<string, unknown>): HeldMessage => ({ rkey, record })
 const user = (rkey: string, value: string, parent?: string, at = '2026-09-26T00:00:00Z') =>
   msg(rkey, { role: 'user', content: text(value), createdAt: at, ...(parent ? { parent } : {}) })
 const reply = (rkey: string, value: string, parent: string, status = 'complete') =>
@@ -52,49 +47,22 @@ const reply = (rkey: string, value: string, parent: string, status = 'complete')
     createdAt: '2026-09-26T00:00:01Z',
   })
 
-function fakeStore(messages: ReturnType<typeof msg>[], state: HandoverState = 'active') {
-  const data = { messages }
-  const changes = new Set<(change: { type: string; skey?: string }) => void>()
-  const states = new Set<(s: HandoverState) => void>()
-  let current = state
-  const store = {
-    data,
-    worker: {
-      getConversation: vi.fn(async (skey: string) => ({
-        skey,
-        info: { title: 'Tiles' } as Record<string, unknown> | null,
-        messages: data.messages,
-      })),
-      refreshConversation: vi.fn(async () => {}),
-      reconcileConversation: vi.fn(async () => {}),
-      listConversations: vi.fn(async () => ({ chats: [], next: null })),
-      listTags: vi.fn(async () => []),
-      latestReplies: vi.fn(async () => []),
-    },
-    state: () => current,
-    onState: (listener: (s: HandoverState) => void) => {
-      states.add(listener)
-      return () => states.delete(listener)
-    },
-    onChange: (listener: (change: { type: string; skey?: string }) => void) => {
-      changes.add(listener)
-      return () => changes.delete(listener)
-    },
-    claim: vi.fn(async () => {
-      current = 'active'
-      for (const listener of states) listener(current)
-      return current
-    }),
-    deleteLocalCopy: vi.fn(async () => {}),
-    update(next: ReturnType<typeof msg>[]) {
-      data.messages = next
-      for (const listener of changes) listener({ type: 'conversation', skey: 's1' })
-    },
-  }
+/** A store holding chat `s1`, with these messages, on this device and the PDS. */
+function storeWith(
+  messages: HeldMessage[],
+  state: HandoverState = 'active',
+  info: Record<string, unknown> = { title: 'Tiles' },
+) {
+  const store = testStore({ state })
+  store.held('s1', { info, messages })
   return store
 }
 
-function renderWith(store: ReturnType<typeof fakeStore>, children: ReactNode, path = '/chat/s1') {
+/** Change chat `s1` to hold these messages, as a sync bringing them to this device would. */
+const update = (store: TestStore, messages: HeldMessage[]) =>
+  store.held('s1', { info: { title: 'Tiles' }, messages })
+
+function renderWith(store: TestStore, children: ReactNode, path = '/chat/s1') {
   return renderAt(
     <MeContext.Provider
       value={{
@@ -108,7 +76,7 @@ function renderWith(store: ReturnType<typeof fakeStore>, children: ReactNode, pa
         accessMessage: null,
       }}
     >
-      <StoreProvider store={store as unknown as StoreClient}>{children}</StoreProvider>
+      <StoreProvider store={store.client}>{children}</StoreProvider>
     </MeContext.Provider>,
     path,
   )
@@ -128,14 +96,14 @@ afterEach(() => vi.unstubAllGlobals())
 
 describe('ConversationView', () => {
   it('shows skeletons in place of the title and messages, and no placeholder, until the local copy answers', async () => {
-    const store = fakeStore([user('u', 'question')])
+    const store = storeWith([user('u', 'question')])
+    const read = store.client.calls.getConversation
     let answer = () => {}
-    store.worker.getConversation.mockImplementationOnce(
-      (skey: string) =>
-        new Promise((resolve) => {
-          answer = () => resolve({ skey, info: { title: 'Tiles' }, messages: store.data.messages })
-        }),
+    vi.spyOn(store.client.calls, 'getConversation').mockImplementationOnce(
+      (skey) => new Promise((resolve) => (answer = () => resolve(read(skey)))),
     )
+    // The PDS answers later still, so only the local copy decides what shows.
+    store.api.fetchConversation.mockReturnValueOnce(new Promise(() => {}))
     await renderWith(store, <ConversationView skey="s1" />)
     expect(await screen.findByText('Loading messages')).toBeInTheDocument()
     expect(screen.queryByText('New chat')).toBeNull()
@@ -154,7 +122,7 @@ describe('ConversationView', () => {
     Element.prototype.scrollIntoView = function (this: Element) {
       scrolled(this.id)
     }
-    const store = fakeStore([
+    const store = storeWith([
       user('u', 'question'),
       reply('u.r0', 'first answer', 'u'),
       reply('u.r1', 'second answer', 'u'),
@@ -166,7 +134,7 @@ describe('ConversationView', () => {
   })
 
   it('shows the newest branch and switches branches with the sibling controls', async () => {
-    const store = fakeStore([
+    const store = storeWith([
       user('u', 'question'),
       reply('u.r0', 'first answer', 'u'),
       reply('u.r1', 'second answer', 'u'),
@@ -183,7 +151,7 @@ describe('ConversationView', () => {
     Element.prototype.scrollIntoView = function (this: Element) {
       scrolled(this.id)
     }
-    const store = fakeStore([
+    const store = storeWith([
       user('u', 'question'),
       reply('u.r0', 'first answer', 'u'),
       reply('u.r1', 'second answer', 'u'),
@@ -200,14 +168,15 @@ describe('ConversationView', () => {
 
   it('regenerates and selects the new reply, even when it is not the newest sibling', async () => {
     stubFetch(vi.fn(async () => Response.json({ replyRkey: 'u.r1', status: 'claimed' })))
-    const store = fakeStore([
+    const messages = [
       user('u', 'question'),
       reply('u.r0', 'first answer', 'u'),
       reply('u.r2', 'third answer', 'u'),
-    ])
+    ]
+    const store = storeWith(messages)
     await renderWith(store, <ConversationView skey="s1" />)
     await userEvent.click(await screen.findByRole('button', { name: 'Regenerate' }))
-    act(() => store.update([...store.data.messages, reply('u.r1', 'regenerated', 'u')]))
+    act(() => update(store, [...messages, reply('u.r1', 'regenerated', 'u')]))
     expect(await screen.findByText('regenerated')).toBeInTheDocument()
     expect(screen.getByText('2/3')).toBeInTheDocument()
   })
@@ -217,7 +186,8 @@ describe('ConversationView', () => {
       Response.json({ rkey: 'u2', replyRkey: 'u2.r0', status: 'claimed' }, { status: 201 }),
     )
     stubFetch(fetch)
-    const store = fakeStore([user('u', 'original'), reply('u.r0', 'answer', 'u')])
+    const messages = [user('u', 'original'), reply('u.r0', 'answer', 'u')]
+    const store = storeWith(messages)
     await renderWith(store, <ConversationView skey="s1" />)
     await userEvent.click(await screen.findByRole('button', { name: 'Edit message' }))
     const boxes = screen.getAllByLabelText('Message')
@@ -226,8 +196,8 @@ describe('ConversationView', () => {
     await userEvent.type(boxes[0] as HTMLElement, 'edited{Enter}')
     await vi.waitFor(() => expect(fetch).toHaveBeenCalled())
     act(() =>
-      store.update([
-        ...store.data.messages,
+      update(store, [
+        ...messages,
         user('u2', 'edited', undefined, '2026-09-26T00:05:00Z'),
         reply('u2.r0', 'new answer', 'u2'),
       ]),
@@ -240,7 +210,7 @@ describe('ConversationView', () => {
       Response.json({ rkey: 'v2', replyRkey: 'v2.r0', status: 'claimed' }, { status: 201 }),
     )
     stubFetch(fetch)
-    const store = fakeStore([
+    const store = storeWith([
       user('u', 'first'),
       reply('u.r0', 'answer', 'u'),
       user('v', 'second', 'u.r0'),
@@ -265,7 +235,7 @@ describe('ConversationView', () => {
   it('stops a generating reply', async () => {
     const fetch = vi.fn(async () => Response.json({ cancelled: true }))
     stubFetch(fetch)
-    const store = fakeStore([user('u', 'q'), reply('u.r0', '', 'u', 'pending')])
+    const store = storeWith([user('u', 'q'), reply('u.r0', '', 'u', 'pending')])
     await renderWith(store, <ConversationView skey="s1" />)
     await userEvent.click(await screen.findByRole('button', { name: 'Stop' }))
     expect(String((writes(fetch)[0] as [string])[0])).toBe(
@@ -274,7 +244,7 @@ describe('ConversationView', () => {
   })
 
   it('shows a pending reply as it streams', async () => {
-    const store = fakeStore([user('u', 'q'), reply('u.r0', '', 'u', 'pending')])
+    const store = storeWith([user('u', 'q'), reply('u.r0', '', 'u', 'pending')])
     await renderWith(store, <ConversationView skey="s1" />)
     await vi.waitFor(() => expect(FakeEventSource.instances).toHaveLength(1))
     const source = FakeEventSource.instances[0] as FakeEventSource
@@ -296,7 +266,7 @@ describe('ConversationView', () => {
       Response.json({ rkey: 'v', replyRkey: null, status: null }, { status: 201 }),
     )
     stubFetch(fetch)
-    const store = fakeStore([user('u', 'question'), reply('u.r0', 'answer', 'u')])
+    const store = storeWith([user('u', 'question'), reply('u.r0', 'answer', 'u')])
     await renderWith(
       store,
       <main data-testid="scroller" style={{ overflowY: 'auto' }}>
@@ -317,18 +287,13 @@ describe('ConversationView', () => {
 
   it('renders again only the message that changed when a reply finishes', async () => {
     const first = [user('u', 'question'), reply('u.r0', 'answer', 'u')]
-    const store = fakeStore([
-      ...first,
-      user('v', 'again', 'u.r0'),
-      reply('v.r0', '', 'v', 'pending'),
-    ])
+    const messages = [...first, user('v', 'again', 'u.r0'), reply('v.r0', '', 'v', 'pending')]
+    const store = storeWith(messages)
     await renderWith(store, <ConversationView skey="s1" />)
     await screen.findByText('again')
     await act(async () => {})
     messageRenders.clear()
-    act(() =>
-      store.update([...store.data.messages.slice(0, 3), reply('v.r0', 'second answer', 'v')]),
-    )
+    act(() => update(store, [...messages.slice(0, 3), reply('v.r0', 'second answer', 'v')]))
     await screen.findByText('second answer')
     expect(messageRenders.get('v.r0')).toBeGreaterThan(0)
     for (const rkey of ['u', 'u.r0', 'v']) expect(messageRenders.get(rkey)).toBeUndefined()
@@ -337,25 +302,22 @@ describe('ConversationView', () => {
   it('syncs and shows a message written from another client', async () => {
     const fetch = vi.fn(async () => Response.json({}))
     stubFetch(fetch)
-    const store = fakeStore([user('u', 'question'), reply('u.r0', 'answer', 'u')])
+    const messages = [user('u', 'question'), reply('u.r0', 'answer', 'u')]
+    const store = storeWith(messages)
     await renderWith(store, <ConversationView skey="s1" />)
     await screen.findByText('answer')
-    await vi.waitFor(() => expect(store.worker.refreshConversation).toHaveBeenCalled())
-    store.worker.refreshConversation.mockClear()
-    // The refresh brings in a message another client wrote to the PDS.
-    store.worker.refreshConversation.mockImplementation(async () =>
-      act(() =>
-        store.update([
-          ...store.data.messages,
-          user('v', 'from my phone', 'u.r0', '2026-09-26T00:00:02Z'),
-        ]),
-      ),
-    )
+    await vi.waitFor(() => expect(store.api.fetchKeys).toHaveBeenCalled())
+    store.api.fetchConversation.mockClear()
+    // Another client writes a message to the PDS, which the refresh brings in.
+    store.remote('s1', {
+      info: { title: 'Tiles' },
+      messages: [...messages, user('v', 'from my phone', 'u.r0', '2026-09-26T00:00:02Z')],
+    })
     expect(screen.queryByText('from my phone')).toBeNull()
     await fromMenu('Sync this chat')
     expect(await screen.findByText('from my phone')).toBeInTheDocument()
     expect(String((writes(fetch)[0] as [string])[0])).toBe('/api/conversations/s1/sync')
-    expect(store.worker.refreshConversation).toHaveBeenCalledWith('s1')
+    expect(store.api.fetchConversation).toHaveBeenCalled()
   })
 })
 
@@ -368,7 +330,7 @@ describe('ConversationView fallback model', () => {
     })
     const answered = reply('u.r0', 'answer', 'u')
     answered.record.model = { provider: 'p', id: 'smart' }
-    const store = fakeStore([user('u', 'question'), answered])
+    const store = storeWith([user('u', 'question'), answered])
     await renderWith(store, <ConversationView skey="s1" />)
     await vi.waitFor(() =>
       expect(screen.getByLabelText('Model')).toHaveTextContent('Default · Smart'),
@@ -387,7 +349,7 @@ describe('ConversationView errors', () => {
       { provider: 'router', id: 'anthropic/claude', name: 'Claude', capabilities: caps },
     ]
     stubFetch(fetch, { '/api/models': { models, defaultModel: null } })
-    const store = fakeStore([user('u', 'question'), reply('u.r0', 'answer', 'u')])
+    const store = storeWith([user('u', 'question'), reply('u.r0', 'answer', 'u')])
     await renderWith(store, <ConversationView skey="s1" />)
     // Regenerate with shows once the models have loaded.
     await userEvent.click(await screen.findByRole('button', { name: 'More actions' }))
@@ -402,7 +364,7 @@ describe('ConversationView errors', () => {
     const fetch = vi.fn(async () => Response.json({ replyRkey: 'v.r1', status: 'claimed' }))
     const models = [{ provider: 'p', id: 'm', name: 'M', capabilities: caps }]
     stubFetch(fetch, { '/api/models': { models, defaultModel: null } })
-    const store = fakeStore([
+    const store = storeWith([
       user('u', 'first'),
       reply('u.r0', 'one', 'u'),
       user('v', 'second', 'u.r0', '2026-09-26T00:00:02Z'),
@@ -427,7 +389,7 @@ describe('ConversationView errors', () => {
         ),
       ),
     )
-    const store = fakeStore([user('u', 'question')])
+    const store = storeWith([user('u', 'question')])
     await renderWith(store, <ConversationView skey="s1" />)
     await userEvent.click(await screen.findByRole('button', { name: 'Tiles' }))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -437,7 +399,7 @@ describe('ConversationView errors', () => {
   it('closes the rename form once the title is saved', async () => {
     const fetch = vi.fn(async () => Response.json({}))
     stubFetch(fetch)
-    const store = fakeStore([user('u', 'question')])
+    const store = storeWith([user('u', 'question')])
     await renderWith(store, <ConversationView skey="s1" />)
     await userEvent.click(await screen.findByRole('button', { name: 'Tiles' }))
     await userEvent.clear(screen.getByRole('textbox', { name: 'Title' }))
@@ -449,15 +411,8 @@ describe('ConversationView errors', () => {
   })
 
   /** A store whose chat has the given instructions. */
-  const instructed = (systemPrompt: string) => {
-    const store = fakeStore([user('u', 'question')])
-    store.worker.getConversation.mockImplementation(async (skey: string) => ({
-      skey,
-      info: { title: 'Tiles', systemPrompt },
-      messages: store.data.messages,
-    }))
-    return store
-  }
+  const instructed = (systemPrompt: string) =>
+    storeWith([user('u', 'question')], 'active', { title: 'Tiles', systemPrompt })
 
   it("edits the chat's instructions from the More menu, starting from the stored ones", async () => {
     const fetch = vi.fn(async () => Response.json({}))
@@ -506,14 +461,9 @@ describe('ConversationView errors', () => {
   })
 
   it("doesn't offer the instructions until the chat's info record has loaded", async () => {
-    const store = fakeStore([])
     // A chat this device hasn't downloaded yet, while the PDS is still answering.
-    store.worker.getConversation.mockImplementation(async (skey: string) => ({
-      skey,
-      info: null,
-      messages: [],
-    }))
-    store.worker.refreshConversation.mockImplementation(() => new Promise(() => {}))
+    const store = testStore()
+    store.api.fetchConversation.mockImplementation(() => new Promise(() => {}))
     await renderWith(store, <ConversationView skey="s1" />)
     await userEvent.click(await screen.findByRole('button', { name: 'More' }))
     expect(screen.getByRole('button', { name: 'Instructions' })).toBeDisabled()
@@ -530,7 +480,7 @@ describe('ConversationView errors', () => {
           : Response.json({ cancelled: true }),
       ),
     )
-    const store = fakeStore([user('u', 'q'), reply('u.r0', '', 'u', 'pending')])
+    const store = storeWith([user('u', 'q'), reply('u.r0', '', 'u', 'pending')])
     await renderWith(store, <ConversationView skey="s1" />)
     await fromMenu('Sync this chat')
     expect(await screen.findByRole('alert')).toHaveTextContent('The PDS is unreachable')
@@ -540,17 +490,15 @@ describe('ConversationView errors', () => {
 
   it('says so when Stop has nothing to stop', async () => {
     stubFetch(vi.fn(async () => Response.json({ cancelled: false })))
-    const store = fakeStore([user('u', 'q'), reply('u.r0', '', 'u', 'pending')])
+    const store = storeWith([user('u', 'q'), reply('u.r0', '', 'u', 'pending')])
     await renderWith(store, <ConversationView skey="s1" />)
     await userEvent.click(await screen.findByRole('button', { name: 'Stop' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('may already be finishing')
   })
 
   it('shows why the conversation could not be loaded', async () => {
-    const store = fakeStore([])
-    store.worker.refreshConversation.mockRejectedValue(
-      new Error('GET returned 404: Space not found'),
-    )
+    const store = testStore()
+    store.api.fetchConversation.mockRejectedValue(new Error('GET returned 404: Space not found'))
     await renderWith(store, <ConversationView skey="s1" />)
     expect(await screen.findByRole('alert')).toHaveTextContent('Space not found')
   })
@@ -558,11 +506,11 @@ describe('ConversationView errors', () => {
 
 describe('BusyBanner', () => {
   it('appears only when the store is busy in another tab, and Use here claims it', async () => {
-    const store = fakeStore([], 'busy')
+    const store = testStore({ state: 'busy' })
     await renderWith(store, <BusyBanner />)
     expect(screen.getByRole('status')).toHaveTextContent('busy in another tab')
     await userEvent.click(screen.getByRole('button', { name: 'Use here' }))
-    expect(store.claim).toHaveBeenCalled()
+    expect(store.client.claim).toHaveBeenCalled()
     await vi.waitFor(() => expect(screen.queryByRole('status')).toBeNull())
   })
 })

@@ -7,30 +7,16 @@ import {
   useReplyFollower,
   useReplyStarted,
 } from '../../../src/features/conversation/reply-follower.ts'
-import type { StoreClient } from '../../../src/store/client.ts'
 import { StoreProvider, useConversation } from '../../../src/store/react.tsx'
 import { FakeEventSource, lastSource, stubEventSource } from '../../helpers/event-source.ts'
 import { renderAt } from '../../helpers/router.tsx'
+import { testStore } from '../../helpers/store.ts'
 
 const user: BranchMessage = { rkey: 'u', record: { role: 'user' } }
 const reply = (status: string): BranchMessage => ({
   rkey: 'u.r0',
   record: { role: 'assistant', parent: 'u', status },
 })
-
-/** A browser store that holds no chats, counting how often the conversation refreshes. */
-function fakeStore() {
-  return {
-    worker: {
-      getConversation: vi.fn(async (skey: string) => ({ skey, info: null, messages: [] })),
-      refreshConversation: vi.fn(async () => {}),
-      reconcileConversation: vi.fn(async () => {}),
-    },
-    state: () => 'active',
-    onState: () => () => {},
-    onChange: () => () => {},
-  }
-}
 
 let follow: (rkey: string) => void
 let setMessages: (messages: BranchMessage[]) => void
@@ -78,14 +64,15 @@ function Stream(props: ReplyProps) {
 }
 
 async function open(messages: BranchMessage[]) {
-  const store = fakeStore()
+  // A store that holds no chats, the conversation's messages coming from the test.
+  const store = testStore()
   const view = await renderAt(
-    <StoreProvider store={store as unknown as StoreClient}>
+    <StoreProvider store={store.client}>
       <Conversation messages={messages} />
     </StoreProvider>,
   )
   // The conversation has loaded and refreshed, so only the follower can rerender it now.
-  await vi.waitFor(() => expect(store.worker.reconcileConversation).toHaveBeenCalled())
+  await vi.waitFor(() => expect(store.api.fetchKeys).toHaveBeenCalled())
   await act(async () => {})
   return { store, view }
 }
@@ -118,9 +105,9 @@ describe('reply follower', () => {
     streamText('Hello')
     expect(await screen.findByText('Hello')).toBeInTheDocument()
     expect(screen.getByRole('heading')).toHaveTextContent('Started')
-    store.worker.refreshConversation.mockClear()
+    store.api.fetchConversation.mockClear()
     act(() => lastSource().emit('status', { status: 'complete' }))
-    await vi.waitFor(() => expect(store.worker.refreshConversation).toHaveBeenCalledWith('s1'))
+    await vi.waitFor(() => expect(store.api.fetchConversation).toHaveBeenCalled())
     expect(lastSource().closed).toBe(true)
     expect(screen.queryByText(/Not live/)).toBeNull()
   })
@@ -152,16 +139,16 @@ describe('reply follower', () => {
     const { store } = await open([user, reply('pending')])
     await vi.waitFor(() => expect(lastSource()).toBeDefined())
     streamText('Hel')
-    store.worker.refreshConversation.mockClear()
+    store.api.fetchConversation.mockClear()
     act(() => lastSource().onerror?.())
     expect(await screen.findByText('Not live: dropped')).toBeInTheDocument()
     expect(screen.getByText('Hel')).toBeInTheDocument()
     // Two seconds, then four more.
     await act(async () => vi.advanceTimersByTimeAsync(6_100))
-    expect(store.worker.refreshConversation).toHaveBeenCalledTimes(2)
+    expect(store.api.fetchConversation).toHaveBeenCalledTimes(2)
     act(() => setMessages([user, reply('complete')]))
     await act(async () => vi.advanceTimersByTimeAsync(30_000))
-    expect(store.worker.refreshConversation).toHaveBeenCalledTimes(2)
+    expect(store.api.fetchConversation).toHaveBeenCalledTimes(2)
   })
 
   it('treats an event it cannot read as a dropped stream', async () => {
@@ -176,13 +163,13 @@ describe('reply follower', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const { store } = await open([user, reply('pending')])
     await vi.waitFor(() => expect(lastSource()).toBeDefined())
-    store.worker.refreshConversation.mockClear()
+    store.api.fetchConversation.mockClear()
     await act(async () => lastSource().emit('status', { status: 'unknown' }))
     expect(await screen.findByText('Not live: elsewhere')).toBeInTheDocument()
     await act(async () => vi.advanceTimersByTimeAsync(1_000))
-    expect(store.worker.refreshConversation).not.toHaveBeenCalled()
+    expect(store.api.fetchConversation).not.toHaveBeenCalled()
     await act(async () => vi.advanceTimersByTimeAsync(1_100))
-    expect(store.worker.refreshConversation).toHaveBeenCalledTimes(1)
+    expect(store.api.fetchConversation).toHaveBeenCalledTimes(1)
     expect(FakeEventSource.instances).toHaveLength(1)
   })
 

@@ -9,22 +9,17 @@ import { PluginSettings } from '../../../src/features/settings/pages/PluginSetti
 import { PreferencesSettings } from '../../../src/features/settings/pages/PreferencesSettings.tsx'
 import { SettingsLayout } from '../../../src/features/settings/pages/SettingsLayout.tsx'
 import { SyncSettings } from '../../../src/features/settings/pages/SyncSettings.tsx'
-import type { StoreClient } from '../../../src/store/client.ts'
 import { StoreProvider } from '../../../src/store/react.tsx'
 import { renderAt } from '../../helpers/router.tsx'
 import { choose } from '../../helpers/select.ts'
+import { testStore } from '../../helpers/store.ts'
 
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
 })
 
-const store = {
-  state: () => 'active',
-  onState: () => () => {},
-  onChange: () => () => {},
-  deleteLocalCopy: vi.fn(async () => {}),
-} as unknown as StoreClient
+const store = testStore().client
 
 const caps = { vision: false, reasoning: false, tools: false }
 

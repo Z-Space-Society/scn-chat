@@ -1,13 +1,18 @@
 import * as Comlink from 'comlink'
+import type { ClientChange, StoreCalls } from './calls.ts'
 import { createHandover, type HandoverState } from './handover.ts'
 import { STORE_NAME } from './names.ts'
-import type { WorkerApi, WorkerChange } from './worker.ts'
+import type { WorkerApi } from './worker.ts'
 
+/**
+ * The user's store, as a tab holds it: its calls, which fail with StoreClosed while another tab
+ * holds it, and whether this tab does.
+ */
 export type StoreClient = {
-  worker: Comlink.Remote<WorkerApi>
+  calls: StoreCalls
   state: () => HandoverState
   onState: (listener: (state: HandoverState) => void) => () => void
-  onChange: (listener: (change: WorkerChange) => void) => () => void
+  onChange: (listener: (change: ClientChange) => void) => () => void
   claim: () => Promise<HandoverState>
   deleteLocalCopy: () => Promise<void>
 }
@@ -30,11 +35,11 @@ function startStore(did: string): StoreClient {
     new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' }),
   )
   const stateListeners = new Set<(state: HandoverState) => void>()
-  const changeListeners = new Set<(change: WorkerChange) => void>()
+  const changeListeners = new Set<(change: ClientChange) => void>()
   let firstOpen = true
 
   void worker.subscribe(
-    Comlink.proxy((change: WorkerChange) => {
+    Comlink.proxy((change: ClientChange) => {
       for (const listener of changeListeners) listener(change)
     }),
   )
@@ -47,13 +52,13 @@ function startStore(did: string): StoreClient {
       await worker.open(did)
       if (firstOpen) {
         firstOpen = false
-        void worker
+        void worker.calls
           .syncIndex()
-          .then(() => worker.reconcileIndex())
-          .then(() => worker.backgroundDownload())
+          .then(() => worker.calls.reconcileIndex())
+          .then(() => worker.calls.backgroundDownload())
           .catch((err) => console.warn('Store sync failed', err))
       } else {
-        void worker.syncIndex().catch((err) => console.warn('Store sync failed', err))
+        void worker.calls.syncIndex().catch((err) => console.warn('Store sync failed', err))
       }
     },
     pause: () => worker.pause(),
@@ -66,7 +71,7 @@ function startStore(did: string): StoreClient {
   void handover.claim()
 
   return {
-    worker,
+    calls: worker.calls,
     state: () => handover.state,
     onState: (listener) => {
       stateListeners.add(listener)

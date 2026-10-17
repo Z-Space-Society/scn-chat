@@ -13,7 +13,7 @@ The PDS is the source of truth, and the server keeps no copy of chat content. Re
 ### Runtime
 
 - `@sqlite.org/sqlite-wasm` runs in a dedicated Web Worker, using the `opfs-sahpool` VFS. That VFS persists to the origin private file system without the cross-origin isolation headers the other OPFS mode needs.
-- The UI talks to the worker through `comlink`, which exposes the worker's functions as async calls.
+- The UI talks to the worker through `comlink`. The worker exposes every method of the store's logic as an async call, each through one guard that fails while another tab holds the store and reports an ended session. The tab's `StoreClient` holds those calls along with the handover state.
 - There is one database file per account, named from a hash of the DID, so accounts on a shared browser stay separate.
 - Signing out deletes that account's database file. So does any 401 from the server, which means the session has lapsed, so chats are not left on a shared device after an expired session. The data is on the PDS, so a later sign-in resyncs it.
 - `opfs-sahpool` allows only one open connection per database, so only one tab holds the store at a time, and it moves to whichever tab the user is working in:
@@ -85,7 +85,7 @@ Changes are announced to the UI through a subscription, so screens rerender when
 - The handover cannot be guaranteed, because a frozen background tab cannot release its file handles. The banner covers that case.
 - The local tables also keep each record's CID, each index entry's CID, and when each conversation was last fetched. Reconciling compares CIDs, and the background download refetches conversations whose entry is newer than their last fetch.
 - Reconciling refetches the whole conversation, or the whole index, when anything differs, since the server has no per-record route.
-- The store logic runs over a small SQL interface, so tests run it on better-sqlite3 while the worker runs it on SQLite WebAssembly.
+- The store logic runs over a small SQL interface, so tests run it on better-sqlite3 while the worker runs it on SQLite WebAssembly. `StoreClient` has two adapters: the worker in the browser, and `testStore` in `tests/helpers/store.ts`, which runs the same logic and guard in the test's process. Component tests use it with a fake server API, so they go through the real reads, syncs, and change events rather than a hand-built store.
 - The worker, OPFS persistence, and reload survival need a real browser, so they are not covered by the jsdom tests.
 
 ## Acceptance Criteria

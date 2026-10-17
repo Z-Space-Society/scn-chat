@@ -107,7 +107,7 @@ export function useConversations(tag: string | null = null): {
   const { store, active, opening } = useActiveStore()
   const query = useInfiniteQuery({
     queryKey: ['conversations', 'list', tag],
-    queryFn: ({ pageParam }) => store.worker.listConversations({ after: pageParam, tag }),
+    queryFn: ({ pageParam }) => store.calls.listConversations({ after: pageParam, tag }),
     initialPageParam: null as ChatCursor | null,
     getNextPageParam: (page) => page.next ?? undefined,
     enabled: active,
@@ -129,7 +129,7 @@ export function useTags(): TagCount[] {
   const { store, active } = useActiveStore()
   const { data } = useQuery({
     queryKey: ['conversations', 'tags'],
-    queryFn: () => store.worker.listTags(),
+    queryFn: () => store.calls.listTags(),
     enabled: active,
   })
   return data ?? []
@@ -145,7 +145,7 @@ export function useLatestReplies(): Record<string, string | null> | null {
     queryKey: ['conversations', 'replies'],
     queryFn: async () =>
       Object.fromEntries(
-        (await store.worker.latestReplies()).map((chat) => [chat.skey, chat.latestReply]),
+        (await store.calls.latestReplies()).map((chat) => [chat.skey, chat.latestReply]),
       ),
     enabled: active,
   })
@@ -173,7 +173,7 @@ export function useRefreshConversation(): (skey: string) => Promise<void> {
 /** Sync the chat index now, as when another client may have changed it. */
 export function useSyncIndex(): () => Promise<void> {
   const store = useStore()
-  return () => store.worker.syncIndex()
+  return () => store.calls.syncIndex()
 }
 
 /** A conversation from the local copy, shown at once and refreshed from the PDS when opened. */
@@ -191,15 +191,15 @@ export function useConversation(skey: string): {
   const { store, active, opening } = useActiveStore()
   const local = useQuery({
     queryKey: ['conversation', skey],
-    queryFn: () => store.worker.getConversation(skey),
+    queryFn: () => store.calls.getConversation(skey),
     enabled: active,
   })
   // The refresh's changes arrive as store events, which update the local query.
   const refreshed = useQuery({
     queryKey: conversationRefreshKey(skey),
     queryFn: async () => {
-      await store.worker.refreshConversation(skey)
-      await store.worker.reconcileConversation(skey)
+      await store.calls.refreshConversation(skey)
+      await store.calls.reconcileConversation(skey)
       return true
     },
     enabled: active,
@@ -226,8 +226,8 @@ export function useChatSearch(query: string): {
     queryKey: ['search', query],
     queryFn: async () => {
       const [results, remaining] = await Promise.all([
-        store.worker.search(query),
-        store.worker.remainingDownloads(),
+        store.calls.search(query),
+        store.calls.remainingDownloads(),
       ])
       return { results, remaining }
     },
@@ -247,7 +247,7 @@ export function useSyncStatus(): SyncStatus | null {
   const { store, active } = useActiveStore()
   const { data } = useQuery({
     queryKey: ['sync-status'],
-    queryFn: () => store.worker.syncStatus(),
+    queryFn: () => store.calls.syncStatus(),
     enabled: active,
   })
   return data ?? null

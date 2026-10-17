@@ -1,13 +1,11 @@
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm'
 import * as Comlink from 'comlink'
-import { type StoreChange, StoreCore } from './core.ts'
-import { StoreClosed } from './errors.ts'
-import { httpApi, Unauthorized } from './http-api.ts'
+import { type ClientChange, storeCalls } from './calls.ts'
+import { StoreCore } from './core.ts'
+import { httpApi } from './http-api.ts'
 import { STORE_NAME } from './names.ts'
 import { ensureSchema } from './schema.ts'
 import type { SqlDb } from './sql.ts'
-
-export type WorkerChange = StoreChange | { type: 'unauthorized' }
 
 type Sqlite = Awaited<ReturnType<typeof sqlite3InitModule>>
 type Pool = Awaited<ReturnType<Sqlite['installOpfsSAHPoolVfs']>>
@@ -18,9 +16,9 @@ let pool: Pool | null | undefined
 let db: Database | undefined
 let core: StoreCore | undefined
 let events: EventSource | undefined
-const listeners = new Set<(change: WorkerChange) => void>()
+const listeners = new Set<(change: ClientChange) => void>()
 
-const emit = (change: WorkerChange) => {
+const emit = (change: ClientChange) => {
   for (const listener of listeners) listener(change)
 }
 
@@ -38,16 +36,7 @@ function adapt(database: Database): SqlDb {
   }
 }
 
-/** Run a store call, turning an ended session into an event the page can act on. */
-async function guard<T>(fn: (store: StoreCore) => Promise<T> | T): Promise<T> {
-  if (!core) throw new StoreClosed()
-  try {
-    return await fn(core)
-  } catch (err) {
-    if (err instanceof Unauthorized) emit({ type: 'unauthorized' })
-    throw err
-  }
-}
+const calls = storeCalls(() => core, emit)
 
 async function loadSqlite(): Promise<Sqlite> {
   sqlite ??= await sqlite3InitModule()
@@ -84,9 +73,9 @@ const api = {
     for (const type of ['conversation-changed', 'conversation-deleted', 'index-changed']) {
       events.addEventListener(type, (event) => {
         const data = JSON.parse((event as MessageEvent).data) as { skey?: string }
-        void guard((store) => store.handleEvent({ type, skey: data.skey })).catch((err: unknown) =>
-          console.warn('Live sync failed', type, err),
-        )
+        void calls
+          .handleEvent({ type, skey: data.skey })
+          .catch((err: unknown) => console.warn('Live sync failed', type, err))
       })
     }
   },
@@ -110,24 +99,12 @@ const api = {
     files.unlink(await fileFor(did))
   },
 
-  subscribe(listener: (change: WorkerChange) => void): void {
+  subscribe(listener: (change: ClientChange) => void): void {
     listeners.add(listener)
   },
 
-  listConversations: (options?: Parameters<StoreCore['listConversations']>[0]) =>
-    guard((store) => store.listConversations(options)),
-  listTags: () => guard((store) => store.listTags()),
-  latestReplies: () => guard((store) => store.latestReplies()),
-  getConversation: (skey: string) => guard((store) => store.getConversation(skey)),
-  syncIndex: () => guard((store) => store.syncIndex()),
-  refreshConversation: (skey: string) => guard((store) => store.refreshConversation(skey)),
-  reconcileIndex: () => guard((store) => store.reconcileIndex()),
-  reconcileConversation: (skey: string) => guard((store) => store.reconcileConversation(skey)),
-  backgroundDownload: () => guard((store) => store.backgroundDownload()),
-  search: (query: string, options?: { limit?: number; offset?: number }) =>
-    guard((store) => store.search(query, options)),
-  remainingDownloads: () => guard((store) => store.remainingDownloads()),
-  syncStatus: () => guard((store) => store.syncStatus()),
+  // Marked as a proxy, so the page calls these methods where they are rather than copying them.
+  calls: Comlink.proxy(calls),
 }
 
 export type WorkerApi = typeof api

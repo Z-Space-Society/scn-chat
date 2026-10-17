@@ -3,11 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useChat, useStartChat } from '../../../src/features/conversation/chat.ts'
 import { useBranch } from '../../../src/features/conversation/hooks/useBranch.ts'
 import type { BranchMessage } from '../../../src/features/conversation/lib/branch.ts'
-import type { StoreClient } from '../../../src/store/client.ts'
 import { StoreProvider } from '../../../src/store/react.tsx'
 import { FakeEventSource, stubEventSource } from '../../helpers/event-source.ts'
 import { stubFetch, writes } from '../../helpers/fetch.ts'
 import { renderAt } from '../../helpers/router.tsx'
+import { testStore } from '../../helpers/store.ts'
 
 const text = (value: string) => ({
   $type: 'network.sharedcomputer.chat.defs#textPart',
@@ -21,20 +21,6 @@ const reply = (rkey: string, parent: string, status = 'complete'): BranchMessage
   rkey,
   record: { role: 'assistant', parent, status, content: { parts: [] } },
 })
-
-/** A browser store holding conversation `s1` with these messages. */
-function fakeStore(messages: BranchMessage[]) {
-  return {
-    worker: {
-      getConversation: vi.fn(async (skey: string) => ({ skey, info: null, messages })),
-      refreshConversation: vi.fn(async () => {}),
-      reconcileConversation: vi.fn(async () => {}),
-    },
-    state: () => 'active',
-    onState: () => () => {},
-    onChange: () => () => {},
-  }
-}
 
 let chat: ReturnType<typeof useChat>
 const onTurnStarted = vi.fn()
@@ -50,16 +36,17 @@ function Chat() {
 }
 
 async function open(messages: BranchMessage[], path = '/chat/s1') {
-  const store = fakeStore(messages)
+  const store = testStore()
+  store.held('s1', { messages })
   const view = await renderAt(
-    <StoreProvider store={store as unknown as StoreClient}>
+    <StoreProvider store={store.client}>
       <Chat />
     </StoreProvider>,
     path,
   )
   // The local copy has answered and the check from opening has finished.
   await vi.waitFor(() => expect(chat.loaded).toBe(true))
-  await vi.waitFor(() => expect(store.worker.reconcileConversation).toHaveBeenCalled())
+  await vi.waitFor(() => expect(store.api.fetchKeys).toHaveBeenCalled())
   await act(async () => {})
   return { store, ...view }
 }
@@ -87,7 +74,7 @@ describe('useChat', () => {
     expect(streamsOpened()).toContain('/api/conversations/s1/messages/u2.r0/stream')
     expect(shown()).toMatch(/^u2 · /)
     expect(onTurnStarted).toHaveBeenCalledTimes(1)
-    await vi.waitFor(() => expect(store.worker.refreshConversation).toHaveBeenCalledTimes(2))
+    await vi.waitFor(() => expect(store.api.fetchConversation).toHaveBeenCalledTimes(2))
   })
 
   it('regenerates a reply as a turn too: following it, showing it, and calling back', async () => {

@@ -4,10 +4,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MeContext } from '../../../../src/features/auth/session.ts'
 import { ChatList } from '../../../../src/features/chat-list/components/ChatList.tsx'
 import { resetSeenCache } from '../../../../src/features/chat-list/lib/seen.ts'
-import type { StoreClient } from '../../../../src/store/client.ts'
 import { StoreProvider } from '../../../../src/store/react.tsx'
 import { stubFetch, writes } from '../../../helpers/fetch.ts'
 import { renderAt } from '../../../helpers/router.tsx'
+import { type HeldMessage, type TestStore, testStore } from '../../../helpers/store.ts'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -17,209 +17,144 @@ async function openSearch() {
   return screen.getByRole('searchbox', { name: 'Search chats' })
 }
 
-type Chat = { skey: string; tags: string[]; latestReply?: string | null }
+const text = (value: string) => ({
+  $type: 'network.sharedcomputer.chat.defs#plainContent',
+  parts: [{ $type: 'network.sharedcomputer.chat.defs#textPart', text: value }],
+})
+const said = (rkey: string, value: string): HeldMessage => ({
+  rkey,
+  record: { role: 'user', content: text(value), createdAt: '2026-09-26T00:00:00Z' },
+})
+const answered = (rkey: string, parent: string, status = 'complete'): HeldMessage => ({
+  rkey,
+  record: {
+    role: 'assistant',
+    parent,
+    status,
+    content: text('answer'),
+    createdAt: '2026-09-26T00:00:01Z',
+  },
+})
 
 /**
- * The store's list, tags, and newest replies over `chats`, read each time they're asked for, as
- * one page, or one page of a tag.
+ * A store with the chats Tiles and Paint, whose message says "blue walls", and two chats this
+ * device hasn't downloaded yet.
  */
-function listing(chats: () => Chat[]) {
-  return {
-    listConversations: vi.fn(
-      async (options?: {
-        tag?: string | null
-        after?: unknown
-      }): Promise<{
-        chats: Chat[]
-        next: { updatedAt: string; skey: string } | null
-      }> => ({
-        chats: chats().filter((chat) => !options?.tag || chat.tags.includes(options.tag)),
-        next: null,
-      }),
-    ),
-    listTags: vi.fn(async () => {
-      const counts = new Map<string, number>()
-      for (const tag of chats().flatMap((chat) => chat.tags))
-        counts.set(tag, (counts.get(tag) ?? 0) + 1)
-      return [...counts].map(([tag, count]) => ({ tag, count }))
-    }),
-    latestReplies: vi.fn(async () =>
-      chats().map((chat) => ({ skey: chat.skey, latestReply: chat.latestReply ?? null })),
-    ),
-  }
+async function listStore() {
+  const store = testStore()
+  await store.chats([
+    { skey: 'a', title: 'Tiles' },
+    { skey: 'b', title: 'Paint' },
+    { skey: 'x' },
+    { skey: 'y' },
+  ])
+  store.held('a', { messages: [said('a', 'grout lines')] })
+  store.held('b', { messages: [said('b', 'blue walls')] })
+  return store
 }
 
-function fakeStore(
-  chats: Chat[] = [{ skey: 'a', uri: 'u', title: 'Tiles', tags: [], updatedAt: 't' } as Chat],
-) {
-  let current = chats
-  return {
-    setChats: (next: Chat[]) => {
-      current = next
-    },
-    worker: {
-      ...listing(() => current),
-      search: vi.fn(async () => [
-        { skey: 'b', title: 'Paint', rkey: 'm1', role: 'user', snippet: 'blue', time: 't' },
-      ]),
-      remainingDownloads: vi.fn(async () => 2),
-    },
-    state: () => 'active',
-    onState: () => () => {},
-    onChange: () => () => {},
-    deleteLocalCopy: vi.fn(async () => {}),
-  }
+async function renderList(store: TestStore, path?: string) {
+  return renderAt(
+    <StoreProvider store={store.client}>
+      <ChatList />
+    </StoreProvider>,
+    path,
+  )
 }
+
+/** The search's result for Paint's message, which the hidden list doesn't count as. */
+const paintResult = () => screen.findByRole('link', { name: /blue walls/ })
 
 describe('ChatList', () => {
   it('shows skeleton rows until the chat index first syncs, then the chats', async () => {
-    const store = fakeStore()
-    const status = { syncedAt: null as string | null, remaining: 0 }
-    store.setChats([])
-    Object.assign(store.worker, { syncStatus: vi.fn(async () => status) })
-    await renderAt(
-      <StoreProvider store={store as unknown as StoreClient}>
-        <ChatList />
-      </StoreProvider>,
-    )
+    await renderList(testStore())
     expect(await screen.findByText('Loading chats')).toBeInTheDocument()
   })
 
   it('shows no skeleton once the list has its chats', async () => {
-    await renderAt(
-      <StoreProvider store={fakeStore() as unknown as StoreClient}>
-        <ChatList />
-      </StoreProvider>,
-    )
+    await renderList(await listStore())
     expect(await screen.findByText('Tiles')).toBeInTheDocument()
     expect(screen.queryByText('Loading chats')).toBeNull()
   })
 
   it('reloads the list when the store reports a change to the chat index', async () => {
-    const listeners = new Set<(change: { type: string }) => void>()
-    const store = {
-      ...fakeStore(),
-      onChange: (listener: (change: { type: string }) => void) => {
-        listeners.add(listener)
-        return () => void listeners.delete(listener)
-      },
-    }
-    await renderAt(
-      <StoreProvider store={store as unknown as StoreClient}>
-        <ChatList />
-      </StoreProvider>,
-    )
+    const store = await listStore()
+    await renderList(store)
     expect(await screen.findByText('Tiles')).toBeInTheDocument()
-    store.setChats([{ skey: 'c', uri: 'u', title: 'Grout', tags: [], updatedAt: 't' } as Chat])
-    for (const listener of listeners) listener({ type: 'index' })
+    await act(() => store.chats([{ skey: 'c', title: 'Grout' }]))
     expect(await screen.findByText('Grout')).toBeInTheDocument()
+    expect(screen.queryByText('Tiles')).toBeNull()
   })
 
   it('replaces the list with local search results while a query is active', async () => {
     const fetch = vi.fn(async () => Response.json({}))
     vi.stubGlobal('fetch', fetch)
-    const store = fakeStore()
-    await renderAt(
-      <StoreProvider store={store as unknown as StoreClient}>
-        <ChatList />
-      </StoreProvider>,
-    )
+    const store = await listStore()
+    const search = vi.spyOn(store.client.calls, 'search')
+    await renderList(store)
     expect(await screen.findByText('Tiles')).toBeInTheDocument()
     await userEvent.type(await openSearch(), 'blue')
-    expect(await screen.findByText('Paint')).toBeInTheDocument()
+    expect(await paintResult()).toBeInTheDocument()
     // The list stays mounted, hidden, so closing the search brings it back as it was.
     expect(screen.getByText('Tiles')).not.toBeVisible()
     expect(screen.getByRole('status')).toHaveTextContent('Still downloading 2 chats.')
-    expect(store.worker.search).toHaveBeenLastCalledWith('blue')
+    expect(search).toHaveBeenLastCalledWith('blue')
     expect(fetch).not.toHaveBeenCalled()
   })
 
   it('keeps the settled search in the URL', async () => {
-    const store = fakeStore()
-    const { router } = await renderAt(
-      <StoreProvider store={store as unknown as StoreClient}>
-        <ChatList />
-      </StoreProvider>,
-    )
+    const { router } = await renderList(await listStore())
     await userEvent.type(await openSearch(), 'blue')
     await vi.waitFor(() => expect(router.state.location.search).toEqual({ q: 'blue' }))
   })
 
   it('starts from the search in the URL', async () => {
-    const store = fakeStore()
-    await renderAt(
-      <StoreProvider store={store as unknown as StoreClient}>
-        <ChatList />
-      </StoreProvider>,
-      '/?q=blue',
-    )
+    await renderList(await listStore(), '/?q=blue')
     expect(screen.getByRole('searchbox', { name: 'Search chats' })).toHaveValue('blue')
-    expect(await screen.findByText('Paint')).toBeInTheDocument()
+    expect(await paintResult()).toBeInTheDocument()
   })
 
   it('waits for two characters before searching', async () => {
-    const store = fakeStore()
-    await renderAt(
-      <StoreProvider store={store as unknown as StoreClient}>
-        <ChatList />
-      </StoreProvider>,
-    )
+    const store = await listStore()
+    const search = vi.spyOn(store.client.calls, 'search')
+    await renderList(store)
     await userEvent.type(await openSearch(), 'b')
     await new Promise((resolve) => setTimeout(resolve, 200))
-    expect(store.worker.search).not.toHaveBeenCalled()
-    expect(screen.getByText('Tiles')).toBeInTheDocument()
+    expect(search).not.toHaveBeenCalled()
+    expect(screen.getByText('Tiles')).toBeVisible()
   })
 
   it('shows the list again when the query drops below two characters', async () => {
-    const store = fakeStore()
-    await renderAt(
-      <StoreProvider store={store as unknown as StoreClient}>
-        <ChatList />
-      </StoreProvider>,
-    )
+    await renderList(await listStore())
     const box = await openSearch()
     await userEvent.type(box, 'bl')
-    expect(await screen.findByText('Paint')).toBeInTheDocument()
+    expect(await paintResult()).toBeInTheDocument()
     await userEvent.type(box, '{Backspace}')
-    expect(await screen.findByText('Tiles')).toBeInTheDocument()
+    await vi.waitFor(() => expect(screen.getByText('Tiles')).toBeVisible())
   })
 
   it('searches once typing pauses, not on every character', async () => {
-    const store = fakeStore()
-    await renderAt(
-      <StoreProvider store={store as unknown as StoreClient}>
-        <ChatList />
-      </StoreProvider>,
-    )
+    const store = await listStore()
+    const search = vi.spyOn(store.client.calls, 'search')
+    await renderList(store)
     await userEvent.type(await openSearch(), 'blue')
-    expect(await screen.findByText('Paint')).toBeInTheDocument()
-    expect(store.worker.search.mock.calls).toEqual([['blue']])
+    expect(await paintResult()).toBeInTheDocument()
+    expect(search.mock.calls).toEqual([['blue']])
   })
 
   it('shows the list again when the query is cleared', async () => {
-    const store = fakeStore()
-    await renderAt(
-      <StoreProvider store={store as unknown as StoreClient}>
-        <ChatList />
-      </StoreProvider>,
-    )
+    await renderList(await listStore())
     const box = await openSearch()
     await userEvent.type(box, 'blue')
-    expect(await screen.findByText('Paint')).toBeInTheDocument()
+    expect(await paintResult()).toBeInTheDocument()
     await userEvent.clear(box)
-    expect(await screen.findByText('Tiles')).toBeInTheDocument()
+    await vi.waitFor(() => expect(screen.getByText('Tiles')).toBeVisible())
   })
 
   it('opens a new chat without creating one until its first message', async () => {
     const fetch = vi.fn(async () => Response.json({}))
     vi.stubGlobal('fetch', fetch)
-    const store = fakeStore()
-    const { router } = await renderAt(
-      <StoreProvider store={store as unknown as StoreClient}>
-        <ChatList />
-      </StoreProvider>,
-      '/chat/s1',
-    )
+    const { router } = await renderList(await listStore(), '/chat/s1')
     await userEvent.click(screen.getByRole('button', { name: 'New chat' }))
     await vi.waitFor(() => expect(router.state.location.pathname).toBe('/'))
     expect(fetch).not.toHaveBeenCalled()
@@ -228,15 +163,11 @@ describe('ChatList', () => {
   it('signs out and deletes the local copy', async () => {
     const fetch = vi.fn(async () => Response.json({ ok: true }))
     vi.stubGlobal('fetch', fetch)
-    const store = fakeStore()
-    await renderAt(
-      <StoreProvider store={store as unknown as StoreClient}>
-        <ChatList />
-      </StoreProvider>,
-    )
+    const store = await listStore()
+    await renderList(store)
     await userEvent.click(screen.getByRole('button', { name: 'Account' }))
     await userEvent.click(screen.getByRole('button', { name: 'Sign out' }))
-    await vi.waitFor(() => expect(store.deleteLocalCopy).toHaveBeenCalled())
+    await vi.waitFor(() => expect(store.client.deleteLocalCopy).toHaveBeenCalled())
     expect(String((fetch.mock.calls[0] as unknown as [string])[0])).toBe('/api/logout')
   })
 
@@ -247,16 +178,12 @@ describe('ChatList', () => {
         Response.json({ error: 'Forbidden', message: 'Cross-origin' }, { status: 403 }),
       ),
     )
-    const store = fakeStore()
-    await renderAt(
-      <StoreProvider store={store as unknown as StoreClient}>
-        <ChatList />
-      </StoreProvider>,
-    )
+    const store = await listStore()
+    await renderList(store)
     await userEvent.click(screen.getByRole('button', { name: 'Account' }))
     await userEvent.click(screen.getByRole('button', { name: 'Sign out' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Cross-origin')
-    expect(store.deleteLocalCopy).not.toHaveBeenCalled()
+    expect(store.client.deleteLocalCopy).not.toHaveBeenCalled()
   })
 
   it('shows why deleting the local copy failed after signing out', async () => {
@@ -264,13 +191,11 @@ describe('ChatList', () => {
       'fetch',
       vi.fn(async () => Response.json({ ok: true })),
     )
-    const store = fakeStore()
-    store.deleteLocalCopy.mockRejectedValue(new Error('Another tab is using this device copy.'))
-    await renderAt(
-      <StoreProvider store={store as unknown as StoreClient}>
-        <ChatList />
-      </StoreProvider>,
+    const store = await listStore()
+    vi.mocked(store.client.deleteLocalCopy).mockRejectedValue(
+      new Error('Another tab is using this device copy.'),
     )
+    await renderList(store)
     await userEvent.click(screen.getByRole('button', { name: 'Account' }))
     await userEvent.click(screen.getByRole('button', { name: 'Sign out' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Another tab')
@@ -281,35 +206,6 @@ describe('ChatList sidebar', () => {
   const now = new Date()
   const hoursAgo = (h: number) => new Date(now.getTime() - h * 3_600_000).toISOString()
   const daysAgo = (d: number) => new Date(now.getTime() - d * 86_400_000).toISOString()
-  const chats = [
-    {
-      skey: 'a',
-      uri: 'u',
-      title: 'Tiles',
-      tags: ['home'],
-      updatedAt: hoursAgo(0),
-      pending: true,
-      latestReply: null,
-    },
-    {
-      skey: 'b',
-      uri: 'u',
-      title: 'Paint',
-      tags: ['home', 'diy'],
-      updatedAt: hoursAgo(0),
-      pending: false,
-      latestReply: 'b.r1',
-    },
-    {
-      skey: 'c',
-      uri: 'u',
-      title: 'Taxes',
-      tags: [],
-      updatedAt: daysAgo(40),
-      pending: false,
-      latestReply: 'c.r0',
-    },
-  ]
   const me = {
     did: 'did:plc:alice',
     handle: 'alice.test',
@@ -321,22 +217,38 @@ describe('ChatList sidebar', () => {
     accessMessage: null,
   }
 
-  function sidebarStore() {
-    const store = fakeStore(chats)
-    return {
-      ...store,
-      worker: {
-        ...store.worker,
-        syncIndex: vi.fn(async () => {}),
-        syncStatus: vi.fn(async () => ({ syncedAt: new Date().toISOString(), remaining: 0 })),
-      },
-    }
+  /**
+   * A store with three chats: Tiles, replying now, Paint, with two replies, both updated today, and
+   * Taxes, with one reply, from last month. `more` adds chats after them.
+   */
+  async function sidebarStore(more: { skey: string; title: string; updatedAt: string }[] = []) {
+    const store = testStore()
+    await store.chats([
+      { skey: 'a', title: 'Tiles', tags: ['home'], updatedAt: hoursAgo(0) },
+      { skey: 'b', title: 'Paint', tags: ['home', 'diy'], updatedAt: hoursAgo(0) },
+      { skey: 'c', title: 'Taxes', updatedAt: daysAgo(40) },
+      ...more,
+    ])
+    store.held('a', { messages: [said('a', 'q'), answered('a.r0', 'a', 'pending')] })
+    store.held('b', { messages: [said('b', 'q'), answered('b.r0', 'b'), answered('b.r1', 'b')] })
+    store.held('c', { messages: [said('c', 'q'), answered('c.r0', 'c')] })
+    store.api.fetchIndex.mockClear()
+    return store
   }
 
-  async function renderSidebar(store = sidebarStore()) {
+  /** Show the list a page of `pageSize` chats at a time, rather than the store's usual 50. */
+  function pagedBy(store: TestStore, pageSize: number) {
+    const list = store.client.calls.listConversations
+    vi.spyOn(store.client.calls, 'listConversations').mockImplementation((options) =>
+      list({ ...options, limit: pageSize }),
+    )
+  }
+
+  async function renderSidebar(storeOrNot?: TestStore) {
+    const store = storeOrNot ?? (await sidebarStore())
     await renderAt(
       <MeContext.Provider value={me}>
-        <StoreProvider store={store as unknown as StoreClient}>
+        <StoreProvider store={store.client}>
           <ChatList />
         </StoreProvider>
       </MeContext.Provider>,
@@ -362,14 +274,10 @@ describe('ChatList sidebar', () => {
 
   it('lists each tag with its count, filters by one, and clears the filter', async () => {
     stubFetch()
-    const store = await renderSidebar()
+    await renderSidebar()
     const filter = screen.getByRole('list', { name: 'Filter by tag' })
     expect(within(filter).getByRole('button', { name: 'home, 2 chats' })).toBeInTheDocument()
     await userEvent.click(within(filter).getByRole('button', { name: 'diy, 1 chat' }))
-    // The store pages through only the tag's chats.
-    expect(store.worker.listConversations).toHaveBeenLastCalledWith(
-      expect.objectContaining({ tag: 'diy' }),
-    )
     await vi.waitFor(() => expect(screen.queryByText('Tiles')).toBeNull())
     expect(screen.getByText('Paint')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Clear the tag filter' }))
@@ -409,7 +317,7 @@ describe('ChatList sidebar', () => {
     const title = screen.getByRole('textbox', { name: 'Title' })
     await userEvent.clear(title)
     await userEvent.type(title, 'Tax return{Enter}')
-    await vi.waitFor(() => expect(store.worker.syncIndex).toHaveBeenCalled())
+    await vi.waitFor(() => expect(store.api.fetchIndex).toHaveBeenCalled())
     await userEvent.click(screen.getByRole('button', { name: 'More for Taxes' }))
     await userEvent.click(screen.getByRole('button', { name: 'Edit tags' }))
     await userEvent.type(
@@ -442,7 +350,7 @@ describe('ChatList sidebar', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
     expect(screen.getByText('Delete “Paint” for good?')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Delete chat' }))
-    await vi.waitFor(() => expect(store.worker.syncIndex).toHaveBeenCalled())
+    await vi.waitFor(() => expect(store.api.fetchIndex).toHaveBeenCalled())
     const [deleted] = writes(fetch) as [[string, RequestInit]]
     expect(deleted[0]).toBe('/api/conversations/b')
     expect(deleted[1].method).toBe('DELETE')
@@ -460,15 +368,23 @@ describe('ChatList sidebar', () => {
 
   it('seeds the seen replies from every chat, including those on pages not loaded yet', async () => {
     stubFetch()
-    const store = sidebarStore()
-    store.worker.latestReplies.mockResolvedValue([
-      { skey: 'b', latestReply: 'b.r1' },
-      { skey: 'z', latestReply: 'z.r4' },
-    ])
+    const store = await sidebarStore([{ skey: 'z', title: 'Old', updatedAt: daysAgo(400) }])
+    store.held('z', { messages: [said('z', 'q'), answered('z.r4', 'z')] })
+    pagedBy(store, 3)
+    // The end of the list never comes into view.
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        observe() {}
+        disconnect() {}
+      },
+    )
     await renderSidebar(store)
+    expect(screen.queryByText('Old')).toBeNull()
     await vi.waitFor(() =>
       expect(JSON.parse(localStorage.getItem('scn-chat:seen:did:plc:alice') ?? '{}')).toEqual({
         b: 'b.r1',
+        c: 'c.r0',
         z: 'z.r4',
       }),
     )
@@ -487,16 +403,11 @@ describe('ChatList sidebar', () => {
         disconnect() {}
       },
     )
-    const store = sidebarStore()
-    const [first, second, third] = chats
-    store.worker.listConversations.mockImplementation(async (options?: { after?: unknown }) =>
-      options?.after
-        ? { chats: [third as Chat], next: null }
-        : { chats: [first, second] as Chat[], next: { updatedAt: 't', skey: 'b' } },
-    )
+    const store = await sidebarStore()
+    pagedBy(store, 2)
     await renderAt(
       <MeContext.Provider value={me}>
-        <StoreProvider store={store as unknown as StoreClient}>
+        <StoreProvider store={store.client}>
           <ChatList />
         </StoreProvider>
       </MeContext.Provider>,
@@ -505,9 +416,6 @@ describe('ChatList sidebar', () => {
     expect(screen.queryByText('Taxes')).toBeNull()
     await act(async () => reach.at(-1)?.())
     expect(await screen.findByText('Taxes')).toBeInTheDocument()
-    expect(store.worker.listConversations).toHaveBeenLastCalledWith(
-      expect.objectContaining({ after: { updatedAt: 't', skey: 'b' } }),
-    )
   })
 
   it('treats replies from before this device kept track as seen', async () => {
@@ -528,7 +436,7 @@ describe('ChatList sidebar', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Account' }))
     expect(screen.getByText('Stored on your PDS')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Sync chats' }))
-    await vi.waitFor(() => expect(store.worker.syncIndex).toHaveBeenCalled())
+    await vi.waitFor(() => expect(store.api.fetchIndex).toHaveBeenCalled())
   })
 
   it('opens Settings, Admin, and Sign out from the account, and closes on Escape', async () => {

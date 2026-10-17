@@ -1,52 +1,38 @@
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getRouter } from '../src/router.tsx'
 import { stubFetch } from './helpers/fetch.ts'
+import { type TestStore, testStore } from './helpers/store.ts'
 
-const { openStore, question, store } = vi.hoisted(() => {
-  const question = {
-    rkey: 'u',
-    author: 'did:plc:alice',
-    cid: 'c-u',
-    record: {
-      role: 'user',
-      content: {
-        $type: 'network.sharedcomputer.chat.defs#plainContent',
-        parts: [{ $type: 'network.sharedcomputer.chat.defs#textPart', text: 'Which tiles?' }],
-      },
-      createdAt: '2026-09-26T00:00:00Z',
-    },
-  }
-  const store = {
-    worker: {
-      listConversations: async () => ({ chats: [], next: null }),
-      listTags: async () => [],
-      latestReplies: async () => [],
-      getConversation: async (skey: string) => ({ skey, info: {}, messages: [question] }),
-      refreshConversation: async () => {},
-      reconcileConversation: async () => {},
-      search: async () => [
-        { skey: 's1', title: 'Tiles', rkey: 'u', role: 'user', snippet: 'tiles', time: '' },
-      ],
-      remainingDownloads: async () => 0,
-      syncStatus: async () => ({ syncedAt: '2026-09-26T00:00:00Z', remaining: 0 }),
-    },
-    state: () => 'active',
-    onState: () => () => {},
-    onChange: vi.fn((_listener: (change: { type: string }) => void) => () => {}),
-    claim: async () => 'active',
-    deleteLocalCopy: vi.fn(async () => {}),
-  }
-  return { store, question, openStore: vi.fn(() => store) }
-})
+const { openStore } = vi.hoisted(() => ({ openStore: vi.fn() }))
 vi.mock('../src/store/client.ts', () => ({ openStore }))
+
+const question = {
+  rkey: 'u',
+  record: {
+    role: 'user',
+    content: {
+      $type: 'network.sharedcomputer.chat.defs#plainContent',
+      parts: [{ $type: 'network.sharedcomputer.chat.defs#textPart', text: 'Which tiles?' }],
+    },
+    createdAt: '2026-09-26T00:00:00Z',
+  },
+}
+
+/** The user's store, holding one untitled chat, `s1`, that asks "Which tiles?". */
+let store: TestStore
+beforeEach(async () => {
+  store = testStore()
+  await store.chats([{ skey: 's1' }])
+  store.held('s1', { info: {}, messages: [question] })
+  openStore.mockImplementation(() => store.client)
+})
 
 afterEach(() => {
   vi.unstubAllGlobals()
-  openStore.mockClear()
-  store.deleteLocalCopy.mockClear()
+  openStore.mockReset()
 })
 
 /**
@@ -211,10 +197,9 @@ describe('App', () => {
     expect(
       await screen.findByRole('heading', { name: 'What can I help with?' }),
     ).toBeInTheDocument()
-    const listener = store.onChange.mock.calls.at(-1)?.[0]
-    listener?.({ type: 'unauthorized' })
+    store.emit({ type: 'unauthorized' })
     await vi.waitFor(() => expect(assign).toHaveBeenCalledWith('/login'))
-    expect(store.deleteLocalCopy).toHaveBeenCalled()
+    expect(store.client.deleteLocalCopy).toHaveBeenCalled()
   })
 
   it('sends users who are not admins from the admin area to their chats', async () => {
@@ -239,7 +224,7 @@ describe('App', () => {
     const rebuild = await screen.findByRole('button', { name: "Rebuild this device's copy" })
     expect(openStore).not.toHaveBeenCalled()
     await userEvent.click(rebuild)
-    await vi.waitFor(() => expect(store.deleteLocalCopy).toHaveBeenCalled())
+    await vi.waitFor(() => expect(store.client.deleteLocalCopy).toHaveBeenCalled())
     expect(openStore).toHaveBeenCalledWith('did:plc:alice')
   })
 
@@ -252,7 +237,7 @@ describe('App', () => {
     const router = renderApp('/chat/s1?q=tiles')
     expect(await screen.findByText('Which tiles?')).toBeInTheDocument()
     const scrollTo = vi.spyOn(window, 'scrollTo')
-    await userEvent.click(await screen.findByRole('link', { name: /^You:\s*tiles/ }))
+    await userEvent.click(await screen.findByRole('link', { name: /^You:.*tiles/ }))
     expect(router.state.location.search).toMatchObject({ m: 'u' })
     await vi.waitFor(() => expect(scrolled).toHaveBeenCalledWith('m-u'))
     // The router's reset to the top would otherwise run after it.
@@ -263,7 +248,7 @@ describe('App', () => {
     signedIn()
     Element.prototype.scrollIntoView = () => {}
     const router = renderApp('/?q=tiles')
-    await userEvent.click(await screen.findByRole('link', { name: /^You:\s*tiles/ }))
+    await userEvent.click(await screen.findByRole('link', { name: /^You:.*tiles/ }))
     await vi.waitFor(() => expect(router.state.location.pathname).toBe('/chat/s1'))
     expect(router.state.location.search).toEqual({ q: 'tiles', m: 'u' })
     const box = screen.getByRole('searchbox', { name: 'Search chats' })
