@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef } from 'react'
 import { ModelSelect } from '../../models/components/ModelSelect.tsx'
-import { leaveDraft, restoreDraft, takeDraft } from '../lib/composer-handoff.ts'
+import { leaveText, restoreText, takeText } from '../lib/composer-handoff.ts'
 import {
   AttachButton,
   ComposerCard,
@@ -27,10 +27,10 @@ export function ComposerFrame(props: Props) {
     const element = box.current
     if (!element) return
     // A frame can take another's place, as the conversation's takes the page's.
-    const draft = takeDraft()
-    if (draft) restoreDraft(element, draft)
+    const left = takeText()
+    if (left) restoreText(element, left)
     // The box is still on the page as the frame gives way, so what it holds can be read then.
-    return () => leaveDraft(element)
+    return () => leaveText(element)
   }, [])
   return (
     <ComposerDock>

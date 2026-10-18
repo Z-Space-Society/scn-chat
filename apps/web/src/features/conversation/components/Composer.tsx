@@ -1,35 +1,25 @@
 import type { ModelRef } from '@scn-chat/lexicons'
-import { nsid } from '@scn-chat/lexicons/nsid'
-import { useStore as useFormStore } from '@tanstack/react-form'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import {
   type ReactNode,
   type Ref,
   type RefObject,
-  useId,
   useImperativeHandle,
   useLayoutEffect,
   useRef,
-  useState,
 } from 'react'
 import { cn } from '../../../shared/cn.ts'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
-import { messageOf } from '../../../shared/errors.ts'
-import { useAppForm } from '../../../shared/form.tsx'
 import { CloseIcon, PencilIcon } from '../../../shared/icons.tsx'
 import { touchOnly } from '../../../shared/touch.ts'
 import { Button } from '../../../shared/ui/Button.tsx'
 import { EffortSelect } from '../../models/components/EffortSelect.tsx'
 import { ModelSelect } from '../../models/components/ModelSelect.tsx'
-import { useModels } from '../../models/hooks/useModels.ts'
-import { lastEffort, rememberEffort } from '../../models/last-effort.ts'
-import { sameModel } from '../../models/models.ts'
-import { attachmentTypesQuery } from '../attachment-types.ts'
+import { rememberEffort } from '../../models/last-effort.ts'
 import type { OutgoingMessage } from '../chat.ts'
-import { useAttachments } from '../hooks/useAttachments.ts'
 import { useAutoGrow } from '../hooks/useAutoGrow.ts'
-import { restoreDraft, takeDraft } from '../lib/composer-handoff.ts'
+import { type Blocked, useDraft } from '../hooks/useDraft.ts'
+import { restoreText, takeText } from '../lib/composer-handoff.ts'
 import { AttachmentChips, removeChip } from './AttachmentChips.tsx'
 import {
   AttachButton,
@@ -76,28 +66,6 @@ export interface ComposerHandle {
   attach: (files: File[]) => void
 }
 
-interface Draft {
-  text: string
-  /** The chosen model by reference, so its capabilities come from the current catalog. */
-  model: ModelRef | null
-  effort: string
-}
-
-/** A passage quoted from a reply, held apart from the draft until the message is sent. */
-type Quote = { id: string; text: string }
-
-/** Text as a Markdown block quote, followed by a blank line to write under it. */
-const asQuote = (text: string) =>
-  `${text
-    .trim()
-    .split('\n')
-    .map((line) => `> ${line}`)
-    .join('\n')}\n\n`
-
-/** What the attach button takes: any type an ingester reads, and images when the model sees them. */
-const acceptedTypes = (types: { images: string[]; files: string[] }, images: boolean) =>
-  [...(images ? types.images : []), ...types.files].join(',')
-
 /**
  * The message box: one white card floating at the bottom of the panel, over the conversation fading
  * under it, with quotes and attachments at its top, the text, and a toolbar of Attach, the model and
@@ -109,87 +77,26 @@ const acceptedTypes = (types: { images: string[]; files: string[] }, images: boo
 export function Composer({ ref, ...props }: ComposerProps) {
   const box = useRef<HTMLTextAreaElement>(null)
   const picker = useRef<HTMLInputElement>(null)
-  const [quotes, setQuotes] = useState<Quote[]>([])
-  /** Let go of these quotes, keeping any added while a message was on its way. */
-  const dropQuotes = (dropped: Quote[]) =>
-    setQuotes((current) => current.filter((quote) => !dropped.includes(quote)))
-  const { models, loading: modelsLoading, fallback, noModels } = useModels(props.inherited ?? null)
-  const queryClient = useQueryClient()
-
-  // This composer's sends, so the cache can tell whether one is on its way.
-  const sendKey = ['send', useId()]
-  const sending = useMutation({
-    mutationKey: sendKey,
-    mutationFn: async (draft: Draft) => {
-      const attached = attachments.attachments
-      const quoted = quotes
-      // The quotes open the message, as Markdown, above what the user wrote.
-      const quotedText = quoted.map((quote) => asQuote(quote.text)).join('')
-      const message = draft.text.trim() ? quotedText + draft.text : quotedText.trimEnd()
-      const parts = [
-        ...attached.map((a) => a.part as Record<string, unknown>),
-        ...(message ? [{ $type: `${nsid.defs}#textPart`, text: message }] : []),
-      ]
-      const generation = {
-        ...(draft.model ? { model: draft.model } : {}),
-        ...(effort ? { effort } : {}),
-      }
-      await props.send({ parent: props.parent, parts, generation })
-      form.setFieldValue('text', '')
-      dropQuotes(quoted)
-      attachments.drop(attached)
-    },
+  const draft = useDraft({
+    send: props.send,
+    parent: props.parent,
+    inherited: props.inherited,
+    waiting: props.waiting,
+    running: Boolean(props.onStop),
+    initialText: props.initialText,
   })
-  const form = useAppForm({
-    // The effort starts where the last message on this device left it.
-    defaultValues: { text: props.initialText ?? '', model: null, effort: lastEffort() } as Draft,
-    // What the chosen model allows and the attachments depend on the form's values, so they come
-    // below, and submitting reads them as they are when it runs.
-    onSubmit: ({ value }) => {
-      // A second Enter while the message is on its way would send it again, and while a reply
-      // runs there is nothing finished to answer. The cache knows of a send at once, before the
-      // composer rerenders, so a second Enter right after the first is caught too.
-      const onItsWay = queryClient.isMutating({ mutationKey: sendKey }) > 0
-      if (!canSend || onItsWay || props.onStop) return
-      attachments.clearError()
-      sending.mutate(value)
-    },
-  })
+  const form = draft.form
   // What was typed into the composer's frame, before this took its place, carries over with its
   // cursor and focus. A frame only stands in for a composer that starts empty, so one editing a
   // message leaves the draft be.
   // biome-ignore lint/correctness/useExhaustiveDependencies: only on taking the frame's place.
   useLayoutEffect(() => {
     if (props.onCancel || props.initialText) return
-    const draft = takeDraft()
-    if (!draft || !box.current) return
-    form.setFieldValue('text', draft.text)
-    restoreDraft(box.current, draft)
+    const left = takeText()
+    if (!left || !box.current) return
+    draft.setText(left.text)
+    restoreText(box.current, left)
   }, [])
-  // Only whether there is text, so typing rerenders the box rather than the whole composer.
-  const hasText = useFormStore(form.store, (state) => state.values.text.trim() !== '')
-  const chosenModel = useFormStore(form.store, (state) => state.values.model)
-  const chosenEffort = useFormStore(form.store, (state) => state.values.effort)
-  const model = chosenModel && models.find((m) => sameModel(m, chosenModel))
-  // With the fallback model, the server checks vision when the turn starts. A chosen model no
-  // longer on offer takes no images, as nothing says it can read them.
-  const seesImages = chosenModel ? Boolean(model?.capabilities.vision) : true
-  const attachments = useAttachments(seesImages)
-  const reasons = Boolean(model?.capabilities.reasoning)
-  // Effort is sent only while its choice is shown, so switching models back keeps it.
-  const effort = reasons ? chosenEffort : ''
-  // Without a fallback model, the server has nothing to run the turn with.
-  const needsModel = !chosenModel && fallback === null
-  // "Default" names the model the server will fall back to, so the user sees who will answer.
-  const fallbackName = fallback && models.find((m) => sameModel(m, fallback))?.name
-  const blocked = noModels || needsModel
-  // Nothing to send: no text but spaces, no quotes, and no attachments.
-  const empty = !hasText && quotes.length === 0 && attachments.attachments.length === 0
-  // Send is disabled, and submitting does nothing, for the same reasons, so a new reason not to
-  // send goes here rather than in either alone.
-  const canSend = !(empty || blocked || props.waiting || attachments.uploading || sending.isPending)
-  const { data: types, error: typesError } = useQuery(attachmentTypesQuery)
-  const accept = types && acceptedTypes(types, seesImages)
 
   /** Focus the box with the cursor at the end, once the new text has rendered. */
   const focusEnd = () =>
@@ -201,35 +108,26 @@ export function Composer({ ref, ...props }: ComposerProps) {
     })
   useImperativeHandle(ref, () => ({
     quote: (quoted) => {
-      if (quoted.trim())
-        setQuotes((current) => [...current, { id: crypto.randomUUID(), text: quoted }])
+      draft.quote(quoted)
       focusEnd()
     },
     fill: (filled) => {
-      form.setFieldValue('text', filled)
+      draft.setText(filled)
       focusEnd()
     },
-    attach: (files) => attachments.add(files),
+    attach: (files) => draft.attach(files),
   }))
-  /** Start the message over: no text, quotes, or attachments, and no error from the last try. */
+  /** Start the message over, and go back to the box. */
   const clear = () => {
-    form.setFieldValue('text', '')
-    setQuotes([])
-    attachments.drop(attachments.attachments)
-    attachments.clearError()
-    sending.reset()
+    draft.clear()
     focusEnd()
   }
-  const error =
-    attachments.error ??
-    (sending.error && messageOf(sending.error)) ??
-    (typesError && "Couldn't load which files you can attach. Reload the page to try again.")
   return (
     <form.AppForm>
       <ComposerDock
         onSubmit={(e) => {
           e.preventDefault()
-          void form.handleSubmit()
+          draft.send()
         }}
       >
         {props.above}
@@ -249,13 +147,13 @@ export function Composer({ ref, ...props }: ComposerProps) {
           </div>
         )}
         <ComposerCard>
-          {quotes.length > 0 && (
+          {draft.quotes.length > 0 && (
             // A quote shows as a well across the card, like a sent quote, cut to two lines.
             <ul
               aria-label="Quotes"
               className={cn(composerPart, 'flex flex-col gap-1.5 px-2.75 pt-2.5 pb-0.5')}
             >
-              {quotes.map((quote) => (
+              {draft.quotes.map((quote) => (
                 <li
                   key={quote.id}
                   title={quote.text}
@@ -267,7 +165,7 @@ export function Composer({ ref, ...props }: ComposerProps) {
                   <button
                     type="button"
                     aria-label="Remove quote"
-                    onClick={() => dropQuotes([quote])}
+                    onClick={() => draft.removeQuote(quote)}
                     className={removeChip}
                   >
                     <CloseIcon />
@@ -277,8 +175,8 @@ export function Composer({ ref, ...props }: ComposerProps) {
             </ul>
           )}
           <AttachmentChips
-            attachments={attachments.attachments}
-            onRemove={(attachment) => attachments.drop([attachment])}
+            attachments={draft.attachments}
+            onRemove={draft.removeAttachment}
             className={cn(composerPart, 'px-2.75 pt-2.5 pb-0.5')}
           />
           <form.AppField name="text">
@@ -298,7 +196,7 @@ export function Composer({ ref, ...props }: ComposerProps) {
                     const files = Array.from(e.clipboardData.files)
                     if (files.length === 0 || e.clipboardData.types.includes('text/plain')) return
                     e.preventDefault()
-                    attachments.add(files)
+                    draft.attach(files)
                   }}
                   onKeyDown={(e) => {
                     // Enter while an input method composes, as for Japanese, picks the words instead.
@@ -309,7 +207,7 @@ export function Composer({ ref, ...props }: ComposerProps) {
                       !touchOnly()
                     ) {
                       e.preventDefault()
-                      void form.handleSubmit()
+                      draft.send()
                     } else if (e.key === 'Escape' && props.onCancel) {
                       e.preventDefault()
                       props.onCancel()
@@ -319,10 +217,10 @@ export function Composer({ ref, ...props }: ComposerProps) {
               </>
             )}
           </form.AppField>
-          {!empty && <ClearButton disabled={sending.isPending} onClick={clear} />}
+          {!draft.empty && <ClearButton disabled={draft.sending} onClick={clear} />}
           <ComposerToolbar>
             <AttachButton
-              title={seesImages ? 'Attach files or images' : 'Attach files'}
+              title={draft.seesImages ? 'Attach files or images' : 'Attach files'}
               onClick={() => picker.current?.click()}
             />
             <input
@@ -331,9 +229,9 @@ export function Composer({ ref, ...props }: ComposerProps) {
               type="file"
               hidden
               multiple
-              accept={accept ?? undefined}
+              accept={draft.accept ?? undefined}
               onChange={(e) => {
-                attachments.add(Array.from(e.target.files ?? []))
+                draft.attach(Array.from(e.target.files ?? []))
                 // The chosen files show as attachments, and clearing lets the same file be chosen
                 // again.
                 e.target.value = ''
@@ -342,25 +240,27 @@ export function Composer({ ref, ...props }: ComposerProps) {
             <ModelSelect
               aria-label="Model"
               quiet
-              loading={modelsLoading}
-              models={models}
-              value={chosenModel}
+              loading={draft.loading}
+              models={draft.models}
+              value={draft.chosenModel}
               onChange={(next) => form.setFieldValue('model', next)}
               title="Model"
               none={
-                fallback === null
+                draft.fallback === null
                   ? { label: 'Choose a model', selectable: false }
                   : {
-                      label: fallbackName ? `Default · ${fallbackName}` : 'Default model',
+                      label: draft.fallbackName
+                        ? `Default · ${draft.fallbackName}`
+                        : 'Default model',
                       selectable: true,
                     }
               }
             />
-            {reasons && (
+            {draft.reasons && (
               <EffortSelect
                 aria-label="Thinking effort"
                 quiet
-                value={chosenEffort}
+                value={draft.chosenEffort}
                 onChange={(next) => {
                   form.setFieldValue('effort', next)
                   rememberEffort(next)
@@ -373,13 +273,13 @@ export function Composer({ ref, ...props }: ComposerProps) {
             ) : (
               <SendButton
                 title={props.onCancel ? 'Send as a new version' : 'Send'}
-                disabled={!canSend}
+                disabled={!draft.canSend}
               />
             )}
           </ComposerToolbar>
         </ComposerCard>
-        <ModelNotice noModels={noModels} needsModel={needsModel} />
-        <ErrorAlert error={error} className="mx-2 mt-2.5 text-small" />
+        <ModelNotice blocked={draft.blocked} />
+        <ErrorAlert error={draft.error} className="mx-2 mt-2.5 text-small" />
       </ComposerDock>
     </form.AppForm>
   )
@@ -397,24 +297,29 @@ function AutoGrow(props: AutoGrowProps) {
 }
 
 interface ModelNoticeProps {
-  noModels: boolean
-  needsModel: boolean
+  blocked: Blocked | null
 }
 
-/** Why the composer can't send yet, for want of a model. */
+/** Why the composer can't send yet, for want of a model that can take the message. */
 function ModelNotice(props: ModelNoticeProps) {
   const className = 'mx-2 mt-2.5 text-muted text-small'
-  if (props.noModels)
+  if (props.blocked === 'noModels')
     return (
       <p className={className}>
         No models are available to you. Add a key of your own in{' '}
         <Link to="/settings/api-keys">API keys</Link>.
       </p>
     )
-  if (props.needsModel)
+  if (props.blocked === 'needsModel')
     return (
       <p className={className}>
         Choose a model, or set a default model in <Link to="/settings">Preferences</Link>.
+      </p>
+    )
+  if (props.blocked === 'images')
+    return (
+      <p className={className}>
+        This model can't read images. Remove the image, or choose a model that can.
       </p>
     )
   return null

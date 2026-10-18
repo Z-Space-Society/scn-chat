@@ -52,6 +52,10 @@ _Avoid_: Guest, read-only user
 
 ## Turns
 
+**Draft**:
+What the user is writing in a composer, with its quotes, attachments, model, and effort, until it is sent.
+_Avoid_: Composer state, pending message
+
 **Fallback model**:
 The model a turn runs with when it names none: the model of the nearest completed reply up the branch, else the user's default model, else the admin's.
 _Avoid_: Default model (that is the user's preference), inherited model

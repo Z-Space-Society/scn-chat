@@ -4,6 +4,14 @@ What changed in each release of SCN Chat, for the people who use it, run it, or 
 
 ## [Unreleased]
 
+### Changed
+
+- With no model chosen, the composer follows the default model's capabilities: the effort select shows when it reasons, and images are turned away when it can't read them.
+
+### Fixed
+
+- An image attached before switching to a model that can't read images now disables Send and says why, rather than sending a turn that fails.
+
 ## [0.3.0] - 2026-10-18
 
 ### Added

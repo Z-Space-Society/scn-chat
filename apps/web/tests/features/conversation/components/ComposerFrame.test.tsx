@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Composer } from '../../../../src/features/conversation/components/Composer.tsx'
 import { ComposerFrame } from '../../../../src/features/conversation/components/ComposerFrame.tsx'
 import { ConversationFrame } from '../../../../src/features/conversation/components/ConversationFrame.tsx'
-import { takeDraft } from '../../../../src/features/conversation/lib/composer-handoff.ts'
+import { takeText } from '../../../../src/features/conversation/lib/composer-handoff.ts'
 import { stubFetch } from '../../../helpers/fetch.ts'
 import { renderAt } from '../../../helpers/router.tsx'
 
@@ -33,7 +33,7 @@ beforeEach(() => {
     '/api/models': { models: [], defaultModel: { provider: 'p', id: 'smart' } },
   })
   // The last test's frame handed its draft on as it was cleaned up.
-  takeDraft()
+  takeText()
 })
 afterEach(() => vi.unstubAllGlobals())
 
@@ -88,7 +88,7 @@ describe('ComposerFrame', () => {
     act(() => advance())
     act(() => advance())
     expect(box()).toHaveValue('Earlier')
-    expect(takeDraft()?.text).toBe('Hello')
+    expect(takeText()?.text).toBe('Hello')
   })
 
   it('keeps what was typed into the page the server sent as the page hydrates', async () => {
@@ -107,6 +107,6 @@ describe('ComposerFrame', () => {
     expect(sent).toHaveFocus()
     act(() => root.unmount())
     container.remove()
-    expect(takeDraft()?.text).toBe('Typed early')
+    expect(takeText()?.text).toBe('Typed early')
   })
 })

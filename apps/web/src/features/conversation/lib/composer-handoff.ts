@@ -1,5 +1,5 @@
 /** What was typed into a composer's frame, for the box that takes its place. */
-export interface Draft {
+export interface FrameText {
   text: string
   selectionStart: number
   selectionEnd: number
@@ -8,18 +8,18 @@ export interface Draft {
 }
 
 /**
- * The draft the last frame left. When nothing takes the frame's place, as when the page fails to
+ * The text the last frame left. When nothing takes the frame's place, as when the page fails to
  * load, it waits for the next composer that starts empty, since it is what the user typed.
  */
-let leftDraft: Draft | null = null
+let leftText: FrameText | null = null
 
 /**
  * Leave what a box holds for the next to take, as a composer's frame does on giving way. A box
- * with no text and no focus leaves nothing, so it never hands on a draft left earlier.
+ * with no text and no focus leaves nothing, so it never hands on text left earlier.
  */
-export function leaveDraft(box: HTMLTextAreaElement) {
+export function leaveText(box: HTMLTextAreaElement) {
   const focused = box.ownerDocument.activeElement === box
-  leftDraft =
+  leftText =
     box.value || focused
       ? {
           text: box.value,
@@ -31,20 +31,20 @@ export function leaveDraft(box: HTMLTextAreaElement) {
 }
 
 /** Take what the last frame left, once. */
-export function takeDraft(): Draft | null {
-  const taken = leftDraft
-  leftDraft = null
+export function takeText(): FrameText | null {
+  const taken = leftText
+  leftText = null
   return taken
 }
 
 /**
- * Show a draft in the box that takes the frame's place, with the cursor and focus as the frame had
+ * Show the text a frame left in the box that takes the frame's place, with the cursor and focus as the frame had
  * them. The text goes into the box at once, before a controlled box rerenders with it, so the
  * cursor has somewhere to go.
  */
-export function restoreDraft(box: HTMLTextAreaElement, draft: Draft) {
-  box.value = draft.text
-  if (!draft.focused) return
+export function restoreText(box: HTMLTextAreaElement, text: FrameText) {
+  box.value = text.text
+  if (!text.focused) return
   box.focus()
-  box.setSelectionRange(draft.selectionStart, draft.selectionEnd)
+  box.setSelectionRange(text.selectionStart, text.selectionEnd)
 }

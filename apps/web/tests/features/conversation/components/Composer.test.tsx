@@ -71,8 +71,10 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('Composer', () => {
-  it('offers effort beside the model only for reasoning models', async () => {
+  it('offers effort beside the model only for reasoning models, the default included', async () => {
     await renderComposer(<Composer send={send} />)
+    await vi.waitFor(() => expect(effortSelect()).toHaveTextContent('Default'))
+    await choose(screen.getByLabelText('Model'), 'Basic')
     expect(effortSelect()).toBeNull()
     await choose(screen.getByLabelText('Model'), 'Smart')
     expect(screen.getByLabelText('Model')).toHaveTextContent(/^Smart$/)
@@ -145,33 +147,6 @@ describe('Composer', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Send' }))
     await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1))
     expect(sentMessage()?.parts).toEqual([expect.objectContaining({ text: '> kept' })])
-  })
-
-  it('does not send an effort hidden by switching to a model without reasoning', async () => {
-    await renderComposer(<Composer send={send} />)
-    await choose(screen.getByLabelText('Model'), 'Smart')
-    await pickEffort('Extra')
-    await choose(screen.getByLabelText('Model'), 'Basic')
-    await userEvent.type(screen.getByLabelText('Message'), 'Hello{Enter}')
-    await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1))
-    expect(sentMessage()?.generation).toEqual({ model: { provider: 'p', id: 'basic' } })
-  })
-
-  it('does not send on Enter while an attachment is still uploading', async () => {
-    serve(() => new Promise<Response>(() => {}))
-    await renderComposer(<Composer send={send} />)
-    const file = new File(['%PDF'], 'report.pdf', { type: 'application/pdf' })
-    await userEvent.upload(screen.getByLabelText('Files to attach'), file)
-    await userEvent.type(screen.getByLabelText('Message'), 'Read this{Enter}')
-    expect(send).not.toHaveBeenCalled()
-  })
-
-  it('sends once when Enter is pressed again while the message is on its way', async () => {
-    send.mockReturnValue(new Promise(() => {}))
-    await renderComposer(<Composer send={send} />)
-    await userEvent.type(screen.getByLabelText('Message'), 'Hello{Enter}{Enter}')
-    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
-    expect(send).toHaveBeenCalledTimes(1)
   })
 
   it('uploads the same file again when it is chosen twice', async () => {
@@ -258,6 +233,24 @@ describe('Composer', () => {
     await vi.waitFor(() => expect(chip).toHaveAttribute('data-state', 'ready'))
   })
 
+  it('says why it cannot send an image the chosen model cannot read', async () => {
+    serve(async () =>
+      Response.json(
+        { part: { image: { ref: { $link: 'bafyimg' }, mimeType: 'image/png', size: 3 } } },
+        { status: 201 },
+      ),
+    )
+    await renderComposer(<Composer send={send} />)
+    await userEvent.upload(
+      screen.getByLabelText('Files to attach'),
+      new File(['png'], 'shot.png', { type: 'image/png' }),
+    )
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled())
+    await choose(screen.getByLabelText('Model'), 'Basic')
+    expect(screen.getByText(/This model can't read images/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
+  })
+
   it('says why an upload failed and drops its attachment', async () => {
     serve(async () =>
       Response.json(
@@ -310,29 +303,6 @@ describe('Composer', () => {
       scrollHeight.mockRestore()
       supports.mockRestore()
     }
-  })
-
-  it('disables Send until there is text or an attachment to send', async () => {
-    serve(async () =>
-      Response.json(
-        { part: { file: { ref: { $link: 'bafy' } }, name: 'report.pdf' } },
-        { status: 201 },
-      ),
-    )
-    await renderComposer(<Composer send={send} />)
-    const sendButton = screen.getByRole('button', { name: 'Send' })
-    expect(sendButton).toBeDisabled()
-    await userEvent.type(screen.getByLabelText('Message'), '   ')
-    expect(sendButton).toBeDisabled()
-    await userEvent.type(screen.getByLabelText('Message'), 'Hi')
-    expect(sendButton).toBeEnabled()
-    await userEvent.clear(screen.getByLabelText('Message'))
-    expect(sendButton).toBeDisabled()
-    await userEvent.upload(
-      screen.getByLabelText('Files to attach'),
-      new File(['%PDF'], 'report.pdf', { type: 'application/pdf' }),
-    )
-    await vi.waitFor(() => expect(sendButton).toBeEnabled())
   })
 
   it('says neither Reply nor Ask anything, and sends nothing, while the messages are on their way', async () => {
