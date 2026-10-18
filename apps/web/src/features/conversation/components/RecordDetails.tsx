@@ -52,7 +52,7 @@ export function recordRows(props: RecordRowsProps): [string, string][] {
 /** The card the details float in, by the button that opened them, so they never move the message. */
 export const detailsCard = cn(
   floating,
-  'fixed z-50 max-w-[min(--spacing(104),calc(100vw-(--spacing(4))))] px-3.5 py-3 text-caption',
+  'fixed z-50 max-w-[min(--spacing(88),calc(100vw-(--spacing(4))))] px-3.5 py-3 text-caption',
 )
 
 interface DetailsListProps {
