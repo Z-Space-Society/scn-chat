@@ -4,6 +4,8 @@ What changed in each release of SCN Chat, for the people who use it, run it, or 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-18
+
 ### Added
 
 - For admins: the whole admin configuration, its settings, roles, plugins, and admin models, can be exported to a JSON file and applied from one with `site-config export` and `site-config apply`, run on the server, so a deployment tool like Ansible can set up a server and keep it as described. `docs/deployment.md` has the commands.
@@ -81,7 +83,8 @@ What changed in each release of SCN Chat, for the people who use it, run it, or 
 
 The first tagged release.
 
-[Unreleased]: https://github.com/Z-Space-Society/scn-chat/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/Z-Space-Society/scn-chat/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Z-Space-Society/scn-chat/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/Z-Space-Society/scn-chat/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/Z-Space-Society/scn-chat/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Z-Space-Society/scn-chat/compare/v0.1.1...v0.2.0
