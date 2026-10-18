@@ -4,6 +4,10 @@ What changed in each release of SCN Chat, for the people who use it, run it, or 
 
 ## [Unreleased]
 
+### Fixed
+
+- Clicking outside the thinking effort menu, or any other select, now closes it, as it already did for the model menu.
+
 ## [0.3.1] - 2026-10-18
 
 ### Changed

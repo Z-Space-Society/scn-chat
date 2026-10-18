@@ -11,6 +11,7 @@ import { createPortal } from 'react-dom'
 import { cn } from '../cn.ts'
 import { ChevronDownIcon } from '../icons.tsx'
 import { touchOnly } from '../touch.ts'
+import { useDismiss } from '../useDismiss.ts'
 import { usePlacement } from '../usePlacement.ts'
 import { field } from './controls.tsx'
 import { floating, menuRow } from './menu.ts'
@@ -149,6 +150,9 @@ export function Select(props: Props) {
     closeToButton()
     if (option.value !== props.value) props.onChange(option.value)
   }
+  // A press outside closes it even when the button never held the focus, as Safari doesn't focus a
+  // clicked button, so no blur would.
+  useDismiss(open, [button, popup], close)
   /** Close when the focus leaves for anywhere but the button or the search box. */
   const onBlur = (event: FocusEvent) => {
     const to = event.relatedTarget
