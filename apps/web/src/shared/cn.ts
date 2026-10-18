@@ -46,7 +46,6 @@ export const themeNames = {
   ease: ['out', 'slide', 'swap'],
   animate: [
     'fade-in',
-    'blur-in',
     'breathe',
     'panel-up',
     'fade-in-late',

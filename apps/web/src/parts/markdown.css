@@ -206,12 +206,11 @@
       word-break: break-all;
     }
 
-    /* While a part streams, Streamdown wraps each new word in a span, which comes into focus as
-       it fades in, and a list item's marker, which can't take opacity or a filter, fades in by its
-       color. Each starts at the delay Streamdown gives
+    /* While a part streams, Streamdown wraps each new word in a span, and a list item's marker,
+       which can't take opacity, fades in by its color. Each starts at the delay Streamdown gives
        it, so a burst of words arrives as a short cascade. */
     & [data-sd-animate] {
-      animation: var(--animate-blur-in);
+      animation: var(--animate-fade-in);
       animation-delay: var(--sd-delay, 0ms);
     }
 
