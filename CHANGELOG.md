@@ -12,6 +12,10 @@ What changed in each release of SCN Chat, for the people who use it, run it, or 
 - A key's page has a Delete card, so a key can be deleted where its models are edited.
 - Rebuilding this device's copy of your chats asks to confirm first.
 
+### Fixed
+
+- A reply's step dots no longer show over the composer or the header as the chat scrolls under them.
+
 ## [0.2.2] - 2026-10-16
 
 ### Fixed

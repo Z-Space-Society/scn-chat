@@ -214,9 +214,10 @@ interface WorkListProps {
  * A finished reply's steps down a quiet rail: no cards or numbers, just a light dot for each step,
  * joined to the next by a short soft segment that stops shy of both dots. Each row draws the
  * segment down to the next row's dot, so the rail follows a step that is open. A dot sits 14px
- * into its row and 16px before it, which the segment is placed by.
+ * into its row and 16px before it, which the segment is placed by. The rail is its own stacking
+ * context, so a dot raised over its segment stays under the sticky header and composer.
  */
-const rail = 'mt-2.5 flex flex-col gap-0.5 ps-6.5'
+const rail = 'isolate mt-2.5 flex flex-col gap-0.5 ps-6.5'
 const railRow = cn(
   'relative py-0.5 pe-3 last:after:hidden',
   'after:absolute after:-start-4.25 after:top-5.5 after:-bottom-2 after:w-0.5 after:rounded-full after:bg-line',
