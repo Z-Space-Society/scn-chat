@@ -4,6 +4,10 @@ What changed in each release of SCN Chat, for the people who use it, run it, or 
 
 ## [Unreleased]
 
+### Changed
+
+- A streaming reply's words fade in as they arrive, rather than appearing at once. Nothing moves under reduced motion.
+
 ## [0.2.2] - 2026-10-16
 
 ### Fixed

@@ -205,5 +205,30 @@
       font-size: 0.75em;
       word-break: break-all;
     }
+
+    /* While a part streams, Streamdown wraps each new word in a span, and a list item's marker,
+       which can't take opacity, fades in by its color. Each starts at the delay Streamdown gives
+       it, so a burst of words arrives as a short cascade. */
+    & [data-sd-animate] {
+      animation: var(--animate-fade-in);
+      animation-delay: var(--sd-delay, 0ms);
+    }
+
+    & [data-sd-animate-marker]::marker {
+      animation: marker-in var(--dur-enter) var(--ease-out) var(--sd-marker-delay, 0ms) backwards;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      & [data-sd-animate],
+      & [data-sd-animate-marker]::marker {
+        animation: none;
+      }
+    }
+  }
+
+  @keyframes marker-in {
+    from {
+      color: transparent;
+    }
   }
 }

@@ -35,6 +35,12 @@ import { codeFilename, downloadText } from './download.ts'
  * ours, styled by markdown.css, since Streamdown's own are styled for another theme.
  */
 
+/**
+ * Words fade in as they stream, over --dur-enter, which markdown.css animates them with. The
+ * duration here only paces when each word starts.
+ */
+const fadeIn = { duration: 240 }
+
 /** Without rehype-raw, so HTML in the model's text is not rendered. */
 const { raw: _raw, ...safeRehypePlugins } = defaultRehypePlugins
 const rehypePlugins = Object.values(safeRehypePlugins)
@@ -375,6 +381,7 @@ export function Markdown(props: Props) {
       <Streamdown
         mode={props.streaming ? 'streaming' : 'static'}
         isAnimating={props.streaming}
+        animated={fadeIn}
         rehypePlugins={rehypePlugins}
         plugins={plugins}
         components={markdownComponents}

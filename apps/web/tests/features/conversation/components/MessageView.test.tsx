@@ -350,7 +350,7 @@ describe('MessageView', () => {
   it('shows streamed text for a pending reply as Markdown', () => {
     const reply = { ...noParts, parts: [{ $type: d('textPart'), text: '*Hel*' }] }
     render(<StreamingReply reply={reply} record={streaming} blobUrl={blobUrl} />)
-    expect(screen.getByText('Hel').tagName).toBe('EM')
+    expect(screen.getByText('Hel').closest('em')).toBeInTheDocument()
   })
 
   it('says what a streaming reply is doing right now', () => {

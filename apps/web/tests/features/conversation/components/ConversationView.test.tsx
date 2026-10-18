@@ -326,7 +326,10 @@ describe('ConversationView', () => {
       lastSource().emit('part-start', { index: 1, partType: 'textPart' })
       lastSource().emit('delta', { index: 1, text: 'Use porcelain.' })
     })
-    expect(await screen.findByText('Use porcelain.')).toBeInTheDocument()
+    // While it streams, each word is a span of its own, which fades in.
+    const streamed = (_: string, el: Element | null) =>
+      el?.tagName === 'P' && el.textContent === 'Use porcelain.'
+    expect(await screen.findByText(streamed)).toBeInTheDocument()
     // The finished record reaches the local copy, and the stream ends.
     act(() =>
       update(store, [
