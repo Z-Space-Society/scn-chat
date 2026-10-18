@@ -22,10 +22,11 @@ The overview at the end of this file lists every spec and whether it is active, 
 
 ### Active
 
+- [[site-config]]: the whole admin configuration exported and applied as one JSON document, through a CLI on the server, for deployment tools like Ansible.
+
 - [[extending]]: the web app made easy to change in a fork, with tables of part and tool views, tool status and steps, message actions as a list with Copy, a Markdown seam with code block copy, smaller components, and a guide in `docs/extending.md`. Phase 3 of the web rebuild, partly built.
 
 ### Planned
-
 - [[encrypted-conversations]]
 
 ### Completed

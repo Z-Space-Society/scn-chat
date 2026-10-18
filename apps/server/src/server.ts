@@ -1,3 +1,4 @@
+import { SiteConfig } from './admin/site-config.ts'
 import { createApp, type Web } from './app.ts'
 import { Access } from './auth/access.ts'
 import { type Account, getAccount } from './auth/accounts.ts'
@@ -15,7 +16,7 @@ import { Cron } from './cron.ts'
 import type { Db } from './db/index.ts'
 import { migrateToLatest } from './db/migrate.ts'
 import type { Logger } from './logger.ts'
-import { PluginAdmin } from './plugins/admin.ts'
+import { nameInstancesAfterPlugins, PluginAdmin } from './plugins/admin.ts'
 import { fireChatHooks } from './plugins/chat-hooks.ts'
 import type { PluginServices } from './plugins/host.ts'
 import type { InstalledPlugins } from './plugins/installed.ts'
@@ -131,6 +132,7 @@ export async function createServer(deps: ServerDeps) {
       }),
     logger,
   })
+  await nameInstancesAfterPlugins(db, box, deps.installed, logger)
   const initial = await build(await readInstances(db, box))
   for (const [instance, status] of initial.statuses) {
     if (status.state === 'failed')
@@ -267,6 +269,15 @@ export async function createServer(deps: ServerDeps) {
     },
     admin: { db, roles, access, cron, settings, identity, plugins, runtime, logger },
     cron,
+    siteConfig: new SiteConfig({
+      db,
+      box,
+      settings,
+      installed: deps.installed,
+      holder,
+      build,
+      logger,
+    }),
   })
 
   const stops: (() => void)[] = []

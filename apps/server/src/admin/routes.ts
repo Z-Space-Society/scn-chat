@@ -4,17 +4,19 @@ import { sql } from 'kysely'
 import { z } from 'zod'
 import { type Access, CannotSuspendAdmin } from '../auth/access.ts'
 import { getAccount } from '../auth/accounts.ts'
-import { issueApiKey, listApiKeys, revokeApiKey } from '../auth/api-keys.ts'
+import { apiKeysHolding, issueApiKey, listApiKeys, revokeApiKey } from '../auth/api-keys.ts'
 import type { IdentityResolver } from '../auth/identity.ts'
 import { addInvite, listInvites, removeInvite } from '../auth/invites.ts'
 import {
   addMember,
   createRole,
   deleteRole,
+  hostnames,
   listRoles,
   RoleExists,
   removeMember,
   roleExists,
+  roleName,
   updateRole,
 } from '../auth/role-store.ts'
 import { ADMIN_ROLE, IMPLICIT_ROLE } from '../auth/roles.ts'
@@ -34,16 +36,9 @@ export type AdminRoutesDeps = PluginAdminRoutesDeps & {
 }
 
 const PAGE_SIZE = 50
-const ROLE_NAME = /^[a-z][a-z0-9-]*$/
-const HOSTNAME =
-  /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/
-
-const hostnames = z.array(
-  z.string().trim().toLowerCase().regex(HOSTNAME, 'must be a hostname, such as example.com'),
-)
 
 const newRole = z.object({
-  name: z.string().regex(ROLE_NAME, `must match ${ROLE_NAME}`),
+  name: roleName,
   description: z.string().default(''),
 })
 
@@ -69,9 +64,7 @@ async function roleUses(deps: AdminRoutesDeps, name: string): Promise<string[]> 
     if ((JSON.parse(model.roles_json) as string[]).includes(name))
       uses.push(`model ${model.provider}/${model.model_id}`)
   }
-  for (const key of await listApiKeys(deps.db)) {
-    if (key.roles.includes(name)) uses.push(`API key ${key.label}`)
-  }
+  for (const label of await apiKeysHolding(deps.db, name)) uses.push(`API key ${label}`)
   return uses
 }
 

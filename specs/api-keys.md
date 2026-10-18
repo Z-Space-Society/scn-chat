@@ -54,7 +54,7 @@ Keys never appear in logs. A rejected request logs the route and the reason, and
 - No keys acting as a user. A key has no DID and can't read or write chats.
 - No keys on existing routes. Only routes that name roles with `requireApiKey` accept them.
 - No expiry. A key lasts until it is revoked.
-- No keys in `.env` or files. Keys are issued and revoked in the admin area.
+- No keys in `.env` or files. Keys are issued and revoked in the admin area, apart from the single-use keys the `site-config` CLI issues itself and revokes, from [[site-config]].
 
 ## Edge Cases and Decisions
 

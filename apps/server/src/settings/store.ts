@@ -50,20 +50,30 @@ export class SettingsStore {
   /** Validate, store, and announce a setting. Throws InvalidBody when it fails its schema. */
   async set<K extends SettingKey>(key: K, input: unknown, adminDid: string): Promise<Settings[K]> {
     const value = validate(settingSchemas[key], input) as Settings[K]
+    await SettingsStore.write(this.db, key, value, adminDid)
+    this.adopt(key, value)
+    this.logger.info({ key, admin: adminDid }, 'admin setting changed')
+    return value
+  }
+
+  /** Store a validated setting without announcing it. Call `adopt` once the write commits. */
+  static async write<K extends SettingKey>(db: Db, key: K, value: Settings[K], adminDid: string) {
     const row = {
       value_json: JSON.stringify(value),
       updated_at: new Date().toISOString(),
       updated_by: adminDid,
     }
-    await this.db
+    await db
       .insertInto('app_setting')
       .values({ key, ...row })
       .onConflict((oc) => oc.column('key').doUpdateSet(row))
       .execute()
+  }
+
+  /** Hold and announce a setting that is already stored. */
+  adopt<K extends SettingKey>(key: K, value: Settings[K]): void {
     this.values[key] = value
-    this.logger.info({ key, admin: adminDid }, 'admin setting changed')
     for (const listener of this.listeners.get(key) ?? []) (listener as Listener<K>)(value)
-    return value
   }
 
   /** Call the listener after each change to the setting. */

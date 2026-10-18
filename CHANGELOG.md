@@ -4,6 +4,10 @@ What changed in each release of SCN Chat, for the people who use it, run it, or 
 
 ## [Unreleased]
 
+### Added
+
+- For admins: the whole admin configuration, its settings, roles, plugins, and admin models, can be exported to a JSON file and applied from one with `site-config export` and `site-config apply`, run on the server, so a deployment tool like Ansible can set up a server and keep it as described. `docs/deployment.md` has the commands.
+
 ### Changed
 
 - A streaming reply's words fade in as they arrive, rather than appearing at once. Nothing moves under reduced motion.
@@ -11,10 +15,12 @@ What changed in each release of SCN Chat, for the people who use it, run it, or 
 - Loading a provider's models while adding an API key lists them to tick, rather than adding every one.
 - A key's page has a Delete card, so a key can be deleted where its models are edited.
 - Rebuilding this device's copy of your chats asks to confirm first.
+- Plugin instances are named after the plugin they make, such as `web-search` or `openai-compatible-litellm`, rather than a random ID. Instances added before this are renamed at startup, keeping their options and secrets.
 
 ### Fixed
 
 - A reply's step dots no longer show over the composer or the header as the chat scrolls under them.
+- Saving a plugin in the admin area while another plugin change is being applied no longer undoes that change.
 
 ## [0.2.2] - 2026-10-16
 
