@@ -281,7 +281,7 @@ function MemberList(props: MemberListProps) {
           <ItemNames title={member.handle ?? member.did} description={memberNote(member)} />
           {/* Taking someone out of a role, admin above all, shouldn't be one slip away. */}
           <ConfirmButton
-            quiet
+            tone="quiet"
             label="Remove"
             question={`Remove ${member.handle ?? member.did} from ${props.role.name}?`}
             onConfirm={() => props.onRemove(member.did)}

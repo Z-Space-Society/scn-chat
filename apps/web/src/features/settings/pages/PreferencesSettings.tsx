@@ -3,7 +3,7 @@ import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-q
 import { ClientOnly } from '@tanstack/react-router'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
 import { messageOf } from '../../../shared/errors.ts'
-import { useAppForm } from '../../../shared/form.tsx'
+import { formKey, useAppForm } from '../../../shared/form.tsx'
 import { ChevronDownIcon } from '../../../shared/icons.tsx'
 import { chooseTheme, type ThemeChoice, useThemeChoice } from '../../../shared/theme.ts'
 import { Select } from '../../../shared/ui/Select.tsx'
@@ -28,6 +28,11 @@ import { preferencesQuery } from '../queries.ts'
 export function PreferencesSettings() {
   const { models, loading, error } = useModels()
   const { data: stored } = useSuspenseQuery(preferencesQuery)
+  const queryClient = useQueryClient()
+  const save = useMutation({
+    mutationFn: savePreferences,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: preferencesQuery.queryKey }),
+  })
   return (
     <SettingsPage
       title="Preferences"
@@ -35,7 +40,18 @@ export function PreferencesSettings() {
     >
       <ErrorAlert error={error} />
       <Appearance />
-      <PreferencesForm stored={stored ?? {}} models={models} modelsLoading={loading} />
+      <PreferencesForm
+        // Start over from the stored preferences whenever they change.
+        key={formKey(stored)}
+        stored={stored ?? {}}
+        models={models}
+        modelsLoading={loading}
+        pending={save.isPending}
+        saved={save.isSuccess}
+        error={save.error && messageOf(save.error)}
+        onSave={save.mutate}
+        onEdit={save.reset}
+      />
     </SettingsPage>
   )
 }
@@ -92,14 +108,15 @@ interface PreferencesFormProps {
   stored: Record<string, unknown>
   models: ModelOption[]
   modelsLoading: boolean
+  pending: boolean
+  saved: boolean
+  error?: string | null
+  onSave: (preferences: Record<string, unknown>) => void
+  /** Called on any change, since what is shown is no longer what was saved. */
+  onEdit: () => void
 }
 
 function PreferencesForm(props: PreferencesFormProps) {
-  const queryClient = useQueryClient()
-  const save = useMutation({
-    mutationFn: savePreferences,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: preferencesQuery.queryKey }),
-  })
   const form = useAppForm({
     defaultValues: {
       defaultModel: (props.stored.defaultModel as ModelRef | undefined) ?? null,
@@ -108,11 +125,11 @@ function PreferencesForm(props: PreferencesFormProps) {
       generateTitles: props.stored.generateTitles !== false,
     },
     // An edit after a save means the page no longer holds what was saved.
-    listeners: { onChange: () => save.reset() },
+    listeners: { onChange: () => props.onEdit() },
     // Fields this form does not edit, like the time zone, keep their stored values. The mutation
     // holds any error for display, so submitting never rejects.
     onSubmit: ({ value }) =>
-      save.mutate({
+      props.onSave({
         ...props.stored,
         defaultModel: value.defaultModel ? modelRef(value.defaultModel) : undefined,
         defaultEffort: value.defaultEffort || undefined,
@@ -190,11 +207,7 @@ function PreferencesForm(props: PreferencesFormProps) {
             )}
           </form.AppField>
         </SettingsGroup>
-        <SaveBar
-          pending={save.isPending}
-          saved={save.isSuccess}
-          error={save.error && messageOf(save.error)}
-        />
+        <SaveBar pending={props.pending} saved={props.saved} error={props.error} />
       </form.Form>
     </form.AppForm>
   )

@@ -103,6 +103,7 @@ export function NewPluginAdmin() {
           )}
           <SaveBar
             label="Add plugin"
+            adds
             pending={add.isPending}
             disabled={!plugin}
             saved={false}

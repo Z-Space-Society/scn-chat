@@ -472,11 +472,12 @@ describe('Admin plugin page', () => {
         }),
     })
     await renderPage(<PluginAdmin id="i1" />, '/admin/plugins/i1')
-    await userEvent.click(await screen.findByRole('button', { name: 'Save' }))
+    await userEvent.type(await screen.findByLabelText('Name'), ' 2')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() =>
       expect(callsTo(fetch, 'PUT', '/api/admin/plugins/i1')[0]?.options).toEqual({
         id: 'scn',
-        name: 'SCN',
+        name: 'SCN 2',
       }),
     )
   })
@@ -494,7 +495,8 @@ describe('Admin plugin page', () => {
         ),
     })
     await renderPage(<PluginAdmin id="i1" />, '/admin/plugins/i1')
-    await userEvent.click(await screen.findByRole('button', { name: 'Save' }))
+    await userEvent.type(await screen.findByLabelText('Provider ID'), '!')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(await screen.findByText('Invalid string')).toBeInTheDocument()
   })
 
@@ -751,6 +753,7 @@ describe('Admin settings', () => {
     )
     const prompt = await screen.findByLabelText('System prompt')
     expect(prompt.tagName).toBe('TEXTAREA')
+    await userEvent.type(prompt, 'Be brief.')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(await screen.findByText('Too long')).toBeInTheDocument()
     expect(screen.getByRole('status')).not.toHaveTextContent('Saved')

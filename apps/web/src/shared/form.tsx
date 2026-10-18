@@ -205,7 +205,7 @@ export const { useAppForm } = createFormHook({
   formComponents: { Form, SubmitButton },
 })
 
-export { useFieldContext }
+export { useFieldContext, useFormContext }
 
 /**
  * A key that remounts a form, starting it over, when the stored record it edits changes, but not

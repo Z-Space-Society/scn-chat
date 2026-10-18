@@ -112,6 +112,7 @@ describe('Settings preferences', () => {
     const fetch = stubServer({ '/api/preferences': () => Response.json({ preferences: null }) })
     await renderPage()
     await screen.findByRole('heading', { name: 'Preferences' })
+    await userEvent.click(screen.getByLabelText('Generate titles'))
     await userEvent.click(screen.getAllByRole('button', { name: 'Save' })[0] as HTMLElement)
     await vi.waitFor(() =>
       expect(
@@ -166,6 +167,7 @@ describe('Settings preferences fields', () => {
     })
     await renderPage()
     expect(await screen.findByLabelText('Custom instructions')).toHaveValue('Metric units')
+    await userEvent.click(screen.getByLabelText('Generate titles'))
     await userEvent.click(screen.getAllByRole('button', { name: 'Save' })[0] as HTMLElement)
     await vi.waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Saved'))
     const put = fetch.mock.calls.find(
@@ -254,6 +256,40 @@ describe('Settings API keys', () => {
       ([url, init]) => url === '/api/credentials' && init?.method === 'POST',
     )
     expect(JSON.parse(String(post?.[1]?.body))).toMatchObject({ providerId: 'mistral', models: [] })
+  })
+
+  it('adds only the loaded models that are ticked, with any typed ones', async () => {
+    const fetch = stubServer({
+      '/api/providers': () =>
+        Response.json({
+          providers: [{ id: 'openai', name: 'OpenAI', userEndpoints: false, listsModels: true }],
+        }),
+      '/api/providers/openai/list-models': () =>
+        Response.json({
+          models: [
+            { id: 'gpt', name: 'GPT', capabilities: caps },
+            { id: 'gpt-mini', name: 'GPT mini', capabilities: caps },
+          ],
+        }),
+    })
+    await renderPage('/api-keys')
+    await choose(await screen.findByRole('combobox', { name: 'Provider' }), 'OpenAI')
+    await userEvent.type(screen.getByLabelText('API key'), 'sk-test')
+    await userEvent.click(screen.getByRole('button', { name: 'Load models' }))
+    const loaded = await screen.findByRole('group', { name: 'Loaded models' })
+    expect(within(loaded).getAllByRole('checkbox', { checked: false })).toHaveLength(2)
+    await userEvent.click(within(loaded).getByRole('checkbox', { name: /GPT mini/ }))
+    await userEvent.type(screen.getByLabelText(/Model IDs/), 'o5, gpt-mini')
+    await userEvent.click(screen.getByRole('button', { name: 'Add key' }))
+    await vi.waitFor(() => expect(screen.getByLabelText('API key')).toHaveValue(''))
+    const post = fetch.mock.calls.find(
+      ([url, init]) => url === '/api/credentials' && init?.method === 'POST',
+    )
+    expect(JSON.parse(String(post?.[1]?.body)).models.map((m: { id: string }) => m.id)).toEqual([
+      'gpt-mini',
+      'o5',
+    ])
+    expect(screen.queryByRole('group', { name: 'Loaded models' })).toBeNull()
   })
 
   it('deletes a stored key and drops it from the list', async () => {
@@ -385,6 +421,25 @@ describe("Settings for one API key's models", () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Remove GPT' }))
     expect(screen.getByText(/No models/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+  })
+
+  it('deletes the key from its page, asking first, and goes back to the list', async () => {
+    let credentials = [workKey]
+    const fetch = stubKey({
+      '/api/credentials': () => Response.json({ credentials }),
+      '/api/credentials/k1': () => {
+        credentials = []
+        return Response.json({ ok: true })
+      },
+    })
+    const { router } = await renderPage('/api-keys/k1')
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete key' }))
+    expect(screen.getByText('Delete this key?')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Delete key' }))
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe('/settings/api-keys'))
+    expect(
+      fetch.mock.calls.filter(([, init]) => init?.method === 'DELETE').map(([url]) => url),
+    ).toEqual(['/api/credentials/k1'])
   })
 
   it("says so when the key isn't saved anymore", async () => {

@@ -110,7 +110,7 @@ function ApiKeyRow(props: ApiKeyRowProps) {
         label="Revoke"
         question={`Revoke ${key.label}? Scripts using it stop working.`}
         onConfirm={props.onRevoke}
-        quiet
+        tone="quiet"
       />
     </Item>
   )
@@ -178,7 +178,7 @@ function IssueKeyForm(props: IssueKeyFormProps) {
             </form.Field>
           </SettingRow>
         </SettingsGroup>
-        <SaveBar label="Issue key" pending={props.pending} saved={false} error={props.error} />
+        <SaveBar label="Issue key" adds pending={props.pending} saved={false} error={props.error} />
       </form.Form>
     </form.AppForm>
   )

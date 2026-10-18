@@ -3,10 +3,10 @@ import { api, json, read } from '../../../shared/api.ts'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
 import { lastError } from '../../../shared/errors.ts'
 import { CloudIcon, DriveIcon } from '../../../shared/icons.tsx'
-import { Button } from '../../../shared/ui/Button.tsx'
 import { Switch } from '../../../shared/ui/controls.tsx'
 import {
   Callout,
+  ConfirmButton,
   SettingRow,
   SettingRowSkeleton,
   SettingsGroup,
@@ -71,13 +71,15 @@ export function SyncSettings() {
           label="Rebuild this device's copy"
           description="Clears the chats saved in this browser and downloads them again. Try it if chats look out of date or missing. Nothing is deleted from where your chats are stored."
         >
-          <Button
-            aria-label="Rebuild this device's copy"
-            busy={rebuild.isPending}
-            onClick={() => rebuild.mutate()}
-          >
-            Rebuild
-          </Button>
+          {/* It reloads the page and downloads every chat again, so it asks first. */}
+          <ConfirmButton
+            label="Rebuild"
+            name="Rebuild this device's copy"
+            question="Clear and download again?"
+            tone="default"
+            disabled={rebuild.isPending}
+            onConfirm={() => rebuild.mutate()}
+          />
         </SettingRow>
       </SettingsGroup>
       <ErrorAlert error={lastError(setBackgroundSync, rebuild) ?? account.error} />

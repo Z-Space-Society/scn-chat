@@ -8,6 +8,7 @@ import { useAppForm } from '../../../shared/form.tsx'
 import { KeyIcon, TrashIcon } from '../../../shared/icons.tsx'
 import { plural } from '../../../shared/plural.ts'
 import { Button } from '../../../shared/ui/Button.tsx'
+import { Checklist, ChecklistItem } from '../../../shared/ui/Checklist.tsx'
 import { literalInput, secretInput } from '../../../shared/ui/controls.tsx'
 import { ItemList, LinkItem } from '../../../shared/ui/ItemList.tsx'
 import {
@@ -19,6 +20,7 @@ import {
   SettingsPage,
 } from '../../../shared/ui/SettingsPage.tsx'
 import { noCapabilities } from '../../models/capabilities.ts'
+import { ModelName } from '../../models/components/ModelName.tsx'
 import { useKeysChanged } from '../hooks/changes.ts'
 import { type Credential, keyDescription, keyLabel } from '../lib/api-keys.ts'
 import { credentialsQuery, providersQuery } from '../queries.ts'
@@ -30,6 +32,8 @@ interface KeyDraft {
   slug: string
   baseUrl: string
   models: string
+  /** The IDs of the loaded models ticked to add. */
+  picked: string[]
 }
 
 const emptyDraft: KeyDraft = {
@@ -39,6 +43,7 @@ const emptyDraft: KeyDraft = {
   slug: '',
   baseUrl: '',
   models: '',
+  picked: [],
 }
 
 /** The user's own API keys, and a form to add one. */
@@ -175,10 +180,11 @@ function AddApiKeyForm() {
     mutationFn: (draft: KeyDraft) => {
       // The select can't be required as a native one can, so the form says it here.
       if (!draft.providerId) throw new Error('Choose a provider.')
+      const picked = listed.filter((model) => draft.picked.includes(model.id))
       const typed = draft.models
         .split(',')
         .map((id) => id.trim())
-        .filter(Boolean)
+        .filter((id) => id && !draft.picked.includes(id))
         .map((id) => ({ id, name: id, capabilities: noCapabilities }))
       return read(
         api.providers.credentials.$post(
@@ -189,7 +195,7 @@ function AddApiKeyForm() {
             name: draft.name || undefined,
             slug: draft.slug || undefined,
             baseUrl: draft.baseUrl || undefined,
-            models: [...listed, ...typed],
+            models: [...picked, ...typed],
           }),
         ),
       )
@@ -203,9 +209,16 @@ function AddApiKeyForm() {
     defaultValues: emptyDraft,
     onSubmit: ({ value, formApi }) => add.mutate(value, { onSuccess: () => formApi.reset() }),
   })
-  const clearsListed = { onChange: () => listModels.reset() }
+  // What was listed, and what was ticked of it, belong to the provider and key it was listed with.
+  const clearsListed = {
+    onChange: () => {
+      listModels.reset()
+      form.setFieldValue('picked', [])
+    },
+  }
   const providerId = useFormStore(form.store, (state) => state.values.providerId)
   const apiKey = useFormStore(form.store, (state) => state.values.apiKey)
+  const picked = useFormStore(form.store, (state) => state.values.picked)
   const provider = providers.find((p) => p.id === providerId)
 
   return (
@@ -275,11 +288,11 @@ function AddApiKeyForm() {
               <Field
                 label="Model IDs"
                 htmlFor="key-models"
-                optional={listed.length > 0}
+                optional={picked.length > 0}
                 wide
                 hint={
                   provider?.listsModels
-                    ? 'Load the models your key can use, or type IDs, separated by commas.'
+                    ? 'Load the models your key can use and tick the ones to add, or type IDs, separated by commas.'
                     : 'The models to use with this key, separated by commas.'
                 }
               >
@@ -304,6 +317,36 @@ function AddApiKeyForm() {
               </Field>
             )}
           </form.AppField>
+          {listed.length > 0 && (
+            <form.Field name="picked">
+              {(field) => (
+                <fieldset className="col-span-full min-w-0">
+                  <legend className="mb-1.5 font-medium text-ink-strong text-ui">
+                    Loaded models
+                  </legend>
+                  <div className="rounded-small border border-line bg-raised pb-card-pad">
+                    <Checklist>
+                      {listed.map((model) => (
+                        <ChecklistItem
+                          key={model.id}
+                          checked={field.state.value.includes(model.id)}
+                          onChange={() =>
+                            field.handleChange((ids) =>
+                              ids.includes(model.id)
+                                ? ids.filter((id) => id !== model.id)
+                                : [...ids, model.id],
+                            )
+                          }
+                        >
+                          <ModelName model={model} />
+                        </ChecklistItem>
+                      ))}
+                    </Checklist>
+                  </div>
+                </fieldset>
+              )}
+            </form.Field>
+          )}
         </div>
         <div className="mt-5 flex items-center justify-end gap-3 border-line border-t pt-4">
           <span role="status" className="me-auto text-accent-strong text-small">

@@ -224,6 +224,9 @@ describe('App', () => {
     const rebuild = await screen.findByRole('button', { name: "Rebuild this device's copy" })
     expect(openStore).not.toHaveBeenCalled()
     await userEvent.click(rebuild)
+    // It asks first, then rebuilds.
+    expect(openStore).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: 'Rebuild' }))
     await vi.waitFor(() => expect(store.client.deleteLocalCopy).toHaveBeenCalled())
     expect(openStore).toHaveBeenCalledWith('did:plc:alice')
   })

@@ -1,5 +1,7 @@
+import { useStore } from '@tanstack/react-form'
 import { type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { cn } from '../cn.ts'
+import { useFormContext } from '../form.tsx'
 import { CheckIcon } from '../icons.tsx'
 import { Button, IconButton } from './Button.tsx'
 import { Radio } from './controls.tsx'
@@ -277,20 +279,27 @@ export const fields = 'grid grid-cols-2 gap-4 @max-narrow:grid-cols-1'
 interface SaveBarProps {
   /** What the button says, Save unless it does something else, such as Add. */
   label?: string
+  /** Whether the form adds something new rather than editing what was saved, so it never says its changes are unsaved. */
+  adds?: boolean
   /** Whether it is saving, which turns a spinner before its label. */
   pending: boolean
   /** Whether there is nothing to save yet, such as before a required choice. */
   disabled?: boolean
-  /** Whether the last save succeeded and nothing has changed since. */
+  /** Whether the last save succeeded and nothing has changed since, which the form must reset on any edit. */
   saved: boolean
   error?: string | null
 }
 
 /**
  * The form's Save, kept in view at the foot of the panel over the settings fading under it, with
- * how the last save went.
+ * how the last save went. It reads its form's changes itself: Save waits for one, and the bar says
+ * there are changes to save.
  */
 export function SaveBar(props: SaveBarProps) {
+  const form = useFormContext()
+  // Saved holds only until the next edit, so it covers a save the form doesn't start over from.
+  const edited = useStore(form.store, (state) => !state.isDefaultValue)
+  const changed = edited && !props.saved
   return (
     <div className="before:mask-t-from-[calc(100%-(--spacing(4)))] sticky bottom-0 isolate -mt-2 flex flex-wrap items-center justify-end gap-x-3 gap-y-2 pt-4 pb-5 before:absolute before:-inset-x-gutter before:inset-y-0 before:-z-1 before:bg-panel">
       {props.error && (
@@ -301,30 +310,53 @@ export function SaveBar(props: SaveBarProps) {
       {/* The status is always there, so screen readers announce it when it fills. */}
       <span
         role="status"
-        className="inline-flex items-center gap-1.25 font-medium text-accent-strong text-small empty:hidden"
+        className="inline-flex items-center gap-1.25 font-medium text-small empty:hidden"
       >
-        {props.saved && (
-          <>
-            <CheckIcon /> Saved
-          </>
-        )}
+        <SaveStatus saved={props.saved} changed={changed && !props.adds} />
       </span>
-      <Button type="submit" className="px-5 py-1.5" busy={props.pending} disabled={props.disabled}>
+      <Button
+        type="submit"
+        className="px-5 py-1.5"
+        busy={props.pending}
+        disabled={props.disabled || !changed}
+      >
         {props.label ?? 'Save'}
       </Button>
     </div>
   )
 }
 
+interface SaveStatusProps {
+  saved: boolean
+  /** Whether there are edits to save. */
+  changed: boolean
+}
+
+/** That the last save went through, or that there are changes it doesn't hold yet. */
+function SaveStatus(props: SaveStatusProps) {
+  if (props.changed) return <span className="text-muted">Unsaved changes</span>
+  if (!props.saved) return null
+  return (
+    <span className="inline-flex items-center gap-1.25 text-accent-strong">
+      <CheckIcon /> Saved
+    </span>
+  )
+}
+
 interface ConfirmProps {
   /** What the button does, such as "Delete role". The confirming button says it again. */
   label: string
+  /** What the button is read out as until asked, when its label is too short to say what it acts on. */
+  name?: string
   /** The question asked before it happens, such as "Delete this role?" */
   question: string
   onConfirm: () => void
   disabled?: boolean
-  /** Whether it stays quiet until asked, as in a row of a list, and turns red only to confirm. */
-  quiet?: boolean
+  /**
+   * How it looks until asked, red by default. Quiet suits a row of a list, and default something
+   * that loses nothing for good, as rebuilding this device's copy. Only the confirming button is red.
+   */
+  tone?: 'quiet' | 'default'
   /** An icon to show in place of the label until asked, with what it is read out as. */
   icon?: { icon: ReactNode; label: string }
 }
@@ -351,7 +383,8 @@ export function ConfirmButton(props: ConfirmProps) {
   if (!asking)
     return (
       <Button
-        tone={props.quiet ? 'quiet' : 'danger'}
+        tone={props.tone ?? 'danger'}
+        aria-label={props.name}
         disabled={props.disabled}
         onClick={() => setAsking(true)}
       >

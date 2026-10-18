@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
+import { useAppForm } from '../../../src/shared/form.tsx'
 import { Chips } from '../../../src/shared/ui/Badge.tsx'
 import { Button } from '../../../src/shared/ui/Button.tsx'
 import { CopyButton } from '../../../src/shared/ui/CopyButton.tsx'
@@ -101,18 +102,55 @@ describe('Choice', () => {
   })
 })
 
+interface DraftProps {
+  pending?: boolean
+  saved?: boolean
+  error?: string
+}
+
+/** A form of one field over its SaveBar, as a settings page holds. */
+function Draft(props: DraftProps) {
+  const form = useAppForm({ defaultValues: { name: 'Work' } })
+  return (
+    <form.AppForm>
+      <form.Form>
+        <form.AppField name="name">
+          {(field) => <field.TextField aria-label="Name" />}
+        </form.AppField>
+        <SaveBar
+          pending={props.pending ?? false}
+          saved={props.saved ?? false}
+          error={props.error}
+        />
+      </form.Form>
+    </form.AppForm>
+  )
+}
+
 describe('SaveBar', () => {
-  it('says Saved in a status and shows the last error', () => {
-    render(<SaveBar pending={false} saved error="Couldn't save." />)
+  it('says Saved in a status and shows the last error', async () => {
+    render(<Draft saved error="Couldn't save." />)
     expect(screen.getByRole('status')).toHaveTextContent('Saved')
     expect(screen.getByRole('alert')).toHaveTextContent("Couldn't save.")
   })
 
-  it('is busy while it saves, keeping its label', () => {
-    render(<SaveBar pending saved={false} />)
+  it('is busy while it saves, keeping its label', async () => {
+    render(<Draft pending />)
     const save = screen.getByRole('button', { name: 'Save' })
     expect(save).toBeDisabled()
     expect(save).toHaveAttribute('aria-busy', 'true')
+    expect(screen.getByRole('status')).toBeEmptyDOMElement()
+  })
+
+  it('waits for a change, and says there is one until it is undone', async () => {
+    render(<Draft />)
+    const save = screen.getByRole('button', { name: 'Save' })
+    expect(save).toBeDisabled()
+    await userEvent.type(screen.getByLabelText('Name'), 's')
+    expect(save).toBeEnabled()
+    expect(screen.getByRole('status')).toHaveTextContent('Unsaved changes')
+    await userEvent.type(screen.getByLabelText('Name'), '{Backspace}')
+    expect(save).toBeDisabled()
     expect(screen.getByRole('status')).toBeEmptyDOMElement()
   })
 })

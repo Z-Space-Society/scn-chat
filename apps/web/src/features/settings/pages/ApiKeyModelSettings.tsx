@@ -1,5 +1,5 @@
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
-import { Link } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { api, json, read } from '../../../shared/api.ts'
 import { cn } from '../../../shared/cn.ts'
@@ -14,9 +14,11 @@ import { Item, ItemList, ItemNames } from '../../../shared/ui/ItemList.tsx'
 import {
   backLink,
   Callout,
+  ConfirmButton,
   cardAlert,
   inlineForm,
   SaveBar,
+  SettingRow,
   SettingsEmpty,
   SettingsGroup,
   SettingsPage,
@@ -49,6 +51,15 @@ export function ApiKeyModelSettings(props: ApiKeyModelSettingsProps) {
   const list = useMutation({
     mutationFn: () =>
       read(api.providers.credentials[':id']['list-models'].$post({ param: { id: props.id } })),
+  })
+  const navigate = useNavigate()
+  const remove = useMutation({
+    mutationFn: () => read(api.providers.credentials[':id'].$delete({ param: { id: props.id } })),
+    // Back to the list first, so this page never says the key it just deleted isn't saved.
+    onSuccess: async () => {
+      await navigate({ to: '/settings/api-keys' })
+      await keysChanged()
+    },
   })
   const credential = credentials.find((candidate) => candidate.id === props.id)
   const back = (
@@ -92,6 +103,20 @@ export function ApiKeyModelSettings(props: ApiKeyModelSettingsProps) {
         onSave={save.mutate}
         onEdit={save.reset}
       />
+      <SettingsGroup danger>
+        <SettingRow
+          label="Delete this key"
+          description="Its models leave your model list. Your chats stay as they are."
+          issues={<ErrorAlert error={remove.error} className="mt-0.75 text-small" />}
+        >
+          <ConfirmButton
+            label="Delete key"
+            question="Delete this key?"
+            disabled={remove.isPending}
+            onConfirm={() => remove.mutate()}
+          />
+        </SettingRow>
+      </SettingsGroup>
     </SettingsPage>
   )
 }

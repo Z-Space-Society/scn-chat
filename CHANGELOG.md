@@ -7,6 +7,10 @@ What changed in each release of SCN Chat, for the people who use it, run it, or 
 ### Changed
 
 - A streaming reply's words fade in as they arrive, rather than appearing at once. Nothing moves under reduced motion.
+- Settings and admin forms keep Save disabled until something changes, and say "Unsaved changes" beside it while the form differs from what was saved.
+- Loading a provider's models while adding an API key lists them to tick, rather than adding every one.
+- A key's page has a Delete card, so a key can be deleted where its models are edited.
+- Rebuilding this device's copy of your chats asks to confirm first.
 
 ## [0.2.2] - 2026-10-16
 
