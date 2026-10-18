@@ -4,6 +4,8 @@ What changed in each release of SCN Chat, for the people who use it, run it, or 
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-18
+
 ### Changed
 
 - With no model chosen, the composer follows the default model's capabilities: the effort select shows when it reasons, and images are turned away when it can't read them.
@@ -91,7 +93,8 @@ What changed in each release of SCN Chat, for the people who use it, run it, or 
 
 The first tagged release.
 
-[Unreleased]: https://github.com/Z-Space-Society/scn-chat/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Z-Space-Society/scn-chat/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/Z-Space-Society/scn-chat/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/Z-Space-Society/scn-chat/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/Z-Space-Society/scn-chat/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/Z-Space-Society/scn-chat/compare/v0.2.0...v0.2.1
