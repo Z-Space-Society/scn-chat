@@ -295,6 +295,8 @@
   --ease-swap: cubic-bezier(0.2, 0, 0, 1);
   /* What arrives fades in; live work breathes at the slow pace. */
   --animate-fade-in: fade-in var(--dur-enter) var(--ease-out) backwards;
+  /* A streaming reply's words come into focus as they arrive. */
+  --animate-blur-in: blur-in var(--dur-enter) var(--ease-out) backwards;
   --animate-breathe: breathe var(--slow) ease-in-out infinite;
   /* A panel rising from the control below it, such as the account menu. */
   --animate-panel-up: panel-up var(--dur-panel) var(--ease-out);
@@ -316,6 +318,13 @@
   @keyframes fade-in {
     from {
       opacity: 0;
+    }
+  }
+
+  @keyframes blur-in {
+    from {
+      opacity: 0;
+      filter: blur(var(--blur-in));
     }
   }
 
@@ -381,6 +390,8 @@
     --dur-swap: 300ms;
     /* How far a panel rises toward its place as it opens. */
     --rise: 4px;
+    /* How blurred a streaming word starts as it comes into focus. */
+    --blur-in: 4px;
     /* How long a reply waits quietly before it shows that it is waiting, so a quick one never
        flashes a waiting state. */
     --wait-quiet: 400ms;

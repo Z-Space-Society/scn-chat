@@ -59,14 +59,14 @@ Every color is `light-dark(<light>, <dark>)` in oklch, so dark mode needs no `da
 | Type | `--text-caption`, `small`, `ui`, `body`, `heading`, `title`, `display` | `text-*` |
 | Radius | `--radius-panel` (was `--radius`), `card`, `small`, `badge`, `row`, `menu`, `bubble`, `composer`, with Tailwind's own `rounded-full` for pills | `rounded-*` |
 | Shadows | `--shadow-float`, `--shadow-lift` | `shadow-*` |
-| Motion | `--ease-out`, `--ease-slide` for the sidebar, and `--animate-*` with their `@keyframes`: fade-in, fade-out, panel-in, panel-up, landed, breathe for live work, skeleton for content on its way, and spin for a busy control | `ease-*`, `animate-*` |
+| Motion | `--ease-out`, `--ease-slide` for the sidebar, and `--animate-*` with their `@keyframes`: fade-in, blur-in for a streaming reply's words, fade-out, panel-in, panel-up, landed, breathe for live work, skeleton for content on its way, and spin for a busy control | `ease-*`, `animate-*` |
 | Named sizes | `--spacing-icon`, `sidebar`, `sidebar-pad`, `row`, `bar`, `toggle`, `composer-button`, `gutter`, `card-pad`, `within`, `turn` | `size-*`, `w-*`, `h-*`, `p-*`, `gap-*`, … |
 | Widths | `--container-column`, `--container-settings`, `--container-narrow` (34rem) | `max-w-*`, `@max-narrow:` |
 | Breakpoint | `--breakpoint-wide: 45rem`, where the sidebar becomes a drawer below | `wide:`, `max-wide:` |
 
 Ink colors are named `ink` because a color named `text` would make `text-text`, and the type scale already owns `text-*`.
 
-Durations, `--menu-pad`, `--menu-edge`, `--rise`, `--wait-quiet`, `--slow`, and the icon strokes `--icon-stroke` and `--icon-stroke-control` have no Tailwind namespace. They are plain custom properties on `:root` in `theme.css`, used as `duration-(--dur-panel)`. A token built from others, like `bubble` or `radius-menu`, refers to them with `var()`, which resolves where it is used.
+Durations, `--menu-pad`, `--menu-edge`, `--rise`, `--blur-in`, `--wait-quiet`, `--slow`, and the icon strokes `--icon-stroke` and `--icon-stroke-control` have no Tailwind namespace. They are plain custom properties on `:root` in `theme.css`, used as `duration-(--dur-panel)`. A token built from others, like `bubble` or `radius-menu`, refers to them with `var()`, which resolves where it is used.
 
 Two tokens change with the device, in `theme.css` below the tokens: `--spacing-gutter` narrows to 1rem below the `wide` breakpoint, and `--input-floor` is 16px on a coarse pointer, so iOS never zooms into a field.
 
