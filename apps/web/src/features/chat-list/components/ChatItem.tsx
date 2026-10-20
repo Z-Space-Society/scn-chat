@@ -9,6 +9,7 @@ import { MoreIcon, PencilIcon, TagIcon, TrashIcon } from '../../../shared/icons.
 import { Button } from '../../../shared/ui/Button.tsx'
 import { MenuItem } from '../../../shared/ui/MenuItem.tsx'
 import { floating } from '../../../shared/ui/menu.ts'
+import { Popover } from '../../../shared/ui/Popover.tsx'
 import { sidebarRow } from '../../../shared/ui/sidebar.ts'
 import { usePopover } from '../../../shared/usePopover.ts'
 import type { ChatListItem } from '../../../store/core.ts'
@@ -146,7 +147,7 @@ interface MoreProps {
  * floating over the list by it. Escape or a click outside closes the menu.
  */
 function MoreButton(props: MoreProps) {
-  const { anchor, floatingRef, position } = usePopover(props.open, props.onClose, 'end')
+  const { anchor, trigger, popover } = usePopover(props.open, props.onClose, 'end')
 
   return (
     <>
@@ -154,29 +155,27 @@ function MoreButton(props: MoreProps) {
         ref={anchor}
         type="button"
         aria-label={`More for ${props.title}`}
-        aria-expanded={props.open}
+        {...trigger}
         onClick={props.onToggle}
         className="absolute end-0.75 top-1/2 inline-flex -translate-y-1/2 cursor-pointer rounded-row p-0.75 text-muted opacity-0 touch:opacity-100 transition-opacity duration-(--dur-feedback) hover:bg-row-active focus-visible:opacity-100 active:bg-row-active group-hover/row:opacity-100 aria-expanded:opacity-100"
       >
         <MoreIcon />
       </button>
-      {props.open && (
-        <div
-          ref={floatingRef}
-          style={position}
-          className={cn(floating, 'fixed z-50 flex w-44 flex-col gap-0.5')}
-        >
-          <MenuItem onClick={() => props.onPick('rename')}>
-            <PencilIcon /> Rename
-          </MenuItem>
-          <MenuItem onClick={() => props.onPick('tags')}>
-            <TagIcon /> Edit tags
-          </MenuItem>
-          <MenuItem danger onClick={() => props.onPick('delete')}>
-            <TrashIcon /> Delete
-          </MenuItem>
-        </div>
-      )}
+      <Popover
+        {...popover}
+        inline
+        className={cn(floating, 'fixed z-50 flex w-44 flex-col gap-0.5')}
+      >
+        <MenuItem onClick={() => props.onPick('rename')}>
+          <PencilIcon /> Rename
+        </MenuItem>
+        <MenuItem onClick={() => props.onPick('tags')}>
+          <TagIcon /> Edit tags
+        </MenuItem>
+        <MenuItem danger onClick={() => props.onPick('delete')}>
+          <TrashIcon /> Delete
+        </MenuItem>
+      </Popover>
     </>
   )
 }

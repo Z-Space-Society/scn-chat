@@ -418,6 +418,8 @@ describe('ConversationView errors', () => {
     // Regenerate with shows once the models have loaded.
     await userEvent.click(await screen.findByRole('button', { name: 'More actions' }))
     await userEvent.click(await screen.findByRole('button', { name: 'Regenerate with' }))
+    // The view taking the menu's place takes the focus too.
+    expect(screen.getByRole('button', { name: 'Back from Regenerate with' })).toHaveFocus()
     await userEvent.click(screen.getByRole('button', { name: 'Claude' }))
     const init = (writes(fetch)[0] as [string, RequestInit])[1]
     expect(JSON.parse(String(init.body))).toEqual({

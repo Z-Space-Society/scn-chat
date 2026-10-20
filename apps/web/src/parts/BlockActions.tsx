@@ -1,9 +1,9 @@
-import { type ReactNode, useEffect, useId, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { type ReactNode, useEffect, useState } from 'react'
 import { cn } from '../shared/cn.ts'
 import { IconButton } from '../shared/ui/Button.tsx'
 import { MenuItem } from '../shared/ui/MenuItem.tsx'
 import { floating } from '../shared/ui/menu.ts'
+import { Popover } from '../shared/ui/Popover.tsx'
 import { usePopover } from '../shared/usePopover.ts'
 
 /**
@@ -36,10 +36,9 @@ const menu = cn(floating, 'fixed z-50 flex min-w-36 flex-col gap-0.5')
 
 /** A block's action with a choice of how, such as copying a table as CSV or as Markdown. */
 export function ActionMenu(props: Props) {
-  const id = useId()
   const [open, setOpen] = useState(false)
   const [done, setDone] = useState(false)
-  const { anchor, floatingRef, position } = usePopover(open, () => setOpen(false), 'end')
+  const { anchor, trigger, popover } = usePopover(open, () => setOpen(false), 'end')
 
   useEffect(() => {
     if (!done) return
@@ -59,24 +58,19 @@ export function ActionMenu(props: Props) {
       <IconButton
         ref={anchor}
         aria-label={done && props.done ? props.done : props.label}
-        aria-expanded={open}
-        aria-controls={open ? id : undefined}
+        {...trigger}
         onClick={() => setOpen(!open)}
         className={blockAction}
       >
         {props.icon(done)}
       </IconButton>
-      {open &&
-        createPortal(
-          <div ref={floatingRef} id={id} style={position} className={menu}>
-            {props.items.map((item) => (
-              <MenuItem key={item.label} onClick={() => void run(item)}>
-                {item.label}
-              </MenuItem>
-            ))}
-          </div>,
-          document.body,
-        )}
+      <Popover {...popover} className={menu}>
+        {props.items.map((item) => (
+          <MenuItem key={item.label} onClick={() => void run(item)}>
+            {item.label}
+          </MenuItem>
+        ))}
+      </Popover>
     </>
   )
 }
