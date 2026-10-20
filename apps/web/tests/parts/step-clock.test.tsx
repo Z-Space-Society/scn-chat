@@ -34,11 +34,12 @@ describe('useStepClock', () => {
     vi.useFakeTimers({ now: 0 })
     const { rerender } = render(<Clock id="r:a" running />)
     expect(screen.getByText('{"elapsed":0}')).toBeInTheDocument()
-    act(() => vi.advanceTimersByTime(3_000))
-    expect(screen.getByText('{"elapsed":3}')).toBeInTheDocument()
+    // Each tick lands just after a whole second since the step started.
+    act(() => vi.advanceTimersByTime(3_010))
+    expect(screen.getByText('{"elapsed":3.01}')).toBeInTheDocument()
     rerender(<Clock id="r:a" running={false} />)
-    expect(screen.getByText('{"duration":3}')).toBeInTheDocument()
-    expect(stepDuration('r:a')).toBe(3)
+    expect(screen.getByText('{"duration":3.01}')).toBeInTheDocument()
+    expect(stepDuration('r:a')).toBe(3.01)
   })
 
   it('keeps the times of the latest steps only, forgetting the oldest first', () => {

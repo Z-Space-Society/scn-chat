@@ -1,5 +1,6 @@
 import { useStore } from '@tanstack/react-form'
-import { type ReactNode, useEffect, useId, useRef, useState } from 'react'
+import { type ReactNode, useId, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { cn } from '../cn.ts'
 import { useFormContext } from '../form.tsx'
 import { CheckIcon } from '../icons.tsx'
@@ -366,16 +367,17 @@ export function ConfirmButton(props: ConfirmProps) {
   const [asking, setAsking] = useState(false)
   const cancel = useRef<HTMLButtonElement>(null)
   // The button that was clicked is gone, so focus moves to the safe answer.
-  useEffect(() => {
-    if (asking) cancel.current?.focus()
-  }, [asking])
+  const ask = () => {
+    flushSync(() => setAsking(true))
+    cancel.current?.focus()
+  }
   if (!asking && props.icon)
     return (
       <IconButton
         tone="danger"
         aria-label={props.icon.label}
         disabled={props.disabled}
-        onClick={() => setAsking(true)}
+        onClick={ask}
       >
         {props.icon.icon}
       </IconButton>
@@ -386,7 +388,7 @@ export function ConfirmButton(props: ConfirmProps) {
         tone={props.tone ?? 'danger'}
         aria-label={props.name}
         disabled={props.disabled}
-        onClick={() => setAsking(true)}
+        onClick={ask}
       >
         {props.label}
       </Button>

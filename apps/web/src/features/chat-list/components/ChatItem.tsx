@@ -1,6 +1,6 @@
 import { noop, useMutation } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { memo, type ReactNode, useRef, useState } from 'react'
+import { memo, type ReactNode, useState } from 'react'
 import { api, json, read } from '../../../shared/api.ts'
 import { cn } from '../../../shared/cn.ts'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
@@ -10,8 +10,7 @@ import { Button } from '../../../shared/ui/Button.tsx'
 import { MenuItem } from '../../../shared/ui/MenuItem.tsx'
 import { floating } from '../../../shared/ui/menu.ts'
 import { sidebarRow } from '../../../shared/ui/sidebar.ts'
-import { useDismiss } from '../../../shared/useDismiss.ts'
-import { usePlacement } from '../../../shared/usePlacement.ts'
+import { usePopover } from '../../../shared/usePopover.ts'
 import type { ChatListItem } from '../../../store/core.ts'
 
 /** The lexicon's limits on a chat's tags. */
@@ -159,15 +158,12 @@ interface MoreProps {
  * floating over the list by it. Escape or a click outside closes the menu.
  */
 function MoreButton(props: MoreProps) {
-  const more = useRef<HTMLButtonElement>(null)
-  const menu = useRef<HTMLDivElement>(null)
-  const position = usePlacement(props.open, more, menu, 'end')
-  useDismiss(props.open, [more, menu], props.onClose)
+  const { anchor, floatingRef, position } = usePopover(props.open, props.onClose, 'end')
 
   return (
     <>
       <button
-        ref={more}
+        ref={anchor}
         type="button"
         aria-label={`More for ${props.title}`}
         aria-expanded={props.open}
@@ -178,7 +174,7 @@ function MoreButton(props: MoreProps) {
       </button>
       {props.open && (
         <div
-          ref={menu}
+          ref={floatingRef}
           style={position}
           className={cn(floating, 'fixed z-50 flex w-44 flex-col gap-0.5')}
         >

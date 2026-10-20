@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 
 /** How many of a list's items show before the rest fold behind a button. */
 export const foldAt = 7
@@ -10,13 +11,6 @@ export const foldAt = 7
 export function useFold<T>(items: T[]) {
   const [open, setOpen] = useState(false)
   const list = useRef<HTMLOListElement & HTMLUListElement>(null)
-  const opened = useRef(false)
-
-  useEffect(() => {
-    if (!open || !opened.current) return
-    opened.current = false
-    list.current?.children[foldAt]?.querySelector('a')?.focus()
-  }, [open])
 
   const folds = items.length > foldAt + 1
   return {
@@ -28,8 +22,9 @@ export function useFold<T>(items: T[]) {
     open,
     list,
     toggle() {
-      opened.current = !open
-      setOpen(!open)
+      if (open) return setOpen(false)
+      flushSync(() => setOpen(true))
+      list.current?.children[foldAt]?.querySelector('a')?.focus()
     },
   }
 }

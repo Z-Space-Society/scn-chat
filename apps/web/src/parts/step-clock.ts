@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useNow } from '../shared/useNow.ts'
 
 /** Seconds as "4s" or "1m 05s". */
 export function formatSeconds(seconds: number): string {
@@ -53,16 +54,16 @@ export function useStepClock(
   id: string | undefined,
   running: boolean,
 ): { elapsed?: number; duration?: number } {
-  const [now, setNow] = useState(() => Date.now())
   // Recording this step's duration rerenders it, and only it, through the signal summaries use.
   const duration = useStepDurations(() => (id ? stepDuration(id) : undefined))
+  // Held here too, since rendering can't watch the map change.
+  const [start, setStart] = useState<number>()
   useEffect(() => {
     if (!id || !running) return
     if (!started.has(id)) keep(started, id, Date.now())
-    setNow(Date.now())
-    const timer = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(timer)
+    setStart(started.get(id))
   }, [id, running])
+  const now = useNow(1000, { on: Boolean(id) && running, since: start })
   useEffect(() => {
     if (!id || running) return
     const start = started.get(id)
@@ -74,7 +75,6 @@ export function useStepClock(
   }, [id, running])
 
   if (!id) return {}
-  const start = started.get(id)
   if (running) return { elapsed: start === undefined ? 0 : (now - start) / 1000 }
   return duration === undefined ? {} : { duration }
 }

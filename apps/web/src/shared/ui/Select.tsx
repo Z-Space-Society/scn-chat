@@ -246,11 +246,6 @@ export function Select(props: Props) {
   useEffect(() => {
     if (open && activeId) document.getElementById(activeId)?.scrollIntoView?.({ block: 'nearest' })
   }, [open, activeId])
-  // The search box takes the focus as the list opens, but on a touch screen only when tapped, since
-  // its keyboard would cover the list.
-  useEffect(() => {
-    if (open && searchable && !touchOnly()) searchBox.current?.focus()
-  }, [open, searchable])
 
   const current = props.options.find((option) => option.value === props.value)
   const label = current?.label ?? props.placeholder ?? ''
@@ -315,7 +310,12 @@ export function Select(props: Props) {
             {searchable && (
               <>
                 <input
-                  ref={searchBox}
+                  ref={(element) => {
+                    searchBox.current = element
+                    // It takes the focus as the list opens, but on a touch screen only when tapped,
+                    // since its keyboard would cover the list.
+                    if (element && !touchOnly()) element.focus()
+                  }}
                   type="text"
                   role="combobox"
                   aria-label={props.searchLabel}

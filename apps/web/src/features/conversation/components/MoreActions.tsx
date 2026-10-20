@@ -1,5 +1,5 @@
 import type { ModelRef } from '@scn-chat/lexicons'
-import { useEffect, useId, useRef, useState } from 'react'
+import { useId, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '../../../shared/cn.ts'
 import {
@@ -13,8 +13,7 @@ import {
 import { iconAction } from '../../../shared/ui/actions.ts'
 import { MenuItem } from '../../../shared/ui/MenuItem.tsx'
 import { floating } from '../../../shared/ui/menu.ts'
-import { useDismiss } from '../../../shared/useDismiss.ts'
-import { usePlacement } from '../../../shared/usePlacement.ts'
+import { usePopover } from '../../../shared/usePopover.ts'
 import { type ModelOption, modelRef } from '../../models/models.ts'
 import { DetailsList, detailsCard } from './RecordDetails.tsx'
 
@@ -43,22 +42,10 @@ const menu = cn(floating, 'fixed z-50 flex w-54 flex-col gap-0.5')
  */
 export function MoreActions(props: Props) {
   const id = useId()
-  const button = useRef<HTMLButtonElement>(null)
-  const floatingRef = useRef<HTMLDivElement>(null)
   const [view, setView] = useState<View>('closed')
   // The selection, read as the menu opens, since choosing Quote would clear it.
   const [selected, setSelected] = useState('')
-  const position = usePlacement(view !== 'closed', button, floatingRef)
-  useDismiss(view !== 'closed', [button, floatingRef], (reason) => {
-    setView('closed')
-    if (reason === 'escape') button.current?.focus()
-  })
-
-  // Each view starts at its first control, so the keyboard lands inside it.
-  useEffect(() => {
-    if (view === 'closed') return
-    floatingRef.current?.querySelector<HTMLElement>('button')?.focus()
-  }, [view])
+  const { anchor, floatingRef, position } = usePopover(view !== 'closed', () => setView('closed'))
 
   const open = () => {
     if (view !== 'closed') return setView('closed')
@@ -72,13 +59,13 @@ export function MoreActions(props: Props) {
 
   const close = () => {
     setView('closed')
-    button.current?.focus()
+    anchor.current?.focus()
   }
 
   return (
     <>
       <button
-        ref={button}
+        ref={anchor}
         type="button"
         aria-label="More actions"
         title="More actions"

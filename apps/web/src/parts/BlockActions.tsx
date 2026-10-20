@@ -1,11 +1,10 @@
-import { type ReactNode, useEffect, useId, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useId, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '../shared/cn.ts'
 import { IconButton } from '../shared/ui/Button.tsx'
 import { MenuItem } from '../shared/ui/MenuItem.tsx'
 import { floating } from '../shared/ui/menu.ts'
-import { useDismiss } from '../shared/useDismiss.ts'
-import { usePlacement } from '../shared/usePlacement.ts'
+import { usePopover } from '../shared/usePopover.ts'
 
 /**
  * The icon actions in the corner of a block of a reply, such as a code block or a table, on a
@@ -38,20 +37,9 @@ const menu = cn(floating, 'fixed z-50 flex min-w-36 flex-col gap-0.5')
 /** A block's action with a choice of how, such as copying a table as CSV or as Markdown. */
 export function ActionMenu(props: Props) {
   const id = useId()
-  const button = useRef<HTMLButtonElement>(null)
-  const floatingRef = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
   const [done, setDone] = useState(false)
-  const position = usePlacement(open, button, floatingRef, 'end')
-  useDismiss(open, [button, floatingRef], (reason) => {
-    setOpen(false)
-    if (reason === 'escape') button.current?.focus()
-  })
-
-  // The menu starts at its first item, so the keyboard lands inside it.
-  useEffect(() => {
-    if (open) floatingRef.current?.querySelector<HTMLElement>('button')?.focus()
-  }, [open])
+  const { anchor, floatingRef, position } = usePopover(open, () => setOpen(false), 'end')
 
   useEffect(() => {
     if (!done) return
@@ -61,7 +49,7 @@ export function ActionMenu(props: Props) {
 
   const run = async (item: Item) => {
     setOpen(false)
-    button.current?.focus()
+    anchor.current?.focus()
     await item.run()
     if (props.done) setDone(true)
   }
@@ -69,7 +57,7 @@ export function ActionMenu(props: Props) {
   return (
     <>
       <IconButton
-        ref={button}
+        ref={anchor}
         aria-label={done && props.done ? props.done : props.label}
         aria-expanded={open}
         aria-controls={open ? id : undefined}

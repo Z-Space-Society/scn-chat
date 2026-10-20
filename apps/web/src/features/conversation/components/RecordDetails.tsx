@@ -1,13 +1,12 @@
 import type { Usage } from '@scn-chat/lexicons'
-import { useId, useRef, useState } from 'react'
+import { useId, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '../../../shared/cn.ts'
 import { InfoIcon } from '../../../shared/icons.tsx'
 import type { MessageRecord } from '../../../shared/message.ts'
 import { iconAction } from '../../../shared/ui/actions.ts'
 import { floating } from '../../../shared/ui/menu.ts'
-import { useDismiss } from '../../../shared/useDismiss.ts'
-import { usePlacement } from '../../../shared/usePlacement.ts'
+import { usePopover } from '../../../shared/usePopover.ts'
 
 const count = (n: number) => n.toLocaleString()
 
@@ -83,19 +82,13 @@ interface DetailsButtonProps {
  */
 export function DetailsButton(props: DetailsButtonProps) {
   const cardId = useId()
-  const button = useRef<HTMLButtonElement>(null)
-  const card = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
-  const position = usePlacement(open, button, card)
-  useDismiss(open, [button, card], (reason) => {
-    setOpen(false)
-    if (reason === 'escape') button.current?.focus()
-  })
+  const { anchor, floatingRef, position } = usePopover(open, () => setOpen(false))
 
   return (
     <>
       <button
-        ref={button}
+        ref={anchor}
         type="button"
         aria-label="Details"
         title="Details"
@@ -108,7 +101,7 @@ export function DetailsButton(props: DetailsButtonProps) {
       </button>
       {open &&
         createPortal(
-          <div ref={card} id={cardId} style={position} className={detailsCard}>
+          <div ref={floatingRef} id={cardId} style={position} className={detailsCard}>
             <DetailsList rows={props.rows} />
           </div>,
           document.body,

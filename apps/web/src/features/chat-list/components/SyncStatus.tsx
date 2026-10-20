@@ -1,22 +1,13 @@
 import { useMutation } from '@tanstack/react-query'
-import { useContext, useEffect, useState } from 'react'
+import { useContext } from 'react'
 import { cn } from '../../../shared/cn.ts'
 import { CloudIcon, DriveIcon, SyncIcon } from '../../../shared/icons.tsx'
 import { plural } from '../../../shared/plural.ts'
 import { timeAgo } from '../../../shared/time.ts'
+import { useNow } from '../../../shared/useNow.ts'
 import type { HandoverState } from '../../../store/handover.ts'
 import { useStoreState, useSyncIndex, useSyncStatus } from '../../../store/react.tsx'
 import { MeContext } from '../../auth/session.ts'
-
-/** The current time, ticking every half minute so "2 min ago" stays true. */
-function useNow(): Date {
-  const [now, setNow] = useState(() => new Date())
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 30_000)
-    return () => clearInterval(timer)
-  }, [])
-  return now
-}
 
 /** Checks the chat index for changes now. The dot and the panel share one, so both show how it went. */
 export function useSyncNow() {
@@ -61,7 +52,8 @@ function useSync(syncing: SyncNow) {
   const me = useContext(MeContext)
   const state = useStoreState()
   const status = useSyncStatus()
-  const now = useNow()
+  // Ticking every half minute so "2 min ago" stays true.
+  const now = new Date(useNow(30_000))
   return {
     local: me?.storageMode === 'local',
     active: state === 'active',

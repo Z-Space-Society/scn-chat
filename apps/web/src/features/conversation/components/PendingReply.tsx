@@ -1,8 +1,9 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext } from 'react'
 import { formatSeconds } from '../../../parts/step-clock.ts'
 import type { BlobUrl } from '../../../parts/types.ts'
 import type { MessageRecord } from '../../../shared/message.ts'
 import { parseDate } from '../../../shared/time.ts'
+import { useNow } from '../../../shared/useNow.ts'
 import type { ReplyParts } from '../lib/reply-stream.ts'
 import { useFollowedReply, useReplyStarted } from '../reply-follower.ts'
 import { PartsView } from './PartsView.tsx'
@@ -14,24 +15,11 @@ import { statusLine } from './Status.tsx'
  */
 export const FollowedConversation = createContext<string | null>(null)
 
-const secondsSince = (start: number) => Math.max(0, Math.floor((Date.now() - start) / 1000))
-
 /** The whole seconds since a time, ticking as each one passes, or none without a time. */
 function useSecondsSince(since: unknown): number | undefined {
   const start = parseDate(since)?.getTime()
-  const [seconds, setSeconds] = useState(() => (start === undefined ? 0 : secondsSince(start)))
-  useEffect(() => {
-    if (start === undefined) return
-    let timer: ReturnType<typeof setTimeout>
-    // Wakes just after each whole second since the start, so each shows as it passes.
-    const tick = () => {
-      setSeconds(secondsSince(start))
-      timer = setTimeout(tick, 1000 - ((Date.now() - start) % 1000) + 10)
-    }
-    tick()
-    return () => clearTimeout(timer)
-  }, [start])
-  return start === undefined ? undefined : seconds
+  const now = useNow(1000, { on: start !== undefined, since: start })
+  return start === undefined ? undefined : Math.max(0, Math.floor((now - start) / 1000))
 }
 
 interface WaitingAuthorProps {

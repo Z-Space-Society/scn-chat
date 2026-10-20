@@ -4,6 +4,10 @@ What changed in each release of SCN Chat, for the people who use it, run it, or 
 
 ## [Unreleased]
 
+### Fixed
+
+- A chat's menu in the sidebar now puts the keyboard on its first item as it opens, and Escape returns to the button that opened it, as the other menus already did.
+
 ## [0.3.2] - 2026-10-20
 
 ### Changed
