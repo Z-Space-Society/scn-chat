@@ -6,7 +6,7 @@ import { Chips } from '../../../src/shared/ui/Badge.tsx'
 import { Button } from '../../../src/shared/ui/Button.tsx'
 import { CopyButton } from '../../../src/shared/ui/CopyButton.tsx'
 import { Switch } from '../../../src/shared/ui/controls.tsx'
-import { ItemNames } from '../../../src/shared/ui/ItemList.tsx'
+import * as ItemList from '../../../src/shared/ui/ItemList.tsx'
 import {
   AddBar,
   Choice,
@@ -179,9 +179,9 @@ describe('CopyButton', () => {
   })
 })
 
-describe('ItemNames', () => {
+describe('ItemList.Names', () => {
   it('shows each detail, leaving out empty ones', () => {
-    render(<ItemNames title="admin" details={['2 members', false, 'PDS on bsky.social']} />)
+    render(<ItemList.Names title="admin" details={['2 members', false, 'PDS on bsky.social']} />)
     expect(screen.getByText('2 members')).toBeInTheDocument()
     expect(screen.getByText('PDS on bsky.social')).toBeInTheDocument()
     expect(screen.getByText('admin').closest('span')?.querySelectorAll('small span')).toHaveLength(

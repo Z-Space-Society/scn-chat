@@ -6,7 +6,7 @@ import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
 import { lastError } from '../../../shared/errors.ts'
 import { Badge } from '../../../shared/ui/Badge.tsx'
 import { Radio } from '../../../shared/ui/controls.tsx'
-import { Item, ItemNames } from '../../../shared/ui/ItemList.tsx'
+import * as ItemList from '../../../shared/ui/ItemList.tsx'
 import {
   cardAlert,
   SettingsEmpty,
@@ -94,9 +94,9 @@ function ModelRow(props: ModelRowProps) {
   const id = useId()
   const warningId = useId()
   return (
-    <Item className="flex-nowrap has-[label:hover]:bg-row-hover">
+    <ItemList.Item className="flex-nowrap has-[label:hover]:bg-row-hover">
       <label htmlFor={id} className="flex min-w-0 flex-1 cursor-pointer items-center gap-3.5">
-        <ItemNames
+        <ItemList.Names
           className="gap-0.5"
           title={
             <>
@@ -110,7 +110,7 @@ function ModelRow(props: ModelRowProps) {
               {model.warning}
             </small>
           )}
-        </ItemNames>
+        </ItemList.Names>
         <Radio
           id={id}
           name="default-model"
@@ -126,6 +126,6 @@ function ModelRow(props: ModelRowProps) {
         disabled={props.moving}
         onMove={props.onMove}
       />
-    </Item>
+    </ItemList.Item>
   )
 }

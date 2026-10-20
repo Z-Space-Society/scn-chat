@@ -4,7 +4,7 @@ import { api, json, read } from '../../../shared/api.ts'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
 import { useAppForm } from '../../../shared/form.tsx'
 import { timeAgo } from '../../../shared/time.ts'
-import { Item, ItemList, ItemNames } from '../../../shared/ui/ItemList.tsx'
+import * as ItemList from '../../../shared/ui/ItemList.tsx'
 import { Secret } from '../../../shared/ui/Secret.tsx'
 import {
   AddBar,
@@ -67,11 +67,11 @@ function ApiKeyList() {
   if (!keys.length) return <SettingsEmpty>No keys yet.</SettingsEmpty>
   return (
     <>
-      <ItemList>
+      <ItemList.Root>
         {keys.map((key) => (
           <ApiKeyRow key={key.id} apiKey={key} onRevoke={() => revoke.mutate(key.id)} />
         ))}
-      </ItemList>
+      </ItemList.Root>
       <ErrorAlert error={revoke.error} className={cardAlert} />
     </>
   )
@@ -85,8 +85,8 @@ interface ApiKeyRowProps {
 function ApiKeyRow(props: ApiKeyRowProps) {
   const key = props.apiKey
   return (
-    <Item>
-      <ItemNames
+    <ItemList.Item>
+      <ItemList.Names
         title={key.label}
         details={[
           key.roles.length ? `For ${key.roles.join(', ')}` : 'No roles',
@@ -111,7 +111,7 @@ function ApiKeyRow(props: ApiKeyRowProps) {
         onConfirm={props.onRevoke}
         tone="quiet"
       />
-    </Item>
+    </ItemList.Item>
   )
 }
 

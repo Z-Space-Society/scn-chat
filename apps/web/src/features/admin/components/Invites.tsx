@@ -5,7 +5,7 @@ import { lastError } from '../../../shared/errors.ts'
 import { useAppForm } from '../../../shared/form.tsx'
 import { Button } from '../../../shared/ui/Button.tsx'
 import { literalInput } from '../../../shared/ui/controls.tsx'
-import { Item, ItemList, ItemNames, ListLabel } from '../../../shared/ui/ItemList.tsx'
+import * as ItemList from '../../../shared/ui/ItemList.tsx'
 import { cardAlert, inlineForm, SettingsGroup } from '../../../shared/ui/SettingsPage.tsx'
 import { adminInvitesQuery } from '../queries.ts'
 
@@ -50,18 +50,18 @@ export function Invites() {
       </form.AppForm>
       {invites.length > 0 && (
         <div>
-          <ListLabel>Added, not signed in yet</ListLabel>
-          <ItemList>
+          <ItemList.Label>Added, not signed in yet</ItemList.Label>
+          <ItemList.Root>
             {invites.map((invite) => (
-              <Item key={invite.did}>
-                <ItemNames
+              <ItemList.Item key={invite.did}>
+                <ItemList.Names
                   title={invite.handle ?? invite.did}
                   description={invite.handle && invite.did}
                 />
                 <Button onClick={() => remove.mutate(invite.did)}>Remove</Button>
-              </Item>
+              </ItemList.Item>
             ))}
-          </ItemList>
+          </ItemList.Root>
         </div>
       )}
       <ErrorAlert error={lastError(add, remove)} className={cardAlert} />

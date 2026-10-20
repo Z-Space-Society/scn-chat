@@ -10,7 +10,7 @@ import { plural } from '../../../shared/plural.ts'
 import { Button } from '../../../shared/ui/Button.tsx'
 import { Checklist, ChecklistItem } from '../../../shared/ui/Checklist.tsx'
 import { literalInput, secretInput } from '../../../shared/ui/controls.tsx'
-import { ItemList, LinkItem } from '../../../shared/ui/ItemList.tsx'
+import * as ItemList from '../../../shared/ui/ItemList.tsx'
 import {
   ConfirmButton,
   Field,
@@ -81,7 +81,7 @@ function ApiKeyList() {
     )
   return (
     <>
-      <ItemList>
+      <ItemList.Root>
         {credentials.map((credential) => (
           <ApiKeyRow
             key={credential.id}
@@ -91,7 +91,7 @@ function ApiKeyList() {
             onDelete={() => remove.mutate(credential.id)}
           />
         ))}
-      </ItemList>
+      </ItemList.Root>
       <ErrorAlert error={remove.error} className="px-card-pad pb-card-pad text-small" />
     </>
   )
@@ -110,28 +110,27 @@ function ApiKeyRow(props: ApiKeyRowProps) {
   const credential = props.credential
   const label = keyLabel(credential, props.provider)
   return (
-    <LinkItem
-      deleting={props.deleting}
-      mark={<KeyIcon />}
-      link={
-        <Link to="/settings/api-keys/$id" params={{ id: credential.id }}>
-          {label}
-        </Link>
-      }
-      description={keyDescription(credential, props.provider)}
-      details={[plural(credential.models.length, { one: '# model', other: '# models' })]}
-      actions={
-        <>
-          <KeyHint credential={credential} />
-          <ConfirmButton
-            label="Delete key"
-            question="Delete this key?"
-            icon={{ icon: <TrashIcon />, label: `Delete ${label}` }}
-            onConfirm={props.onDelete}
-          />
-        </>
-      }
-    />
+    <ItemList.LinkItem deleting={props.deleting}>
+      <ItemList.Mark>
+        <KeyIcon />
+      </ItemList.Mark>
+      <ItemList.Names
+        title={
+          <Link to="/settings/api-keys/$id" params={{ id: credential.id }}>
+            {label}
+          </Link>
+        }
+        description={keyDescription(credential, props.provider)}
+        details={[plural(credential.models.length, { one: '# model', other: '# models' })]}
+      />
+      <KeyHint credential={credential} />
+      <ConfirmButton
+        label="Delete key"
+        question="Delete this key?"
+        icon={{ icon: <TrashIcon />, label: `Delete ${label}` }}
+        onConfirm={props.onDelete}
+      />
+    </ItemList.LinkItem>
   )
 }
 

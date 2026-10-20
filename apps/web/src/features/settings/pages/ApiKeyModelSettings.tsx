@@ -9,7 +9,7 @@ import { ArrowLeftIcon, CloseIcon } from '../../../shared/icons.tsx'
 import { Button, IconButton } from '../../../shared/ui/Button.tsx'
 import { Checklist, ChecklistItem } from '../../../shared/ui/Checklist.tsx'
 import { field, literalInput } from '../../../shared/ui/controls.tsx'
-import { Item, ItemList, ItemNames } from '../../../shared/ui/ItemList.tsx'
+import * as ItemList from '../../../shared/ui/ItemList.tsx'
 import {
   backLink,
   Callout,
@@ -192,11 +192,11 @@ function ModelRows(props: ModelRowsProps) {
   const replace = (index: number, model: KeyModel) =>
     props.onChange(props.models.map((each, i) => (i === index ? model : each)))
   return (
-    <ItemList>
+    <ItemList.Root>
       {props.models.map((model, index) => (
-        <Item key={model.id}>
+        <ItemList.Item key={model.id}>
           {/* In a narrow column the chips always go under the name, so every row reads alike. */}
-          <ItemNames
+          <ItemList.Names
             title={model.name}
             description={model.name === model.id ? undefined : <code>{model.id}</code>}
             className="@max-narrow:basis-full"
@@ -225,9 +225,9 @@ function ModelRows(props: ModelRowsProps) {
               <CloseIcon />
             </IconButton>
           </span>
-        </Item>
+        </ItemList.Item>
       ))}
-    </ItemList>
+    </ItemList.Root>
   )
 }
 

@@ -4,7 +4,7 @@ import { api, json, read } from '../../../shared/api.ts'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
 import { PlusIcon } from '../../../shared/icons.tsx'
 import { button } from '../../../shared/ui/Button.tsx'
-import { LinkItem } from '../../../shared/ui/ItemList.tsx'
+import * as ItemList from '../../../shared/ui/ItemList.tsx'
 import {
   cardAlert,
   SettingsEmpty,
@@ -71,31 +71,29 @@ interface PluginRowProps {
 function PluginRow(props: PluginRowProps) {
   const instance = props.instance
   return (
-    <LinkItem
-      mark={props.index + 1}
-      link={
-        <Link to="/admin/plugins/$id" params={{ id: instance.id }}>
-          {instance.name ?? instance.package}
-        </Link>
-      }
-      description={<code className="text-caption">{instance.package}</code>}
-      actions={
-        <>
-          <PluginStatus status={instance.status} />
-          <ReorderButtons
-            index={props.index}
-            count={props.count}
-            disabled={props.moving}
-            onMove={props.onMove}
-          />
-        </>
-      }
-    >
-      {instance.error && (
-        <small role="alert" className="text-danger text-small">
-          {instance.error}
-        </small>
-      )}
-    </LinkItem>
+    <ItemList.LinkItem>
+      <ItemList.Mark>{props.index + 1}</ItemList.Mark>
+      <ItemList.Names
+        title={
+          <Link to="/admin/plugins/$id" params={{ id: instance.id }}>
+            {instance.name ?? instance.package}
+          </Link>
+        }
+        description={<code className="text-caption">{instance.package}</code>}
+      >
+        {instance.error && (
+          <small role="alert" className="text-danger text-small">
+            {instance.error}
+          </small>
+        )}
+      </ItemList.Names>
+      <PluginStatus status={instance.status} />
+      <ReorderButtons
+        index={props.index}
+        count={props.count}
+        disabled={props.moving}
+        onMove={props.onMove}
+      />
+    </ItemList.LinkItem>
   )
 }

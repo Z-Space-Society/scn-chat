@@ -6,7 +6,7 @@ import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
 import { useAppForm } from '../../../shared/form.tsx'
 import { plural } from '../../../shared/plural.ts'
 import { Badge } from '../../../shared/ui/Badge.tsx'
-import { ItemList, LinkItem } from '../../../shared/ui/ItemList.tsx'
+import * as ItemList from '../../../shared/ui/ItemList.tsx'
 import {
   cardAlert,
   inlineForm,
@@ -33,7 +33,7 @@ export function RolesAdmin() {
           </>
         }
       >
-        <ItemList>
+        <ItemList.Root>
           {data.roles.map((role) => (
             <RoleRow
               key={role.name}
@@ -41,7 +41,7 @@ export function RolesAdmin() {
               environmentAdmins={data.environmentAdmins.length}
             />
           ))}
-        </ItemList>
+        </ItemList.Root>
       </SettingsGroup>
       <NewRoleForm />
     </SettingsPage>
@@ -59,22 +59,24 @@ function RoleRow(props: RoleRowProps) {
   const role = props.role
   const members = role.members.length + (role.name === 'admin' ? props.environmentAdmins : 0)
   return (
-    <LinkItem
-      link={
-        <>
-          <Link to="/admin/roles/$name" params={{ name: role.name }}>
-            {role.name}
-          </Link>{' '}
-          {role.builtIn && <Badge>Built in</Badge>}
-        </>
-      }
-      description={role.description || undefined}
-      details={[
-        plural(members, { one: '# member', other: '# members' }),
-        role.pdsHosts.length > 0 && `PDS on ${role.pdsHosts.join(', ')}`,
-        role.handleDomains.length > 0 && `Handles ending in ${role.handleDomains.join(', ')}`,
-      ]}
-    />
+    <ItemList.LinkItem>
+      <ItemList.Names
+        title={
+          <>
+            <Link to="/admin/roles/$name" params={{ name: role.name }}>
+              {role.name}
+            </Link>{' '}
+            {role.builtIn && <Badge>Built in</Badge>}
+          </>
+        }
+        description={role.description || undefined}
+        details={[
+          plural(members, { one: '# member', other: '# members' }),
+          role.pdsHosts.length > 0 && `PDS on ${role.pdsHosts.join(', ')}`,
+          role.handleDomains.length > 0 && `Handles ending in ${role.handleDomains.join(', ')}`,
+        ]}
+      />
+    </ItemList.LinkItem>
   )
 }
 

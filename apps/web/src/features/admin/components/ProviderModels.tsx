@@ -9,7 +9,7 @@ import { Badge } from '../../../shared/ui/Badge.tsx'
 import { Button } from '../../../shared/ui/Button.tsx'
 import { Checklist, ChecklistItem } from '../../../shared/ui/Checklist.tsx'
 import { literalInput } from '../../../shared/ui/controls.tsx'
-import { ItemList, LinkItem } from '../../../shared/ui/ItemList.tsx'
+import * as ItemList from '../../../shared/ui/ItemList.tsx'
 import {
   cardAlert,
   inlineForm,
@@ -142,36 +142,37 @@ interface ModelListProps {
 function ModelList(props: ModelListProps) {
   if (props.models.length === 0) return <SettingsEmpty>No models yet.</SettingsEmpty>
   return (
-    <ItemList>
+    <ItemList.Root>
       {props.models.map((model) => {
         const can = capabilities
           .filter((capability) => model.capabilities[capability.key])
           .map((capability) => capability.label)
         return (
-          <LinkItem
-            key={model.id}
-            link={
-              <>
-                <Link
-                  to="/admin/plugins/$id/model"
-                  params={{ id: props.pluginId }}
-                  search={{ provider: model.provider, id: model.id }}
-                >
-                  {model.name}
-                </Link>{' '}
-                {model.default && <Badge tone="good">Default</Badge>}
-              </>
-            }
-            details={[
-              <code key="id" className="text-caption">
-                {model.id}
-              </code>,
-              can.length > 0 && can.join(', '),
-              model.roles.length ? `For ${model.roles.join(', ')}` : 'No roles',
-            ]}
-          />
+          <ItemList.LinkItem key={model.id}>
+            <ItemList.Names
+              title={
+                <>
+                  <Link
+                    to="/admin/plugins/$id/model"
+                    params={{ id: props.pluginId }}
+                    search={{ provider: model.provider, id: model.id }}
+                  >
+                    {model.name}
+                  </Link>{' '}
+                  {model.default && <Badge tone="good">Default</Badge>}
+                </>
+              }
+              details={[
+                <code key="id" className="text-caption">
+                  {model.id}
+                </code>,
+                can.length > 0 && can.join(', '),
+                model.roles.length ? `For ${model.roles.join(', ')}` : 'No roles',
+              ]}
+            />
+          </ItemList.LinkItem>
         )
       })}
-    </ItemList>
+    </ItemList.Root>
   )
 }

@@ -9,7 +9,7 @@ import { ArrowLeftIcon } from '../../../shared/icons.tsx'
 import { splitLines } from '../../../shared/lines.ts'
 import { Badge } from '../../../shared/ui/Badge.tsx'
 import { literalInput, monoField } from '../../../shared/ui/controls.tsx'
-import { Item, ItemList, ItemMark, ItemNames } from '../../../shared/ui/ItemList.tsx'
+import * as ItemList from '../../../shared/ui/ItemList.tsx'
 import {
   backLink,
   ConfirmButton,
@@ -259,18 +259,21 @@ function MemberList(props: MemberListProps) {
     return <SettingsEmpty>No one has been added yet.</SettingsEmpty>
   return (
     // The list follows the form it adds to, with no line between.
-    <ItemList className="before:hidden">
+    <ItemList.Root className="before:hidden">
       {props.environmentAdmins.map((did) => (
-        <Item key={did}>
-          <ItemMark initial>{null}</ItemMark>
-          <ItemNames title={did} description="Set in ADMIN_DIDS, so it can't be removed here" />
+        <ItemList.Item key={did}>
+          <ItemList.Mark initial>{null}</ItemList.Mark>
+          <ItemList.Names
+            title={did}
+            description="Set in ADMIN_DIDS, so it can't be removed here"
+          />
           <Badge>ADMIN_DIDS</Badge>
-        </Item>
+        </ItemList.Item>
       ))}
       {props.role.members.map((member) => (
-        <Item key={member.did}>
-          <ItemMark initial>{member.handle?.slice(0, 1).toUpperCase()}</ItemMark>
-          <ItemNames title={member.handle ?? member.did} description={memberNote(member)} />
+        <ItemList.Item key={member.did}>
+          <ItemList.Mark initial>{member.handle?.slice(0, 1).toUpperCase()}</ItemList.Mark>
+          <ItemList.Names title={member.handle ?? member.did} description={memberNote(member)} />
           {/* Taking someone out of a role, admin above all, shouldn't be one slip away. */}
           <ConfirmButton
             tone="quiet"
@@ -278,8 +281,8 @@ function MemberList(props: MemberListProps) {
             question={`Remove ${member.handle ?? member.did} from ${props.role.name}?`}
             onConfirm={() => props.onRemove(member.did)}
           />
-        </Item>
+        </ItemList.Item>
       ))}
-    </ItemList>
+    </ItemList.Root>
   )
 }

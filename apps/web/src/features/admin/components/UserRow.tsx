@@ -2,7 +2,7 @@ import { ClientOnly } from '@tanstack/react-router'
 import { ChevronDownIcon, CloseIcon } from '../../../shared/icons.tsx'
 import { timeAgo } from '../../../shared/time.ts'
 import { Badge, Chip } from '../../../shared/ui/Badge.tsx'
-import { Item, ItemMark, ItemNames } from '../../../shared/ui/ItemList.tsx'
+import * as ItemList from '../../../shared/ui/ItemList.tsx'
 import { Select } from '../../../shared/ui/Select.tsx'
 import type { UserActions } from '../hooks/useUserActions.ts'
 import type { AdminUser } from '../queries.ts'
@@ -23,9 +23,9 @@ export function UserRow(props: Props) {
   const user = props.user
   const name = user.handle ?? user.did
   return (
-    <Item className="items-start">
-      <ItemMark initial>{user.handle?.slice(0, 1).toUpperCase()}</ItemMark>
-      <ItemNames
+    <ItemList.Item className="items-start">
+      <ItemList.Mark initial>{user.handle?.slice(0, 1).toUpperCase()}</ItemList.Mark>
+      <ItemList.Names
         className="min-w-48 gap-0.5"
         title={
           <>
@@ -82,13 +82,13 @@ export function UserRow(props: Props) {
             </Select>
           )}
         </span>
-      </ItemNames>
+      </ItemList.Names>
       <SuspendControl
         name={name}
         suspension={user.suspension}
         onSuspend={(reason) => props.actions.suspend(user.did, reason)}
         onRestore={() => props.actions.restore(user.did)}
       />
-    </Item>
+    </ItemList.Item>
   )
 }

@@ -2,7 +2,7 @@ import { useSuspenseInfiniteQuery, useSuspenseQuery } from '@tanstack/react-quer
 import { Suspense } from 'react'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
 import { Button } from '../../../shared/ui/Button.tsx'
-import { ItemList, ItemRowsSkeleton } from '../../../shared/ui/ItemList.tsx'
+import * as ItemList from '../../../shared/ui/ItemList.tsx'
 import {
   cardAlert,
   SettingsEmpty,
@@ -32,7 +32,7 @@ export function UsersAdmin(props: UsersAdminProps) {
       <SettingsGroup title="Accounts">
         <UserSearch q={props.q} />
         {/* Only the results wait for a new search, so the search box keeps its focus. */}
-        <Suspense fallback={<ItemRowsSkeleton initial className={undivided} />}>
+        <Suspense fallback={<ItemList.RowsSkeleton initial className={undivided} />}>
           <UserList q={props.q} />
         </Suspense>
       </SettingsGroup>
@@ -58,11 +58,11 @@ function UserList(props: UserListProps) {
           {props.q ? `No one matches "${props.q}".` : 'No accounts yet.'}
         </SettingsEmpty>
       )}
-      <ItemList aria-label="Accounts" className={undivided}>
+      <ItemList.Root aria-label="Accounts" className={undivided}>
         {accounts.map((user) => (
           <UserRow key={user.did} user={user} assignable={assignable} actions={actions} />
         ))}
-      </ItemList>
+      </ItemList.Root>
       {users.hasNextPage && (
         <div className={`flex justify-center p-card-pad ${undivided}`}>
           <Button busy={users.isFetchingNextPage} onClick={() => void users.fetchNextPage()}>
