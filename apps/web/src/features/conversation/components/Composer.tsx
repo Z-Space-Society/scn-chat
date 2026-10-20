@@ -1,9 +1,10 @@
-import type { ModelRef } from '@scn-chat/lexicons'
 import { Link } from '@tanstack/react-router'
 import {
+  createContext,
   type ReactNode,
   type Ref,
   type RefObject,
+  use,
   useImperativeHandle,
   useLayoutEffect,
   useRef,
@@ -16,45 +17,43 @@ import { Button } from '../../../shared/ui/Button.tsx'
 import { EffortSelect } from '../../models/components/EffortSelect.tsx'
 import { ModelSelect } from '../../models/components/ModelSelect.tsx'
 import { rememberEffort } from '../../models/last-effort.ts'
-import type { OutgoingMessage } from '../chat.ts'
 import { useAutoGrow } from '../hooks/useAutoGrow.ts'
-import { type Blocked, useDraft } from '../hooks/useDraft.ts'
+import { type Blocked, type DraftOptions, useDraft } from '../hooks/useDraft.ts'
 import { restoreText, takeText } from '../lib/composer-handoff.ts'
 import { AttachmentChips, removeChip } from './AttachmentChips.tsx'
 import {
   AttachButton,
   ClearButton,
-  ComposerCard,
   ComposerDock,
-  ComposerToolbar,
   composerPart,
   MessageBox,
-  messagePlaceholder,
   SendButton,
-  StopButton,
 } from './composer-parts.tsx'
 
-export interface ComposerProps {
-  /** Send the message, which the composer clears once this resolves. */
-  send: (message: OutgoingMessage) => Promise<unknown>
-  /** The message this one answers, if any. */
-  parent?: string
-  /**
-   * Whether the chat's messages are still on their way, so it isn't known yet whether the message
-   * starts the chat or replies. The box says neither, and nothing sends until they arrive.
-   */
-  waiting?: boolean
-  /** The model last used at or above `parent`, which the server falls back to. */
-  inherited?: ModelRef | null
-  initialText?: string
-  /** Stop editing an earlier message, offered by the note that says the composer is editing, and on Escape. */
-  onCancel?: () => void
-  /** Stop the reply running at the end of the branch, offered in place of Send until it ends. */
-  onStop?: () => void
-  /** What floats just above the box, such as a button that jumps to the latest message. */
-  above?: ReactNode
-  ref?: Ref<ComposerHandle>
-}
+/*
+ * The composer's parts, each reading the draft from the composer it is in, so a composer is the
+ * parts it shows, in order. Imported together, as `import * as Composer`, and composed by
+ * ReplyComposer and EditComposer:
+ *
+ *   const composer = Composer.useComposer(options, ref)
+ *   <Composer.Provider value={composer}>
+ *     <Composer.Form>
+ *       <Composer.Card>
+ *         <Composer.Input placeholder="Reply" />
+ *         <Composer.Toolbar>
+ *           <Composer.Attach />
+ *           <Composer.Send />
+ *         </Composer.Toolbar>
+ *       </Composer.Card>
+ *     </Composer.Form>
+ *   </Composer.Provider>
+ */
+
+export {
+  ComposerCard as Card,
+  ComposerToolbar as Toolbar,
+  StopButton as Stop,
+} from './composer-parts.tsx'
 
 /** What the conversation can do to the composer from outside it. */
 export interface ComposerHandle {
@@ -66,39 +65,26 @@ export interface ComposerHandle {
   attach: (files: File[]) => void
 }
 
-/**
- * The message box: one white card floating at the bottom of the panel, over the conversation fading
- * under it, with quotes and attachments at its top, the text, and a toolbar of Attach, the model and
- * effort, and Send, which nests in the card's corner as the main action. While a reply runs, Stop
- * takes Send's place.
- */
-// The ref is kept out of `props`: React Compiler treats an object holding a ref as one, so reading
-// any other prop in render would stop it memoizing the composer.
-export function Composer({ ref, ...props }: ComposerProps) {
-  const box = useRef<HTMLTextAreaElement>(null)
-  const picker = useRef<HTMLInputElement>(null)
-  const draft = useDraft({
-    send: props.send,
-    parent: props.parent,
-    inherited: props.inherited,
-    waiting: props.waiting,
-    running: Boolean(props.onStop),
-    initialText: props.initialText,
-  })
-  const form = draft.form
-  // What was typed into the composer's frame, before this took its place, carries over with its
-  // cursor and focus. A frame only stands in for a composer that starts empty, so one editing a
-  // message leaves the draft be.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: only on taking the frame's place.
-  useLayoutEffect(() => {
-    if (props.onCancel || props.initialText) return
-    const left = takeText()
-    if (!left || !box.current) return
-    draft.setText(left.text)
-    restoreText(box.current, left)
-  }, [])
+/** What a composer's parts share: the draft, and the box it is typed into. */
+export interface ComposerState {
+  draft: ReturnType<typeof useDraft>
+  box: RefObject<HTMLTextAreaElement | null>
+  /** Focus the box with the cursor at the end, once new text has rendered. */
+  focusEnd: () => void
+}
 
-  /** Focus the box with the cursor at the end, once the new text has rendered. */
+const ComposerContext = createContext<ComposerState | null>(null)
+
+function useComposerState(): ComposerState {
+  const composer = use(ComposerContext)
+  if (!composer) throw new Error('A composer part needs a Composer.Provider around it')
+  return composer
+}
+
+/** A composer's draft and box, for its parts, and what the conversation can do to it through `ref`. */
+export function useComposer(options: DraftOptions, ref?: Ref<ComposerHandle>): ComposerState {
+  const box = useRef<HTMLTextAreaElement>(null)
+  const draft = useDraft(options)
   const focusEnd = () =>
     requestAnimationFrame(() => {
       const element = box.current
@@ -117,162 +103,165 @@ export function Composer({ ref, ...props }: ComposerProps) {
     },
     attach: (files) => draft.attach(files),
   }))
-  /** Start the message over, and go back to the box. */
-  const clear = () => {
-    draft.clear()
-    focusEnd()
-  }
+  return { draft, box, focusEnd }
+}
+
+/**
+ * Carry over what was typed into the composer's frame before this composer took its place, with
+ * its cursor and focus. A frame only stands in for a composer that starts empty.
+ */
+export function useFrameHandoff(composer: ComposerState) {
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only on taking the frame's place.
+  useLayoutEffect(() => {
+    const left = takeText()
+    if (!left || !composer.box.current) return
+    composer.draft.setText(left.text)
+    restoreText(composer.box.current, left)
+  }, [])
+}
+
+interface ProviderProps {
+  value: ComposerState
+  children: ReactNode
+}
+
+export function Provider(props: ProviderProps) {
+  const form = props.value.draft.form
   return (
-    <form.AppForm>
-      <ComposerDock
-        onSubmit={(e) => {
-          e.preventDefault()
-          draft.send()
-        }}
+    <ComposerContext value={props.value}>
+      <form.AppForm>{props.children}</form.AppForm>
+    </ComposerContext>
+  )
+}
+
+interface ChildrenProps {
+  children: ReactNode
+}
+
+/** The composer floating at the bottom of the panel, which sends the draft when submitted. */
+export function Form(props: ChildrenProps) {
+  const { draft } = useComposerState()
+  return (
+    <ComposerDock
+      onSubmit={(e) => {
+        e.preventDefault()
+        draft.send()
+      }}
+    >
+      {props.children}
+    </ComposerDock>
+  )
+}
+
+interface EditingNoteProps {
+  onCancel: () => void
+}
+
+/** That the composer is editing an earlier message, above the box, with a way back. */
+export function EditingNote(props: EditingNoteProps) {
+  return (
+    <div className="mx-1.5 mb-2 flex items-center gap-1.75 text-caption text-muted">
+      <PencilIcon className="size-3.75" />
+      <span>Editing your message. Sending adds it as a new version.</span>
+      <Button
+        size="small"
+        title="Stop editing (Esc)"
+        onClick={props.onCancel}
+        className="ms-auto px-2.5 py-0.5 text-caption"
       >
-        {props.above}
-        {props.onCancel && (
-          // Editing an earlier message says so above the box, with a way back.
-          <div className="mx-1.5 mb-2 flex items-center gap-1.75 text-caption text-muted">
-            <PencilIcon className="size-3.75" />
-            <span>Editing your message. Sending adds it as a new version.</span>
-            <Button
-              size="small"
-              title="Stop editing (Esc)"
-              onClick={props.onCancel}
-              className="ms-auto px-2.5 py-0.5 text-caption"
-            >
-              Cancel
-            </Button>
-          </div>
-        )}
-        <ComposerCard>
-          {draft.quotes.length > 0 && (
-            // A quote shows as a well across the card, like a sent quote, cut to two lines.
-            <ul
-              aria-label="Quotes"
-              className={cn(composerPart, 'flex flex-col gap-1.5 px-2.75 pt-2.5 pb-0.5')}
-            >
-              {draft.quotes.map((quote) => (
-                <li
-                  key={quote.id}
-                  title={quote.text}
-                  className="flex w-full items-start gap-2 rounded-quote bg-well py-1.5 ps-2.75 pe-1 text-caption"
-                >
-                  <blockquote className="line-clamp-2 flex-1 text-muted">
-                    {quote.text.trim().replace(/\s+/g, ' ')}
-                  </blockquote>
-                  <button
-                    type="button"
-                    aria-label="Remove quote"
-                    onClick={() => draft.removeQuote(quote)}
-                    className={removeChip}
-                  >
-                    <CloseIcon />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <AttachmentChips
-            attachments={draft.attachments}
-            onRemove={draft.removeAttachment}
-            className={cn(composerPart, 'px-2.75 pt-2.5 pb-0.5')}
+        Cancel
+      </Button>
+    </div>
+  )
+}
+
+/** The draft's quotes, each a well across the card like a sent quote, cut to two lines. */
+export function Quotes() {
+  const { draft } = useComposerState()
+  if (draft.quotes.length === 0) return null
+  return (
+    <ul
+      aria-label="Quotes"
+      className={cn(composerPart, 'flex flex-col gap-1.5 px-2.75 pt-2.5 pb-0.5')}
+    >
+      {draft.quotes.map((quote) => (
+        <li
+          key={quote.id}
+          title={quote.text}
+          className="flex w-full items-start gap-2 rounded-quote bg-well py-1.5 ps-2.75 pe-1 text-caption"
+        >
+          <blockquote className="line-clamp-2 flex-1 text-muted">
+            {quote.text.trim().replace(/\s+/g, ' ')}
+          </blockquote>
+          <button
+            type="button"
+            aria-label="Remove quote"
+            onClick={() => draft.removeQuote(quote)}
+            className={removeChip}
+          >
+            <CloseIcon />
+          </button>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** The draft's attachments, as chips. */
+export function Attachments() {
+  const { draft } = useComposerState()
+  return (
+    <AttachmentChips
+      attachments={draft.attachments}
+      onRemove={draft.removeAttachment}
+      className={cn(composerPart, 'px-2.75 pt-2.5 pb-0.5')}
+    />
+  )
+}
+
+interface InputProps {
+  placeholder: string
+  /** What Escape in the box does, such as stop editing. */
+  onEscape?: () => void
+}
+
+/** The message box, where Enter sends, except on a touch screen, and pasted files attach. */
+export function Input(props: InputProps) {
+  const { draft, box } = useComposerState()
+  return (
+    <draft.form.AppField name="text">
+      {(field) => (
+        <>
+          <AutoGrow box={box} text={field.state.value} />
+          <MessageBox
+            ref={box}
+            name={field.name}
+            value={field.state.value}
+            onChange={(e) => field.handleChange(e.target.value)}
+            onBlur={field.handleBlur}
+            placeholder={props.placeholder}
+            onPaste={(e) => {
+              // Copied text can carry a picture of itself, as from an office app, so it pastes
+              // as text.
+              const files = Array.from(e.clipboardData.files)
+              if (files.length === 0 || e.clipboardData.types.includes('text/plain')) return
+              e.preventDefault()
+              draft.attach(files)
+            }}
+            onKeyDown={(e) => {
+              // Enter while an input method composes, as for Japanese, picks the words instead.
+              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && !touchOnly()) {
+                e.preventDefault()
+                draft.send()
+              } else if (e.key === 'Escape' && props.onEscape) {
+                e.preventDefault()
+                props.onEscape()
+              }
+            }}
           />
-          <form.AppField name="text">
-            {(field) => (
-              <>
-                <AutoGrow box={box} text={field.state.value} />
-                <MessageBox
-                  ref={box}
-                  name={field.name}
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  onBlur={field.handleBlur}
-                  placeholder={messagePlaceholder(props)}
-                  onPaste={(e) => {
-                    // Copied text can carry a picture of itself, as from an office app, so it pastes
-                    // as text.
-                    const files = Array.from(e.clipboardData.files)
-                    if (files.length === 0 || e.clipboardData.types.includes('text/plain')) return
-                    e.preventDefault()
-                    draft.attach(files)
-                  }}
-                  onKeyDown={(e) => {
-                    // Enter while an input method composes, as for Japanese, picks the words instead.
-                    if (
-                      e.key === 'Enter' &&
-                      !e.shiftKey &&
-                      !e.nativeEvent.isComposing &&
-                      !touchOnly()
-                    ) {
-                      e.preventDefault()
-                      draft.send()
-                    } else if (e.key === 'Escape' && props.onCancel) {
-                      e.preventDefault()
-                      props.onCancel()
-                    }
-                  }}
-                />
-              </>
-            )}
-          </form.AppField>
-          {!draft.empty && <ClearButton disabled={draft.sending} onClick={clear} />}
-          <ComposerToolbar>
-            <AttachButton
-              title={draft.seesImages ? 'Attach files or images' : 'Attach files'}
-              onClick={() => picker.current?.click()}
-            />
-            <input
-              ref={picker}
-              aria-label="Files to attach"
-              type="file"
-              hidden
-              multiple
-              accept={draft.accept ?? undefined}
-              onChange={(e) => {
-                draft.attach(Array.from(e.target.files ?? []))
-                // The chosen files show as attachments, and clearing lets the same file be chosen
-                // again.
-                e.target.value = ''
-              }}
-            />
-            <ModelSelect
-              aria-label="Model"
-              quiet
-              loading={draft.loading}
-              models={draft.models}
-              value={draft.selected}
-              onChange={(next) => form.setFieldValue('model', next)}
-              title="Model"
-              none={draft.defaultOption}
-            />
-            {draft.reasons && (
-              <EffortSelect
-                aria-label="Thinking effort"
-                quiet
-                value={draft.chosenEffort}
-                onChange={(next) => {
-                  form.setFieldValue('effort', next)
-                  rememberEffort(next)
-                }}
-                auto={{ label: 'Default', detail: 'As set in Preferences' }}
-              />
-            )}
-            {props.onStop ? (
-              <StopButton onClick={props.onStop} />
-            ) : (
-              <SendButton
-                title={props.onCancel ? 'Send as a new version' : 'Send'}
-                disabled={!draft.canSend}
-              />
-            )}
-          </ComposerToolbar>
-        </ComposerCard>
-        <ModelNotice blocked={draft.blocked} />
-        <ErrorAlert error={draft.error} className="mx-2 mt-2.5 text-small" />
-      </ComposerDock>
-    </form.AppForm>
+        </>
+      )}
+    </draft.form.AppField>
   )
 }
 
@@ -285,6 +274,104 @@ interface AutoGrowProps {
 function AutoGrow(props: AutoGrowProps) {
   useAutoGrow(props.box, props.text)
   return null
+}
+
+/** Clear, while there is something to clear, which starts the message over and goes back to the box. */
+export function Clear() {
+  const { draft, focusEnd } = useComposerState()
+  if (draft.empty) return null
+  return (
+    <ClearButton
+      disabled={draft.sending}
+      onClick={() => {
+        draft.clear()
+        focusEnd()
+      }}
+    />
+  )
+}
+
+/** Attach, which opens the file picker for the types the draft takes. */
+export function Attach() {
+  const { draft } = useComposerState()
+  const picker = useRef<HTMLInputElement>(null)
+  return (
+    <>
+      <AttachButton
+        title={draft.seesImages ? 'Attach files or images' : 'Attach files'}
+        onClick={() => picker.current?.click()}
+      />
+      <input
+        ref={picker}
+        aria-label="Files to attach"
+        type="file"
+        hidden
+        multiple
+        accept={draft.accept ?? undefined}
+        onChange={(e) => {
+          draft.attach(Array.from(e.target.files ?? []))
+          // The chosen files show as attachments, and clearing lets the same file be chosen again.
+          e.target.value = ''
+        }}
+      />
+    </>
+  )
+}
+
+/** The model the message asks for. */
+export function Model() {
+  const { draft } = useComposerState()
+  return (
+    <ModelSelect
+      aria-label="Model"
+      quiet
+      loading={draft.loading}
+      models={draft.models}
+      value={draft.selected}
+      onChange={(next) => draft.form.setFieldValue('model', next)}
+      title="Model"
+      none={draft.defaultOption}
+    />
+  )
+}
+
+/** The thinking effort, when the answering model reasons, remembered for the next message. */
+export function Effort() {
+  const { draft } = useComposerState()
+  if (!draft.reasons) return null
+  return (
+    <EffortSelect
+      aria-label="Thinking effort"
+      quiet
+      value={draft.chosenEffort}
+      onChange={(next) => {
+        draft.form.setFieldValue('effort', next)
+        rememberEffort(next)
+      }}
+      auto={{ label: 'Default', detail: 'As set in Preferences' }}
+    />
+  )
+}
+
+interface SendProps {
+  title?: string
+}
+
+/** Send, waiting until the draft can be sent. */
+export function Send(props: SendProps) {
+  const { draft } = useComposerState()
+  return <SendButton title={props.title ?? 'Send'} disabled={!draft.canSend} />
+}
+
+/** Under the box: why the draft can't be sent yet, and why the last send or file failed. */
+export function Notices() {
+  const { draft } = useComposerState()
+  return (
+    <>
+      <ModelNotice blocked={draft.blocked} />
+      <ErrorAlert error={draft.error} className="mx-2 mt-2.5 text-small" />
+    </>
+  )
 }
 
 interface ModelNoticeProps {

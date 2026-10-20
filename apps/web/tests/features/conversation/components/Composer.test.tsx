@@ -4,10 +4,9 @@ import userEvent from '@testing-library/user-event'
 import { act, createRef, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
 import type { OutgoingMessage } from '../../../../src/features/conversation/chat.ts'
-import {
-  Composer,
-  type ComposerHandle,
-} from '../../../../src/features/conversation/components/Composer.tsx'
+import type { ComposerHandle } from '../../../../src/features/conversation/components/Composer.tsx'
+import { EditComposer } from '../../../../src/features/conversation/components/EditComposer.tsx'
+import { ReplyComposer } from '../../../../src/features/conversation/components/ReplyComposer.tsx'
 import type { ModelOption } from '../../../../src/features/models/models.ts'
 import { modelsQuery } from '../../../../src/features/models/queries.ts'
 import { stubFetch, writes } from '../../../helpers/fetch.ts'
@@ -72,7 +71,7 @@ afterEach(() => vi.unstubAllGlobals())
 
 describe('Composer', () => {
   it('offers effort beside the model only for reasoning models, the default included', async () => {
-    await renderComposer(<Composer send={send} />)
+    await renderComposer(<ReplyComposer send={send} />)
     await vi.waitFor(() => expect(effortSelect()).toHaveTextContent('Default'))
     await choose(screen.getByLabelText('Model'), 'Basic')
     expect(effortSelect()).toBeNull()
@@ -84,30 +83,30 @@ describe('Composer', () => {
   })
 
   it('names the model the default falls back to', async () => {
-    await renderComposer(<Composer send={send} />)
+    await renderComposer(<ReplyComposer send={send} />)
     await vi.waitFor(() =>
       expect(screen.getByLabelText('Model')).toHaveTextContent('Default · Smart'),
     )
   })
 
   it("shows the chat's own model by name, with no default to pick", async () => {
-    await renderComposer(<Composer send={send} inherited={{ provider: 'p', id: 'basic' }} />)
+    await renderComposer(<ReplyComposer send={send} inherited={{ provider: 'p', id: 'basic' }} />)
     expect(screen.getByLabelText('Model')).toHaveTextContent(/^Basic$/)
     expect(await optionsOf(screen.getByLabelText('Model'))).not.toContain('Default · Smart')
   })
 
   it('starts on the effort last chosen on this device', async () => {
-    const first = await renderComposer(<Composer send={send} />)
+    const first = await renderComposer(<ReplyComposer send={send} />)
     await choose(screen.getByLabelText('Model'), 'Smart')
     await pickEffort('High')
     first.unmount()
-    await renderComposer(<Composer send={send} />)
+    await renderComposer(<ReplyComposer send={send} />)
     await choose(screen.getByLabelText('Model'), 'Smart')
     expect(effortSelect()).toHaveTextContent('High')
   })
 
   it('stops offering images for models without vision', async () => {
-    await renderComposer(<Composer send={send} />)
+    await renderComposer(<ReplyComposer send={send} />)
     await vi.waitFor(() =>
       expect(screen.getByLabelText('Files to attach')).toHaveAttribute(
         'accept',
@@ -119,7 +118,7 @@ describe('Composer', () => {
   })
 
   it('stops offering images once the chosen model is no longer offered', async () => {
-    const { queryClient } = await renderComposer(<Composer send={send} />)
+    const { queryClient } = await renderComposer(<ReplyComposer send={send} />)
     await choose(screen.getByLabelText('Model'), 'Smart')
     queryClient.setQueryData(modelsQuery.queryKey, { models: models.slice(1), defaultModel: null })
     await vi.waitFor(() =>
@@ -129,7 +128,7 @@ describe('Composer', () => {
   })
 
   it('sends the text with the chosen model and effort on Enter', async () => {
-    await renderComposer(<Composer send={send} parent="p0" />)
+    await renderComposer(<ReplyComposer send={send} parent="p0" />)
     await choose(screen.getByLabelText('Model'), 'Smart')
     await pickEffort('High')
     await userEvent.type(screen.getByLabelText('Message'), 'Hello{Enter}')
@@ -144,7 +143,7 @@ describe('Composer', () => {
 
   it('sends a quote on its own, and drops a removed one', async () => {
     const composer = createRef<ComposerHandle>()
-    await renderComposer(<Composer ref={composer} send={send} />)
+    await renderComposer(<ReplyComposer ref={composer} send={send} />)
     act(() => composer.current?.quote('dropped'))
     act(() => composer.current?.quote('kept'))
     const removes = screen.getAllByRole('button', { name: 'Remove quote' })
@@ -162,7 +161,7 @@ describe('Composer', () => {
       const file = { ref: { $link: `bafy${uploads}` }, mimeType: 'application/pdf', size: 4 }
       return Response.json({ part: { file, name: 'report.pdf' } }, { status: 201 })
     })
-    await renderComposer(<Composer send={send} />)
+    await renderComposer(<ReplyComposer send={send} />)
     const file = new File(['%PDF'], 'report.pdf', { type: 'application/pdf' })
     await userEvent.upload(screen.getByLabelText('Files to attach'), file)
     await userEvent.upload(screen.getByLabelText('Files to attach'), file)
@@ -181,7 +180,7 @@ describe('Composer', () => {
       },
     }
     const fetch = serve(async () => Response.json({ part }, { status: 201 }))
-    await renderComposer(<Composer send={send} />)
+    await renderComposer(<ReplyComposer send={send} />)
     const file = new File(['%PDF'], 'report.pdf', { type: 'application/pdf' })
     await userEvent.upload(screen.getByLabelText('Files to attach'), file)
     expect(await screen.findByText('report.pdf')).toBeInTheDocument()
@@ -205,7 +204,7 @@ describe('Composer', () => {
       signal = init?.signal
       return new Promise<Response>(() => {})
     })
-    await renderComposer(<Composer send={send} />)
+    await renderComposer(<ReplyComposer send={send} />)
     await userEvent.upload(
       screen.getByLabelText('Files to attach'),
       new File(['%PDF'], 'report.pdf', { type: 'application/pdf' }),
@@ -229,7 +228,7 @@ describe('Composer', () => {
         { status: 201 },
       ),
     )
-    await renderComposer(<Composer send={send} />)
+    await renderComposer(<ReplyComposer send={send} />)
     await userEvent.upload(
       screen.getByLabelText('Files to attach'),
       new File(['png'], 'shot.png', { type: 'image/png' }),
@@ -246,7 +245,7 @@ describe('Composer', () => {
         { status: 201 },
       ),
     )
-    await renderComposer(<Composer send={send} />)
+    await renderComposer(<ReplyComposer send={send} />)
     await userEvent.upload(
       screen.getByLabelText('Files to attach'),
       new File(['png'], 'shot.png', { type: 'image/png' }),
@@ -267,7 +266,7 @@ describe('Composer', () => {
         { status: 415 },
       ),
     )
-    await renderComposer(<Composer send={send} />)
+    await renderComposer(<ReplyComposer send={send} />)
     await userEvent.upload(
       screen.getByLabelText('Files to attach'),
       new File(['a,b'], 'data.csv', { type: 'text/csv' }),
@@ -286,7 +285,7 @@ describe('Composer', () => {
         { status: 201 },
       ),
     )
-    await renderComposer(<Composer send={send} />)
+    await renderComposer(<ReplyComposer send={send} />)
     const file = new File(['%PDF'], 'report.pdf', { type: 'application/pdf' })
     const box = screen.getByLabelText('Message')
     fireEvent.paste(box, { clipboardData: { files: [file], types: ['text/plain', 'Files'] } })
@@ -302,7 +301,7 @@ describe('Composer', () => {
       .mockReturnValue(120)
     const supports = vi.spyOn(CSS, 'supports').mockReturnValue(false)
     try {
-      await renderComposer(<Composer send={send} />)
+      await renderComposer(<ReplyComposer send={send} />)
       await userEvent.type(screen.getByLabelText('Message'), 'a{Shift>}{Enter}{/Shift}b')
       expect(screen.getByLabelText('Message').style.height).toBe('120px')
     } finally {
@@ -312,7 +311,7 @@ describe('Composer', () => {
   })
 
   it('says neither Reply nor Ask anything, and sends nothing, while the messages are on their way', async () => {
-    await renderAt(<Composer send={send} waiting />)
+    await renderAt(<ReplyComposer send={send} waiting />)
     expect(screen.getByLabelText('Message')).toHaveAttribute('placeholder', '')
     // Nothing says yet which model the chat uses, so the select names none, not the default.
     expect(screen.getByLabelText('Model')).toBeDisabled()
@@ -329,7 +328,7 @@ describe('Composer', () => {
       signal = init?.signal
       return new Promise<Response>(() => {})
     })
-    await renderComposer(<Composer send={send} />)
+    await renderComposer(<ReplyComposer send={send} />)
     expect(screen.queryByRole('button', { name: 'Clear' })).toBeNull()
     await userEvent.type(screen.getByLabelText('Message'), 'Draft')
     await userEvent.upload(
@@ -345,7 +344,7 @@ describe('Composer', () => {
   })
 
   it('opens the file picker from the attach button', async () => {
-    await renderComposer(<Composer send={send} />)
+    await renderComposer(<ReplyComposer send={send} />)
     const click = vi.spyOn(screen.getByLabelText('Files to attach'), 'click')
     await userEvent.click(screen.getByRole('button', { name: 'Attach files' }))
     expect(click).toHaveBeenCalled()
@@ -353,7 +352,7 @@ describe('Composer', () => {
 
   it('says it is editing, and stops on Cancel or Escape', async () => {
     const onCancel = vi.fn()
-    await renderComposer(<Composer send={send} initialText="Old" onCancel={onCancel} />)
+    await renderComposer(<EditComposer send={send} text="Old" onCancel={onCancel} />)
     expect(screen.getByText(/Editing your message/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Send' })).toHaveAttribute(
       'title',
@@ -365,7 +364,7 @@ describe('Composer', () => {
   })
 
   it('adds a newline on Shift+Enter instead of sending', async () => {
-    await renderComposer(<Composer send={send} />)
+    await renderComposer(<ReplyComposer send={send} />)
     await userEvent.type(screen.getByLabelText('Message'), 'a{Shift>}{Enter}{/Shift}b')
     expect(screen.getByLabelText('Message')).toHaveValue('a\nb')
     expect(send).not.toHaveBeenCalled()
@@ -373,14 +372,14 @@ describe('Composer', () => {
 
   it('adds a newline on Enter on a touch screen, leaving Send to send', async () => {
     vi.stubGlobal('matchMedia', (query: string) => ({ matches: query === '(hover: none)' }))
-    await renderComposer(<Composer send={send} />)
+    await renderComposer(<ReplyComposer send={send} />)
     await userEvent.type(screen.getByLabelText('Message'), 'a{Enter}b')
     expect(screen.getByLabelText('Message')).toHaveValue('a\nb')
     expect(send).not.toHaveBeenCalled()
   })
 
   it('leaves Enter to an input method while it composes', async () => {
-    await renderComposer(<Composer send={send} />)
+    await renderComposer(<ReplyComposer send={send} />)
     const box = screen.getByLabelText('Message')
     await userEvent.type(box, 'nihon')
     fireEvent.keyDown(box, { key: 'Enter', isComposing: true })
@@ -391,7 +390,7 @@ describe('Composer', () => {
 
   it('refuses to send, even with an inherited model, when the user has no models at all', async () => {
     stubFetch(undefined, { '/api/models': { models: [], defaultModel: null } })
-    await renderAt(<Composer send={send} inherited={{ provider: 'p', id: 'smart' }} />)
+    await renderAt(<ReplyComposer send={send} inherited={{ provider: 'p', id: 'smart' }} />)
     expect(await screen.findByText(/No models are available to you/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
     await userEvent.type(screen.getByLabelText('Message'), 'Hello{Enter}')
@@ -400,7 +399,7 @@ describe('Composer', () => {
 
   it('asks for a model before sending when there is no default', async () => {
     serve(undefined, null)
-    await renderComposer(<Composer send={send} />)
+    await renderComposer(<ReplyComposer send={send} />)
     await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled())
     expect(await optionsOf(screen.getByLabelText('Model'))).not.toContain('Default model')
     await userEvent.type(screen.getByLabelText('Message'), 'Hello{Enter}')

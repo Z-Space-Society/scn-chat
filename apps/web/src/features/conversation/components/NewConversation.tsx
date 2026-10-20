@@ -3,8 +3,9 @@ import { useEffect, useRef } from 'react'
 import { useStartChat } from '../chat.ts'
 import { useFileDrop } from '../hooks/useFileDrop.ts'
 import { loadConversationView } from '../lib/load-conversation.ts'
-import { Composer, type ComposerHandle } from './Composer.tsx'
+import type { ComposerHandle } from './Composer.tsx'
 import { EmptyConversation } from './EmptyConversation.tsx'
+import { ReplyComposer } from './ReplyComposer.tsx'
 
 /**
  * The page without an open chat: an empty conversation whose first message creates the chat,
@@ -23,7 +24,7 @@ export function NewConversation() {
   return (
     <section {...drop} className="mx-auto flex w-full max-w-column flex-1 flex-col px-gutter">
       <EmptyConversation onStart={(text) => composer.current?.fill(text)} />
-      <Composer
+      <ReplyComposer
         ref={composer}
         send={async (message) => {
           const { skey } = await start(message)

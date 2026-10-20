@@ -2,7 +2,9 @@ import type { ReactNode, Ref } from 'react'
 import { messageText } from '../../../store/core.ts'
 import type { OutgoingMessage } from '../chat.ts'
 import { type BranchMessage, type BranchStep, inheritedModel } from '../lib/branch.ts'
-import { Composer, type ComposerHandle } from './Composer.tsx'
+import type { ComposerHandle } from './Composer.tsx'
+import { EditComposer } from './EditComposer.tsx'
+import { ReplyComposer } from './ReplyComposer.tsx'
 
 interface Props {
   branch: BranchStep[]
@@ -28,14 +30,14 @@ export function BranchComposer({ ref, ...props }: Props) {
   if (props.editing) {
     const parent = props.editing.record.parent
     return (
-      <Composer
+      <EditComposer
         // Editing another message starts the composer over from that message.
         key={`edit-${props.editing.rkey}`}
         ref={ref}
         above={props.above}
         parent={parent}
         inherited={inheritedModel(props.branch, parent)}
-        initialText={messageText(props.editing.record)}
+        text={messageText(props.editing.record)}
         send={async (message) => {
           await props.send(message)
           props.onEdited()
@@ -46,7 +48,7 @@ export function BranchComposer({ ref, ...props }: Props) {
   }
   const leaf = props.branch.at(-1)?.message.rkey
   return (
-    <Composer
+    <ReplyComposer
       key="reply"
       ref={ref}
       above={props.above}

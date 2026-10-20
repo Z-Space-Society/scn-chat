@@ -4,9 +4,10 @@ import { act, type ReactNode, useState } from 'react'
 import { hydrateRoot } from 'react-dom/client'
 import { renderToString } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Composer } from '../../../../src/features/conversation/components/Composer.tsx'
 import { ComposerFrame } from '../../../../src/features/conversation/components/ComposerFrame.tsx'
 import { ConversationFrame } from '../../../../src/features/conversation/components/ConversationFrame.tsx'
+import { EditComposer } from '../../../../src/features/conversation/components/EditComposer.tsx'
+import { ReplyComposer } from '../../../../src/features/conversation/components/ReplyComposer.tsx'
 import { takeText } from '../../../../src/features/conversation/lib/composer-handoff.ts'
 import { stubFetch } from '../../../helpers/fetch.ts'
 import { renderAt } from '../../../helpers/router.tsx'
@@ -23,7 +24,7 @@ function Loading(props: LoadingProps) {
   const [stage, setStage] = useState(0)
   advance = () => setStage((current) => current + 1)
   if (stage < 2) return <ComposerFrame key={stage} waiting={false} />
-  return props.composer ?? <Composer send={async () => {}} />
+  return props.composer ?? <ReplyComposer send={async () => {}} />
 }
 
 const box = () => screen.getByLabelText<HTMLTextAreaElement>('Message')
@@ -82,7 +83,7 @@ describe('ComposerFrame', () => {
   })
 
   it('leaves its draft to a composer that starts empty, not one editing a message', async () => {
-    const editing = <Composer initialText="Earlier" onCancel={() => {}} send={async () => {}} />
+    const editing = <EditComposer text="Earlier" onCancel={() => {}} send={async () => {}} />
     await renderAt(<Loading composer={editing} />)
     await userEvent.type(box(), 'Hello')
     act(() => advance())
