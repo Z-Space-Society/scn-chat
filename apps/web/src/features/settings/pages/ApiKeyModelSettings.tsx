@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { api, json, read } from '../../../shared/api.ts'
 import { cn } from '../../../shared/cn.ts'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
-import { messageOf } from '../../../shared/errors.ts'
 import { formKey, useAppForm } from '../../../shared/form.tsx'
 import { ArrowLeftIcon, CloseIcon } from '../../../shared/icons.tsx'
 import { Button, IconButton } from '../../../shared/ui/Button.tsx'
@@ -17,6 +16,7 @@ import {
   ConfirmButton,
   cardAlert,
   inlineForm,
+  type Save,
   SaveBar,
   SettingRow,
   SettingsEmpty,
@@ -97,11 +97,7 @@ export function ApiKeyModelSettings(props: ApiKeyModelSettingsProps) {
           error: list.error,
           onLoad: () => list.mutate(),
         }}
-        pending={save.isPending}
-        saved={save.isSuccess}
-        error={save.error && messageOf(save.error)}
-        onSave={save.mutate}
-        onEdit={save.reset}
+        save={save}
       />
       <SettingsGroup danger>
         <SettingRow
@@ -134,19 +130,14 @@ interface Listing {
 interface ModelsFormProps {
   models: KeyModel[]
   listing: Listing
-  pending: boolean
-  saved: boolean
-  error?: string | null
-  onSave: (models: KeyModel[]) => void
-  /** Called on any change, since what is shown is no longer what was saved. */
-  onEdit: () => void
+  save: Save<KeyModel[]>
 }
 
 /** The key's models as one draft, changed by their chips and by adding or removing models. */
 function ModelsForm(props: ModelsFormProps) {
   const form = useAppForm({
     defaultValues: { models: props.models },
-    onSubmit: ({ value }) => props.onSave(value.models),
+    onSubmit: ({ value }) => props.save.mutate(value.models),
   })
   return (
     <form.AppForm>
@@ -155,7 +146,7 @@ function ModelsForm(props: ModelsFormProps) {
           {(models) => {
             const change = (next: KeyModel[]) => {
               models.handleChange(next)
-              props.onEdit()
+              props.save.reset()
             }
             return (
               <>
@@ -179,12 +170,7 @@ function ModelsForm(props: ModelsFormProps) {
                     onChange={change}
                   />
                 </SettingsGroup>
-                <SaveBar
-                  pending={props.pending}
-                  disabled={models.state.value.length === 0}
-                  saved={props.saved}
-                  error={props.error}
-                />
+                <SaveBar save={props.save} disabled={models.state.value.length === 0} />
               </>
             )
           }}

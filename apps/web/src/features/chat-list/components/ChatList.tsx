@@ -4,7 +4,7 @@ import {
   lazy,
   type RefObject,
   Suspense,
-  useContext,
+  use,
   useEffect,
   useEffectEvent,
   useRef,
@@ -270,7 +270,7 @@ const tool =
  * After that, the open chat's newest reply counts as seen.
  */
 function useMarkSeen(current: string | undefined): Seen | null {
-  const did = useContext(MeContext)?.did ?? ''
+  const did = use(MeContext)?.did ?? ''
   const seen = useSeen(did)
   const replies = useLatestReplies()
   const openReply = current ? replies?.[current] : undefined

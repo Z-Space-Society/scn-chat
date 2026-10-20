@@ -2,12 +2,12 @@ import type { ModelRef } from '@scn-chat/lexicons'
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { ClientOnly } from '@tanstack/react-router'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
-import { messageOf } from '../../../shared/errors.ts'
 import { formKey, useAppForm } from '../../../shared/form.tsx'
 import { ChevronDownIcon } from '../../../shared/icons.tsx'
 import { chooseTheme, type ThemeChoice, useThemeChoice } from '../../../shared/theme.ts'
 import { Select } from '../../../shared/ui/Select.tsx'
 import {
+  type Save,
   SaveBar,
   SettingRow,
   SettingsGroup,
@@ -46,11 +46,7 @@ export function PreferencesSettings() {
         stored={stored ?? {}}
         models={models}
         modelsLoading={loading}
-        pending={save.isPending}
-        saved={save.isSuccess}
-        error={save.error && messageOf(save.error)}
-        onSave={save.mutate}
-        onEdit={save.reset}
+        save={save}
       />
     </SettingsPage>
   )
@@ -108,12 +104,7 @@ interface PreferencesFormProps {
   stored: Record<string, unknown>
   models: ModelOption[]
   modelsLoading: boolean
-  pending: boolean
-  saved: boolean
-  error?: string | null
-  onSave: (preferences: Record<string, unknown>) => void
-  /** Called on any change, since what is shown is no longer what was saved. */
-  onEdit: () => void
+  save: Save<Record<string, unknown>>
 }
 
 function PreferencesForm(props: PreferencesFormProps) {
@@ -125,11 +116,11 @@ function PreferencesForm(props: PreferencesFormProps) {
       generateTitles: props.stored.generateTitles !== false,
     },
     // An edit after a save means the page no longer holds what was saved.
-    listeners: { onChange: () => props.onEdit() },
+    listeners: { onChange: () => props.save.reset() },
     // Fields this form does not edit, like the time zone, keep their stored values. The mutation
     // holds any error for display, so submitting never rejects.
     onSubmit: ({ value }) =>
-      props.onSave({
+      props.save.mutate({
         ...props.stored,
         defaultModel: value.defaultModel ? modelRef(value.defaultModel) : undefined,
         defaultEffort: value.defaultEffort || undefined,
@@ -207,7 +198,7 @@ function PreferencesForm(props: PreferencesFormProps) {
             )}
           </form.AppField>
         </SettingsGroup>
-        <SaveBar pending={props.pending} saved={props.saved} error={props.error} />
+        <SaveBar save={props.save} />
       </form.Form>
     </form.AppForm>
   )

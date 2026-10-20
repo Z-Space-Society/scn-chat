@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { type ReactNode, useContext, useRef, useState } from 'react'
+import { type ReactNode, use, useRef, useState } from 'react'
 import { cn } from '../../../shared/cn.ts'
 import { MoreVerticalIcon, SettingsIcon, ShieldIcon, SignOutIcon } from '../../../shared/icons.tsx'
 import { floating } from '../../../shared/ui/menu.ts'
@@ -23,7 +23,7 @@ interface Props {
  * and reaches past the button by its padding and edge, so its rows line up with the sidebar's.
  */
 export function AccountMenu(props: Props) {
-  const me = useContext(MeContext)
+  const me = use(MeContext)
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
 

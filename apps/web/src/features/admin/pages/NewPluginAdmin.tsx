@@ -2,14 +2,14 @@ import { useStore as useFormStore } from '@tanstack/react-form'
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { api, json, read } from '../../../shared/api.ts'
-import { issuesOf, messageOf } from '../../../shared/errors.ts'
+import { issuesOf } from '../../../shared/errors.ts'
 import { useAppForm } from '../../../shared/form.tsx'
 import { ArrowLeftIcon } from '../../../shared/icons.tsx'
 import { SchemaFields } from '../../../shared/schema-fields/SchemaFields.tsx'
 import { Select } from '../../../shared/ui/Select.tsx'
 import {
+  AddBar,
   backLink,
-  SaveBar,
   SettingRow,
   SettingsGroup,
   SettingsPage,
@@ -101,14 +101,7 @@ export function NewPluginAdmin() {
               </form.Field>
             </SettingsGroup>
           )}
-          <SaveBar
-            label="Add plugin"
-            adds
-            pending={add.isPending}
-            disabled={!plugin}
-            saved={false}
-            error={add.error && messageOf(add.error)}
-          />
+          <AddBar label="Add plugin" adding={add} disabled={!plugin} />
         </form.Form>
       </form.AppForm>
     </SettingsPage>

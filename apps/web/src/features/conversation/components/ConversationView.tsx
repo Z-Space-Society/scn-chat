@@ -1,4 +1,4 @@
-import { createContext, useContext, useRef, useState } from 'react'
+import { createContext, use, useRef, useState } from 'react'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
 import { lastError } from '../../../shared/errors.ts'
 import { JumpDownIcon, RetryIcon } from '../../../shared/icons.tsx'
@@ -90,9 +90,9 @@ export function ConversationView(props: Props) {
       <ErrorAlert error={lastError(actions.outcome, chat.outcome) ?? chat.loadError} />
       {waiting && <ConversationSkeleton />}
       {chat.empty && <EmptyConversation onStart={(text) => composer.current?.fill(text)} />}
-      <FollowedConversation.Provider value={props.skey}>
-        <RunningReply.Provider value={stoppable}>
-          <Regenerating.Provider value={regenerating}>
+      <FollowedConversation value={props.skey}>
+        <RunningReply value={stoppable}>
+          <Regenerating value={regenerating}>
             <BranchView
               branch={branch}
               blobUrl={blobUrl}
@@ -108,9 +108,9 @@ export function ConversationView(props: Props) {
               )}
               arrived={(message) => !opened?.has(message.rkey)}
             />
-          </Regenerating.Provider>
-        </RunningReply.Provider>
-      </FollowedConversation.Provider>
+          </Regenerating>
+        </RunningReply>
+      </FollowedConversation>
       <BranchComposer
         branch={branch}
         editing={editing}
@@ -138,7 +138,7 @@ interface TryAgainProps {
 
 /** A failed reply's Try again, busy while a regeneration is on its way. */
 function TryAgain(props: TryAgainProps) {
-  const busy = useContext(Regenerating)
+  const busy = use(Regenerating)
   return (
     <Button size="small" className="mt-2.5" busy={busy} onClick={props.onClick}>
       <RetryIcon className="size-3.75 text-muted" />

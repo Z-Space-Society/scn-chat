@@ -8,6 +8,7 @@ import {
   backLink,
   Callout,
   ConfirmButton,
+  type Save,
   SaveBar,
   SettingRow,
   SettingsGroup,
@@ -79,11 +80,7 @@ export function ModelAdmin(props: ModelAdminProps) {
         key={formKey(model)}
         model={storedModel(model)}
         roleNames={rolesWithUser(roles.roles)}
-        pending={save.isPending}
-        saved={save.isSuccess}
-        error={save.error && messageOf(save.error)}
-        onSave={save.mutate}
-        onEdit={save.reset}
+        save={save}
       />
       <SettingsGroup danger>
         <SettingRow
@@ -111,20 +108,15 @@ export function ModelAdmin(props: ModelAdminProps) {
 interface ModelFormProps {
   model: AdminModel
   roleNames: string[]
-  pending: boolean
-  saved: boolean
-  error?: string | null
-  onSave: (model: AdminModel) => void
-  /** Called on any change, since what is shown is no longer what was saved. */
-  onEdit: () => void
+  save: Save<AdminModel>
 }
 
 /** One admin model's name, capabilities, and roles. */
 function ModelForm(props: ModelFormProps) {
   const form = useAppForm({
     defaultValues: props.model,
-    listeners: { onChange: () => props.onEdit() },
-    onSubmit: ({ value }) => props.onSave(value),
+    listeners: { onChange: () => props.save.reset() },
+    onSubmit: ({ value }) => props.save.mutate(value),
   })
   return (
     <form.AppForm>
@@ -174,7 +166,7 @@ function ModelForm(props: ModelFormProps) {
             )}
           </form.Field>
         </SettingsGroup>
-        <SaveBar pending={props.pending} saved={props.saved} error={props.error} />
+        <SaveBar save={props.save} />
       </form.Form>
     </form.AppForm>
   )

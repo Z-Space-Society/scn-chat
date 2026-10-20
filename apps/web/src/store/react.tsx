@@ -5,7 +5,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
-import { createContext, type ReactNode, useContext, useEffect, useSyncExternalStore } from 'react'
+import { createContext, type ReactNode, use, useEffect, useSyncExternalStore } from 'react'
 import { MeContext } from '../features/auth/session.ts'
 import { reportUnauthorized } from '../shared/api.ts'
 import { messageOf } from '../shared/errors.ts'
@@ -48,7 +48,7 @@ export function StoreProvider(props: Props) {
       }),
     [props.store, queryClient],
   )
-  return <StoreContext.Provider value={props.store}>{props.children}</StoreContext.Provider>
+  return <StoreContext value={props.store}>{props.children}</StoreContext>
 }
 
 /**
@@ -57,8 +57,8 @@ export function StoreProvider(props: Props) {
  * just by being open.
  */
 export function useOpenStore(): () => StoreClient {
-  const provided = useContext(StoreContext)
-  const me = useContext(MeContext)
+  const provided = use(StoreContext)
+  const me = use(MeContext)
   return () => {
     if (provided) return provided
     if (!me) throw new Error('Opening the store needs a signed-in user')
@@ -67,7 +67,7 @@ export function useOpenStore(): () => StoreClient {
 }
 
 export function useStore(): StoreClient {
-  const store = useContext(StoreContext)
+  const store = use(StoreContext)
   if (!store) throw new Error('useStore needs a StoreProvider')
   return store
 }

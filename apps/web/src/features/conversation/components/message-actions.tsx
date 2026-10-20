@@ -1,5 +1,5 @@
 import type { ModelRef } from '@scn-chat/lexicons'
-import { type ComponentType, createContext, useContext } from 'react'
+import { type ComponentType, createContext, use } from 'react'
 import { PencilIcon, RetryIcon } from '../../../shared/icons.tsx'
 import { isPending } from '../../../shared/message.ts'
 import { action, iconAction } from '../../../shared/ui/actions.ts'
@@ -93,7 +93,7 @@ function RegenerateAction(props: MessageActionProps) {
 }
 
 function StopAction(props: MessageActionProps) {
-  const running = useContext(RunningReply)
+  const running = use(RunningReply)
   if (isUser(props.message) || !isPending(props.message.record)) return null
   if (props.message.rkey === running) return null
   return (

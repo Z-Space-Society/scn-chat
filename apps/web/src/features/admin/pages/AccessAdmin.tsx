@@ -1,11 +1,11 @@
 import { useStore as useFormStore } from '@tanstack/react-form'
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { api, json, read } from '../../../shared/api.ts'
-import { messageOf } from '../../../shared/errors.ts'
 import { formKey, useAppForm } from '../../../shared/form.tsx'
 import {
   Choice,
   Choices,
+  type Save,
   SaveBar,
   SettingsGroup,
   SettingsPage,
@@ -50,11 +50,7 @@ export function AccessAdmin() {
         key={formKey(access)}
         stored={access}
         roleNames={roleNames(roles.roles)}
-        pending={save.isPending}
-        saved={save.isSuccess}
-        error={save.error && messageOf(save.error)}
-        onSave={save.mutate}
-        onEdit={save.reset}
+        save={save}
       />
     </SettingsPage>
   )
@@ -63,19 +59,14 @@ export function AccessAdmin() {
 interface AccessFormProps {
   stored: Access
   roleNames: string[]
-  pending: boolean
-  saved: boolean
-  error?: string | null
-  onSave: (access: Access) => void
-  /** Called on any change, since what is shown is no longer what was saved. */
-  onEdit: () => void
+  save: Save<Access>
 }
 
 function AccessForm(props: AccessFormProps) {
   const form = useAppForm({
     defaultValues: props.stored,
-    listeners: { onChange: () => props.onEdit() },
-    onSubmit: ({ value }) => props.onSave(value),
+    listeners: { onChange: () => props.save.reset() },
+    onSubmit: ({ value }) => props.save.mutate(value),
   })
   const registration = useFormStore(form.store, (state) => state.values.registration)
   return (
@@ -117,7 +108,7 @@ function AccessForm(props: AccessFormProps) {
             </form.Field>
           </SettingsGroup>
         )}
-        <SaveBar pending={props.pending} saved={props.saved} error={props.error} />
+        <SaveBar save={props.save} />
       </form.Form>
     </form.AppForm>
   )

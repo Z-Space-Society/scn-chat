@@ -4,6 +4,7 @@ import type { Issue } from '../../../shared/response.ts'
 import { type Schema, SchemaFields } from '../../../shared/schema-fields/SchemaFields.tsx'
 import {
   ConfirmButton,
+  type Save,
   SaveBar,
   SettingRow,
   SettingsGroup,
@@ -30,13 +31,8 @@ interface Props {
   instance: AdminPlugin
   models: AdminModel[]
   issues: Issue[]
-  pending: boolean
-  saved: boolean
-  error?: string | null
   removeError?: string | null
-  onSave: (change: PluginChange) => void
-  /** Called on any change, since what is shown is no longer what was saved. */
-  onEdit: () => void
+  save: Save<PluginChange>
   onRemove: () => void
 }
 
@@ -48,9 +44,9 @@ export function PluginForm(props: Props) {
       enabled: props.instance.enabled,
       clearSecrets: [],
     } as PluginChange,
-    listeners: { onChange: () => props.onEdit() },
+    listeners: { onChange: () => props.save.reset() },
     onSubmit: ({ value }) =>
-      props.onSave({ ...value, options: knownOptions(props.instance.schema, value.options) }),
+      props.save.mutate({ ...value, options: knownOptions(props.instance.schema, value.options) }),
   })
   // The provider blocks list models with the options as they are in the form, saved or not.
   const options = useFormStore(form.store, (state) => state.values.options)
@@ -101,7 +97,7 @@ export function PluginForm(props: Props) {
               </form.Field>
             )}
           </SettingsGroup>
-          <SaveBar pending={props.pending} saved={props.saved} error={props.error} />
+          <SaveBar save={props.save} />
         </form.Form>
       </form.AppForm>
       {props.instance.providers.map((provider) => (

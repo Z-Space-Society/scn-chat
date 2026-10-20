@@ -4,7 +4,12 @@ import { issuesOf, messageOf } from '../../../shared/errors.ts'
 import { formKey, useAppForm } from '../../../shared/form.tsx'
 import type { Issue } from '../../../shared/response.ts'
 import { type Schema, SchemaFields } from '../../../shared/schema-fields/SchemaFields.tsx'
-import { SaveBar, SettingsGroup, SettingsPage } from '../../../shared/ui/SettingsPage.tsx'
+import {
+  type Save,
+  SaveBar,
+  SettingsGroup,
+  SettingsPage,
+} from '../../../shared/ui/SettingsPage.tsx'
 import { adminSettingsQuery } from '../queries.ts'
 
 interface Group {
@@ -102,11 +107,7 @@ export function SettingsAdmin(props: SettingsAdminProps) {
         groups={groups}
         sections={props.sections}
         failed={failed && { key: failed.key, issues: issuesOf(failed.cause) }}
-        pending={save.isPending}
-        saved={save.isSuccess}
-        error={save.error && messageOf(save.error)}
-        onSave={save.mutate}
-        onEdit={save.reset}
+        save={save}
       />
     </SettingsPage>
   )
@@ -117,20 +118,15 @@ interface SettingsFormProps {
   sections: Section[]
   /** The group whose save failed, with the problems the server found in it. */
   failed: { key: string; issues: Issue[] } | null
-  pending: boolean
-  saved: boolean
-  error?: string | null
-  onSave: (values: SettingValues) => void
-  /** Called on any change, since what is shown is no longer what was saved. */
-  onEdit: () => void
+  save: Save<SettingValues>
 }
 
 function SettingsForm(props: SettingsFormProps) {
   // Fields are addressed by position, as in the user's plugin form.
   const form = useAppForm({
     defaultValues: { groups: props.groups.map((group) => group.value) } as SettingValues,
-    listeners: { onChange: () => props.onEdit() },
-    onSubmit: ({ value }) => props.onSave(value),
+    listeners: { onChange: () => props.save.reset() },
+    onSubmit: ({ value }) => props.save.mutate(value),
   })
   const issues = (key: string) => (props.failed?.key === key ? props.failed.issues : [])
   return (
@@ -189,7 +185,7 @@ function SettingsForm(props: SettingsFormProps) {
             </SettingsGroup>
           )
         })}
-        <SaveBar pending={props.pending} saved={props.saved} error={props.error} />
+        <SaveBar save={props.save} />
       </form.Form>
     </form.AppForm>
   )

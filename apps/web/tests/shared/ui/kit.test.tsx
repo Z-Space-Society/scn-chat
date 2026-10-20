@@ -8,6 +8,7 @@ import { CopyButton } from '../../../src/shared/ui/CopyButton.tsx'
 import { Switch } from '../../../src/shared/ui/controls.tsx'
 import { ItemNames } from '../../../src/shared/ui/ItemList.tsx'
 import {
+  AddBar,
   Choice,
   Choices,
   ConfirmButton,
@@ -106,22 +107,24 @@ interface DraftProps {
   pending?: boolean
   saved?: boolean
   error?: string
+  adds?: boolean
 }
 
-/** A form of one field over its SaveBar, as a settings page holds. */
+/** A form of one field over its SaveBar, or its AddBar, as a settings page holds. */
 function Draft(props: DraftProps) {
   const form = useAppForm({ defaultValues: { name: 'Work' } })
+  const save = {
+    isPending: props.pending ?? false,
+    isSuccess: props.saved ?? false,
+    error: props.error ? new Error(props.error) : null,
+  }
   return (
     <form.AppForm>
       <form.Form>
         <form.AppField name="name">
           {(field) => <field.TextField aria-label="Name" />}
         </form.AppField>
-        <SaveBar
-          pending={props.pending ?? false}
-          saved={props.saved ?? false}
-          error={props.error}
-        />
+        {props.adds ? <AddBar label="Add" adding={save} /> : <SaveBar save={save} />}
       </form.Form>
     </form.AppForm>
   )
@@ -151,6 +154,17 @@ describe('SaveBar', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Unsaved changes')
     await userEvent.type(screen.getByLabelText('Name'), '{Backspace}')
     expect(save).toBeDisabled()
+    expect(screen.getByRole('status')).toBeEmptyDOMElement()
+  })
+})
+
+describe('AddBar', () => {
+  it('waits for a change, but never calls it unsaved', async () => {
+    render(<Draft adds />)
+    const add = screen.getByRole('button', { name: 'Add' })
+    expect(add).toBeDisabled()
+    await userEvent.type(screen.getByLabelText('Name'), 's')
+    expect(add).toBeEnabled()
     expect(screen.getByRole('status')).toBeEmptyDOMElement()
   })
 })

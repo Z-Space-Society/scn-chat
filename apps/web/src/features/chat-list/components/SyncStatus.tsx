@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
-import { useContext } from 'react'
+import { use } from 'react'
 import { cn } from '../../../shared/cn.ts'
 import { CloudIcon, DriveIcon, SyncIcon } from '../../../shared/icons.tsx'
 import { plural } from '../../../shared/plural.ts'
@@ -49,7 +49,7 @@ function dotState(
 
 /** Where the chats live, and how current this device's copy is, in words and as a dot's state. */
 function useSync(syncing: SyncNow) {
-  const me = useContext(MeContext)
+  const me = use(MeContext)
   const state = useStoreState()
   const status = useSyncStatus()
   // Ticking every half minute so "2 min ago" stays true.

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { type ReactNode, useContext } from 'react'
+import { type ReactNode, use } from 'react'
 import { Skeleton, SkeletonText } from '../../../shared/ui/Skeleton.tsx'
 import { profileQuery } from '../queries.ts'
 import { MeContext } from '../session.ts'
@@ -17,7 +17,7 @@ interface Props {
  * It is phrasing content, so it can sit inside a button.
  */
 export function AccountCard(props: Props) {
-  const me = useContext(MeContext)
+  const me = use(MeContext)
   const { data: profile, isPending } = useQuery({ ...profileQuery, enabled: me !== null })
   if (!me) return null
   if (isPending)

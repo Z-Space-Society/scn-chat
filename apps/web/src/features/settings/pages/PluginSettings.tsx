@@ -1,11 +1,12 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { api, read } from '../../../shared/api.ts'
-import { lastError, messageOf } from '../../../shared/errors.ts'
+import { lastError } from '../../../shared/errors.ts'
 import { useAppForm } from '../../../shared/form.tsx'
 import { type Schema, SchemaFields } from '../../../shared/schema-fields/SchemaFields.tsx'
 import { Button } from '../../../shared/ui/Button.tsx'
 import { Switch } from '../../../shared/ui/controls.tsx'
 import {
+  type Save,
   SaveBar,
   SettingRow,
   SettingsEmpty,
@@ -29,7 +30,6 @@ export function PluginSettings() {
     mutationFn: (id: string) => read(api.plugins[':id'].settings.$delete({ param: { id } })),
     onSuccess: reload,
   })
-  const error = lastError(save, reset)
   return (
     <SettingsPage
       title="Plugins"
@@ -40,11 +40,8 @@ export function PluginSettings() {
           // Start over from the stored values whenever they change.
           key={query.dataUpdatedAt}
           plugins={plugins}
-          pending={save.isPending}
-          saved={save.isSuccess}
-          error={error && messageOf(error)}
-          onSave={save.mutate}
-          onEdit={save.reset}
+          // Resetting a plugin fails through the same bar as saving.
+          save={{ ...save, error: lastError(save, reset) }}
           onReset={reset.mutate}
         />
       ) : (
@@ -60,8 +57,8 @@ function usePluginsForm(props: PluginsFormProps) {
   return useAppForm({
     defaultValues: pluginValues(props.plugins),
     // An edit after a save means the page no longer holds what was saved.
-    listeners: { onChange: () => props.onEdit() },
-    onSubmit: ({ value }) => props.onSave(value),
+    listeners: { onChange: () => props.save.reset() },
+    onSubmit: ({ value }) => props.save.mutate(value),
   })
 }
 
@@ -69,12 +66,7 @@ type PluginsFormApi = ReturnType<typeof usePluginsForm>
 
 interface PluginsFormProps {
   plugins: PluginSettingsEntry[]
-  pending: boolean
-  saved: boolean
-  error?: string | null
-  onSave: (values: PluginValues) => void
-  /** Called on any change, since what is shown is no longer what was saved. */
-  onEdit: () => void
+  save: Save<PluginValues>
   onReset: (id: string) => void
 }
 
@@ -92,7 +84,7 @@ function PluginsForm(props: PluginsFormProps) {
             onReset={() => props.onReset(plugin.id)}
           />
         ))}
-        <SaveBar pending={props.pending} saved={props.saved} error={props.error} />
+        <SaveBar save={props.save} />
       </form.Form>
     </form.AppForm>
   )

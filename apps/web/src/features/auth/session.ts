@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query'
-import { createContext, useContext } from 'react'
+import { createContext, use } from 'react'
 import { ApiError } from '../../shared/api.ts'
 import { messageOf } from '../../shared/errors.ts'
 import { openStore } from '../../store/client.ts'
@@ -21,7 +21,7 @@ export interface Me {
 export const MeContext = createContext<Me | null>(null)
 
 export function useMe(): Me {
-  const me = useContext(MeContext)
+  const me = use(MeContext)
   if (!me) throw new Error('useMe needs a signed-in user')
   return me
 }

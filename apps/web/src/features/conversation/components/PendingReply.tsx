@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react'
+import { createContext, use } from 'react'
 import { formatSeconds } from '../../../parts/step-clock.ts'
 import type { BlobUrl } from '../../../parts/types.ts'
 import type { MessageRecord } from '../../../shared/message.ts'
@@ -60,7 +60,7 @@ interface AuthorProps {
  * the model's name. It rerenders only once the reply starts, not with each delta.
  */
 export function PendingAuthor(props: AuthorProps) {
-  const skey = useContext(FollowedConversation)
+  const skey = use(FollowedConversation)
   if (!skey || !props.rkey) return <WaitingAuthor model={props.model} since={props.since} />
   return <LiveAuthor skey={skey} rkey={props.rkey} model={props.model} since={props.since} />
 }
@@ -92,7 +92,7 @@ interface BodyProps {
  * the reply instead. The finished record replaces all of it.
  */
 export function PendingBody(props: BodyProps) {
-  const skey = useContext(FollowedConversation)
+  const skey = use(FollowedConversation)
   if (!skey || !props.rkey) return null
   return <ReplyStream skey={skey} rkey={props.rkey} record={props.record} blobUrl={props.blobUrl} />
 }

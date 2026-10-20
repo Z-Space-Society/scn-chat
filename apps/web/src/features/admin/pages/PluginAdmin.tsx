@@ -4,7 +4,7 @@ import { api, json, read } from '../../../shared/api.ts'
 import { issuesOf, messageOf } from '../../../shared/errors.ts'
 import { formKey } from '../../../shared/form.tsx'
 import { ArrowLeftIcon } from '../../../shared/icons.tsx'
-import { backLink, Callout, SettingsPage } from '../../../shared/ui/SettingsPage.tsx'
+import { backLink, Callout, type Save, SettingsPage } from '../../../shared/ui/SettingsPage.tsx'
 import { type PluginChange, PluginForm } from '../components/PluginForm.tsx'
 import { PluginStatus } from '../components/PluginStatus.tsx'
 import { usePluginsChanged } from '../hooks/changes.ts'
@@ -63,12 +63,8 @@ export function PluginAdmin(props: PluginAdminProps) {
       <PluginDetails
         instance={instance}
         issues={save.error ? issuesOf(save.error) : instance.issues}
-        pending={save.isPending}
-        saved={save.isSuccess}
-        error={save.error && messageOf(save.error)}
+        save={save}
         removeError={remove.error && messageOf(remove.error)}
-        onSave={save.mutate}
-        onEdit={save.reset}
         onRemove={() => remove.mutate()}
       />
     </SettingsPage>
@@ -78,13 +74,8 @@ export function PluginAdmin(props: PluginAdminProps) {
 interface PluginDetailsProps {
   instance: AdminPlugin
   issues: AdminPlugin['issues']
-  pending: boolean
-  saved: boolean
-  error?: string | null
   removeError?: string | null
-  onSave: (change: PluginChange) => void
-  /** Called on any change, since what is shown is no longer what was saved. */
-  onEdit: () => void
+  save: Save<PluginChange>
   onRemove: () => void
 }
 

@@ -2,16 +2,16 @@ import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-q
 import { ClientOnly } from '@tanstack/react-router'
 import { api, json, read } from '../../../shared/api.ts'
 import { ErrorAlert } from '../../../shared/ErrorAlert.tsx'
-import { messageOf } from '../../../shared/errors.ts'
 import { useAppForm } from '../../../shared/form.tsx'
 import { timeAgo } from '../../../shared/time.ts'
 import { Item, ItemList, ItemNames } from '../../../shared/ui/ItemList.tsx'
 import { Secret } from '../../../shared/ui/Secret.tsx'
 import {
+  AddBar,
   Callout,
   ConfirmButton,
   cardAlert,
-  SaveBar,
+  type SaveState,
   SettingRow,
   SettingsEmpty,
   SettingsGroup,
@@ -44,8 +44,7 @@ export function ApiKeysAdmin() {
         <ApiKeyList />
       </SettingsGroup>
       <IssueKeyForm
-        pending={issue.isPending}
-        error={issue.error && messageOf(issue.error)}
+        issuing={issue}
         onIssue={(draft, issued) => issue.mutate(draft, { onSuccess: issued })}
       />
     </SettingsPage>
@@ -130,8 +129,7 @@ function LastUsed(props: LastUsedProps) {
 }
 
 interface IssueKeyFormProps {
-  pending: boolean
-  error?: string | null
+  issuing: SaveState
   /** Issue a key, calling `issued` once it is, so the form can start over. */
   onIssue: (draft: { label: string; roles: string[] }, issued: () => void) => void
 }
@@ -178,7 +176,7 @@ function IssueKeyForm(props: IssueKeyFormProps) {
             </form.Field>
           </SettingRow>
         </SettingsGroup>
-        <SaveBar label="Issue key" adds pending={props.pending} saved={false} error={props.error} />
+        <AddBar label="Issue key" adding={props.issuing} />
       </form.Form>
     </form.AppForm>
   )

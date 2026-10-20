@@ -2,6 +2,7 @@ import { useStore } from '@tanstack/react-form'
 import { type ReactNode, useId, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { cn } from '../cn.ts'
+import { messageOf } from '../errors.ts'
 import { useFormContext } from '../form.tsx'
 import { CheckIcon } from '../icons.tsx'
 import { Button, IconButton } from './Button.tsx'
@@ -277,18 +278,27 @@ export function Field(props: FieldProps) {
 /** A form's fields, labels over their controls, two to a row where there is room. */
 export const fields = 'grid grid-cols-2 gap-4 @max-narrow:grid-cols-1'
 
+/** How a form's save is going. A TanStack Query mutation is one. */
+export interface SaveState {
+  isPending: boolean
+  /** Whether the last save succeeded, which holds until the form resets it on an edit. */
+  isSuccess: boolean
+  error: unknown
+}
+
+/** A form's save, which the page holding the form gives it. A TanStack Query mutation is one. */
+export interface Save<T> extends SaveState {
+  mutate: (value: T) => void
+  /** Forget how the last save went, as the form does on any edit. */
+  reset: () => void
+}
+
 interface SaveBarProps {
-  /** What the button says, Save unless it does something else, such as Add. */
+  /** What the button says, Save unless it does something else. */
   label?: string
-  /** Whether the form adds something new rather than editing what was saved, so it never says its changes are unsaved. */
-  adds?: boolean
-  /** Whether it is saving, which turns a spinner before its label. */
-  pending: boolean
+  save: SaveState
   /** Whether there is nothing to save yet, such as before a required choice. */
   disabled?: boolean
-  /** Whether the last save succeeded and nothing has changed since, which the form must reset on any edit. */
-  saved: boolean
-  error?: string | null
 }
 
 /**
@@ -297,15 +307,65 @@ interface SaveBarProps {
  * there are changes to save.
  */
 export function SaveBar(props: SaveBarProps) {
-  const form = useFormContext()
+  const edited = useEdited()
   // Saved holds only until the next edit, so it covers a save the form doesn't start over from.
-  const edited = useStore(form.store, (state) => !state.isDefaultValue)
-  const changed = edited && !props.saved
+  const saved = props.save.isSuccess
+  const changed = edited && !saved
+  return (
+    <FormBar
+      label={props.label ?? 'Save'}
+      pending={props.save.isPending}
+      disabled={props.disabled || !changed}
+      error={props.save.error}
+      status={<SaveStatus saved={saved} changed={changed} />}
+    />
+  )
+}
+
+interface AddBarProps {
+  /** What the button says, such as Add plugin. */
+  label: string
+  adding: Pick<SaveState, 'isPending' | 'error'>
+  /** Whether there is nothing to add yet, such as before a required choice. */
+  disabled?: boolean
+}
+
+/**
+ * A form's button that adds something new, rather than saving what was there, at the foot of the
+ * panel as Save is. It never says its changes are unsaved, since what it adds is gone once added.
+ */
+export function AddBar(props: AddBarProps) {
+  const edited = useEdited()
+  return (
+    <FormBar
+      label={props.label}
+      pending={props.adding.isPending}
+      disabled={props.disabled || !edited}
+      error={props.adding.error}
+    />
+  )
+}
+
+/** Whether the form holds anything but what it started from. */
+function useEdited() {
+  const form = useFormContext()
+  return useStore(form.store, (state) => !state.isDefaultValue)
+}
+
+interface FormBarProps {
+  label: string
+  pending: boolean
+  disabled: boolean
+  error: unknown
+  status?: ReactNode
+}
+
+function FormBar(props: FormBarProps) {
   return (
     <div className="before:mask-t-from-[calc(100%-(--spacing(4)))] sticky bottom-0 isolate -mt-2 flex flex-wrap items-center justify-end gap-x-3 gap-y-2 pt-4 pb-5 before:absolute before:-inset-x-gutter before:inset-y-0 before:-z-1 before:bg-panel">
-      {props.error && (
+      {Boolean(props.error) && (
         <p role="alert" className="me-auto text-danger text-small">
-          {props.error}
+          {messageOf(props.error)}
         </p>
       )}
       {/* The status is always there, so screen readers announce it when it fills. */}
@@ -313,15 +373,10 @@ export function SaveBar(props: SaveBarProps) {
         role="status"
         className="inline-flex items-center gap-1.25 font-medium text-small empty:hidden"
       >
-        <SaveStatus saved={props.saved} changed={changed && !props.adds} />
+        {props.status}
       </span>
-      <Button
-        type="submit"
-        className="px-5 py-1.5"
-        busy={props.pending}
-        disabled={props.disabled || !changed}
-      >
-        {props.label ?? 'Save'}
+      <Button type="submit" className="px-5 py-1.5" busy={props.pending} disabled={props.disabled}>
+        {props.label}
       </Button>
     </div>
   )

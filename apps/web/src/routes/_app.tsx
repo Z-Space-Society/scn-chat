@@ -21,8 +21,8 @@ function SignedIn() {
   useSyncTimeZone()
   useEndSessionOnUnauthorized(me.did)
   return (
-    <MeContext.Provider value={me}>
+    <MeContext value={me}>
       <Outlet />
-    </MeContext.Provider>
+    </MeContext>
   )
 }
