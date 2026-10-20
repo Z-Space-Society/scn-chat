@@ -4,6 +4,8 @@ What changed in each release of SCN Chat, for the people who use it, run it, or 
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-10-20
+
 ### Changed
 
 - A chat sticks with the model you last switched to, even when its reply failed or was stopped, rather than going back to the model of the last finished reply. The composer's model select shows that model by name from the moment you send, including while the reply runs and when you come back to the chat, and "Default" now only means the default from settings. Each message names its model, so a chat started on the default keeps it after you change the default.
@@ -103,7 +105,8 @@ What changed in each release of SCN Chat, for the people who use it, run it, or 
 
 The first tagged release.
 
-[Unreleased]: https://github.com/Z-Space-Society/scn-chat/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/Z-Space-Society/scn-chat/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/Z-Space-Society/scn-chat/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/Z-Space-Society/scn-chat/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/Z-Space-Society/scn-chat/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/Z-Space-Society/scn-chat/compare/v0.2.1...v0.2.2
