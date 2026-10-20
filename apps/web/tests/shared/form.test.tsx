@@ -21,7 +21,7 @@ function Example(props: Props) {
         </form.AppField>
         <form.AppField name="bio">{(field) => <field.TextAreaField label="Bio" />}</form.AppField>
         <form.AppField name="public">
-          {(field) => <field.CheckboxField label="Public" />}
+          {(field) => <field.SwitchField aria-label="Public" />}
         </form.AppField>
         <form.AppField name="plan">
           {(field) => (

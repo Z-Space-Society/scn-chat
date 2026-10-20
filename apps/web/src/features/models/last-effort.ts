@@ -1,4 +1,4 @@
-import { isEffort } from './components/EffortSelect.tsx'
+import { isEffort } from './effort.ts'
 
 const KEY = 'scn-chat:effort'
 // The effort when storage is blocked, which then lasts until the page reloads.

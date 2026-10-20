@@ -23,7 +23,7 @@ export type Property = {
 export type Schema = { properties?: Record<string, Property> }
 
 /** The string fields that hold secrets, which show as password inputs. */
-export interface Secrets {
+interface Secrets {
   fields: string[]
   /** The secret fields with a value already saved, which a blank input keeps. */
   stored?: string[]
@@ -33,7 +33,7 @@ export interface Secrets {
   clearing?: { cleared: string[]; onClear: (key: string, clear: boolean) => void }
 }
 
-export interface SchemaFieldsProps {
+interface SchemaFieldsProps {
   schema: Schema
   values: Record<string, unknown>
   secrets?: Secrets

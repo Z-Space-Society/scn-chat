@@ -17,10 +17,10 @@ import {
   SettingsGroup,
   undivided,
 } from '../../../shared/ui/SettingsPage.tsx'
-import { capabilities, noCapabilities } from '../../models/capabilities.ts'
+import { type Capabilities, capabilities, noCapabilities } from '../../models/capabilities.ts'
 import { ModelName } from '../../models/components/ModelName.tsx'
 import { useModelsChanged } from '../hooks/changes.ts'
-import type { AdminModel, Capabilities } from '../lib/models.ts'
+import type { AdminModel } from '../lib/models.ts'
 import type { AdminPlugin } from '../queries.ts'
 
 type Provider = AdminPlugin['providers'][number]

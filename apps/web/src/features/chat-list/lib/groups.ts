@@ -1,5 +1,5 @@
 /** Chats grouped under a date heading, such as "Today" or "September 2026". */
-export type DateGroup<T> = { label: string; items: T[] }
+type DateGroup<T> = { label: string; items: T[] }
 
 const DAY = 86_400_000
 

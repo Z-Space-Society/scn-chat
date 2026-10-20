@@ -66,7 +66,7 @@ export function Button(props: Props) {
   )
 }
 
-export const iconButton = cva(
+const iconButton = cva(
   'inline-flex shrink-0 cursor-pointer items-center justify-center rounded-small p-1.5 transition-[background-color,color] duration-(--dur-feedback) [-webkit-tap-highlight-color:transparent] disabled:cursor-default disabled:opacity-40',
   {
     variants: {

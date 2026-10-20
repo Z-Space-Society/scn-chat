@@ -73,30 +73,6 @@ function TextAreaField(props: TextAreaFieldProps) {
   )
 }
 
-interface CheckboxFieldProps extends Omit<Controlled<'input'>, 'type'> {
-  /** Text after the checkbox, inside its label. */
-  label: ReactNode
-}
-
-/** A labelled checkbox bound to a boolean field. */
-function CheckboxField(props: CheckboxFieldProps) {
-  const field = useFieldContext<boolean>()
-  const { label, ...input } = props
-  return (
-    <label>
-      <input
-        {...input}
-        type="checkbox"
-        name={field.name}
-        checked={field.state.value}
-        onChange={(e) => field.handleChange(e.target.checked)}
-        onBlur={field.handleBlur}
-      />{' '}
-      {label}
-    </label>
-  )
-}
-
 interface SwitchFieldProps extends Omit<Controlled<'input'>, 'type'> {}
 
 /** A switch bound to a boolean field, labelled by its setting row or an aria-label. */
@@ -201,11 +177,11 @@ function SubmitButton(props: SubmitButtonProps) {
 export const { useAppForm } = createFormHook({
   fieldContext,
   formContext,
-  fieldComponents: { TextField, TextAreaField, CheckboxField, SwitchField, SelectField },
+  fieldComponents: { TextField, TextAreaField, SwitchField, SelectField },
   formComponents: { Form, SubmitButton },
 })
 
-export { useFieldContext, useFormContext }
+export { useFormContext }
 
 /**
  * A key that remounts a form, starting it over, when the stored record it edits changes, but not

@@ -310,10 +310,6 @@ function TableBlock(props: ComponentProps<'table'>) {
 }
 
 /**
- * The components that Markdown node names render as, every one of ours. Each block of prose takes
- * its direction from its own text, so a reply can mix scripts.
- */
-/**
  * Follows a link within the text, such as a footnote and its way back, inside the same text, since
  * every reply numbers its footnotes from one and a plain jump would land in the first reply's.
  */
@@ -325,6 +321,10 @@ function jumpInText(event: MouseEvent<HTMLAnchorElement>) {
   target.scrollIntoView({ block: 'center' })
 }
 
+/**
+ * The components that Markdown node names render as, every one of ours. Each block of prose takes
+ * its direction from its own text, so a reply can mix scripts.
+ */
 export const markdownComponents: Components = {
   p: ({ node: _node, ...props }) => <p {...props} dir="auto" />,
   li: ({ node: _node, ...props }) => <li {...props} dir="auto" />,
