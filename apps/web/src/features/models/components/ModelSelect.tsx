@@ -7,7 +7,7 @@ import { type ModelOption, modelRef, sameModel } from '../models.ts'
 const keyOf = (m: ModelRef) => `${m.provider}/${m.id}`
 
 /** The choice of no model: an option, or only what the button says while none is chosen. */
-interface None {
+export interface None {
   label: string
   /** Whether "none" can be picked, rather than only shown until something is. */
   selectable: boolean

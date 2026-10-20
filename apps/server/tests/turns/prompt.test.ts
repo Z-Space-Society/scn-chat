@@ -6,7 +6,7 @@ import {
   branchTo,
   buildInstructions,
   fillBasePrompt,
-  lastReplyModel,
+  lastUsedModel,
   TurnInputError,
   timeZoneOf,
   toModelMessages,
@@ -50,14 +50,24 @@ describe('branchTo', () => {
   })
 })
 
-describe('lastReplyModel', () => {
-  it('returns the model of the nearest completed reply', () => {
+describe('lastUsedModel', () => {
+  it('returns the model of the nearest reply, whatever its status', () => {
+    for (const status of ['complete', 'error', 'cancelled']) {
+      const branch = [
+        msg('a.r0', { role: 'assistant', status: 'complete', model: { provider: 'p', id: 'old' } }),
+        msg('b.r0', { role: 'assistant', status, model: { provider: 'p', id: 'new' } }),
+      ]
+      expect(lastUsedModel(branch)).toEqual({ provider: 'p', id: 'new' })
+    }
+  })
+
+  it('returns the model a user message asked for when no reply after it names one', () => {
     const branch = [
       msg('a.r0', { role: 'assistant', status: 'complete', model: { provider: 'p', id: 'old' } }),
-      msg('b.r0', { role: 'assistant', status: 'complete', model: { provider: 'p', id: 'new' } }),
-      msg('c.r0', { role: 'assistant', status: 'error', model: { provider: 'p', id: 'broken' } }),
+      msg('b', { role: 'user', generation: { model: { provider: 'p', id: 'new' } } }),
+      msg('b.r0', { role: 'assistant', status: 'error' }),
     ]
-    expect(lastReplyModel(branch)).toEqual({ provider: 'p', id: 'new' })
+    expect(lastUsedModel(branch)).toEqual({ provider: 'p', id: 'new' })
   })
 })
 

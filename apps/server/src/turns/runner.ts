@@ -31,7 +31,7 @@ import {
   branchTo,
   buildInstructions,
   fillBasePrompt,
-  lastReplyModel,
+  lastUsedModel,
   TurnInputError,
   timeZoneOf,
   toModelMessages,
@@ -277,7 +277,7 @@ export class TurnRunner {
     const branch = branchTo(loaded.messages, userRkey)
     const model =
       generation.model ??
-      lastReplyModel(branch) ??
+      lastUsedModel(branch) ??
       (loaded.preferences?.defaultModel as ModelRef | undefined) ??
       (await lease.runtime.catalog.defaultModelFor(did))
     const effort = generation.effort ?? (loaded.preferences?.defaultEffort as string | undefined)

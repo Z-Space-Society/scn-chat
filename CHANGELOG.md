@@ -4,8 +4,14 @@ What changed in each release of SCN Chat, for the people who use it, run it, or 
 
 ## [Unreleased]
 
+### Changed
+
+- A chat sticks with the model you last switched to, even when its reply failed or was stopped, rather than going back to the model of the last finished reply. The composer's model select shows that model by name from the moment you send, including while the reply runs and when you come back to the chat, and "Default" now only means the default from settings. Each message names its model, so a chat started on the default keeps it after you change the default.
+
 ### Fixed
 
+- Regenerate and Try again use the reply's own model, rather than a sibling's or a changed default.
+- Reloading a chat no longer shows the default model for a moment before the chat's own model.
 - Clicking outside the thinking effort menu, or any other select, now closes it, as it already did for the model menu.
 
 ## [0.3.1] - 2026-10-18

@@ -5,9 +5,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useId, useState } from 'react'
 import { messageOf } from '../../../shared/errors.ts'
 import { useAppForm } from '../../../shared/form.tsx'
+import type { None } from '../../models/components/ModelSelect.tsx'
 import { useModels } from '../../models/hooks/useModels.ts'
 import { lastEffort } from '../../models/last-effort.ts'
-import { sameModel } from '../../models/models.ts'
+import { type ModelOption, modelRef, sameModel } from '../../models/models.ts'
 import { attachmentTypesQuery } from '../attachment-types.ts'
 import type { OutgoingMessage } from '../chat.ts'
 import { type Attachment, useAttachments } from './useAttachments.ts'
@@ -17,7 +18,7 @@ export interface DraftOptions {
   send: (message: OutgoingMessage) => Promise<unknown>
   /** The message this one answers, if any. */
   parent?: string
-  /** The model of the nearest completed reply above `parent`, which the server falls back to. */
+  /** The model last used at or above `parent`, which the server falls back to. */
   inherited?: ModelRef | null
   /** Whether the chat's messages are still on their way, so nothing knows yet what this answers. */
   waiting?: boolean
@@ -62,6 +63,21 @@ const acceptedTypes = (types: { images: string[]; files: string[] }, images: boo
 const isImage = (attachment: Attachment) => attachment.type.startsWith('image/')
 
 /**
+ * The model select's choice of no model: "Default", the default from settings, named so the user
+ * sees who will answer. It is offered only before the chat has a model of its own.
+ */
+function defaultOption(
+  inherited: ModelRef | null,
+  fallback: ModelRef | null | undefined,
+  models: ModelOption[],
+): None | undefined {
+  if (inherited) return undefined
+  if (fallback === null) return { label: 'Choose a model', selectable: false }
+  const name = fallback && models.find((m) => sameModel(m, fallback))?.name
+  return { label: name ? `Default · ${name}` : 'Default model', selectable: true }
+}
+
+/**
  * The Draft: what the user is writing in a composer, with its quotes, attachments, model, and
  * effort, until it is sent. It holds the rules for whether it can be sent and builds the message
  * from all of them, so the composer only shows it.
@@ -91,11 +107,10 @@ export function useDraft(options: DraftOptions) {
   // Only a fallback the catalog doesn't list leaves it to the server, which checks vision when
   // the turn starts.
   const seesImages = model ? model.capabilities.vision : !chosenModel
-  const reasons = Boolean(model?.capabilities.reasoning)
+  // Until the chat's messages arrive, nothing says which model it uses, so no effort is offered.
+  const reasons = !options.waiting && Boolean(model?.capabilities.reasoning)
   // Effort is sent only while its choice is shown, so switching models back keeps it.
   const effort = reasons ? chosenEffort : ''
-  // "Default" names the model the server will fall back to, so the user sees who will answer.
-  const fallbackName = fallback && models.find((m) => sameModel(m, fallback))?.name
   const attachments = useAttachments(seesImages)
   const { data: types, error: typesError } = useQuery(attachmentTypesQuery)
 
@@ -136,6 +151,7 @@ export function useDraft(options: DraftOptions) {
   /** The message as the draft stands: the quotes, as Markdown above the text, and the attachments. */
   const build = (): OutgoingMessage => {
     const values = form.state.values
+    const answering = values.model ?? (fallback && modelRef(fallback))
     const quotedText = quotes.map((quote) => asQuote(quote.text)).join('')
     const text = values.text.trim() ? quotedText + values.text : quotedText.trimEnd()
     return {
@@ -145,7 +161,9 @@ export function useDraft(options: DraftOptions) {
         ...(text ? [{ $type: `${nsid.defs}#textPart`, text }] : []),
       ],
       generation: {
-        ...(values.model ? { model: values.model } : {}),
+        // The message names the model that answers it, even one left to the default, so the chat
+        // keeps that model whatever later becomes of the default.
+        ...(answering ? { model: answering } : {}),
         ...(effort ? { effort } : {}),
       },
     }
@@ -156,13 +174,21 @@ export function useDraft(options: DraftOptions) {
     form,
     quotes,
     attachments: attachments.attachments,
-    /** The models on offer, and whether they are still on their way. */
+    /** The models on offer. */
     models,
-    loading,
-    /** The model the server falls back to: undefined while unknown, and null when there is none. */
-    fallback,
-    fallbackName,
-    chosenModel,
+    /** Whether the models, or the chat's messages that say which one it uses, are on their way. */
+    loading: loading || Boolean(options.waiting),
+    /**
+     * The model the select shows: the one chosen, else the chat's own, the one last used on the
+     * branch. Null leaves the choice to the default from settings.
+     */
+    selected: chosenModel ?? options.inherited ?? null,
+    /**
+     * The select's choice of no model: the default from settings, named once the catalog offers
+     * it. A chat with a model of its own offers none, so "Default" never names a model the user
+     * picked for the chat.
+     */
+    defaultOption: defaultOption(options.inherited ?? null, fallback, models),
     chosenEffort,
     seesImages,
     /** Whether the answering model reasons, so the effort is shown and sent. */

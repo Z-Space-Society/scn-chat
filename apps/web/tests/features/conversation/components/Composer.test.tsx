@@ -90,6 +90,12 @@ describe('Composer', () => {
     )
   })
 
+  it("shows the chat's own model by name, with no default to pick", async () => {
+    await renderComposer(<Composer send={send} inherited={{ provider: 'p', id: 'basic' }} />)
+    expect(screen.getByLabelText('Model')).toHaveTextContent(/^Basic$/)
+    expect(await optionsOf(screen.getByLabelText('Model'))).not.toContain('Default · Smart')
+  })
+
   it('starts on the effort last chosen on this device', async () => {
     const first = await renderComposer(<Composer send={send} />)
     await choose(screen.getByLabelText('Model'), 'Smart')
@@ -306,8 +312,12 @@ describe('Composer', () => {
   })
 
   it('says neither Reply nor Ask anything, and sends nothing, while the messages are on their way', async () => {
-    await renderComposer(<Composer send={send} waiting />)
+    await renderAt(<Composer send={send} waiting />)
     expect(screen.getByLabelText('Message')).toHaveAttribute('placeholder', '')
+    // Nothing says yet which model the chat uses, so the select names none, not the default.
+    expect(screen.getByLabelText('Model')).toBeDisabled()
+    expect(screen.getByLabelText('Model')).not.toHaveTextContent('Default')
+    expect(effortSelect()).toBeNull()
     await userEvent.type(screen.getByLabelText('Message'), 'Hello{Enter}')
     expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
     expect(send).not.toHaveBeenCalled()

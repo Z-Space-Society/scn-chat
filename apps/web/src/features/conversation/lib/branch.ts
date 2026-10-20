@@ -66,15 +66,19 @@ export function choicesFor(messages: BranchMessage[], rkey: string): Record<stri
   return choices
 }
 
-/** The model of the nearest completed reply on the branch, at or above `parent`. */
+/**
+ * The model last used on the branch, at or above `parent`: the nearest reply's model, or the model
+ * a user message asked for, whatever became of its reply. The server falls back to the same one,
+ * so a switch of model sticks until the user makes another.
+ */
 export function inheritedModel(
   branch: { message: BranchMessage }[],
   parent: string | undefined,
 ): ModelRef | null {
   for (let i = branch.findIndex((step) => step.message.rkey === parent); i >= 0; i--) {
     const { record } = (branch[i] as { message: BranchMessage }).message
-    if (record.role === 'assistant' && record.status === 'complete' && record.model)
-      return record.model
+    const model = record.role === 'assistant' ? record.model : record.generation?.model
+    if (model) return model
   }
   return null
 }

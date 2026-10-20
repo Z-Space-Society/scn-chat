@@ -42,12 +42,20 @@ export function branchTo(messages: Map<string, BranchMessage>, rkey: string): Br
   return chain
 }
 
-/** Get the model of the nearest completed reply on the branch. */
-export function lastReplyModel(branch: BranchMessage[]): ModelRef | undefined {
+/**
+ * Get the model last used on the branch: the nearest reply's model, or the model a user message
+ * asked for, whatever became of its reply. A failed or stopped reply still counts, so a switch of
+ * model sticks until the user makes another, rather than quietly going back to an earlier one.
+ * The web app's `inheritedModel` follows the same rule, so its model select shows this model.
+ */
+export function lastUsedModel(branch: BranchMessage[]): ModelRef | undefined {
   for (let i = branch.length - 1; i >= 0; i--) {
     const record = branch[i]?.record as unknown as JsonRecord | undefined
-    if (record?.role === 'assistant' && record.status === 'complete' && record.model)
-      return record.model as ModelRef
+    const model =
+      record?.role === 'assistant'
+        ? record.model
+        : (record?.generation as JsonRecord | undefined)?.model
+    if (model) return model as ModelRef
   }
   return undefined
 }

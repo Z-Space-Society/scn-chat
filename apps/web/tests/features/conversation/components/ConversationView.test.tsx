@@ -185,6 +185,25 @@ describe('ConversationView', () => {
     expect(screen.getByText('2/3')).toBeInTheDocument()
   })
 
+  it("regenerates and tries again with the reply's own model", async () => {
+    const fetch = vi.fn(async () => Response.json({ replyRkey: 'u.r1', status: 'claimed' }))
+    stubFetch(fetch)
+    const answered = reply('u.r0', 'answer', 'u')
+    answered.record.model = { provider: 'p', id: 'smart' }
+    const failed = reply('v.r0', 'broken', 'v', 'error')
+    failed.record.model = { provider: 'p', id: 'basic' }
+    const messages = [user('u', 'question'), answered, user('v', 'again', 'u.r0'), failed]
+    await renderWith(storeWith(messages), <ConversationView skey="s1" />)
+    const [first] = await screen.findAllByRole('button', { name: 'Regenerate' })
+    await userEvent.click(first as HTMLElement)
+    await userEvent.click(await screen.findByRole('button', { name: 'Try again' }))
+    const bodies = writes(fetch).map(([, init]) => JSON.parse(String((init as RequestInit).body)))
+    expect(bodies).toEqual([
+      { model: { provider: 'p', id: 'smart' } },
+      { model: { provider: 'p', id: 'basic' } },
+    ])
+  })
+
   it('edits a message into a sibling with its own reply', async () => {
     const fetch = vi.fn(async () =>
       Response.json({ rkey: 'u2', replyRkey: 'u2.r0', status: 'claimed' }, { status: 201 }),
@@ -369,7 +388,7 @@ describe('ConversationView', () => {
 })
 
 describe('ConversationView fallback model', () => {
-  it("lets the composer fall back to an earlier reply's model when the server has no default", async () => {
+  it("shows an earlier reply's model, and sends with it, when the server has no default", async () => {
     const smart = { provider: 'p', id: 'smart', name: 'Smart', source: 'admin', default: false }
     const capabilities = { vision: false, reasoning: false, tools: false }
     stubFetch(undefined, {
@@ -379,9 +398,7 @@ describe('ConversationView fallback model', () => {
     answered.record.model = { provider: 'p', id: 'smart' }
     const store = storeWith([user('u', 'question'), answered])
     await renderWith(store, <ConversationView skey="s1" />)
-    await vi.waitFor(() =>
-      expect(screen.getByLabelText('Model')).toHaveTextContent('Default · Smart'),
-    )
+    await vi.waitFor(() => expect(screen.getByLabelText('Model')).toHaveTextContent(/^Smart$/))
     await userEvent.type(screen.getByLabelText('Message'), 'Hello')
     expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled()
   })

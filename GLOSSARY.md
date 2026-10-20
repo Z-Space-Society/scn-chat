@@ -57,7 +57,7 @@ What the user is writing in a composer, with its quotes, attachments, model, and
 _Avoid_: Composer state, pending message
 
 **Fallback model**:
-The model a turn runs with when it names none: the model of the nearest completed reply up the branch, else the user's default model, else the admin's.
+The model a turn runs with when it names none: the model last used on the branch, by the nearest reply or asked for by the nearest user message, whatever became of its reply, else the user's default model, else the admin's.
 _Avoid_: Default model (that is the user's preference), inherited model
 
 **Reply follower**:

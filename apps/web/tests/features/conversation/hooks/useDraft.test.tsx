@@ -60,7 +60,8 @@ async function renderDraft(options: Partial<DraftOptions> = {}) {
     <QueryClientProvider client={queryClient}>{props.children}</QueryClientProvider>
   )
   const hook = renderHook(() => useDraft({ send, ...options }), { wrapper })
-  await vi.waitFor(() => expect(hook.result.current.loading).toBe(false))
+  // Once the models and preferences load, as `loading` stays true while the chat's messages don't.
+  await vi.waitFor(() => expect(queryClient.isFetching()).toBe(0))
   return hook
 }
 
@@ -160,6 +161,17 @@ describe('useDraft', () => {
     expect(send.mock.calls[0]?.[0]?.generation).toEqual({ model: { provider: 'p', id: 'basic' } })
   })
 
+  it('names the model it falls back to, so the chat keeps it whatever becomes of the default', async () => {
+    for (const inherited of [undefined, modelRef(basic)]) {
+      send.mockClear()
+      const { result } = await renderDraft({ inherited })
+      act(() => result.current.setText('Hello'))
+      act(() => result.current.send())
+      await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1))
+      expect(send.mock.calls[0]?.[0]?.generation.model).toEqual(inherited ?? modelRef(smart))
+    }
+  })
+
   it('takes its capabilities from the fallback model when none is chosen', async () => {
     serve({ defaultModel: modelRef(basic) })
     const { result } = await renderDraft()
@@ -168,6 +180,14 @@ describe('useDraft', () => {
     choose(result.current, smart)
     expect(result.current.seesImages).toBe(true)
     expect(result.current.reasons).toBe(true)
+  })
+
+  it("shows the chat's own model, and offers no effort until the chat's messages arrive", async () => {
+    const inherited = { provider: 'p', id: 'smart' }
+    expect((await renderDraft({ inherited })).result.current.selected).toEqual(inherited)
+    const waiting = await renderDraft({ waiting: true })
+    expect(waiting.result.current.loading).toBe(true)
+    expect(waiting.result.current.reasons).toBe(false)
   })
 
   it('leaves images to the server under a fallback the catalog does not list', async () => {

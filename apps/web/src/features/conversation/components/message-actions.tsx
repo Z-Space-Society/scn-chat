@@ -81,7 +81,10 @@ function RegenerateAction(props: MessageActionProps) {
       type="button"
       aria-label="Regenerate"
       title="Regenerate"
-      onClick={() => props.operations.regenerate(parentOf(props.message), null)}
+      // With the reply's own model, so regenerating never changes the model on its own.
+      onClick={() =>
+        props.operations.regenerate(parentOf(props.message), props.message.record.model ?? null)
+      }
       className={iconAction}
     >
       <RetryIcon />

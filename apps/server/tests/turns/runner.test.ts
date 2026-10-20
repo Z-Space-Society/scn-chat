@@ -203,6 +203,41 @@ describe('TurnRunner.start', () => {
     expect(h.created).toEqual(['admin-default', 'requested', 'requested', 'preferred'])
   })
 
+  it('keeps the model of a reply that failed or was stopped, rather than an earlier one', async () => {
+    const h = await turnsHarness({
+      adminModels: [{ id: 'admin-default', default: true }, { id: 'earlier' }, { id: 'switched' }],
+    })
+    const { skey } = await h.chats.createConversation()
+    for (const [status, rkey] of [
+      ['error', '3uuuuuuuuuuu2'],
+      ['cancelled', '3uuuuuuuuuuu4'],
+    ] as const) {
+      await h.chats.createMessage(skey, `${rkey}.r0`, {
+        $type: nsid.message,
+        role: 'assistant',
+        parent: rkey,
+        content: { $type: `${nsid.defs}#plainContent`, parts: [] },
+        model: { provider: 'fake', id: 'switched' },
+        status,
+        createdAt: new Date().toISOString(),
+      } as never)
+    }
+    await sendUser(h, skey, '3uuuuuuuuuuu1', {
+      generation: { model: { provider: 'fake', id: 'earlier' } },
+    })
+    await h.runner.start(ALICE, skey, '3uuuuuuuuuuu1')
+    await h.runner.idle()
+    await sendUser(h, skey, '3uuuuuuuuuuu2', { parent: '3uuuuuuuuuuu1.r0' })
+    await sendUser(h, skey, '3uuuuuuuuuuu3', { parent: '3uuuuuuuuuuu2.r0' })
+    await h.runner.start(ALICE, skey, '3uuuuuuuuuuu3')
+    await h.runner.idle()
+    await sendUser(h, skey, '3uuuuuuuuuuu4', { parent: '3uuuuuuuuuuu3.r0' })
+    await sendUser(h, skey, '3uuuuuuuuuuu5', { parent: '3uuuuuuuuuuu4.r0' })
+    await h.runner.start(ALICE, skey, '3uuuuuuuuuuu5')
+    await h.runner.idle()
+    expect(h.created).toEqual(['earlier', 'switched', 'switched'])
+  })
+
   it('skips an admin default the user may not use, and keeps it out of the reply', async () => {
     const h = await turnsHarness({
       adminModels: [{ id: 'admin-default', default: true, roles: ['staff'] }],

@@ -50,7 +50,7 @@ When sync emits `message:invalid` for a user message that carries a generation r
 `startTurn(user, conversation, userMessageKey)` runs the turn in the background and returns once the reply is claimed:
 
 1. **Load.** It reads the conversation's info record and every message from the record store, once per turn, and keeps them in memory only for the turn. The reply key is `<userMessageKey>.r<attempt>`, with `attempt` defaulting to 0.
-2. **Choose the model.** The model reference is `generation.model`, else the model of the nearest completed assistant reply up the branch, else the user's `defaultModel` preference, else the admin default if the user's roles allow it. An admin default the user can't use is skipped, so it never appears in their reply. The effort is `generation.effort`, else the `defaultEffort` preference.
+2. **Choose the model.** The model reference is `generation.model`, else the model last used up the branch, the nearest assistant reply's `model` or user message's `generation.model`, whatever the reply's status, else the user's `defaultModel` preference, else the admin default if the user's roles allow it. An admin default the user can't use is skipped, so it never appears in their reply. The effort is `generation.effort`, else the `defaultEffort` preference.
 3. **Rate limit.** A user may start `turns.ratePerMinute` turns per minute, default 10. Past that, the turn waits in an in-memory queue per user and starts when the limit allows, without claiming the reply yet. The web UI's stream shows a `queued` status meanwhile.
 4. **Claim.** It calls `createMessage` at the reply key with a placeholder: `role: "assistant"`, the parent key, empty `plainContent` parts, the chosen model and effort, `status: "pending"`, and `createdAt`. If that throws `RecordExists`, another runner, possibly another deployment watching the same space, owns the attempt, and `startTurn` stops. On success it records the reply URI in a local `turn_claim` table.
 5. **Resolve.** The providers spec resolves the model reference to an AI SDK model. A failure rewrites the placeholder with `status: "error"` and a message saying why.
@@ -121,7 +121,7 @@ The `turns` admin setting, from the admin-settings spec, holds `ratePerMinute`, 
 - A rate-limited turn is delayed, not answered with an error, so direct clients are not left with a dead-end reply.
 - Several deployments can watch the same spaces. The create-only claim picks one winner, and each server only cleans up its own claims.
 - Replies that errored or are still pending are left out of later prompts. Cancelled replies keep their partial content in the prompt.
-- The model falls back to the last completed reply's model on the branch, so switching models sticks for later turns, as the lexicons README says.
+- The model falls back to the model last used on the branch, so switching models sticks for later turns, as the lexicons README says. A failed or stopped reply counts too: the app never switches models on its own, so a model that fails keeps failing visibly until the user picks another, rather than an earlier model quietly answering instead.
 - A turn interrupted by a restart becomes `error` with "interrupted" on the next startup, not a retry, because retrying could spend money twice.
 - Claimed replies are recorded in a local `turn_claim` table, keyed by conversation and reply key.
 - The stream channel opens as soon as a reply is claimed, so a browser subscribing right after sending never sees an unknown stream.
@@ -142,7 +142,7 @@ The `turns` admin setting, from the admin-settings spec, holds `ratePerMinute`, 
 - [ ] When the web UI and sync both notice a message, exactly one generation runs.
 - [ ] Regenerating raises the attempt and writes the reply at `<key>.r<attempt>`, keeping earlier replies.
 - [ ] An edit creates a sibling message with the same parent and its own reply.
-- [ ] Model resolution follows request, then last completed reply on the branch, then preferences, then the admin default.
+- [ ] Model resolution follows request, then the model last used on the branch, whatever its reply's status, then preferences, then the admin default.
 - [ ] An admin default the user's roles don't allow is skipped, and the reply fails without naming it.
 - [ ] The prompt contains only the branch from the root to the user message, with custom instructions and the system prompt as instructions.
 - [ ] The instructions start with the base prompt, with the date in the user's time zone, falling back to UTC for a missing or unknown zone.

@@ -98,9 +98,13 @@ export function ConversationView(props: Props) {
               blobUrl={blobUrl}
               onPick={pick}
               actions={(message) => <MessageActions message={message} operations={operations} />}
-              // A failed reply tries again with the same model.
+              // A failed reply tries again with its own model, never one the branch falls back to.
               retry={(message) => (
-                <TryAgain onClick={() => regenerate(message.record.parent ?? null, null)} />
+                <TryAgain
+                  onClick={() =>
+                    regenerate(message.record.parent ?? null, message.record.model ?? null)
+                  }
+                />
               )}
               arrived={(message) => !opened?.has(message.rkey)}
             />

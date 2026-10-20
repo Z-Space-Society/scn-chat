@@ -96,14 +96,25 @@ const reply = (rkey: string, model: object, status = 'complete') =>
 describe('inheritedModel', () => {
   const branch = [user('a'), reply('a.r0', smart), user('b'), reply('b.r0', fast), user('c')]
 
-  it("takes the nearest completed reply's model at or above the parent", () => {
+  it("takes the nearest reply's model at or above the parent", () => {
     expect(inheritedModel(branch, 'c')).toEqual(fast)
     expect(inheritedModel(branch, 'b')).toEqual(smart)
   })
 
-  it('skips replies that did not complete', () => {
-    const failed = [user('a'), reply('a.r0', smart), user('b'), reply('b.r0', fast, 'error')]
-    expect(inheritedModel(failed, 'b.r0')).toEqual(smart)
+  it('keeps the model of a reply that is running, stopped, or failed', () => {
+    for (const status of ['pending', 'cancelled', 'error']) {
+      const ended = [user('a'), reply('a.r0', smart), user('b'), reply('b.r0', fast, status)]
+      expect(inheritedModel(ended, 'b.r0')).toEqual(fast)
+    }
+  })
+
+  it('takes the model a message asked for before its reply arrives', () => {
+    const asked = [
+      user('a'),
+      reply('a.r0', smart),
+      step('b', { role: 'user', generation: { model: fast } }),
+    ]
+    expect(inheritedModel(asked, 'b')).toEqual(fast)
   })
 
   it('has none above the first message, or for a parent off the branch', () => {

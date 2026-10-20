@@ -44,7 +44,7 @@ export interface ComposerProps {
    * starts the chat or replies. The box says neither, and nothing sends until they arrive.
    */
   waiting?: boolean
-  /** The model of the nearest completed reply above `parent`, which the server falls back to. */
+  /** The model last used at or above `parent`, which the server falls back to. */
   inherited?: ModelRef | null
   initialText?: string
   /** Stop editing an earlier message, offered by the note that says the composer is editing, and on Escape. */
@@ -242,19 +242,10 @@ export function Composer({ ref, ...props }: ComposerProps) {
               quiet
               loading={draft.loading}
               models={draft.models}
-              value={draft.chosenModel}
+              value={draft.selected}
               onChange={(next) => form.setFieldValue('model', next)}
               title="Model"
-              none={
-                draft.fallback === null
-                  ? { label: 'Choose a model', selectable: false }
-                  : {
-                      label: draft.fallbackName
-                        ? `Default · ${draft.fallbackName}`
-                        : 'Default model',
-                      selectable: true,
-                    }
-              }
+              none={draft.defaultOption}
             />
             {draft.reasons && (
               <EffortSelect
