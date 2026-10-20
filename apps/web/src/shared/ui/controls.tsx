@@ -49,7 +49,7 @@ export function Switch(props: InputProps) {
       <input
         {...input}
         type="checkbox"
-        className="peer absolute inset-0 m-0 cursor-pointer appearance-none rounded-full border border-line bg-hover transition-[background-color,border-color] duration-(--dur-feedback) checked:border-accent checked:bg-accent disabled:cursor-default disabled:opacity-50 motion-reduce:transition-none"
+        className="peer absolute inset-0 m-0 size-full cursor-pointer appearance-none rounded-full border border-line bg-hover transition-[background-color,border-color] duration-(--dur-feedback) [-webkit-appearance:none] checked:border-accent checked:bg-accent disabled:cursor-default disabled:opacity-50 motion-reduce:transition-none"
       />
       <span
         aria-hidden
